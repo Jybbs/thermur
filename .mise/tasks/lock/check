@@ -1,0 +1,18 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "lockfile"
+#MISE description = "Verify `uv.lock` and `.mise/mise.lock` against their manifests"
+
+restore() {
+  cmp -s "$snapshot" .mise/mise.lock || mv -f "$snapshot" .mise/mise.lock
+  rm -f "$snapshot"
+}
+
+uv lock --check
+snapshot=$(mktemp)
+cp -p .mise/mise.lock "$snapshot"
+trap restore EXIT
+report=$(mise lock 2>&1) && [[ "$report" == *"(0 skipped)"* ]] || {
+  echo "$report" >&2
+  exit 1
+}
+diff -u "$snapshot" .mise/mise.lock >&2

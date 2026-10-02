@@ -4,7 +4,7 @@
 
 ### *Teaching Drone Flocks to See Fire Like Starlings See Hawks*
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
 [![Hydra](https://img.shields.io/badge/Config-Hydra--zen-89b8cd.svg)](https://github.com/mit-ll-responsible-ai/hydra-zen)
@@ -20,8 +20,13 @@
 Get Thermur running in under a minute:
 
 ```bash
-# Install from PyPI
-pip install thermur
+# Clone the repository and build its locked environment
+git clone https://github.com/Jybbs/thermur.git
+cd thermur
+mise trust
+mise install
+mise x -- uv sync
+source .venv/bin/activate
 
 # Start training (auto-downloads sample data on first run)
 thermur train
@@ -542,48 +547,27 @@ Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermu
 
 ### System Requirements
 
-- **Python**: 3.13 or higher
-- **CUDA**: 11.8+ for GPU acceleration (optional but recommended)
+- **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
+- **CUDA**: An NVIDIA driver at 580 or later on Linux for GPU acceleration (*optional but recommended*), since `uv.lock` resolves the CUDA 13 wheels of `torch`
 - **Memory**: 16GB RAM minimum, 32GB recommended
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux, macOS, or Windows with WSL2
+- **OS**: Linux on glibc for x86-64 or arm64, Windows through WSL2, or macOS 14 or later on Apple silicon, the platforms `torch` publishes wheels for
 
-### Installation with uv
+### Installation
 
-This project uses [uv](https://github.com/astral-sh/uv) for dependency management with a lock file ensuring reproducible builds:
-
-```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Clone the repository
-git clone https://github.com/Jybbs/Thermur.git
-cd Thermur
-
-# Create virtual environment and sync dependencies
-uv venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-uv sync
-
-# The project is now installed in development mode
-```
-
-### Alternative Installation
-
-If you prefer using pip directly:
+*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists. The commands under Quick Start build that environment, after which one command reports any condition the clone still lacks, beside the command that supplies it:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Jybbs/Thermur.git
-cd Thermur
-
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate
-
-# Install in development mode
-pip install -e .
+mise doctor project
 ```
+
+### Lockfiles
+
+| **Task** | **What It Does** |
+|---|---|
+| `mise lockfile` | Verifies `uv.lock` and `.mise/mise.lock` against `pyproject.toml` and `.mise/config.toml` |
+| `mise relock` | Re-resolves both lockfiles after either manifest changes |
+| `mise scan` | Holds every package `uv.lock` resolves to the published advisories through `uv audit` |
 
 ### Post-Installation Setup
 
@@ -607,6 +591,11 @@ The codebase uses a deliberate two-pronged architecture separating configuration
 
 ```
 thermur/
+├── .mise/
+│   ├── config.toml                 # Pinned Python and uv, and the doctor checks
+│   ├── mise.lock                   # Locked tool downloads and checksums
+│   └── tasks/lock/                 # The lockfile, relock, and scan tasks
+│
 ├── src/
 │   ├── config/                     # Lightweight configuration layer (fast imports)
 │   │   ├── cli/
