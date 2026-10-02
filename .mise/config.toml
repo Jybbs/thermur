@@ -15,16 +15,7 @@ PYTHONPYCACHEPREFIX = "{{config_root}}/.cache/pycache"
 UV_LOCKED           = "1"
 
 [settings]
-auto_install       = false
-lockfile_platforms = [
-    "linux-arm64",
-    "linux-arm64-musl",
-    "linux-x64",
-    "linux-x64-musl",
-    "macos-arm64",
-    "macos-x64",
-    "windows-x64"
-]
+auto_install = false
 
 [tool_config]
 locked = true
