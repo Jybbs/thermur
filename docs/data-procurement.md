@@ -29,7 +29,7 @@ The Moisseeva & Stull *(2020)* dataset was selected for factors that align with 
 
 ### Option 1: Sample Data (Quick Start)
 
-For immediate testing and development, a curated 1.5 GB sample is published as [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face.
+For immediate testing and development, a curated sample is published as [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face, a 468 MB archive that unpacks to the 1.5 GB `samples/wrf_sample.nc`.
 
 **Why This Sample?**
 

@@ -378,7 +378,7 @@ u_safe = cbf_filter.filter(flock_state, u_nominal)
 
 #### 5. Monitoring & Metrics
 
-Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermur-imitation/workspace). The comprehensive metrics suite evaluates both imitation learning performance and preservation of emergent flocking behaviors:
+The comprehensive metrics suite evaluates both imitation learning performance and preservation of emergent flocking behaviors:
 
 **Imitation Learning Metrics:**
 
@@ -426,7 +426,7 @@ Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermu
 
 - **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux on x86-64 or arm64, macOS on Apple silicon or Intel, or Windows through WSL2, the platforms `.mise/mise.lock` records the pinned Python and uv for
+- **OS**: Linux on x86-64 or arm64 or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records the pinned Python and uv for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
 
 ### Installation
 
@@ -448,7 +448,7 @@ mise doctor project
 
 ## 📁 Project Structure
 
-The repository holds the pinned toolchain and its tasks, the documentation pages, and the manifest beside its lockfile:
+The repository holds the pinned toolchain and its tasks, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/raw/` holding the NetCDF files a reader downloads:
 
 ```
 thermur/
