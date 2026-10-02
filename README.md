@@ -426,7 +426,7 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 - **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux on x86-64 or arm64 or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records the pinned Python and uv for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
+- **OS**: Linux on x86-64 or arm64, or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records the pinned Python and uv for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
 
 ### Installation
 

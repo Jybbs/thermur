@@ -29,15 +29,15 @@ The Moisseeva & Stull *(2020)* dataset was selected for factors that align with 
 
 ### Option 1: Sample Data (Quick Start)
 
-For immediate testing and development, a curated sample is published as [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face, a 468 MB archive that unpacks to the 1.5 GB `samples/wrf_sample.nc`.
+For immediate testing and development, a curated sample is published as the 468 MB archive [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face, which unpacks to the 1.5 GB `samples/wrf_sample.nc`.
 
 **Why This Sample?**
 
-The 1.5 GB sample *(`data/samples/wrf_sample.nc`)* was extracted from `wrfout_W5F7R4`, representing the Goldilocks zone of fire simulation data. This moderate intensity scenario strikes an optimal balance for algorithm development.
+The 1.5 GB sample *(`samples/wrf_sample.nc`)* was extracted from `wrfout_W5F7R4`, representing the Goldilocks zone of fire simulation data. This moderate intensity scenario strikes an optimal balance for algorithm development.
 
 Unlike the gentle 3 m/s winds of low-wind scenarios, this 5 m/s breeze creates sufficient plume tilt and asymmetry to challenge formation-keeping algorithms. Yet, it avoids the opposite extreme of 12 m/s winds that would immediately sweep agents into dangerous thermal zones. The **Southern rough** fuel type *(F7)* creates a heterogeneous burning pattern with both smoldering ground fuels and active flaming fronts. In addition, minutes 3-4 of this particular simulation capture established fire spread with fully-developed convection columns reaching into the boundary layer.
 
-This sample contains enough complexity to develop core algorithms while remaining computationally tractable for rapid iteration. Full specifications are in `data/samples/README.md`.
+This sample contains enough complexity to develop core algorithms while remaining computationally tractable for rapid iteration. Full specifications are in `samples/README.md`.
 
 ### Option 2: Individual Files via Globus *(2-4 hours per file)*
 
@@ -122,10 +122,6 @@ Plan your storage accordingly:
 - Recommended starter set (4 files): ~150 GB
 
 - Full dataset: 5.33 TB
-
-Default locations:
-- Full dataset: `data/wrf-sfire/`
-- Sample data: `data/samples/`
 
 ## Network Considerations
 
