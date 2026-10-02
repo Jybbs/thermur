@@ -555,20 +555,9 @@ Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermu
 
 ### Installation
 
-*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists:
+*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists. The commands under Quick Start build that environment, after which one command reports any condition the clone still lacks, beside the command that supplies it:
 
 ```bash
-# Clone the repository
-git clone https://github.com/Jybbs/thermur.git
-cd thermur
-
-# Install the pinned Python and uv, then build .venv from uv.lock
-mise trust
-mise install
-mise x -- uv sync
-source .venv/bin/activate
-
-# Report any condition the clone still lacks, beside the command that supplies it
 mise doctor project
 ```
 

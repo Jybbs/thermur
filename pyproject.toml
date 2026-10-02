@@ -21,7 +21,7 @@ dependencies    = [
     "wandb[media]",
     "xarray"
 ]
-description     = "Thermally-constrained flocking and color-mapping for wildfires."
+description     = "Thermally-constrained flocking for wildfires."
 license         = "MIT"
 name            = "thermur"
 readme          = "README.md"

@@ -1,6 +1,6 @@
 min_version = "2026.9.18"
 
-[doctor.checks.sync]
+[doctor.checks.packages]
 description = "`.venv` holds what `uv.lock` resolves"
 hint        = "Run `mise x -- uv sync`, which installs what `uv.lock` resolves into `.venv`."
 run         = "uv sync --check"
@@ -8,7 +8,7 @@ run         = "uv sync --check"
 [doctor.checks.venv]
 description = "`.venv` was built on the interpreter `.mise/config.toml` pins"
 hint        = "Run `mise x -- uv venv --clear` and then `mise x -- uv sync`, which rebuild `.venv` on the interpreter mise pins."
-run         = '''test "$(.venv/bin/python -c "import sys; print(sys.base_prefix)")" = "$(mise where python)"'''
+run         = '''test .venv/bin/python -ef "$(mise which python)"'''
 
 [env]
 PYTHONPYCACHEPREFIX = "{{config_root}}/.cache/pycache"
