@@ -1,16 +1,30 @@
 min_version = "2026.9.18"
 
+[doctor.checks.sync]
+description = "`.venv` holds what `uv.lock` resolves"
+hint        = "Run `mise x -- uv sync`, which installs what `uv.lock` resolves into `.venv`."
+run         = "uv sync --check"
+
 [doctor.checks.venv]
 description = "`.venv` was built on the interpreter `.mise/config.toml` pins"
 hint        = "Run `mise x -- uv venv --clear` and then `mise x -- uv sync`, which rebuild `.venv` on the interpreter mise pins."
-run         = '''test "$(.venv/bin/python -c "import sys; print(sys.base_prefix)")" = "$(python -c "import sys; print(sys.prefix)")"'''
+run         = '''test "$(.venv/bin/python -c "import sys; print(sys.base_prefix)")" = "$(mise where python)"'''
 
 [env]
 PYTHONPYCACHEPREFIX = "{{config_root}}/.cache/pycache"
 UV_LOCKED           = "1"
 
 [settings]
-auto_install = false
+auto_install       = false
+lockfile_platforms = [
+    "linux-arm64",
+    "linux-arm64-musl",
+    "linux-x64",
+    "linux-x64-musl",
+    "macos-arm64",
+    "macos-x64",
+    "windows-x64"
+]
 
 [tool_config]
 locked = true

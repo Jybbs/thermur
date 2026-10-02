@@ -548,14 +548,14 @@ Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermu
 ### System Requirements
 
 - **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
-- **CUDA**: 11.8+ for GPU acceleration (optional but recommended)
+- **CUDA**: An NVIDIA driver at 580 or later on Linux for GPU acceleration (*optional but recommended*), since `uv.lock` resolves the CUDA 13 wheels of `torch`
 - **Memory**: 16GB RAM minimum, 32GB recommended
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
 - **OS**: Linux, macOS, or Windows with WSL2
 
 ### Installation
 
-*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to, so a fresh clone builds the same environment on every machine:
+*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every machine:
 
 ```bash
 # Clone the repository
@@ -603,7 +603,7 @@ The codebase uses a deliberate two-pronged architecture separating configuration
 ```
 thermur/
 ├── .mise/
-│   ├── config.toml                 # Pinned Python and uv, and the doctor check
+│   ├── config.toml                 # Pinned Python and uv, and the doctor checks
 │   ├── mise.lock                   # Locked tool downloads and checksums
 │   └── tasks/lock/                 # The lockfile, relock, and scan tasks
 │
