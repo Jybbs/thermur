@@ -551,11 +551,11 @@ Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermu
 - **CUDA**: An NVIDIA driver at 580 or later on Linux for GPU acceleration (*optional but recommended*), since `uv.lock` resolves the CUDA 13 wheels of `torch`
 - **Memory**: 16GB RAM minimum, 32GB recommended
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux, macOS, or Windows with WSL2
+- **OS**: Linux on glibc for x86-64 or arm64, Windows through WSL2, or macOS 14 or later on Apple silicon, the platforms `torch` publishes wheels for
 
 ### Installation
 
-*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every machine:
+*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists:
 
 ```bash
 # Clone the repository

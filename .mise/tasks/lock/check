@@ -3,9 +3,11 @@
 #MISE description = "Verify `uv.lock` and `.mise/mise.lock` against their manifests"
 
 uv lock --check
-locked=$(<.mise/mise.lock)
-mise lock
-diff -u <(printf '%s\n' "$locked") .mise/mise.lock >&2 || {
-  printf '%s\n' "$locked" > .mise/mise.lock
+snapshot=$(mktemp)
+cp -p .mise/mise.lock "$snapshot"
+trap 'mv "$snapshot" .mise/mise.lock' EXIT
+report=$(mise lock 2>&1) && [[ "$report" == *"(0 skipped)"* ]] || {
+  echo "$report" >&2
   exit 1
 }
+diff -u "$snapshot" .mise/mise.lock >&2
