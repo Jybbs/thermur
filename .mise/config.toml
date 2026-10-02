@@ -1,0 +1,20 @@
+min_version = "2026.9.18"
+
+[doctor.checks.venv]
+description = "`.venv` was built on the interpreter `.mise/config.toml` pins"
+hint        = "Run `mise x -- uv venv --clear` and then `mise x -- uv sync`, which rebuild `.venv` on the interpreter mise pins."
+run         = '''test "$(.venv/bin/python -c "import sys; print(sys.base_prefix)")" = "$(python -c "import sys; print(sys.prefix)")"'''
+
+[env]
+PYTHONPYCACHEPREFIX = "{{config_root}}/.cache/pycache"
+UV_LOCKED           = "1"
+
+[settings]
+auto_install = false
+
+[tool_config]
+locked = true
+
+[tools]
+python = "3.14.8"
+uv     = "0.12.22"

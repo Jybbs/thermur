@@ -1,17 +1,15 @@
-# Development
-*.lock
-.claude
-.DS_Store
-.ipynb_checkpoints
-.venv
+/.cache/
+/.claude
 
-# Project-specific
+__pycache__/
+
+.venv/
+.env
+dist/
+
 checkpoints/
 data/
 notes/
 wandb/
 
-# Python
-*.py[cod]
-*.so
-__pycache__/
+.DS_Store

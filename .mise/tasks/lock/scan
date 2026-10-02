@@ -1,0 +1,5 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "scan"
+#MISE description = "Hold every package `uv.lock` resolves to the published advisories"
+
+uv audit --preview-features audit-command

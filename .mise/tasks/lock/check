@@ -1,0 +1,11 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "lockfile"
+#MISE description = "Verify `uv.lock` and `.mise/mise.lock` against their manifests"
+
+uv lock --check
+locked=$(<.mise/mise.lock)
+mise lock
+diff -u <(printf '%s\n' "$locked") .mise/mise.lock >&2 || {
+  printf '%s\n' "$locked" > .mise/mise.lock
+  exit 1
+}
