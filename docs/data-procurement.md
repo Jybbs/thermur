@@ -29,20 +29,15 @@ The Moisseeva & Stull *(2020)* dataset was selected for factors that align with 
 
 ### Option 1: Sample Data (Quick Start)
 
-For immediate testing and development, Thermur automatically downloads a carefully curated 1.5GB sample on first run:
-
-```bash
-# Simply start training - sample downloads automatically if no data exists
-thermur train
-```
+For immediate testing and development, a curated sample is published as the 468 MB archive [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face, which unpacks to the 1.5 GB `samples/wrf_sample.nc`.
 
 **Why This Sample?**
 
-The 1.5 GB sample *(`data/samples/wrf_sample.nc`)* was extracted from `wrfout_W5F7R4`, representing the Goldilocks zone of fire simulation data. This moderate intensity scenario strikes an optimal balance for algorithm development.
+The 1.5 GB sample *(`samples/wrf_sample.nc`)* was extracted from `wrfout_W5F7R4`, representing the Goldilocks zone of fire simulation data. This moderate intensity scenario strikes an optimal balance for algorithm development.
 
 Unlike the gentle 3 m/s winds of low-wind scenarios, this 5 m/s breeze creates sufficient plume tilt and asymmetry to challenge formation-keeping algorithms. Yet, it avoids the opposite extreme of 12 m/s winds that would immediately sweep agents into dangerous thermal zones. The **Southern rough** fuel type *(F7)* creates a heterogeneous burning pattern with both smoldering ground fuels and active flaming fronts. In addition, minutes 3-4 of this particular simulation capture established fire spread with fully-developed convection columns reaching into the boundary layer.
 
-This sample contains enough complexity to develop core algorithms while remaining computationally tractable for rapid iteration. Full specifications are in `data/samples/README.md`.
+This sample contains enough complexity to develop core algorithms while remaining computationally tractable for rapid iteration. Full specifications are in `samples/README.md`.
 
 ### Option 2: Individual Files via Globus *(2-4 hours per file)*
 
@@ -57,7 +52,6 @@ Download specific simulations directly from the Globus endpoint:
 1. Install [Globus Connect Personal](https://www.globus.org/globus-connect-personal) or use the web interface
 2. Navigate to the endpoint using the ID above
 3. Download desired NetCDF files to `data/raw/` in your Thermur directory
-4. Training will automatically discover and use all NetCDF files
 
 **Recommended Starter Files:**
 
@@ -85,7 +79,7 @@ globus transfer \
 
 **Advantages:** The HPC approach reduces download times from days to hours. Endpoint-to-endpoint transfers bypass local network bottlenecks, achieving speeds 10-100x faster than Globus Connect Personal. This makes acquiring the entire 5.33 TB dataset feasible for research groups with access to high performance computing, like [**Explorer** at Northeastern University](https://rc-docs.northeastern.edu/en/explorer-main/).
 
-**After Transfer:** Place all NetCDF files in `data/raw/` within your Thermur directory. Training will automatically discover and use all available files.
+**After Transfer:** Place all NetCDF files in `data/raw/` within your Thermur directory.
 
 ## File Naming Convention
 
@@ -128,10 +122,6 @@ Plan your storage accordingly:
 - Recommended starter set (4 files): ~150 GB
 
 - Full dataset: 5.33 TB
-
-Default locations:
-- Full dataset: `data/wrf-sfire/`
-- Sample data: `data/samples/`
 
 ## Network Considerations
 
@@ -247,8 +237,5 @@ After acquiring data:
 
 1. **Explore the physics**: Use tools like `xarray` and `matplotlib` to visualize temperature and velocity fields
 2. **Verify thermal safety**: Check that maximum temperatures align with hardware constraints
-3. **Start training**: Begin with `thermur train` to test your setup
-4. **Monitor convergence**: Use `thermur monitor` to track safety violations and legibility metrics
-5. **Iterate on full data**: Graduate to downloaded files for robust policy learning
 
 Remember: This data represents real fire physics. The chaotic, dangerous air patterns in these simulations are exactly what firefighters face, and what our bio-inspired flock aims to make visible.

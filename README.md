@@ -17,22 +17,15 @@
 
 ## 🚀 Quick Start
 
-Get Thermur running in under a minute:
+Clone *Thermur* and build its locked environment:
 
 ```bash
-# Clone the repository and build its locked environment
 git clone https://github.com/Jybbs/thermur.git
 cd thermur
 mise trust
 mise install
 mise x -- uv sync
 source .venv/bin/activate
-
-# Start training (auto-downloads sample data on first run)
-thermur train
-
-# Monitor training progress in real-time
-thermur monitor  # Opens WandB dashboard
 ```
 
 ---
@@ -213,110 +206,6 @@ These emergent behaviors are verified through the comprehensive metrics suite de
 
 ---
 
-## 💻 Command-Line Interface
-
-Thermur provides an elegant CLI built with [Typer](https://typer.tiangolo.com/) and [Rich](https://rich.readthedocs.io/) for beautiful terminal output:
-
-### Core Commands
-
-```bash
-thermur --help  # Shows all available commands with emoji icons
-```
-
-| Command | Description | Key Options |
-|---------|-------------|-------------|
-| `info` | 📋 Display system and configuration information | - |
-| `monitor` | 🎨 Open [WandB dashboard](https://wandb.ai/Thermur/thermur-imitation) in browser | - |
-| `runs` | 🏃 Explore training runs and configurations | `list`, `show`, `compare`, `clean` |
-| `train` | 🚀 Train the thermal drone flock using imitation learning | `--dry-run`, `--force`, `--name`, `--resume` |
-| `validate` | ✅ Validate system setup and configuration | `--config` |
-
-### Training Workflow
-
-The `train` command supports both interactive and non-interactive modes:
-
-```bash
-# Interactive mode (default) - prompts for configuration
-thermur train
-
-# Named training run (auto-downloads sample if needed)
-thermur train --name my-experiment
-
-# Resume from last checkpoint
-thermur train --resume last
-
-# Resume from specific checkpoint
-thermur train --resume checkpoints/epoch5.ckpt
-
-# Non-interactive mode with Hydra overrides
-thermur train --no-interactive \
-              controller.mmm.heterogeneity_std=0.25 \
-              controller.mmm.k_neighbors=7 \
-              training.optimizer.learning_rate=0.001
-
-# Dry run to validate configuration without training
-thermur train --dry-run
-```
-
-### Configuration System
-
-Thermur uses [Hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) with [Pydantic](https://pydantic.dev/) validation for type-safe configuration management:
-
-```bash
-# Standard override syntax
-thermur train training.optimizer.learning_rate=0.001   # Set value
-thermur train +training.architecture.new_param=42      # Append new parameter
-thermur train ++training.architecture.force_param=true # Force add/override
-thermur train ~training.architecture.remove_param      # Remove parameter
-
-# Combining multiple overrides
-thermur train controller.mmm.agent_count=50 \
-              training.hardware.accelerator=gpu \
-              training.optimizer.max_epochs=100
-```
-
-### Run Management
-
-Explore and manage training experiments with the `runs` subcommand:
-
-```bash
-# List recent training runs with status
-thermur runs list               # Shows 10 most recent
-thermur runs list --all         # Shows all runs
-thermur runs list -n 20         # Shows 20 most recent
-
-# Show detailed configuration for a run
-thermur runs show last          # Most recent run
-thermur runs show last2         # Second most recent
-thermur runs show run-id        # Specific run by ID
-
-# Compare configurations between runs
-thermur runs compare            # Compare last 2 runs
-thermur runs compare run1 run2  # Compare specific runs
-
-# Clean up old runs
-thermur runs clean --keep 5  # Keep only 5 most recent
-```
-
-### System Validation
-
-Before training, validate your setup:
-
-```bash
-# Full system validation
-thermur validate
-
-# Validate with config overrides
-thermur validate controller.mmm.agent_count=100
-
-# Display system information
-thermur info
-```
-
-All training runs are automatically logged to our [WandB project](https://wandb.ai/Thermur/thermur-imitation/workspace) for collaborative monitoring and analysis.
-
----
-
 ## 🦾 Data Pipeline & Training
 
 ### WRF-SFIRE Dataset
@@ -333,19 +222,7 @@ The training data comes from 147 high-resolution wildfire simulations (5.33 TB t
 
 ### Data Management
 
-Thermur automatically manages training data:
-
-```bash
-# Sample data (1.5GB) downloads automatically on first run
-thermur train
-
-# For full WRF-SFIRE dataset (5.3TB, 147 simulations):
-# 1. Download NetCDF files from the Globus endpoint
-# 2. Place them in data/raw/
-# 3. Training will automatically discover and use them
-```
-
-For details on the WRF-SFIRE dataset and data procurement, see [`docs/data-procurement.md`](docs/data-procurement.md).
+The sample is published as [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face, and the full dataset transfers from its Globus endpoint. For details on the WRF-SFIRE dataset and data procurement, see [`docs/data-procurement.md`](docs/data-procurement.md).
 
 ### Training Workflow
 
@@ -501,7 +378,7 @@ u_safe = cbf_filter.filter(flock_state, u_nominal)
 
 #### 5. Monitoring & Metrics
 
-Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermur-imitation/workspace). The comprehensive metrics suite evaluates both imitation learning performance and preservation of emergent flocking behaviors:
+The comprehensive metrics suite evaluates both imitation learning performance and preservation of emergent flocking behaviors:
 
 **Imitation Learning Metrics:**
 
@@ -548,10 +425,8 @@ Track training progress in our [WandB workspace](https://wandb.ai/Thermur/thermu
 ### System Requirements
 
 - **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
-- **CUDA**: An NVIDIA driver at 580 or later on Linux for GPU acceleration (*optional but recommended*), since `uv.lock` resolves the CUDA 13 wheels of `torch`
-- **Memory**: 16GB RAM minimum, 32GB recommended
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux on glibc for x86-64 or arm64, Windows through WSL2, or macOS 14 or later on Apple silicon, the platforms `torch` publishes wheels for
+- **OS**: Linux on x86-64 or arm64, or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records the pinned Python and uv for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
 
 ### Installation
 
@@ -569,25 +444,11 @@ mise doctor project
 | `mise relock` | Re-resolves both lockfiles after either manifest changes |
 | `mise scan` | Holds every package `uv.lock` resolves to the published advisories through `uv audit` |
 
-### Post-Installation Setup
-
-```bash
-# Configure Weights & Biases for experiment tracking
-wandb login
-
-# Verify installation and check system
-thermur validate
-thermur info
-
-# Start training (sample data downloads automatically if needed)
-thermur train
-```
-
 ---
 
 ## 📁 Project Structure
 
-The codebase uses a deliberate two-pronged architecture separating configuration from implementation. This design allows the CLI to load instantly without importing heavy ML dependencies until needed:
+The repository holds the pinned toolchain and its tasks, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/raw/` holding the NetCDF files a reader downloads:
 
 ```
 thermur/
@@ -596,115 +457,16 @@ thermur/
 │   ├── mise.lock                   # Locked tool downloads and checksums
 │   └── tasks/lock/                 # The lockfile, relock, and scan tasks
 │
-├── src/
-│   ├── config/                     # Lightweight configuration layer (fast imports)
-│   │   ├── cli/
-│   │   │   ├── builds.py           # Hydra-zen builds
-│   │   │   └── schemas.py          # Pydantic models for CLI
-│   │   └── imitation/
-│   │       ├── controller/
-│   │       │   ├── builds.py       # Controller component builds
-│   │       │   └── schemas.py      # MurmurationModel, SafetyModel
-│   │       ├── environment/
-│   │       │   ├── builds.py       # Environment builds
-│   │       │   └── schemas.py      # Physics and world models
-│   │       └── training/
-│   │           ├── builds.py       # Trainer, callbacks, loggers
-│   │           └── schemas.py      # Training hyperparameters
-│   │
-│   └── thermur/                    # Core implementation (heavy dependencies)
-│       ├── cli/
-│       │   ├── app.py              # Application context
-│       │   ├── cli.py              # Main entry point
-│       │   ├── commands/
-│       │   │   ├── info.py         # System information
-│       │   │   ├── monitor.py      # WandB dashboard
-│       │   │   ├── runs.py         # Run history management
-│       │   │   ├── train.py        # Training orchestration
-│       │   │   └── validate.py     # System verification
-│       │   └── helpers/
-│       │       ├── prompts.py      # Interactive configuration
-│       │       ├── system.py       # System utilities
-│       │       └── ui.py           # Rich console formatting
-│       │
-│       └── imitation/
-│           ├── controller/
-│           │   ├── dataset.py      # Expert dataset with stratified sampling
-│           │   ├── murmuration.py  # Biomimetic flocking (critical state)
-│           │   └── safety.py       # Thermal safety penalties
-│           ├── environment/
-│           │   ├── generator.py    # Physics simulation for trajectories
-│           │   └── loader.py       # WRF-SFIRE data interface
-│           └── training/
-│               ├── callbacks.py    # Rich progress bar & model summary
-│               ├── metrics.py      # TorchMetrics-based evaluation suite
-│               └── policy.py       # GNN policy with PyG message passing
-│
 ├── data/
-│   ├── processed/                  # Cached PyG expert trajectories
 │   └── raw/                        # NetCDF files from WRF-SFIRE
 │
 ├── docs/
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
-├── wandb/                          # Experiment tracking
 ├── pyproject.toml                  # Package configuration
 └── uv.lock                         # Locked dependencies
 ```
-
----
-
-## 🪄 Monitoring & Experiments
-
-Thermur integrates with [Weights & Biases](https://wandb.ai/) for experiment tracking and monitoring:
-
-### Real-time Monitoring
-
-```bash
-# Open the WandB dashboard in your browser
-thermur monitor
-```
-
-This opens the [WandB project](https://wandb.ai/Thermur/thermur-imitation/workspace) where all metrics are automatically logged during training. See [Monitoring & Metrics](#5-monitoring--metrics) for the complete list of tracked metrics.
-
-### Run Management
-
-Local run inspection and comparison tools:
-
-```bash
-# List recent training runs
-thermur runs list               # Shows 10 most recent
-thermur runs list --all         # Shows all runs
-
-# View detailed configuration of a specific run
-thermur runs show               # Most recent run
-thermur runs show last2         # Second most recent
-thermur runs show IM001         # Specific run by ID
-
-# Compare configurations between runs
-thermur runs compare            # Compare last 2 runs
-thermur runs compare last last3 # Compare most recent to 3rd most recent
-
-# Filter comparisons by domain
-thermur runs compare -d controller  # Only compare controller configs
-thermur runs compare -d lightning   # Only compare training configs
-
-# Clean up old runs
-thermur runs clean --keep 5     # Keep only 5 most recent
-```
-
-### WandB Features
-
-The [project workspace](https://wandb.ai/Thermur/thermur-imitation/workspace) provides:
-
-- **Training Dashboards**: Real-time loss curves and metrics
-
-- **Run Comparisons**: Side-by-side hyperparameter analysis
-
-- **System Metrics**: GPU memory, compute utilization
-
-- **Artifact Tracking**: Model checkpoints and configurations
 
 ---
 
