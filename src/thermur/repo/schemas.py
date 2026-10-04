@@ -5,6 +5,7 @@ checkout's TOML through their `Document` base, each `Task` mise lists, and
 each `Finding` a check makes beside each `Parity` a check compares.
 """
 
+from collections.abc        import Iterable
 from packaging.requirements import Requirement
 from pathlib                import Path
 from pydantic               import (
@@ -18,7 +19,7 @@ type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
 
 
-def read_commands(run: list[str | dict]) -> list[str]:
+def read_commands(run: Iterable[str | dict]) -> list[str]:
     """
     Keeps the lines a shell runs out of the `run` mise lists for a task,
     leaving out each `task` or `tasks` table, which names another task mise

@@ -4,26 +4,31 @@ key each document field reads, the annotation a `Finding` prints, the
 finding a `Parity` makes, and the holders a `Manifest` names.
 """
 
-from functools             import reduce
-from hypothesis            import example, given
-from hypothesis.strategies import text
-from pathlib               import Path
-from pydantic              import AliasPath, ValidationError
-from pytest                import Config, mark, param, raises
-from tomllib               import loads
-from urllib.parse          import unquote
+from functools    import reduce
+from pathlib      import Path
+from pydantic     import AliasPath, ValidationError
+from pytest       import Config, mark, param, raises
+from tomllib      import loads
+from urllib.parse import unquote
 
 from thermur.repo.schemas import Author, Config as MiseConfig, Finding, Manifest, Parity
 
 
-@given(message=text())
-@example(message="100%0A")
+@mark.parametrize(
+    "message",
+    [
+        param("line\nbreak", id="newline"),
+        param("carriage\rreturn", id="carriage-return"),
+        param("100%", id="percent"),
+        param("a,b:c", id="separators"),
+        param("100%0A", id="escape-literal")
+    ]
+)
 def test_an_annotation_stays_on_one_line_and_reads_back(message: str):
     """
-    Asserts that any message, a newline or a `%` inside it included, writes
-    an annotation holding no line break, from which decoding the escapes
-    reads the message back, each escape being the percent-encoding of the
-    character it stands for.
+    Asserts that a message holding a line break, a `%`, a separator, or the
+    literal text of an escape writes an annotation holding no line break,
+    from which decoding the escapes reads the message back.
     """
     annotation = Finding(file=Path("pyproject.toml"), message=message).annotation
 

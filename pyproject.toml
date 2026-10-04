@@ -18,7 +18,6 @@ Repository = "https://github.com/Jybbs/thermur"
 
 [dependency-groups]
 dev = [
-    "hypothesis",
     "prose-formatter",
     "pytest",
     "pytest-cov",

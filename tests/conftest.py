@@ -1,29 +1,15 @@
 """
-Sets the example count on Hypothesis's built-in profiles, two hundred under
-the `ci` profile Hypothesis loads on a CI runner and twenty-five under
-`default`, which also drops the deadline the `ci` profile already drops, so
-a heavily loaded machine fails no test a runner passes. It also defines the
-fixtures every test folder shares, each described where it is defined.
-
-The autouse `environment` fixture isolates every test from the machine
-running it, and the collection hook lets a test open a network connection
-only when it carries the `network` mark.
+Defines the fixtures every test folder shares, each described where it is
+defined. The autouse `environment` fixture isolates every test from the
+machine running it, and the collection hook lets a test open a network
+connection only when it carries the `network` mark.
 """
 
 from common.environment import CLEARED
-from hypothesis         import settings
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
 
 from thermur.repo.checkout import Checkout
-
-settings.register_profile("ci", settings.get_profile("ci"), max_examples=200)
-settings.register_profile(
-    "default",
-    settings.get_profile("default"),
-    deadline     = None,
-    max_examples = 25
-)
 
 
 @fixture

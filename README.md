@@ -473,7 +473,7 @@ thermur/
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
 ├── src/thermur/repo/               # The checks `mise audit` runs
-├── tests/                          # The pytest suite, mirroring src/thermur and .mise/tasks
+├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── pyproject.toml                  # Package configuration, with packaging and pydantic for the audit
 └── uv.lock                         # Locked dependencies

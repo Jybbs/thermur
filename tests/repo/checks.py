@@ -133,7 +133,7 @@ def test_a_restated_declaration_that_drifts_is_named(
     ]
 
 
-def test_a_hatchling_pin_spelled_in_capitals_passes(checkout: Checkout):
+def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
     """
     Asserts that an exact pin naming hatchling in another spelling its
     normalized name allows passes, since a package's name compares case
@@ -455,16 +455,18 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
 def test_a_toml_task_referencing_another_task_is_read_for_its_lines(checkout: Checkout):
     """
     Asserts that a task declared in TOML whose `run` names another task
-    beside a shell line reads as the shell line alone rather than failing
+    beside a shell line is held to that shell line rather than failing
     validation.
     """
     append(
         checkout,
         ".mise/config.toml",
-        '\n[tasks."py:sweep"]\nrun = ["mise doctor project", { task = "py:check" }]\n'
+        '\n[tasks."py:sweep"]\nrun = ["uv run pytest", { task = "py:check" }]\n'
     )
 
-    assert RunCheck(checkout=checkout).findings == []
+    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
+        Path(".mise/config.toml")
+    ]
 
 
 def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
