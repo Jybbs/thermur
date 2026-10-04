@@ -1,45 +1,77 @@
 """
-Pins the output format `py:check` passes the formatter, the annotations
-GitHub Actions reads under a workflow run and plain text everywhere else.
+Pins the arguments each `py` task hands the formatter or pytest, meaning the
+folders the formatter reads, the reports coverage writes, every argument a
+reader adds, and the annotations `py:check` prints under GitHub Actions.
 """
 
 from collections.abc import Callable
 from pytest          import Config, MonkeyPatch, mark, param
 from subprocess      import run
 
+FOLDERS = [".mise/tasks", "src", "tests"]
+
 
 @mark.parametrize(
-    ("actions", "output"),
+    ("task", "actions", "passed"),
     [
-        param("true", "github", id="actions"),
-        param("", "text", id="empty"),
-        param(None, "text", id="unset")
+        param(
+            "check",
+            "true",
+            ["check", "--output-format", "github", "--marker", *FOLDERS],
+            id = "check-actions"
+        ),
+        param(
+            "check",
+            "",
+            ["check", "--output-format", "text", "--marker", *FOLDERS],
+            id = "check-empty"
+        ),
+        param(
+            "check",
+            None,
+            ["check", "--output-format", "text", "--marker", *FOLDERS],
+            id = "check-unset"
+        ),
+        param("format", None, ["format", "--marker", *FOLDERS], id="format"),
+        param("test", None, ["--marker"], id="test"),
+        param(
+            "coverage",
+            None,
+            ["--cov", "--cov-report", "html", "--cov-report", "term", "--marker"],
+            id = "coverage"
+        )
     ]
 )
-def test_the_check_prints_annotations_under_github_actions(
+def test_each_task_hands_its_program_every_argument(
     actions      : str | None,
     monkeypatch  : MonkeyPatch,
-    output       : str,
+    passed       : list[str],
     pytestconfig : Config,
-    stand_in     : Callable[[str, str], None]
+    stand_in     : Callable[[str, str], None],
+    task         : str
 ):
     """
-    Asserts that `py:check` passes the formatter `--output-format github`
-    where `GITHUB_ACTIONS` is set and `--output-format text` where it is
-    empty or unset, ahead of the folders it checks.
+    Asserts that each `py` task runs its program on the arguments it
+    fixes followed by every argument a reader adds, the formatter over
+    `.mise/tasks`, `src`, and `tests` and coverage writing its HTML and
+    terminal reports, with `py:check` passing `--output-format github` where
+    `GITHUB_ACTIONS` is set and `--output-format text` where it is empty
+    or unset.
     """
     root = pytestconfig.rootpath
-    stand_in("prose", 'printf "%s\\n" "$@"')
+    for program in ("prose", "pytest"):
+        stand_in(program, 'printf "%s\\n" "$@"')
+
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     if actions is not None:
         monkeypatch.setenv("GITHUB_ACTIONS", actions)
 
-    passed = run(
-        [root / ".mise/tasks/py/check"],
+    printed = run(
+        [root / ".mise/tasks/py" / task, "--marker"],
         capture_output = True,
         check          = True,
         cwd            = root,
         text           = True
     ).stdout.splitlines()
 
-    assert passed == ["check", "--output-format", output, ".mise/tasks", "src", "tests"]
+    assert printed == passed

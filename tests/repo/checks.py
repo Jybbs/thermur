@@ -292,7 +292,13 @@ def test_a_script_is_named_where_its_module_is_not_carried(
     (checkout.root / "src/thermur/cli/__init__.py").write_text("app = None\n")
     append(checkout, "pyproject.toml", f'\n[project.scripts]\nthermur = "{target}"\n')
 
-    assert bool(WheelCheck(checkout=checkout).findings) is named
+    assert WheelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path("pyproject.toml"),
+            message = f"The `thermur` script targets `{target.partition(':')[0]}`, "
+            "which the wheel does not carry"
+        )
+    ] * named
 
 
 def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
@@ -452,35 +458,24 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
 
 
-def test_a_toml_task_referencing_another_task_is_read_for_its_lines(checkout: Checkout):
-    """
-    Asserts that a task declared in TOML whose `run` names another task
-    beside a shell line is held to that shell line rather than failing
-    validation.
-    """
-    append(
-        checkout,
-        ".mise/config.toml",
-        '\n[tasks."py:sweep"]\nrun = ["uv run pytest", { task = "py:check" }]\n'
-    )
-
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
-        Path(".mise/config.toml")
+@mark.parametrize(
+    "run",
+    [
+        param('"uv run pytest"', id="line"),
+        param('["uv run pytest", { task = "py:check" }]', id="beside-a-reference")
     ]
-
-
+)
 def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
-    checkout: Checkout
+    checkout : Checkout,
+    run      : str
 ):
     """
     Asserts that a task `.mise/config.toml` declares in TOML is held to the
-    lines it runs and named on that configuration.
+    lines it runs and named on that configuration, including a line beside
+    a table naming another task, which is held to that line rather than
+    failing validation.
     """
-    append(
-        checkout,
-        ".mise/config.toml",
-        '\n[tasks."py:sweep"]\nrun = "uv run pytest"\n'
-    )
+    append(checkout, ".mise/config.toml", f'\n[tasks."py:sweep"]\nrun = {run}\n')
 
     assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
         Path(".mise/config.toml")
