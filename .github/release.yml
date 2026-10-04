@@ -1,0 +1,22 @@
+changelog:
+  categories:
+    - labels: ["🐞 bug"]
+      title: 🐞 Bugs
+    - labels: ["🔬 discovery"]
+      title: 🔬 Discoveries
+    - labels: ["🦜 cli"]
+      title: 🦜 Command Line
+    - labels: ["🪶 controller"]
+      title: 🪶 Controller
+    - labels: ["🌪️ environment"]
+      title: 🌪️ Environment
+    - labels: ["🌡️ metrics"]
+      title: 🌡️ Metrics
+    - labels: ["🧱 config"]
+      title: 🧱 Configuration
+    - labels: ["📚 docs"]
+      title: 📚 Documentation
+    - labels: ["🧰 tooling"]
+      title: 🧰 Tooling
+    - labels: ["*"]
+      title: Other

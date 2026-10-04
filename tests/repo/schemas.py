@@ -1,7 +1,9 @@
 """
 Pins the records the repository audit reads and reports, meaning the TOML
 key each document field reads, the annotation a `Finding` prints, the
-finding a `Parity` makes, and the holders a `Manifest` names.
+finding a `Parity` makes, the holders a `Manifest` names, and the rows a
+`Labels` registry accepts, the command each `Label` writes, and the live
+labels a registry omits.
 """
 
 from functools    import reduce
@@ -11,7 +13,11 @@ from pytest       import Config, mark, param, raises
 from tomllib      import loads
 from urllib.parse import unquote
 
-from thermur.repo.schemas import Author, Config as MiseConfig, Finding, Manifest, Parity
+from thermur.repo.schemas import (
+    Author, Document, Finding, Label, Labels, Manifest, Parity
+)
+
+ROW = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
 
 
 @mark.parametrize(
@@ -95,13 +101,13 @@ def test_a_parity_names_a_copy_that_drifts(copied: str | None, finding: Finding 
     ("document", "field"),
     [
         param(document, name, id=f"{document.__name__}.{name}")
-        for document in (Manifest, MiseConfig)
+        for document in Document.__subclasses__()
         for name, info in document.model_fields.items()
         if info.is_required()
     ]
 )
 def test_each_required_field_reads_the_key_its_alias_names(
-    document     : type[Manifest | MiseConfig],
+    document     : type[Document],
     field        : str,
     pytestconfig : Config
 ):
@@ -142,3 +148,110 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
     manifest = Manifest.model_construct(authors=[Author(name=name) for name in names])
 
     assert manifest.holders == holders
+
+
+@mark.parametrize(
+    ("data", "errors"),
+    [
+        param(
+            {"labels": [ROW | {"color": "8C055E"}]},
+            [(("labels", 0, "color"), "String should match pattern '^[0-9a-f]{6}$'")],
+            id = "uppercase-color"
+        ),
+        param(
+            {"labels": [ROW | {"color": "#8c055e"}]},
+            [(("labels", 0, "color"), "String should match pattern '^[0-9a-f]{6}$'")],
+            id = "hashed-color"
+        ),
+        param(
+            {"labels": [ROW | {"color": "fff"}]},
+            [(("labels", 0, "color"), "String should match pattern '^[0-9a-f]{6}$'")],
+            id = "short-color"
+        ),
+        param(
+            {"labels": [ROW | {"glyph": "🐞"}]},
+            [(("labels", 0, "glyph"), "Extra inputs are not permitted")],
+            id = "further-key"
+        ),
+        param(
+            {"labels": [{"color": "8c055e", "name": "🐞 bug"}]},
+            [(("labels", 0, "description"), "Field required")],
+            id = "missing-description"
+        ),
+        param(
+            {"categories": [], "labels": [ROW]},
+            [(("categories",), "Extra inputs are not permitted")],
+            id = "key-beside-the-rows"
+        ),
+        param(
+            {"labels": [ROW, ROW | {"color": "0044aa"}]},
+            [(("labels",), "Value error, declares the name `🐞 bug` more than once")],
+            id = "repeated-name"
+        ),
+        param(
+            {"labels": [ROW, ROW | {"name": "🧰 tooling"}]},
+            [(("labels",), "Value error, declares the color `8c055e` more than once")],
+            id = "repeated-color"
+        ),
+        param(
+            {"labels": [ROW, ROW]},
+            [
+                (
+                    ("labels",),
+                    "Value error, declares the name `🐞 bug` and the color `8c055e` "
+                    "more than once"
+                )
+            ],
+            id = "repeated-row"
+        )
+    ]
+)
+def test_a_malformed_registry_fails_at_the_key_it_breaks(
+    data   : dict[str, list[dict[str, str]]],
+    errors : list[tuple[tuple[int | str, ...], str]]
+):
+    """
+    Asserts that a registry holding a color other than six lowercase hex
+    digits, a row with a further key or a missing one, a key beside its
+    rows, or two labels sharing a name or a color fails validation at the
+    key that breaks the rule, with the message a finding then carries.
+    """
+    with raises(ValidationError) as error:
+        Labels.model_validate(data)
+
+    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == errors
+
+
+def test_a_label_writes_the_command_that_creates_or_updates_it():
+    """
+    Asserts that a label writes the `gh label create --force` command
+    carrying its color, its description, and its name, which creates the
+    label or updates the one already carrying that name.
+    """
+    assert Label.model_validate(ROW).command == [
+        "gh", "label", "create", "--color", "8c055e",
+        "--description", "Wrong output", "--force", "🐞 bug"
+    ]
+
+
+@mark.parametrize(
+    ("live", "omitted"),
+    [
+        param(["🐞 bug"], [], id="all-declared"),
+        param(
+            ["✨feature", "🐞 bug", "🐞bug"],
+            ["✨feature", "🐞bug"],
+            id = "older-labels"
+        ),
+        param([], [], id="none-live")
+    ]
+)
+def test_a_registry_omits_each_live_label_it_declares_nowhere(
+    live    : list[str],
+    omitted : list[str]
+):
+    """
+    Asserts that a registry names each live label it declares no row for, in
+    the order the live labels arrive, and none where it declares them all.
+    """
+    assert Labels.model_validate({"labels": [ROW]}).omits(live) == omitted

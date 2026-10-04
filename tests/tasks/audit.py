@@ -58,6 +58,7 @@ def test_a_broken_checkout_fails_naming_each_finding(
     (root / "LICENSE").write_text("BSD License\n")
     (root / "src/thermur/repo").rename(root / "repo")
     edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
+    edit(checkout, ".github/release.yml", new='["🐛 bug"]', old='["🐞 bug"]')
 
     status, printed = audited()
 

@@ -6,16 +6,18 @@ beside them.
 """
 
 from abc             import abstractmethod
+from collections     import Counter
 from collections.abc import Iterator
 from filecmp         import cmp
+from functools       import cached_property
 from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re import search, sub
+from re import findall, search, sub
 
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Parity
+from thermur.repo.schemas  import Finding, Parity, join_names
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -90,17 +92,127 @@ class BinCheck(Check):
                 )
 
 
+class LabelCheck(Check):
+    """
+    Every file naming a label agrees with `.github/labels.toml`, meaning the
+    release-notes categories file each label it declares under one category,
+    the issue templates and the contributor guide name only labels it
+    declares, and the guide describes each label as the registry does.
+
+    The categories and the templates list their labels in YAML, read here as
+    the double-quoted names on each `labels:` line, which is the form both
+    files take.
+    """
+
+    @cached_property
+    def described(self) -> dict[str, str]:
+        """
+        Maps each label the contributor guide's table names to the
+        description beside it, the table running from its header to the
+        first blank line.
+        """
+        table = self.checkout.read(self.guide).partition(
+            "| **Label** | **Covers** |"
+        )[2]
+        return dict(findall(r"(?m)^\| `(.+?)` \| (.+) \|$", table.partition("\n\n")[0]))
+
+    @property
+    def guide(self) -> Path:
+        """
+        Names the contributor guide, relative to the root.
+        """
+        return Path(".github/CONTRIBUTING.md")
+
+    @property
+    def named(self) -> dict[Path, list[str]]:
+        """
+        Maps each file naming labels to every label it names, in the order
+        it names them, meaning the release-notes categories, each issue
+        template, and the contributor guide. The categories' `*`, which
+        files every pull request no earlier category takes, names no label.
+        """
+        root  = self.checkout.root
+        files = [
+            self.release,
+            *sorted(
+                path.relative_to(root)
+                for path in root.glob(".github/ISSUE_TEMPLATE/*.md")
+            )
+        ]
+        return {
+            file: [
+                name
+                for line in findall(
+                    r"(?m)^\s*(?:- )?labels: \[.*\]$",
+                    self.checkout.read(file)
+                )
+                for name in findall(r'"(.+?)"', line)
+                if name != "*"
+            ]
+            for file in files
+        } | {self.guide: list(self.described)}
+
+    @property
+    def release(self) -> Path:
+        """
+        Names the release-notes categories, relative to the root.
+        """
+        return Path(".github/release.yml")
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each label a file names that the registry does not declare,
+        then each declared label the categories file under any number of
+        categories but one, then each the guide describes otherwise.
+        """
+        labels = self.checkout.labels
+        named  = self.named
+        for file, names in named.items():
+            for name in dict.fromkeys(names):
+                if name not in labels.names:
+                    yield Finding(
+                        file    = file,
+                        message = f"`{file}` names `{name}`, a label `{labels.file}` "
+                        "does not declare"
+                    )
+
+        filed = Counter(named[self.release])
+        for name in labels.names:
+            if filed[name] != 1:
+                yield Finding(
+                    file    = self.release,
+                    message = f"`{self.release}` files `{name}` under {filed[name]} "
+                    "release-notes categories rather than one"
+                )
+
+        yield from filter(
+            None,
+            (
+                Parity(
+                    copied   = self.described.get(label.name),
+                    file     = self.guide,
+                    label    = f"The description of `{label.name}` in `{self.guide}`",
+                    origin   = f"its description in `{labels.file}`",
+                    original = label.description
+                ).finding
+                for label in labels.rows
+            )
+        )
+
+
 class ParityCheck(Check):
     """
-    Every file restating the Python version, the uv release, or the license
-    reads the value `pyproject.toml` or `.mise/config.toml` declares.
+    Every file restating the Python version, the uv release, the license,
+    or the release `CITATION.cff` cites reads the value `pyproject.toml` or
+    `.mise/config.toml` declares.
 
     The manifest's `requires-python` floor is the Python version the
     README's badge, the formatter's `target-version`, and the minor of
     the `python` mise pins each restate. The `uv` mise pins is the release
     `[tool.uv]` requires, and the manifest's license and authors are what
     the README's badge and the title and the copyright line of `LICENSE`
-    restate.
+    restate. `CITATION.cff` restates the manifest's version, license,
+    repository, and authors, each read off the lines naming it.
     """
 
     @property
@@ -108,13 +220,22 @@ class ParityCheck(Check):
         """
         Pairs each restated declaration with the one it restates.
         """
-        config       = self.checkout.config
-        manifest     = self.checkout.manifest
-        license_path = Path("LICENSE")
-        readme       = self.checkout.read(manifest.readme)
-        notice       = self.checkout.read(license_path)
-        badge        = self.extract(r"badge/License-((?:--|[^-])+)-", readme)
-        python       = f"the floor of `requires-python` in `{manifest.file}`"
+        citation_path = Path("CITATION.cff")
+        config        = self.checkout.config
+        manifest      = self.checkout.manifest
+        license_path  = Path("LICENSE")
+        readme        = self.checkout.read(manifest.readme)
+        notice        = self.checkout.read(license_path)
+        citation      = self.checkout.read(citation_path)
+        badge         = self.extract(r"badge/License-((?:--|[^-])+)-", readme)
+        python        = f"the floor of `requires-python` in `{manifest.file}`"
+        cited         = [
+            f"{given} {family}"
+            for family, given in findall(
+                r"(?m)^\s*- family-names: (.+)\n\s+given-names: (.+)$",
+                citation
+            )
+        ]
 
         return [
             Parity(
@@ -163,6 +284,27 @@ class ParityCheck(Check):
                 copied   = self.extract(r"Copyright \(c\) [\d-]+ (.+)", notice),
                 file     = license_path,
                 label    = f"The copyright holder list in `{license_path}`",
+                origin   = f"the author list in `{manifest.file}`",
+                original = manifest.holders
+            ),
+            *(
+                Parity(
+                    copied   = self.extract(rf"(?m)^{key}: (.+)$", citation),
+                    file     = citation_path,
+                    label    = f"The `{key}` in `{citation_path}`",
+                    origin   = f"the `{name}` in `{manifest.file}`",
+                    original = original
+                )
+                for key, name, original in (
+                    ("license", "license", manifest.license),
+                    ("repository-code", "Repository", manifest.repository),
+                    ("version", "version", manifest.version)
+                )
+            ),
+            Parity(
+                copied   = join_names(cited) or None,
+                file     = citation_path,
+                label    = f"The author list in `{citation_path}`",
                 origin   = f"the author list in `{manifest.file}`",
                 original = manifest.holders
             )

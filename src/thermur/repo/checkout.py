@@ -10,7 +10,7 @@ from pydantic   import AfterValidator, BaseModel, Field, TypeAdapter
 from subprocess import check_output
 from typing     import Annotated
 
-from thermur.repo.schemas import Config, Manifest, Task
+from thermur.repo.schemas import Config, Labels, Manifest, Task
 
 
 class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -33,6 +33,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
+
+    @cached_property
+    def labels(self) -> Labels:
+        """
+        Validates `.github/labels.toml`.
+        """
+        return Labels.read(self.root)
 
     @cached_property
     def listed(self) -> list[Task]:

@@ -1,15 +1,24 @@
 """
 Holds the records the repository audit reads and reports, meaning the
-`Manifest` with its `Author` rows and the `Config` it validates out of the
-checkout's TOML through their `Document` base, each `Task` mise lists, and
-each `Finding` a check makes beside each `Parity` a check compares.
+`Manifest` with its `Author` rows, the `Config`, and the `Labels` with
+their `Label` rows, each validated out of the checkout's TOML through their
+`Document` base, each `Task` mise lists, and each `Finding` a check makes
+beside each `Parity` a check compares.
 """
 
-from collections.abc        import Iterable
+from collections            import Counter
+from collections.abc        import Iterable, Sequence
+from operator               import attrgetter
 from packaging.requirements import Requirement
 from pathlib                import Path
 from pydantic               import (
-    AfterValidator, AliasPath, BaseModel, BeforeValidator, Field, PlainValidator
+    AfterValidator,
+    AliasPath,
+    BaseModel,
+    BeforeValidator,
+    Field,
+    PlainValidator,
+    field_validator
 )
 from re      import search
 from tomllib import loads
@@ -17,6 +26,17 @@ from typing  import Annotated, Self
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
+
+
+class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One author `[project].authors` names.
+    """
+
+    name: str
+    """
+    The author's name as a copyright line gives it.
+    """
 
 
 def read_commands(run: Iterable[str | dict]) -> list[str]:
@@ -43,17 +63,6 @@ def read_minor(version: str) -> str:
     raise ValueError("names no major and minor version")
 
 
-class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
-    """
-    One author `[project].authors` names.
-    """
-
-    name: str
-    """
-    The author's name as a copyright line gives it.
-    """
-
-
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
     A TOML file of the checkout, declaring the fields the checks read and
@@ -77,28 +86,6 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
         return cls.model_validate(
             loads((root / cls.model_config["title"]).read_text(encoding="utf-8"))
         )
-
-
-class Config(Document, title=".mise/config.toml"):
-    """
-    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
-    the path.
-    """
-
-    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
-    """
-    The folder `_.path` puts on the path, relative to the root.
-    """
-
-    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
-    """
-    The major and minor of the `python` mise pins.
-    """
-
-    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
-    """
-    The `uv` release mise pins.
-    """
 
 
 class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -132,117 +119,106 @@ class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         return f"::error file={place}::{self.message.translate(str.maketrans(escapes))}"
 
 
-class Manifest(Document, title="pyproject.toml"):
+class Config(Document, title=".mise/config.toml"):
     """
-    The declarations `pyproject.toml` makes that another file restates or
-    that the build reads past `uv.lock`.
-    """
-
-    authors: list[Author] = Field(validation_alias=AliasPath("project", "authors"))
-    """
-    The authors `[project]` names.
+    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
+    the path.
     """
 
-    constraints: list[Dependency] = Field(
-        [],
-        validation_alias = AliasPath("tool", "uv", "build-constraint-dependencies")
-    )
+    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
     """
-    The build constraints `[tool.uv]` holds hatchling's own dependencies to.
+    The folder `_.path` puts on the path, relative to the root.
     """
 
-    floor: Minor = Field(validation_alias=AliasPath("project", "requires-python"))
+    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
     """
-    The major and minor `requires-python` sets as the floor.
-    """
-
-    license: str = Field(validation_alias=AliasPath("project", "license"))
-    """
-    The SPDX expression `[project].license` declares.
+    The major and minor of the `python` mise pins.
     """
 
-    packages: list[Path] = Field(
-        validation_alias = AliasPath(
-            "tool",
-            "hatch",
-            "build",
-            "targets",
-            "wheel",
-            "packages"
-        )
-    )
+    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
     """
-    The folders the wheel carries, relative to the root.
+    The `uv` release mise pins.
     """
 
-    readme: Path = Field(validation_alias=AliasPath("project", "readme"))
+
+class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    The README `[project]` names, relative to the root.
+    One label `.github/labels.toml` declares, as GitHub shows it on an issue
+    or a pull request.
     """
 
-    required_version: str = Field(
-        validation_alias = AliasPath("tool", "uv", "required-version")
-    )
+    color: Annotated[str, Field(pattern=r"^[0-9a-f]{6}$")]
     """
-    The `uv` release `[tool.uv]` requires.
+    The label's color as six lowercase hex digits.
     """
 
-    requires: list[Dependency] = Field(
-        validation_alias = AliasPath("build-system", "requires")
-    )
+    description: str
     """
-    The requirements `[build-system]` builds the wheel with.
+    What the label covers, in one line.
     """
 
-    scripts: dict[str, str] = Field(
-        {},
-        validation_alias = AliasPath("project", "scripts")
-    )
+    name: str
     """
-    The object each script `[project.scripts]` declares targets, by script.
-    """
-
-    target_version: str = Field(
-        validation_alias = AliasPath("tool", "prose", "target-version")
-    )
-    """
-    The Python version `[tool.prose]` formats for.
+    The label's glyph and word, as an issue or a pull request carries it.
     """
 
     @property
-    def holders(self) -> str:
+    def command(self) -> list[str]:
         """
-        Joins the authors' names the way a copyright line names its holders,
-        two by `and` and three or more by commas with `and` before the last.
+        Writes the `gh label create` command that creates the label on the
+        repository the checkout's remote names, or updates the color and the
+        description of the label already carrying its name.
         """
-        names = [author.name for author in self.authors]
-        if len(names) < 3:
-            return " and ".join(names)
+        return [
+            "gh", "label", "create", "--color", self.color,
+            "--description", self.description, "--force", self.name
+        ]
 
-        return f"{', '.join(names[:-1])}, and {names[-1]}"
 
-
-class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+class Labels(Document, extra="forbid", title=".github/labels.toml"):
     """
-    One task the checkout declares, as `mise tasks ls --json` lists it. A
-    file task names the file it lives in, whereas a task declared in TOML
-    leaves `file` unset and carries the lines it runs.
+    The labels `.github/labels.toml` declares, the one place a label is
+    written down, holding nothing beside its rows.
     """
 
-    file: Path | None
+    rows: list[Label] = Field(validation_alias=AliasPath("labels"))
     """
-    The file holding a file task, as mise resolves it.
-    """
-
-    run: Annotated[tuple[str, ...], BeforeValidator(read_commands)]
-    """
-    The lines a task declared in TOML runs in a shell.
+    The labels, in the order the registry lists them.
     """
 
-    source: Path
-    """
-    The file declaring the task, as mise resolves it.
-    """
+    @property
+    def names(self) -> list[str]:
+        """
+        Lists the name of each label, in the order the registry lists them.
+        """
+        return [label.name for label in self.rows]
+
+    def omits(self, live: Iterable[str]) -> list[str]:
+        """
+        Keeps each of the `live` label names the registry declares no label
+        under, in the order `live` gives them.
+        """
+        return [name for name in live if name not in self.names]
+
+    @field_validator("rows")
+    @classmethod
+    def reject_repeats(cls, rows: list[Label]) -> list[Label]:
+        """
+        Passes `rows` through where no two labels share a name or a color.
+
+        Raises:
+            ValueError: Naming each name and each color two or more labels
+                        share, which validation reports against the field.
+        """
+        if repeats := [
+            f"the {field} `{value}`"
+            for field in ("name", "color")
+            for value, count in Counter(map(attrgetter(field), rows)).items()
+            if count > 1
+        ]:
+            raise ValueError(f"declares {join_names(repeats)} more than once")
+
+        return rows
 
 
 class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -295,3 +271,135 @@ class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
             message = f"{self.label} {reading}, where {self.origin} reads "
             f"`{self.original}`"
         )
+
+
+class Manifest(Document, title="pyproject.toml"):
+    """
+    The declarations `pyproject.toml` makes that another file restates or
+    that the build reads past `uv.lock`.
+    """
+
+    authors: list[Author] = Field(validation_alias=AliasPath("project", "authors"))
+    """
+    The authors `[project]` names.
+    """
+
+    constraints: list[Dependency] = Field(
+        [],
+        validation_alias = AliasPath("tool", "uv", "build-constraint-dependencies")
+    )
+    """
+    The build constraints `[tool.uv]` holds hatchling's own dependencies to.
+    """
+
+    floor: Minor = Field(validation_alias=AliasPath("project", "requires-python"))
+    """
+    The major and minor `requires-python` sets as the floor.
+    """
+
+    license: str = Field(validation_alias=AliasPath("project", "license"))
+    """
+    The SPDX expression `[project].license` declares.
+    """
+
+    packages: list[Path] = Field(
+        validation_alias = AliasPath(
+            "tool",
+            "hatch",
+            "build",
+            "targets",
+            "wheel",
+            "packages"
+        )
+    )
+    """
+    The folders the wheel carries, relative to the root.
+    """
+
+    readme: Path = Field(validation_alias=AliasPath("project", "readme"))
+    """
+    The README `[project]` names, relative to the root.
+    """
+
+    repository: str = Field(
+        validation_alias = AliasPath("project", "urls", "Repository")
+    )
+    """
+    The address of the repository `[project.urls]` names.
+    """
+
+    required_version: str = Field(
+        validation_alias = AliasPath("tool", "uv", "required-version")
+    )
+    """
+    The `uv` release `[tool.uv]` requires.
+    """
+
+    requires: list[Dependency] = Field(
+        validation_alias = AliasPath("build-system", "requires")
+    )
+    """
+    The requirements `[build-system]` builds the wheel with.
+    """
+
+    scripts: dict[str, str] = Field(
+        {},
+        validation_alias = AliasPath("project", "scripts")
+    )
+    """
+    The object each script `[project.scripts]` declares targets, by script.
+    """
+
+    target_version: str = Field(
+        validation_alias = AliasPath("tool", "prose", "target-version")
+    )
+    """
+    The Python version `[tool.prose]` formats for.
+    """
+
+    version: str = Field(validation_alias=AliasPath("project", "version"))
+    """
+    The release `[project]` carries, the version a tag names.
+    """
+
+    @property
+    def holders(self) -> str:
+        """
+        Joins the authors' names the way a copyright line names its holders.
+        """
+        return join_names([author.name for author in self.authors])
+
+
+class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One task the checkout declares, as `mise tasks ls --json` lists it. A
+    file task names the file it lives in, whereas a task declared in TOML
+    leaves `file` unset and carries the lines it runs.
+    """
+
+    file: Path | None
+    """
+    The file holding a file task, as mise resolves it.
+    """
+
+    run: Annotated[tuple[str, ...], BeforeValidator(read_commands)]
+    """
+    The lines a task declared in TOML runs in a shell.
+    """
+
+    source: Path
+    """
+    The file declaring the task, as mise resolves it.
+    """
+
+
+def join_names(names: Sequence[str]) -> str:
+    """
+    Joins `names` into one English list, the way a copyright line names
+    its holders, two by `and` and three or more by commas with `and` before
+    the last.
+    """
+    if len(names) < 3:
+        return " and ".join(names)
+
+    return f"{', '.join(names[:-1])}, and {names[-1]}"

@@ -1,0 +1,44 @@
+[[labels]]
+color       = "8c055e"
+description = "Wrong output or a broken run in any domain"
+name        = "🐞 bug"
+
+[[labels]]
+color       = "195905"
+description = "The command line"
+name        = "🦜 cli"
+
+[[labels]]
+color       = "d9a89a"
+description = "The settings model and the Hamilton graph every domain reads"
+name        = "🧱 config"
+
+[[labels]]
+color       = "fb8b23"
+description = "The drones' murmuration controller and its response to fire"
+name        = "🪶 controller"
+
+[[labels]]
+color       = "bb88ff"
+description = "Work that ends in a finding rather than a change to the code"
+name        = "🔬 discovery"
+
+[[labels]]
+color       = "7f6c24"
+description = "The README and the docs site"
+name        = "📚 docs"
+
+[[labels]]
+color       = "99bdd2"
+description = "The WRF-SFIRE fields and the physics that moves the flock"
+name        = "🌪️ environment"
+
+[[labels]]
+color       = "00756a"
+description = "The measured properties of the flock and their calibration"
+name        = "🌡️ metrics"
+
+[[labels]]
+color       = "0044aa"
+description = "The packaging, dependencies, workflows, and release"
+name        = "🧰 tooling"

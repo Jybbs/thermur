@@ -1,7 +1,7 @@
 """
 Pins what each check `repo:audit` runs reports over a copy of the checkout,
 nothing for the copy as it stands and one finding for each way a case breaks
-it.
+it, the label registry's agreement with each file naming a label among them.
 """
 
 from common.edits import append, edit, task
@@ -12,12 +12,42 @@ from shutil       import copystat
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import (
-    BinCheck, Check, ParityCheck, PinCheck, RunCheck, WheelCheck
+    BinCheck, Check, LabelCheck, ParityCheck, PinCheck, RunCheck, WheelCheck
 )
 from thermur.repo.schemas  import Finding, Task
 
 FLOOR = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
 SHELL = "#!/usr/bin/env -S bash -euo pipefail\n"
+
+
+def test_a_citation_naming_each_author_passes(checkout: Checkout):
+    """
+    Asserts that two authors, each written in `CITATION.cff` as a
+    `family-names` line over a `given-names` line, read in order and join
+    the way the manifest's authors do, so a citation, a manifest, and a
+    copyright line naming the same two make no finding.
+    """
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"James Parkington" }, { name = "Ada Lovelace" }]',
+        old = '"James Parkington" }]'
+    )
+    edit(
+        checkout,
+        "CITATION.cff",
+        new = "    given-names: James\n  - family-names: Lovelace\n"
+        "    given-names: Ada\n",
+        old = "    given-names: James\n"
+    )
+    edit(
+        checkout,
+        "LICENSE",
+        new = "James Parkington and Ada Lovelace",
+        old = "James Parkington"
+    )
+
+    assert ParityCheck(checkout=checkout).findings == []
 
 
 def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
@@ -35,16 +65,6 @@ def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
             message = "`.mise/bin/pytest` differs byte for byte from `.mise/bin/prose`"
         )
     ]
-
-
-def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
-    """
-    Asserts that a copyright line naming a range of years, as a license
-    carried past its first year does, reads the holders after the range.
-    """
-    edit(checkout, "LICENSE", new="Copyright (c) 2025-2026", old="Copyright (c) 2025")
-
-    assert ParityCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -111,6 +131,63 @@ def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
             "The copyright holder list in `LICENSE` reads `Jybbs`, where the author "
             "list in `pyproject.toml` reads `James Parkington`",
             id = "license-holders"
+        ),
+        param(
+            "CITATION.cff",
+            "version: 0.1.0",
+            "version: 0.2.0",
+            "The `version` in `CITATION.cff` reads `0.2.0`, where the `version` in "
+            "`pyproject.toml` reads `0.1.0`",
+            id = "citation-version"
+        ),
+        param(
+            "CITATION.cff",
+            "license: MIT",
+            "license: Apache-2.0",
+            "The `license` in `CITATION.cff` reads `Apache-2.0`, where the `license` "
+            "in `pyproject.toml` reads `MIT`",
+            id = "citation-license"
+        ),
+        param(
+            "CITATION.cff",
+            "repository-code: https://github.com/Jybbs/thermur",
+            "repository-code: https://github.com/Jybbs/Thermur",
+            "The `repository-code` in `CITATION.cff` reads "
+            "`https://github.com/Jybbs/Thermur`, where the `Repository` in "
+            "`pyproject.toml` reads `https://github.com/Jybbs/thermur`",
+            id = "citation-repository"
+        ),
+        param(
+            "CITATION.cff",
+            "given-names: James",
+            "given-names: Jim",
+            "The author list in `CITATION.cff` reads `Jim Parkington`, where the "
+            "author list in `pyproject.toml` reads `James Parkington`",
+            id = "citation-authors"
+        ),
+        param(
+            "CITATION.cff",
+            "version: 0.1.0\n",
+            "",
+            "The `version` in `CITATION.cff` is missing, where the `version` in "
+            "`pyproject.toml` reads `0.1.0`",
+            id = "citation-version-missing"
+        ),
+        param(
+            "CITATION.cff",
+            "  - family-names: Parkington\n    given-names: James\n",
+            "",
+            "The author list in `CITATION.cff` is missing, where the author list in "
+            "`pyproject.toml` reads `James Parkington`",
+            id = "citation-authors-missing"
+        ),
+        param(
+            "CITATION.cff",
+            "version: 0.1.0",
+            'version: "0.1.0"',
+            'The `version` in `CITATION.cff` reads `"0.1.0"`, where the `version` in '
+            "`pyproject.toml` reads `0.1.0`",
+            id = "citation-version-quoted"
         )
     ]
 )
@@ -122,9 +199,9 @@ def test_a_restated_declaration_that_drifts_is_named(
     message  : str
 ):
     """
-    Asserts that each file restating the Python version, the uv release,
-    or the license is named once its copy drifts from the declaration it
-    restates, or once the file stops carrying it.
+    Asserts that each file restating the Python version, the uv release, the
+    license, or what `CITATION.cff` cites is named once its copy drifts from
+    the declaration it restates, or once the file stops carrying it.
     """
     edit(checkout, path, new=new, old=old)
 
@@ -133,20 +210,14 @@ def test_a_restated_declaration_that_drifts_is_named(
     ]
 
 
-def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
+def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
     """
-    Asserts that an exact pin naming hatchling in another spelling its
-    normalized name allows passes, since a package's name compares case
-    insensitively.
+    Asserts that a copyright line naming a range of years, as a license
+    carried past its first year does, reads the holders after the range.
     """
-    edit(
-        checkout,
-        "pyproject.toml",
-        new = '"Hatchling==1.32.4"',
-        old = '"hatchling==1.32.4"'
-    )
+    edit(checkout, "LICENSE", new="Copyright (c) 2025-2026", old="Copyright (c) 2025")
 
-    assert PinCheck(checkout=checkout).findings == []
+    assert ParityCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -203,6 +274,179 @@ def test_a_task_is_named_where_its_uv_run_is_not_locked(
     ] * named
 
 
+def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
+    """
+    Asserts that a contributor guide whose label table loses its header
+    reads as describing no label, so every label the registry declares is
+    named as missing from it.
+    """
+    edit(
+        checkout,
+        ".github/CONTRIBUTING.md",
+        new = "| **Name** | **Covers** |",
+        old = "| **Label** | **Covers** |"
+    )
+
+    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
+        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where its description in `.github/labels.toml` reads `{label.description}`"
+        for label in checkout.labels.rows
+    ]
+
+
+def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
+    """
+    Asserts that an exact pin naming hatchling in another spelling its
+    normalized name allows passes, since a package's name compares case
+    insensitively.
+    """
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"Hatchling==1.32.4"',
+        old = '"hatchling==1.32.4"'
+    )
+
+    assert PinCheck(checkout=checkout).findings == []
+
+
+@mark.parametrize(
+    ("path", "old", "new", "findings"),
+    [
+        param(
+            ".github/release.yml",
+            '["🐞 bug"]',
+            '["🐛 bug"]',
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                ),
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under 0 release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-undeclared"
+        ),
+        param(
+            ".github/release.yml",
+            '["🦜 cli"]',
+            '["🦜 cli", "🐞 bug"]',
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under 2 release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-twice"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            '["🐞 bug"]',
+            '["🐞bug"]',
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐞bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "template-undeclared"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🦜 cli` | The command line |",
+            "| `🦜 cli` | The commands |",
+            [
+                (
+                    ".github/CONTRIBUTING.md",
+                    "The description of `🦜 cli` in `.github/CONTRIBUTING.md` reads "
+                    "`The commands`, where its description in `.github/labels.toml` "
+                    "reads `The command line`"
+                )
+            ],
+            id = "guide-description"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🦜 cli` | The command line |\n",
+            "",
+            [
+                (
+                    ".github/CONTRIBUTING.md",
+                    "The description of `🦜 cli` in `.github/CONTRIBUTING.md` is "
+                    "missing, where its description in `.github/labels.toml` reads "
+                    "`The command line`"
+                )
+            ],
+            id = "guide-missing"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🦜 cli` | The command line |\n",
+            "| `🦜 cli` | The command line |\n| `✨ feature` | A new capability |\n",
+            [
+                (
+                    ".github/CONTRIBUTING.md",
+                    "`.github/CONTRIBUTING.md` names `✨ feature`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "guide-undeclared"
+        ),
+        param(
+            ".github/labels.toml",
+            'color       = "8c055e"',
+            'color       = "8C055E"',
+            [
+                (
+                    ".github/labels.toml",
+                    "`labels.0.color` in `.github/labels.toml`: String should match "
+                    "pattern '^[0-9a-f]{6}$'"
+                )
+            ],
+            id = "registry-malformed"
+        ),
+        param(
+            ".github/release.yml",
+            '- labels: ["🐞 bug"]',
+            "- labels:\n        - 🐞 bug",
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under 0 release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-block-list"
+        )
+    ]
+)
+def test_a_file_disagreeing_with_the_label_registry_is_named(
+    checkout : Checkout,
+    path     : str,
+    old      : str,
+    new      : str,
+    findings : list[tuple[str, str]]
+):
+    """
+    Asserts that a release-notes category or an issue template naming a
+    label the registry does not declare, a declared label filed under no
+    category or under two, a guide describing a label otherwise or naming
+    one the registry lacks, and a registry failing its own validation are
+    each named on the file a reader opens to put it right.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(file=Path(file), message=message) for file, message in findings
+    ]
+
+
 def test_a_linked_program_is_named(checkout: Checkout):
     """
     Asserts that a program written as a symlink is named once, and is left
@@ -217,21 +461,6 @@ def test_a_linked_program_is_named(checkout: Checkout):
             file    = Path(".mise/bin/pytest"),
             message = "`.mise/bin/pytest` is a symlink rather than a copy"
         )
-    ]
-
-
-def test_a_moved_python_floor_names_every_copy(checkout: Checkout):
-    """
-    Asserts that raising `requires-python` names the README's badge, the
-    formatter's `target-version`, and the minor mise pins, each against the
-    new floor.
-    """
-    edit(checkout, "pyproject.toml", new='">=3.15"', old='">=3.14"')
-
-    assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
-        Path("README.md"),
-        Path("pyproject.toml"),
-        Path(".mise/config.toml")
     ]
 
 
@@ -479,6 +708,59 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
 
     assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
         Path(".mise/config.toml")
+    ]
+
+
+@mark.parametrize(
+    ("old", "new", "files"),
+    [
+        param(
+            '">=3.14"',
+            '">=3.15"',
+            ["README.md", "pyproject.toml", ".mise/config.toml"],
+            id = "python-floor"
+        ),
+        param(
+            'version         = "0.1.0"',
+            'version         = "0.2.0"',
+            ["CITATION.cff"],
+            id = "version"
+        )
+    ]
+)
+def test_a_moved_manifest_declaration_names_every_copy(
+    checkout : Checkout,
+    old      : str,
+    new      : str,
+    files    : list[str]
+):
+    """
+    Asserts that raising `requires-python` names the README's badge, the
+    formatter's `target-version`, and the minor mise pins, and that moving
+    `[project].version` names `CITATION.cff`, each against the new value.
+    """
+    edit(checkout, "pyproject.toml", new=new, old=old)
+
+    assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
+        Path(file) for file in files
+    ]
+
+
+def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
+    """
+    Asserts that renaming a label in the registry alone names the
+    release-notes categories, the bug template, and the guide, each still
+    naming the old label, then the new label filed under no category and
+    missing from the guide.
+    """
+    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
+
+    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
+        Path(".github/release.yml"),
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/CONTRIBUTING.md"),
+        Path(".github/release.yml"),
+        Path(".github/CONTRIBUTING.md")
     ]
 
 
