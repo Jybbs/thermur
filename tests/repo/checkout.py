@@ -3,7 +3,7 @@ Pins what `Checkout` lists for the checks, meaning the tasks mise lists for
 the clone and the programs on its path.
 """
 
-from common.edits import append
+from common.edits import append, task
 from os           import pathsep
 from pathlib      import Path
 from pytest       import MonkeyPatch, TempPathFactory
@@ -64,6 +64,17 @@ def test_tasks_leaves_out_a_task_declared_above_the_root(
     assert {task.source.relative_to(clone) for task in cloned.tasks} == {
         task.source.relative_to(checkout.root) for task in checkout.tasks
     }
+
+
+def test_tasks_lists_a_hidden_task(checkout: Checkout):
+    """
+    Asserts that a task its `#MISE hide` line keeps out of a plain `mise
+    tasks ls` still reads as one of the checkout's tasks, so every check
+    holds it as it holds a listed one.
+    """
+    path = checkout.root / task(checkout, "py/hidden", "#!/bin/sh\n#MISE hide = true\n")
+
+    assert Task(file=path, run=(), source=path) in checkout.tasks
 
 
 def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):

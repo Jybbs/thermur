@@ -8,6 +8,7 @@ from common.edits import append, edit, task
 from pathlib      import Path
 from pydantic     import TypeAdapter, ValidationError
 from pytest       import MonkeyPatch, mark, param, raises
+from shutil       import copystat
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import (
@@ -22,9 +23,11 @@ SHELL = "#!/usr/bin/env -S bash -euo pipefail\n"
 def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
     """
     Asserts that a program whose bytes differ from the first program's is
-    named against that first program.
+    named against that first program, even where the two match in size and
+    in modification time.
     """
-    append(checkout, ".mise/bin/pytest", "\n")
+    edit(checkout, ".mise/bin/pytest", new="--frozen", old="--locked")
+    copystat(checkout.root / ".mise/bin/prose", checkout.root / ".mise/bin/pytest")
 
     assert BinCheck(checkout=checkout).findings == [
         Finding(
@@ -130,27 +133,27 @@ def test_a_restated_declaration_that_drifts_is_named(
     ]
 
 
-def test_a_linked_program_is_named(checkout: Checkout):
+def test_a_hatchling_pin_spelled_in_capitals_passes(checkout: Checkout):
     """
-    Asserts that a program written as a symlink to another is named, and is
-    left out of the byte comparison it would otherwise pass.
+    Asserts that an exact pin naming hatchling in another spelling its
+    normalized name allows passes, since a package's name compares case
+    insensitively.
     """
-    linked = checkout.root / ".mise/bin/pytest"
-    linked.unlink()
-    linked.symlink_to("prose")
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"Hatchling==1.32.4"',
+        old = '"hatchling==1.32.4"'
+    )
 
-    assert BinCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".mise/bin/pytest"),
-            message = "`.mise/bin/pytest` is a symlink rather than a copy"
-        )
-    ]
+    assert PinCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
     ("text", "named"),
     [
         param(f"{SHELL}uv run pytest\n", True, id="bare"),
+        param("#!/usr/bin/env -S uv run\nprint()\n", True, id="shebang"),
         param(f"{SHELL}uv run --exact pytest\n", True, id="exact-alone"),
         param(f"{SHELL}uv run --locked --exact pytest\n", True, id="reordered"),
         param(f"{SHELL}uv run --exact --lockedx pytest\n", True, id="partial-flag"),
@@ -200,6 +203,23 @@ def test_a_task_is_named_where_its_uv_run_is_not_locked(
     ] * named
 
 
+def test_a_linked_program_is_named(checkout: Checkout):
+    """
+    Asserts that a program written as a symlink is named once, and is left
+    out of the byte comparison it would otherwise fail.
+    """
+    linked = checkout.root / ".mise/bin/pytest"
+    linked.unlink()
+    linked.symlink_to("../config.toml")
+
+    assert BinCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".mise/bin/pytest"),
+            message = "`.mise/bin/pytest` is a symlink rather than a copy"
+        )
+    ]
+
+
 def test_a_moved_python_floor_names_every_copy(checkout: Checkout):
     """
     Asserts that raising `requires-python` names the README's badge, the
@@ -232,18 +252,6 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
             file    = Path("pyproject.toml"),
             message = "The wheel `packages` entry `src/config` holds no module"
         )
-    ]
-
-
-def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
-    """
-    Asserts that a program under `.mise/bin/` is held to `--exact --locked`
-    as a task is.
-    """
-    edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
-
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
-        Path(".mise/bin/pytest")
     ]
 
 
@@ -287,20 +295,16 @@ def test_a_script_is_named_where_its_module_is_not_carried(
     assert bool(WheelCheck(checkout=checkout).findings) is named
 
 
-def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
+def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
     """
-    Asserts that a Python task is held to the `uv run` its shebang runs and
-    not to one its docstring mentions.
+    Asserts that a program under `.mise/bin/` is held to `--exact --locked`
+    as a task is.
     """
-    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
-    task(
-        checkout = checkout,
-        name     = "repo/sweep.py",
-        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
-    )
-    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
+    edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
 
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
+    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
+        Path(".mise/bin/pytest")
+    ]
 
 
 @mark.parametrize(
@@ -329,6 +333,18 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
             '"pluggy>=1.6,<2"',
             "The build constraint `pluggy<2,>=1.6` in `[tool.uv]` is not an exact pin",
             id = "constraint-range"
+        ),
+        param(
+            '"hatchling==1.32.4"',
+            '"hatchling"',
+            "The `requires` of `[build-system]` holds no exact pin on hatchling",
+            id = "hatchling-unpinned"
+        ),
+        param(
+            '"pluggy==1.6.0"',
+            '"pluggy"',
+            "The build constraint `pluggy` in `[tool.uv]` is not an exact pin",
+            id = "constraint-unpinned"
         ),
         param(
             '"hatchling==1.32.4"',
@@ -418,6 +434,37 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
     assert ParityCheck(checkout=checkout).findings == [
         Finding(file=Path(path), message=message) for message in messages
     ]
+
+
+def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
+    """
+    Asserts that a Python task is held to the `uv run` its shebang runs and
+    not to one its docstring mentions.
+    """
+    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
+    task(
+        checkout = checkout,
+        name     = "repo/sweep.py",
+        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
+    )
+    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
+
+    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
+
+
+def test_a_toml_task_referencing_another_task_is_read_for_its_lines(checkout: Checkout):
+    """
+    Asserts that a task declared in TOML whose `run` names another task
+    beside a shell line reads as the shell line alone rather than failing
+    validation.
+    """
+    append(
+        checkout,
+        ".mise/config.toml",
+        '\n[tasks."py:sweep"]\nrun = ["mise doctor project", { task = "py:check" }]\n'
+    )
+
+    assert RunCheck(checkout=checkout).findings == []
 
 
 def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(

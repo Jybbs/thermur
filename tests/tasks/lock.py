@@ -11,6 +11,7 @@ from pytest          import Config, FixtureRequest, MonkeyPatch, fixture, mark, 
 from subprocess      import CompletedProcess, run
 from tomllib         import loads
 
+MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
 SUMMARY = "✓ Updated 14 platform entries ({skipped} skipped)"
 
 
@@ -50,15 +51,22 @@ def test_a_current_lock_passes(copy: Path, stand_in: Callable[[str, str], None])
     """
     Asserts that the task exits `0` where `uv.lock` is current, `mise lock`
     writes every platform and changes nothing, and the dry run installs
-    every tool the project pins under the project's lock scope alone.
+    every tool the project pins under the project's lock scope alone, while
+    the task prints nothing and leaves `.mise/mise.lock` the file it found.
     """
+    lock = copy / ".mise/mise.lock"
+    held = (lock.read_bytes(), lock.stat().st_ino)
     stand_in(
         "mise",
         f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}"\n'
-        'echo "$MISE_LOCKED_SCOPES $*" >> install'
+        'echo "$MISE_LOCKED_SCOPES $*" >> install\n'
+        'echo "mise uv@0.12.22 would install"'
     )
 
-    assert checked(copy).returncode == 0
+    result = checked(copy)
+
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    assert (lock.read_bytes(), lock.stat().st_ino) == held
     assert (copy / "install").read_text().splitlines()[-1] == (
         "project install --dry-run --force --locked"
     )
@@ -121,9 +129,9 @@ def mise(request: FixtureRequest, stand_in: Callable[[str, str], None]):
         ),
         param(
             f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}" && exit 0\n'
-            'echo "No lockfile URL found for uv on macos-arm64" >&2\n'
+            f'echo "{MISSING}" >&2\n'
             "exit 1",
-            "No lockfile URL found for uv on macos-arm64",
+            MISSING,
             id = "missing-entry"
         )
     ],

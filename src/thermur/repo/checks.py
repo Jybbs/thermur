@@ -9,6 +9,7 @@ from abc             import abstractmethod
 from collections.abc import Iterator
 from filecmp         import cmp
 from packaging.requirements import Requirement
+from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
 from re import search, sub
@@ -61,9 +62,10 @@ class BinCheck(Check):
     Every program in the folder the `_.path` of `.mise/config.toml` puts on
     the path is a regular file holding the same bytes as the first of them.
 
-    Git checks a symlink out as a plain file holding its target's name
-    wherever `core.symlinks` is off, so a linked program would run that name
-    and exit `0`.
+    Git checks a symlink out as a plain, non-executable file holding its
+    target's name wherever `core.symlinks` is off, so a shell looking the
+    program up on the path skips it and runs any program of that name the
+    machine already holds.
     """
 
     def scan(self) -> Iterator[Finding]:
@@ -202,12 +204,14 @@ class PinCheck(Check):
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names a `[build-system]` holding no exact pin on hatchling, then
-        each build constraint naming a range.
+        Names a `[build-system]` holding no exact pin on hatchling, under
+        any spelling its normalized name allows, then each build constraint
+        naming a range.
         """
         manifest = self.checkout.manifest
         if not any(
-            requirement.name == "hatchling" and self.exact(requirement)
+            canonicalize_name(requirement.name) == "hatchling"
+            and self.exact(requirement)
             for requirement in manifest.requires
         ):
             yield Finding(

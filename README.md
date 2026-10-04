@@ -438,7 +438,7 @@ mise doctor project
 
 ### Tasks
 
-Each operation runs as a mise task, which runs the formatter and pytest at the versions `uv.lock` holds rather than any copy the machine already carries:
+Each operation runs as a mise task, and the tasks that run the formatter and pytest run them at the versions `uv.lock` holds rather than any copy the machine already carries:
 
 | **Task** | **What It Does** |
 |---|---|
@@ -473,7 +473,7 @@ thermur/
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
 ├── src/thermur/repo/               # The checks `mise audit` runs
-├── tests/                          # The pytest suite, mirroring src/thermur
+├── tests/                          # The pytest suite, mirroring src/thermur and .mise/tasks
 │
 ├── pyproject.toml                  # Package configuration, with packaging and pydantic for the audit
 └── uv.lock                         # Locked dependencies

@@ -5,7 +5,7 @@ finding a `Parity` makes, and the holders a `Manifest` names.
 """
 
 from functools             import reduce
-from hypothesis            import given
+from hypothesis            import example, given
 from hypothesis.strategies import text
 from pathlib               import Path
 from pydantic              import AliasPath, ValidationError
@@ -17,6 +17,7 @@ from thermur.repo.schemas import Author, Config as MiseConfig, Finding, Manifest
 
 
 @given(message=text())
+@example(message="100%0A")
 def test_an_annotation_stays_on_one_line_and_reads_back(message: str):
     """
     Asserts that any message, a newline or a `%` inside it included, writes

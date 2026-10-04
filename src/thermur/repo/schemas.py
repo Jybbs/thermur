@@ -7,13 +7,24 @@ each `Finding` a check makes beside each `Parity` a check compares.
 
 from packaging.requirements import Requirement
 from pathlib                import Path
-from pydantic               import AfterValidator, AliasPath, BaseModel, Field, PlainValidator
+from pydantic               import (
+    AfterValidator, AliasPath, BaseModel, BeforeValidator, Field, PlainValidator
+)
 from re      import search
 from tomllib import loads
 from typing  import Annotated, Self
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
+
+
+def read_commands(run: list[str | dict]) -> list[str]:
+    """
+    Keeps the lines a shell runs out of the `run` mise lists for a task,
+    leaving out each `task` or `tasks` table, which names another task mise
+    runs at that point.
+    """
+    return [line for line in run if isinstance(line, str)]
 
 
 def read_minor(version: str) -> str:
@@ -109,8 +120,9 @@ class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     def annotation(self) -> str:
         """
         Writes the finding as the GitHub Actions error annotation the runner
-        shows on `file`, escaping each character a workflow command reads as
-        its own syntax, so the annotation stays on one line.
+        shows on `file`, percent-encoding each line break and `%`, and each
+        `,` and `:` in the file name, which a workflow command reads as its
+        own syntax.
         """
         escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
         place   = str(self.file).translate(
@@ -221,9 +233,9 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     The file holding a file task, as mise resolves it.
     """
 
-    run: tuple[str, ...]
+    run: Annotated[tuple[str, ...], BeforeValidator(read_commands)]
     """
-    The lines a task declared in TOML runs.
+    The lines a task declared in TOML runs in a shell.
     """
 
     source: Path
