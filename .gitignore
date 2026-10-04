@@ -1,6 +1,7 @@
 /.cache/
 /.claude
 
+*.pyc
 __pycache__/
 
 .venv/

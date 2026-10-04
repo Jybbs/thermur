@@ -11,8 +11,11 @@ hint        = "Run `mise x -- uv venv --clear` and then `mise x -- uv sync`, whi
 run         = '''test .venv/bin/python -ef "$(mise which python)"'''
 
 [env]
-PYTHONPYCACHEPREFIX = "{{config_root}}/.cache/pycache"
-UV_LOCKED           = "1"
+HYPOTHESIS_STORAGE_DIRECTORY = "{{config_root}}/.cache/hypothesis"
+PROSE_CACHE_DIR              = "{{config_root}}/.cache/prose"
+PYTHONPYCACHEPREFIX          = "{{config_root}}/.cache/pycache"
+UV_LOCKED                    = "1"
+_.path                       = ".mise/bin"
 
 [settings]
 auto_install = false

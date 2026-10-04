@@ -436,11 +436,18 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 mise doctor project
 ```
 
-### Lockfiles
+### Tasks
+
+Each operation runs as a mise task, which runs the formatter and pytest at the versions `uv.lock` holds rather than any copy the machine already carries:
 
 | **Task** | **What It Does** |
 |---|---|
-| `mise lockfile` | Verifies `uv.lock` and `.mise/mise.lock` against `pyproject.toml` and `.mise/config.toml` |
+| `mise test` | Runs the test suite through pytest, passing any further arguments to it |
+| `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
+| `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
+| `mise format` | Rewrites the Python source to *Prose*'s style |
+| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, and the wheel's `packages` and scripts to modules it carries |
+| `mise lockfile` | Verifies `uv.lock` and `.mise/mise.lock` against `pyproject.toml` and `.mise/config.toml`, and that the lock holds every pinned tool for the running platform |
 | `mise relock` | Re-resolves both lockfiles after either manifest changes |
 | `mise scan` | Holds every package `uv.lock` resolves to the published advisories through `uv audit` |
 
@@ -448,14 +455,15 @@ mise doctor project
 
 ## 📁 Project Structure
 
-The repository holds the pinned toolchain and its tasks, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/raw/` holding the NetCDF files a reader downloads:
+The repository holds the pinned toolchain and its tasks, the package the audit runs from and its test suite, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/raw/` holding the NetCDF files a reader downloads:
 
 ```
 thermur/
 ├── .mise/
-│   ├── config.toml                 # Pinned Python and uv, and the doctor checks
+│   ├── bin/                        # The script each task runs Prose and pytest through
+│   ├── config.toml                 # Pinned Python and uv, the environment, and the doctor checks
 │   ├── mise.lock                   # Locked tool downloads and checksums
-│   └── tasks/lock/                 # The lockfile, relock, and scan tasks
+│   └── tasks/                      # The lock, py, and repo tasks
 │
 ├── data/
 │   └── raw/                        # NetCDF files from WRF-SFIRE
@@ -464,7 +472,10 @@ thermur/
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
-├── pyproject.toml                  # Package configuration
+├── src/thermur/repo/               # The checks `mise audit` runs
+├── tests/                          # The pytest suite, mirroring src/thermur
+│
+├── pyproject.toml                  # Package configuration, with packaging and pydantic for the audit
 └── uv.lock                         # Locked dependencies
 ```
 
