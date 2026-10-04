@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "lockfile"
-#MISE description = "Verify `uv.lock` and `.mise/mise.lock` against their manifests"
+#MISE description = "Verify `uv.lock` and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for this platform"
 
 restore() {
   cmp -s "$snapshot" .mise/mise.lock || mv -f "$snapshot" .mise/mise.lock
@@ -16,3 +16,7 @@ report=$(mise lock 2>&1) && [[ "$report" == *"(0 skipped)"* ]] || {
   exit 1
 }
 diff -u "$snapshot" .mise/mise.lock >&2
+report=$(MISE_LOCKED_SCOPES=project mise install --dry-run --force --locked 2>&1) || {
+  echo "$report" >&2
+  exit 1
+}

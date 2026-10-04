@@ -4,7 +4,7 @@ requires      = ["hatchling==1.32.4"]
 
 [project]
 authors         = [{ name = "James Parkington" }]
-dependencies    = []
+dependencies    = ["packaging", "pydantic"]
 description     = "Thermally-constrained flocking for wildfires."
 license         = "MIT"
 name            = "thermur"
@@ -16,11 +16,62 @@ version         = "0.1.0"
 Homepage   = "https://jybbs.github.io/thermur/"
 Repository = "https://github.com/Jybbs/thermur"
 
+[dependency-groups]
+dev = [
+    "prose-formatter",
+    "pytest",
+    "pytest-cov",
+    "pytest-randomly",
+    "pytest-socket",
+    "syrupy"
+]
+
+[tool.coverage.html]
+directory = ".cache/coverage/html"
+
+[tool.coverage.report]
+precision    = 2
+show_missing = true
+
+[tool.coverage.run]
+branch    = true
+data_file = ".cache/coverage/data"
+source    = ["src/thermur"]
+
 [tool.hatch.build.targets.sdist]
 only-include = [".mise", "src", "uv.lock"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/thermur"]
+
+[tool.prose]
+target-version = "3.14"
+
+[tool.prose.imports]
+first-party = ["thermur"]
+
+[tool.pytest]
+addopts                  = [
+    "--allow-unix-socket",
+    "--disable-socket",
+    "--import-mode=importlib",
+    "-m",
+    "not network",
+    "-ra",
+    "--snapshot-dirname=fixtures"
+]
+cache_dir                = ".cache/pytest"
+empty_parameter_set_mark = "fail_at_collect"
+filterwarnings           = ["error"]
+markers                  = [
+    "network: reaches a service over the network",
+    "slow: runs longer than a few seconds"
+]
+norecursedirs            = ["common", "fixtures"]
+python_files             = ["*.py"]
+pythonpath               = ["tests"]
+strict                   = true
+testpaths                = ["tests"]
 
 [tool.uv]
 build-constraint-dependencies = [
