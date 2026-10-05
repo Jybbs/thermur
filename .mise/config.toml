@@ -11,6 +11,7 @@ hint        = "Run `mise x -- uv venv --clear` and then `mise x -- uv sync`, whi
 run         = '''test .venv/bin/python -ef "$(mise which python)"'''
 
 [env]
+HAMILTON_AUTOLOAD_EXTENSIONS = "0"
 PROSE_CACHE_DIR              = "{{config_root}}/.cache/prose"
 PYTHONPYCACHEPREFIX          = "{{config_root}}/.cache/pycache"
 UV_LOCKED                    = "1"

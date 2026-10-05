@@ -1,15 +1,60 @@
 """
-Pins what `Checkout` lists for the checks, meaning the tasks mise lists for
-the clone and the programs on its path.
+Pins what `Checkout` reads from the clone, meaning the tasks mise lists
+for it, the programs on its path, the commit checked out, the digest of its
+`uv.lock`, and the clone the package was installed from.
 """
 
 from common.edits import append, task
 from os           import pathsep
 from pathlib      import Path
-from pytest       import MonkeyPatch, TempPathFactory
+from pytest       import Config, MonkeyPatch, TempPathFactory, raises
+from subprocess   import CalledProcessError, check_output
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
+
+
+def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(checkout: Checkout):
+    """
+    Asserts that reading the commit of a folder no git repository holds
+    raises the error git exits with, rather than returning what git prints.
+    """
+    with raises(CalledProcessError):
+        checkout.commit
+
+
+def test_commit_reads_the_commit_checked_out(clone: Checkout):
+    """
+    Asserts that the commit is the hash git logs for the clone's `HEAD`,
+    without the line break git prints after it.
+    """
+    assert clone.commit == check_output(
+        ["git", "log", "-1", "--format=%H"],
+        cwd  = clone.root,
+        text = True
+    ).removesuffix("\n")
+
+
+def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
+    pytestconfig: Config
+):
+    """
+    Asserts that the installed checkout sits at the worktree `uv sync`
+    installed the package from, which is the root the suite runs in.
+    """
+    assert Checkout.installed().root == pytestconfig.rootpath.resolve()
+
+
+def test_lockfile_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
+    """
+    Asserts that the lockfile digest is the SHA-256 digest of `uv.lock`,
+    pinned on an empty file against the digest of empty input.
+    """
+    (checkout.root / "uv.lock").write_bytes(b"")
+
+    assert checkout.lockfile == (
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
 
 
 def test_scripts_lists_each_program_but_a_dotfile(checkout: Checkout):
