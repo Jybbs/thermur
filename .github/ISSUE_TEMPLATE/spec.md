@@ -5,7 +5,7 @@ title: ""
 labels: []
 ---
 
-<!-- A lead of about 150 words naming the problem and what has to change rather than how to build it, linking each library, dataset, or service on its first mention. Where the change takes fewer than three steps beyond its tests, fold them into the lead and drop the divider and the Requirements section below. -->
+<!-- A lead of 150 words or fewer naming the problem and what has to change rather than how to build it, linking each library, dataset, or service on its first mention. Where the change takes fewer than three steps beyond its tests, fold them into the lead and drop the divider and the Requirements section below. -->
 
 ---
 

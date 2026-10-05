@@ -14,7 +14,7 @@ from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re import findall, search, sub
+from re import findall, fullmatch, search, sub
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Finding, Parity, join_names
@@ -100,8 +100,8 @@ class LabelCheck(Check):
     declares, and the guide describes each label as the registry does.
 
     The categories and the templates list their labels in YAML, read here as
-    the double-quoted names on each `labels:` line, which is the form both
-    files take.
+    the double-quoted names on each `labels:` line, so a line listing them
+    in any other form is named rather than read as naming no label.
     """
 
     @cached_property
@@ -124,6 +124,24 @@ class LabelCheck(Check):
         return Path(".github/CONTRIBUTING.md")
 
     @property
+    def listed(self) -> dict[Path, list[str]]:
+        """
+        Maps the release-notes categories and each file under
+        `.github/ISSUE_TEMPLATE/` to every `labels:` line it holds.
+        """
+        root = self.checkout.root
+        return {
+            file: findall(r"(?m)^\s*(?:- )?labels:.*$", self.checkout.read(file))
+            for file in [
+                self.release,
+                *sorted(
+                    path.relative_to(root)
+                    for path in root.glob(".github/ISSUE_TEMPLATE/*")
+                )
+            ]
+        }
+
+    @property
     def named(self) -> dict[Path, list[str]]:
         """
         Maps each file naming labels to every label it names, in the order
@@ -131,25 +149,14 @@ class LabelCheck(Check):
         template, and the contributor guide. The categories' `*`, which
         files every pull request no earlier category takes, names no label.
         """
-        root  = self.checkout.root
-        files = [
-            self.release,
-            *sorted(
-                path.relative_to(root)
-                for path in root.glob(".github/ISSUE_TEMPLATE/*.md")
-            )
-        ]
         return {
             file: [
                 name
-                for line in findall(
-                    r"(?m)^\s*(?:- )?labels: \[.*\]$",
-                    self.checkout.read(file)
-                )
+                for line in lines
                 for name in findall(r'"(.+?)"', line)
                 if name != "*"
             ]
-            for file in files
+            for file, lines in self.listed.items()
         } | {self.guide: list(self.described)}
 
     @property
@@ -161,12 +168,26 @@ class LabelCheck(Check):
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names each label a file names that the registry does not declare,
+        Names each `labels:` line in a form the audit reads no names from,
+        then each label a file names that the registry does not declare,
         then each declared label the categories file under any number of
         categories but one, then each the guide describes otherwise.
         """
         labels = self.checkout.labels
         named  = self.named
+        for file, lines in self.listed.items():
+            for line in lines:
+                if not fullmatch(
+                    r'\s*(?:- )?labels: \[(?:"[^"]+"(?:, "[^"]+")*)?\]',
+                    line
+                ):
+                    yield Finding(
+                        file    = file,
+                        message = f"`{file}` lists labels as `{line.strip()}` rather "
+                        "than as a list of double-quoted names, the one form the audit "
+                        "reads"
+                    )
+
         for file, names in named.items():
             for name in dict.fromkeys(names):
                 if name not in labels.names:
@@ -181,8 +202,8 @@ class LabelCheck(Check):
             if filed[name] != 1:
                 yield Finding(
                     file    = self.release,
-                    message = f"`{self.release}` files `{name}` under {filed[name]} "
-                    "release-notes categories rather than one"
+                    message = f"`{self.release}` files `{name}` under "
+                    f"{filed[name] or 'no'} release-notes categories rather than one"
                 )
 
         yield from filter(
@@ -212,7 +233,8 @@ class ParityCheck(Check):
     `[tool.uv]` requires, and the manifest's license and authors are what
     the README's badge and the title and the copyright line of `LICENSE`
     restate. `CITATION.cff` restates the manifest's version, license,
-    repository, and authors, each read off the lines naming it.
+    repository, and authors, each read off the lines naming it with any
+    quotes around it set aside.
     """
 
     @property
@@ -229,10 +251,11 @@ class ParityCheck(Check):
         citation      = self.checkout.read(citation_path)
         badge         = self.extract(r"badge/License-((?:--|[^-])+)-", readme)
         python        = f"the floor of `requires-python` in `{manifest.file}`"
+        value         = r"""["']?(.+?)["']?"""
         cited         = [
             f"{given} {family}"
             for family, given in findall(
-                r"(?m)^\s*- family-names: (.+)\n\s+given-names: (.+)$",
+                rf"(?m)^\s*- family-names: {value}\n\s+given-names: {value}$",
                 citation
             )
         ]
@@ -289,7 +312,7 @@ class ParityCheck(Check):
             ),
             *(
                 Parity(
-                    copied   = self.extract(rf"(?m)^{key}: (.+)$", citation),
+                    copied   = self.extract(rf"(?m)^{key}: {value}$", citation),
                     file     = citation_path,
                     label    = f"The `{key}` in `{citation_path}`",
                     origin   = f"the `{name}` in `{manifest.file}`",

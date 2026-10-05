@@ -17,6 +17,7 @@ from thermur.repo.checks   import (
 from thermur.repo.schemas  import Finding, Task
 
 FLOOR = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
+FORM  = "rather than as a list of double-quoted names, the one form the audit reads"
 SHELL = "#!/usr/bin/env -S bash -euo pipefail\n"
 
 
@@ -180,14 +181,6 @@ def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
             "The author list in `CITATION.cff` is missing, where the author list in "
             "`pyproject.toml` reads `James Parkington`",
             id = "citation-authors-missing"
-        ),
-        param(
-            "CITATION.cff",
-            "version: 0.1.0",
-            'version: "0.1.0"',
-            'The `version` in `CITATION.cff` reads `"0.1.0"`, where the `version` in '
-            "`pyproject.toml` reads `0.1.0`",
-            id = "citation-version-quoted"
         )
     ]
 )
@@ -325,7 +318,7 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
                 ),
                 (
                     ".github/release.yml",
-                    "`.github/release.yml` files `🐞 bug` under 0 release-notes "
+                    "`.github/release.yml` files `🐞 bug` under no release-notes "
                     "categories rather than one"
                 )
             ],
@@ -418,11 +411,79 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
             [
                 (
                     ".github/release.yml",
-                    "`.github/release.yml` files `🐞 bug` under 0 release-notes "
+                    f"`.github/release.yml` lists labels as `- labels:` {FORM}"
+                ),
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under no release-notes "
                     "categories rather than one"
                 )
             ],
             id = "release-block-list"
+        ),
+        param(
+            ".github/release.yml",
+            '["🦜 cli"]',
+            '["🐛 bug", "🐛 bug"]',
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                ),
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🦜 cli` under no release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-repeated"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            "labels: 🐛 bug",
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` lists labels as "
+                    f"`labels: 🐛 bug` {FORM}"
+                )
+            ],
+            id = "template-string"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            "labels: ['🐛 bug']",
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` lists labels as "
+                    f"`labels: ['🐛 bug']` {FORM}"
+                )
+            ],
+            id = "template-single-quoted"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            "labels:\n  - 🐛 bug",
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    f"`.github/ISSUE_TEMPLATE/bug.md` lists labels as `labels:` {FORM}"
+                )
+            ],
+            id = "template-block-list"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🧰 tooling` | The packaging, dependencies, workflows, and release |\n",
+            "| `🧰 tooling` | The packaging, dependencies, workflows, and release |\n"
+            "\nA paragraph.\n\n| `✨ feature` | A new capability |\n",
+            [],
+            id = "guide-later-table"
         )
     ]
 )
@@ -749,15 +810,17 @@ def test_a_moved_manifest_declaration_names_every_copy(
 def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
     """
     Asserts that renaming a label in the registry alone names the
-    release-notes categories, the bug template, and the guide, each still
-    naming the old label, then the new label filed under no category and
-    missing from the guide.
+    release-notes categories, the bug and spec templates in that order, and
+    the guide, each still naming the old label, then the new label filed
+    under no category and missing from the guide.
     """
+    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
     edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
 
     assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
         Path(".github/release.yml"),
         Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md"),
         Path(".github/CONTRIBUTING.md"),
         Path(".github/release.yml"),
         Path(".github/CONTRIBUTING.md")
@@ -781,3 +844,50 @@ def test_a_validation_error_outside_the_documents_is_raised(
 
     with raises(ValidationError):
         RunCheck(checkout=checkout).findings
+
+
+def test_an_issue_form_naming_an_undeclared_label_is_named(checkout: Checkout):
+    """
+    Asserts that an issue form under `.github/ISSUE_TEMPLATE/`, read beside
+    the Markdown templates, is named where it lists a label the registry
+    does not declare.
+    """
+    (checkout.root / ".github/ISSUE_TEMPLATE/feature.yml").write_text(
+        'name: Feature\nlabels: ["✨ feature"]\n'
+    )
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/ISSUE_TEMPLATE/feature.yml"),
+            message = "`.github/ISSUE_TEMPLATE/feature.yml` names `✨ feature`, a "
+            "label `.github/labels.toml` does not declare"
+        )
+    ]
+
+
+@mark.parametrize(
+    ("old", "new"),
+    [
+        param("version: 0.1.0", 'version: "0.1.0"', id="version"),
+        param("license: MIT", "license: 'MIT'", id="license"),
+        param(
+            "repository-code: https://github.com/Jybbs/thermur",
+            'repository-code: "https://github.com/Jybbs/thermur"',
+            id = "repository-code"
+        ),
+        param("given-names: James", 'given-names: "James"', id="authors")
+    ]
+)
+def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
+    checkout : Checkout,
+    old      : str,
+    new      : str
+):
+    """
+    Asserts that a `CITATION.cff` value written in single or double quotes,
+    which YAML reads as the same string, agrees with the manifest as the
+    plain value does.
+    """
+    edit(checkout, "CITATION.cff", new=new, old=old)
+
+    assert ParityCheck(checkout=checkout).findings == []

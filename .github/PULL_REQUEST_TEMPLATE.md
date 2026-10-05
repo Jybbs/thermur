@@ -1,6 +1,6 @@
 ### 🔥 Quick Summary
 
-<!-- Two or three sentences naming what the pull request delivers, opening on the verb the issue's title opens on. -->
+<!-- Two or three sentences naming what the pull request delivers, opening on the verb the issue's title opens on wherever that verb fits. -->
 
 ---
 
