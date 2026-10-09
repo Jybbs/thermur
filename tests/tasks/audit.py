@@ -80,7 +80,12 @@ def test_a_broken_checkout_fails_naming_each_finding(
         path = draft
     )
     edit(checkout, warm, new="&image ubuntu-24.04", old="&image ubuntu-26.04")
-    edit(checkout, warm, new="", old="          - tools : zizmor\n")
+    edit(
+        checkout,
+        warm,
+        new = "",
+        old = "          - name  : 🎒 Kit · Workflows\n            tools : zizmor\n"
+    )
     edit(checkout, warm, new="]", old=", .mise/mise.lock]")
     task(checkout, "py/sweep", '#!/bin/sh\n#MISE alias = "audit"\ntrue\n')
 

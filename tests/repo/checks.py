@@ -683,7 +683,7 @@ def test_a_validation_error_outside_the_documents_is_raised(
     ("old", "new", "finding"),
     [
         param(
-            "          - tools : zizmor\n",
+            "          - name  : 🎒 Kit · Workflows\n            tools : zizmor\n",
             "",
             Finding(
                 file    = Path(CI),
@@ -693,8 +693,10 @@ def test_a_validation_error_outside_the_documents_is_raised(
             id = "unsaved"
         ),
         param(
-            "          - tools : zizmor\n",
-            "          - tools : zizmor\n          - tools : bun\n",
+            "            tools : zizmor\n",
+            "            tools : zizmor\n"
+            "          - name  : 🎒 Kit · Site\n"
+            "            tools : bun\n",
             Finding(
                 file    = Path(WARM),
                 message = f"`{WARM}` saves the archive of the `bun` subset, which no "

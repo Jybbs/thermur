@@ -6,7 +6,7 @@ concurrency:
 
 jobs:
   check:
-    name    : 🧰 ${{ matrix.task }}
+    name    : ${{ matrix.name }}
     outputs : { coverage: "${{ steps.attach.outputs.artifact-url }}" }
     runs-on : &image ubuntu-26.04
 
@@ -30,18 +30,24 @@ jobs:
 
       matrix:
         include:
-          - task  : lock:check
+          - name  : 🪵 Lockfiles
+            task  : lock:check
             tools : &package python uv
-          - task  : lock:scan
+          - name  : ⛈️ Advisories
+            task  : lock:scan
             tools : *package
-          - task  : py:check
+          - name  : 🪻 Prose
+            task  : py:check
             tools : *package
-          - report : coverage
+          - name   : ☂️ Coverage
+            report : coverage
             task   : py:coverage
             tools  : *package
-          - task  : repo:audit
+          - name  : 🧯 Audit
+            task  : repo:audit
             tools : *package
-          - task  : repo:vet
+          - name  : 🗝️ Workflows
+            task  : repo:vet
             tools : zizmor
 
     timeout-minutes : &timeout 15

@@ -6,7 +6,7 @@ concurrency:
 
 jobs:
   kit:
-    name    : 🧰 ${{ matrix.tools }}
+    name    : ${{ matrix.name }}
     runs-on : &image ubuntu-26.04
 
     steps:
@@ -19,13 +19,15 @@ jobs:
 
       matrix:
         include:
-          - tools : &package python uv
-          - tools : zizmor
+          - name  : 🎒 Kit · Package
+            tools : &package python uv
+          - name  : 🎒 Kit · Workflows
+            tools : zizmor
 
     timeout-minutes : &timeout 15
 
   prune:
-    name        : 🧰 Prune
+    name        : 🍂 Prune
     needs       : [kit]
     permissions : { actions: write, contents: read }
     runs-on     : *image
