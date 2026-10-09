@@ -447,20 +447,41 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
     ]
 
 
-def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(checkout: Checkout):
+@mark.parametrize(
+    ("character", "problem"),
+    [
+        param(
+            "\x85",
+            "while scanning a simple key, could not find expected ':'",
+            id = "next-line"
+        ),
+        param(
+            "\x07",
+            "unacceptable character #x0007: special characters are not allowed",
+            id = "control-character"
+        )
+    ]
+)
+def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(
+    character : str,
+    checkout  : Checkout,
+    problem   : str
+):
     """
     Asserts that a manifest yaml-rs reads but PyYAML cannot parse, here one
-    whose description holds the NEL that YAML 1.1 reads as a line break, is
-    named for the problem PyYAML reports rather than raising.
+    whose description holds the NEL that YAML 1.1 reads as a line break or
+    a control character PyYAML's reader rejects, is named for the problem
+    PyYAML reports rather than raising.
     """
-    edit(checkout, ACTION, new="The number\x85of commits", old="The number of commits")
+    edit(
+        checkout,
+        ACTION,
+        new = f"The number{character}of commits",
+        old = "The number of commits"
+    )
 
     assert AnchorCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(ACTION),
-            message = f"PyYAML cannot parse `{ACTION}`: while scanning a simple key, "
-            "could not find expected ':'"
-        )
+        Finding(file=Path(ACTION), message=f"PyYAML cannot parse `{ACTION}`: {problem}")
     ]
 
 

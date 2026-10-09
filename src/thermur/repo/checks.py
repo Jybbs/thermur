@@ -81,9 +81,9 @@ class AnchorCheck(Check):
     def scan(self) -> Iterator[Finding]:
         """
         Names each anchor a manifest declares or reads through an alias,
-        once and in the order PyYAML's parse events carry them, or the
-        problem PyYAML reports, without its location lines, where it cannot
-        parse the manifest.
+        once and in the order PyYAML's parse events carry them, and where
+        PyYAML cannot parse the manifest, names the context and problem its
+        error states without the indented lines locating them in the text.
         """
         for path in self.checkout.actions:
             try:
