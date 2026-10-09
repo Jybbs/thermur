@@ -927,7 +927,25 @@ def test_an_anchor_in_an_action_manifest_is_named(
         param("? &k a\n: 1\n", ["k"], id="explicit-key"),
         param("a: [x#y, &z 1]\n", ["z"], id="hash-inside-scalar"),
         param("a:\t&x 1\n", ["x"], id="tab-after-colon"),
-        param("a: [1,  &x 2]\n", ["x"], id="spaces-after-comma")
+        param("a: [1,  &x 2]\n", ["x"], id="spaces-after-comma"),
+        param(
+            "steps:\n  - run: |\n    shell: &x bash\n",
+            ["x"],
+            id = "indented-empty-block-in-entry"
+        ),
+        param("? a: |\n  b: &x 1\n: v\n", ["x"], id="empty-block-in-explicit-key"),
+        param("- - a: |\n    b: &x 1\n", ["x"], id="empty-block-in-nested-entry"),
+        param("- a:  |\n  b: &x 1\n", ["x"], id="spaces-before-block-in-entry"),
+        param("- a: >\n  b: &x 1\n", ["x"], id="folded-block-in-entry"),
+        param("- a: |-\n  b: &x 1\n", ["x"], id="chomped-block-in-entry"),
+        param("- a: | # c\n  b: &x 1\n", ["x"], id="commented-block-in-entry"),
+        param("e: |\n  x\n  b: &s\nf: &x 1\n", ["x"], id="second-block-line"),
+        param("a: 'p'\nb: &x 1\nc: 'q'\n", ["x"], id="between-single-quoted"),
+        param("a: {&x b: 1}\n", ["x"], id="brace"),
+        param("a:\n  - &x 1\n", ["x"], id="indented-entry"),
+        param("a:  &x 1\n", ["x"], id="spaces-after-colon"),
+        param("- &k run: |\n    echo\n", ["k"], id="anchored-key-before-block"),
+        param('"a #b": |\n  x: &s\nc: &y 1\n', ["y"], id="quoted-key-holding-a-hash")
     ]
 )
 def test_the_anchor_scan_reads_only_an_ampersand_opening_a_node(

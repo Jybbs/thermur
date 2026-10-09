@@ -96,20 +96,24 @@ class AnchorCheck(Check):
           than its `-` or `?` indicator where no key opens it
         - A `${{ }}` expression GitHub evaluates
         """
+        key = (
+            r"(?:\"(?:[^\"\\\n]|\\.)*\"|'(?:[^'\n]|'')*'"
+            r"|[^\n#&]|(?<=\S)#|(?<=[^\s\[{,])&|&(?=\s))*?"
+        )
+        tail = r"[|>][-+1-9]*[ \t]*(?:#.*)?"
         return list(
             dict.fromkeys(
                 match["anchor"]
                 for match in finditer(
                     r"(?<!\S)#.*|\$\{\{.*?\}\}"
-                    r"|^(?P<lead> *+)(?:[-?][ \t]+)*(?:(?:[^\n#]|(?<=\S)#)*?:[ \t]+)?"
-                    r"[|>][-+1-9]*[ \t]*(?:#.*)?\n(?:[ \t]*\n)*"
-                    r"(?P<indent>(?P=lead) +)\S.*(?:\n(?P=indent).*|\n[ \t]*(?=\n))*"
+                    rf"|^(?P<lead> *+)(?:[-?][ \t]+)*(?:{key}:[ \t]+)?{tail}\n"
+                    r"(?:[ \t]*\n)*(?P<indent>(?P=lead) +)\S.*"
+                    r"(?:\n(?P=indent).*|\n[ \t]*(?=\n))*"
                     r"|(?:^ *(?:[-?][ \t]+)*|^---[ \t]+|:[ \t]+|[\[{,][ \t]*)"
                     r"(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'"
                     r"|(?:![^\s]*[ \t]+)?&(?P<anchor>[^\s,\[\]{}]+))",
                     sub(
-                        r"^( *)((?:[-?][ \t]+)+)(?=(?:[^\n#]|(?<=\S)#)*?:[ \t]+"
-                        r"[|>][-+1-9]*[ \t]*(?:#.*)?$)",
+                        rf"^( *)((?:[-?][ \t]+)+)(?={key}:[ \t]+{tail}$)",
                         lambda entry: entry[1] + " " * len(entry[2]),
                         text,
                         flags = MULTILINE
