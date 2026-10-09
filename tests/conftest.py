@@ -8,6 +8,7 @@ connection only when it carries the `network` mark.
 from common.environment import CLEARED
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
+from subprocess         import run
 
 from thermur.repo.checkout import Checkout
 
@@ -19,12 +20,12 @@ def checkout(
     tmp_path     : Path
 ) -> Checkout:
     """
-    Copies into `tmp_path` every file the audit's checks read, meaning the
-    manifest, the README, the license, `.mise/`, and `src/`, then trusts the
-    copy's mise configuration and returns the `Checkout` rooted there, which
-    a case edits before a check reads it.
+    Copies into `tmp_path` every file a `Checkout` reads, meaning the
+    manifest, the README, the license, `uv.lock`, `.mise/`, and `src/`, then
+    trusts the copy's mise configuration and returns the `Checkout` rooted
+    there, which a case edits before a check reads it.
     """
-    for name in (".mise", "LICENSE", "README.md", "pyproject.toml", "src"):
+    for name in (".mise", "LICENSE", "README.md", "pyproject.toml", "src", "uv.lock"):
         (pytestconfig.rootpath / name).copy(
             tmp_path / name,
             follow_symlinks   = False,
@@ -33,6 +34,30 @@ def checkout(
 
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
     return Checkout(root=tmp_path)
+
+
+@fixture
+def clone(checkout: Checkout) -> Checkout:
+    """
+    Commits the copy `checkout` makes into a git repository of its own, so a
+    case reads the commit checked out there.
+    """
+    for command in (
+        ["init", "--quiet"],
+        ["add", "--all"],
+        ["commit", "--message=Copy", "--quiet"]
+    ):
+        run(
+            [
+                "git", "-c", "user.email=thermur@example.com",
+                "-c", "user.name=Thermur",
+                *command
+            ],
+            check = True,
+            cwd   = checkout.root
+        )
+
+    return checkout
 
 
 @fixture(autouse=True)
