@@ -6,4 +6,8 @@ format=plain
 offline=true
 [[ -z "${GITHUB_ACTIONS:-}" ]] || { format=github; offline=false; }
 
-ZIZMOR_OFFLINE=$offline zizmor --cache-dir .cache/zizmor --format "$format" .
+ZIZMOR_OFFLINE=$offline zizmor \
+  --cache-dir .cache/zizmor \
+  --format "$format" \
+  --strict-collection \
+  .

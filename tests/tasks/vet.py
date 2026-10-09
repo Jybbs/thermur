@@ -26,9 +26,10 @@ def test_zizmor_audits_online_under_github_actions_alone(
     stand_in     : Callable[[str, str], StandIn]
 ):
     """
-    Asserts that the task runs zizmor over the checkout with its cache under
-    `.cache/zizmor`, online and printing annotations where `GITHUB_ACTIONS`
-    is set, and offline in plain text where it is empty or unset.
+    Asserts that the task runs zizmor over the checkout with its cache
+    under `.cache/zizmor`, failing on a file it cannot validate, online and
+    printing annotations where `GITHUB_ACTIONS` is set, and offline in plain
+    text where it is empty or unset.
     """
     stand_in("zizmor", 'echo "$ZIZMOR_OFFLINE"\nprintf "%s\\n" "$@"')
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
@@ -42,5 +43,6 @@ def test_zizmor_audits_online_under_github_actions_alone(
         cwd            = pytestconfig.rootpath,
         text           = True
     ).stdout.splitlines() == [
-        offline, "--cache-dir", ".cache/zizmor", "--format", output, "."
+        offline, "--cache-dir", ".cache/zizmor", "--format",
+        output, "--strict-collection", "."
     ]
