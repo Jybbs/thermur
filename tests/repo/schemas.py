@@ -102,6 +102,7 @@ def test_a_parity_names_a_copy_that_drifts(copied: str | None, finding: Finding 
     [
         param(document, name, id=f"{document.__name__}.{name}")
         for document in Document.__subclasses__()
+        if "title" in document.model_config
         for name, info in document.model_fields.items()
         if info.is_required()
     ]
@@ -276,7 +277,12 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
             {"name": "Bug", "labels": []},
             id = "front-matter"
         ),
-        param(".md", "name: Bug\n---\n", None, id="no-front-matter")
+        param(
+            ".cff",
+            "date-released: 2026-10-02\n",
+            {"date-released": "2026-10-02"},
+            id = "timestamp"
+        )
     ]
 )
 def test_a_document_reads_the_value_its_suffix_names(
@@ -285,12 +291,21 @@ def test_a_document_reads_the_value_its_suffix_names(
     value  : object
 ):
     """
-    Asserts that a document's text reads as TOML under `.toml`, as YAML 1.2
-    under any other suffix, keeping `on` and a version as the strings they
-    are written as, and as the front matter alone under `.md`, ending at its
-    first closing `---` and reading as `None` where the file opens on none.
+    Asserts that a document's text reads as TOML under `.toml`, as YAML
+    1.2 under any other suffix, keeping `on`, a version, and a date as the
+    strings they are written as, and as the front matter alone under `.md`,
+    ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
+
+
+def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+    """
+    Asserts that a Markdown file whose text opens on anything but front
+    matter fails to read rather than reading as an empty document.
+    """
+    with raises(ValueError, match="opens on no front matter"):
+        Document.load(".md", "name: Bug\n---\n")
 
 
 @mark.parametrize(

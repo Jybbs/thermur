@@ -68,7 +68,8 @@ def stand_in(
     case writes there answers in place of the real one.
 
     Returns:
-        A writer taking the program's name and the `sh` lines it runs.
+        A writer taking the program's name and the `sh` lines it runs, and
+        returning the `StandIn` whose log holds each command it receives.
     """
     folder = tmp_path_factory.mktemp("bin")
     monkeypatch.setenv("PATH", str(folder), prepend=pathsep)

@@ -111,25 +111,25 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
     def load(suffix: str, text: str) -> object:
         """
         Reads `text`, the text of a file whose name ends on `suffix`, as
-        TOML where the suffix is `.toml`, as the YAML front matter opening a
-        Markdown file where it is `.md`, and as YAML otherwise.
-
-        Returns:
-            The value the text holds, or `None` where a Markdown file opens
-            on no front matter.
+        TOML where the suffix is `.toml`, as the YAML front matter opening
+        a Markdown file where it is `.md`, and as YAML otherwise, keeping a
+        YAML timestamp as its text.
 
         Raises:
-            ValueError: Where the TOML or the YAML fails to parse, which
+            ValueError: Where the TOML or the YAML fails to parse, or where
+                        a Markdown file opens on no front matter, which
                         validation reports against the whole document.
         """
         if suffix == ".toml":
             return loads(text)
 
         if suffix == ".md":
-            front = search(r"(?ms)\A---\n(.*?)^---$", text)
-            return from_yaml(front[1]) if front else None
+            if front := search(r"(?ms)\A---\n(.*?)^---$", text):
+                return from_yaml(front[1], parse_datetime=False)
 
-        return from_yaml(text)
+            raise ValueError("opens on no front matter")
+
+        return from_yaml(text, parse_datetime=False)
 
     @model_validator(mode="before")
     @classmethod

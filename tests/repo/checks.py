@@ -838,16 +838,16 @@ def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Che
 
 def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
     """
-    Asserts that a Markdown template whose front matter is gone, which
-    GitHub leaves out of its template chooser, is named on its file.
+    Asserts that a Markdown template opening on no front matter is named on
+    its file rather than read as naming no label.
     """
     edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
 
     assert LabelCheck(checkout=checkout).findings == [
         Finding(
             file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
-            message = "`.github/ISSUE_TEMPLATE/bug.md`: Input should be a valid "
-            "dictionary or instance of Template"
+            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
+            "front matter"
         )
     ]
 

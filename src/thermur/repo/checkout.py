@@ -83,14 +83,9 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     def scripts(self) -> list[Path]:
         """
         Lists every program in the folder the `_.path` of
-        `.mise/config.toml` puts on the path, leaving out a dotfile such as
-        the `.DS_Store` macOS writes into a folder Finder opens.
+        `.mise/config.toml` puts on the path.
         """
-        return [
-            path
-            for path in self.glob(f"{self.config.bin}/*")
-            if not path.name.startswith(".")
-        ]
+        return self.glob(f"{self.config.bin}/*")
 
     @cached_property
     def tasks(self) -> list[Task]:
@@ -112,10 +107,15 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
 
     def glob(self, pattern: str) -> list[Path]:
         """
-        Finds every file under the root matching `pattern`, relative to the
-        root and in path order.
+        Finds every file under the root matching `pattern`, relative to
+        the root and in path order, leaving out a dotfile such as the
+        `.DS_Store` macOS writes into a folder Finder opens.
         """
-        return sorted(path.relative_to(self.root) for path in self.root.glob(pattern))
+        return sorted(
+            path.relative_to(self.root)
+            for path in self.root.glob(pattern)
+            if not path.name.startswith(".")
+        )
 
     def read(self, path: Path) -> str:
         """

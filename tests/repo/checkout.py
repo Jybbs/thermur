@@ -1,6 +1,6 @@
 """
 Pins what `Checkout` lists for the checks, meaning the tasks mise lists for
-the clone and the programs on its path.
+the clone, the programs on its path, and its issue templates.
 """
 
 from common.edits import append, task
@@ -88,6 +88,20 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
     assert set(checkout.tasks) == {
         Task(file=path, run=(), source=path) for path in files
     }
+
+
+def test_templates_leaves_out_a_dotfile(checkout: Checkout):
+    """
+    Asserts that the issue templates are every file under
+    `.github/ISSUE_TEMPLATE/` but a `.DS_Store`, which holds no UTF-8 text,
+    in name order.
+    """
+    (checkout.root / ".github/ISSUE_TEMPLATE/.DS_Store").write_bytes(b"\x00\xff")
+
+    assert list(checkout.templates) == [
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md")
+    ]
 
 
 def test_the_root_resolves_through_a_symlink(
