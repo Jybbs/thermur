@@ -50,8 +50,9 @@ def test_a_digest_changes_wherever_the_code_does(
 ):
     """
     Asserts that a subpackage's digest changes with a statement, a data
-    file, or a new module, and holds through an edit to a docstring or a
-    comment and through the bytecode Python writes beside a module.
+    file, or a new module, and holds through an edit to a function's
+    docstring or a comment and through the bytecode Python writes beside
+    a module.
     """
     original = tmp_path / "original"
     original.mkdir()

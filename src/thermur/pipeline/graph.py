@@ -4,7 +4,8 @@ one `Settings` through a driver whose cache keeps each result under
 `.cache/hamilton/`, beside `Recorder`, which records each run of a recorded
 graph under `data/runs/`, and `NetcdfWriter`, which saves each table the
 run computes. Importing the module registers with Hamilton the saver and a
-fingerprint for each type whose values Hamilton's own fingerprints miss.
+fingerprint reading the values of each array, xarray object, and Pydantic
+record.
 """
 
 from dataclasses import dataclass
@@ -59,9 +60,9 @@ class NetcdfWriter(DataSaver):
         Writes `data` into the file at `path`.
 
         Returns:
-            The `path` the experiment tracker records, in place of the file
-            metadata Hamilton's own savers return, which calls the
-            deprecated `datetime.utcnow`.
+            The `path` the experiment tracker records, in place of the
+            `get_file_metadata` result Hamilton's own savers return, which
+            calls the deprecated `datetime.utcnow`.
         """
         data.to_netcdf(self.path, engine="h5netcdf")
         return {"path": self.path}
@@ -79,18 +80,22 @@ class Recorder(ExperimentTracker):
 
     def __init__(self, folder: Path, run: Run):
         """
-        Opens the folder of the run under `folder`, the `data/runs/` of
-        the clone.
+        Keeps `folder`, the `data/runs/` of the clone, and the `run` each
+        execution of the graph records.
         """
-        super().__init__(base_directory=str(folder), experiment_name="thermur")
-        self.run = run
+        self.folder = folder
+        self.run    = run
 
-    def run_after_graph_construction(self, **_: object):
+    def run_before_graph_execution(self, **kwargs: object):
         """
-        Stores the run's record as the configuration the tracker writes, in
-        place of the driver's configuration, which the graph leaves empty.
+        Opens a run of its own under `folder` for each execution of the
+        graph, since the tracker fixes its identifier and its folder when
+        built, and stores the run's record as the configuration the tracker
+        writes before recording the execution's inputs.
         """
+        super().__init__(base_directory=str(self.folder), experiment_name="thermur")
         self.config = self.run.model_dump(mode="json")
+        super().run_before_graph_execution(**kwargs)
 
 
 class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -207,9 +212,10 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 def fingerprint_array(array: Array | ndarray, *, depth: int = 0) -> str:
     """
     Fingerprints a NumPy or a JAX array by its shape, its dtype, and its
-    values, where Hamilton reads a NumPy array's bytes alone, which arrays
-    of zeros share at every shape, and gives every JAX array the one
-    fingerprint it gives an object it cannot read.
+    values, where Hamilton reads a NumPy array's bytes alone, which every
+    array of zeros spanning as many bytes shares whatever its shape or
+    dtype, and gives every JAX array the one fingerprint it gives an object
+    it cannot read.
     """
     values = asarray(array)
     return hash_value(
@@ -225,7 +231,7 @@ def fingerprint_dataset(data: DataArray | Dataset, *, depth: int = 0) -> str:
     Fingerprints a `DataArray` or a `Dataset` by every variable's name,
     dimensions, attributes, and values, which `to_dict` lays out as a
     mapping holding each variable's values as an array, where Hamilton reads
-    a `Dataset`'s variable names alone and nothing of a `DataArray`.
+    a `Dataset`'s data variable names alone and nothing of a `DataArray`.
     """
     return hash_value(data.to_dict(data="array"), depth=depth + 1)
 
@@ -245,7 +251,7 @@ def fingerprint_record(record: BaseModel, *, depth: int = 0) -> str:
 def fingerprint_tree(tree: DataTree, *, depth: int = 0) -> str:
     """
     Fingerprints a `DataTree` by the `Dataset` at each of its paths, where
-    Hamilton reads the tree's variable names alone.
+    Hamilton reads the names of the tree's variables and children alone.
     """
     return hash_value(tree.to_dict(), depth=depth + 1)
 

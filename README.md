@@ -7,7 +7,6 @@
 [![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
-[![Hydra](https://img.shields.io/badge/Config-Hydra--zen-89b8cd.svg)](https://github.com/mit-ll-responsible-ai/hydra-zen)
 [![WandB](https://img.shields.io/badge/Monitoring-Weights%20%26%20Biases-ffcc00.svg)](https://wandb.ai/Thermur/thermur-imitation/workspace)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 

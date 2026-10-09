@@ -14,10 +14,10 @@ from hamilton.caching.adapter        import CachingEventType
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
 from jax            import Array, numpy
 from json           import loads
-from numpy          import float32, ones, zeros
+from numpy          import float32, int32, ones, zeros
 from pathlib        import Path
 from pydantic       import BaseModel
-from pytest         import Config, fixture, mark, param
+from pytest         import Config, MonkeyPatch, fixture, mark, param
 from xarray         import DataArray, DataTree, Dataset, open_dataset, open_datatree
 from xarray.testing import assert_identical
 
@@ -74,7 +74,7 @@ def computed(graph: Graph) -> set[str]:
     ("one", "other"),
     [
         param(zeros((2, 3)), zeros((3, 2)), id="numpy-shape"),
-        param(zeros(3), zeros(6, float32), id="numpy-dtype"),
+        param(zeros(3, int32), zeros(3, float32), id="numpy-dtype"),
         param(numpy.zeros(3), numpy.ones(3), id="jax-values"),
         param(numpy.zeros((2, 3)), numpy.zeros((3, 2)), id="jax-shape"),
         param(
@@ -113,19 +113,20 @@ def computed(graph: Graph) -> set[str]:
             DataTree(Dataset({"t": ("x", ones(3))})),
             id = "tree-values"
         ),
+        param(
+            DataTree(Dataset({"t": ("x", zeros(3))}, attrs={"units": "K"})),
+            DataTree(Dataset({"t": ("x", zeros(3))}, attrs={"units": "C"})),
+            id = "tree-attributes"
+        ),
         param(Holder(numpy.zeros(3)), Holder(numpy.ones(3)), id="module-values"),
         param(Tuned(radius_m=1.0), Tuned(radius_m=2.0), id="record-values")
     ]
 )
-def test_values_differing_only_where_hamilton_cannot_read_fingerprint_apart(
-    one   : object,
-    other : object
-):
+def test_values_differing_in_any_part_fingerprint_apart(one: object, other: object):
     """
     Asserts that arrays sharing their bytes but not their shape or dtype,
-    and arrays, datasets, trees, and records holding them that differ
-    only in their values, each fingerprint apart, where Hamilton's own
-    fingerprints read them alike.
+    and arrays, datasets, trees, and records differing in a value, a
+    dimension, an attribute, or a name, each fingerprint apart.
     """
     assert hash_value(one) != hash_value(other)
 
@@ -234,17 +235,20 @@ def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
         assert_identical(saved, results["table"])
 
 
-def test_an_unrecorded_run_writes_nothing_under_data(
-    clone   : Checkout,
-    graphed : Callable[..., Graph]
+def test_an_unrecorded_run_saves_nothing(
+    clone       : Checkout,
+    graphed     : Callable[..., Graph],
+    monkeypatch : MonkeyPatch
 ):
     """
     Asserts that a graph that records nothing leaves the clone's `data/`
-    untouched.
+    untouched and saves no table into the working directory either.
     """
+    monkeypatch.chdir(clone.root)
     graphed().compute("grid", "table")
 
     assert not (clone.root / "data").exists()
+    assert not list(clone.root.rglob("*.nc"))
 
 
 def test_each_recorded_run_saves_its_tables_again(graphed: Callable[..., Graph]):
@@ -257,6 +261,22 @@ def test_each_recorded_run_saves_its_tables_again(graphed: Callable[..., Graph])
         graph.compute("table")
 
         assert (graph.recorder.run_directory / "table.nc").is_file()
+
+
+def test_each_run_of_one_graph_keeps_a_record_of_its_own(graphed: Callable[..., Graph]):
+    """
+    Asserts that two runs of one recorded graph each keep their record in a
+    folder of their own, so the second never replaces the first or lists the
+    table the first saved.
+    """
+    graph   = graphed(recorded=True)
+    records = []
+    for step in ("table", "grid"):
+        graph.compute(step)
+        records.append(loads(graph.recorder.cache.read(graph.recorder.run_id)))
+
+    assert len({record["run_dir"] for record in records}) == 2
+    assert [len(record["materialized"]) for record in records] == [1, 0]
 
 
 @mark.parametrize(

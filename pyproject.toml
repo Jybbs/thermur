@@ -6,6 +6,7 @@ requires      = ["hatchling==1.32.4"]
 authors         = [{ name = "James Parkington" }]
 dependencies    = [
     "apache-hamilton",
+    "equinox",
     "h5netcdf[h5py]",
     "jax",
     "numpy",
@@ -27,7 +28,6 @@ Repository = "https://github.com/Jybbs/thermur"
 
 [dependency-groups]
 dev = [
-    "equinox",
     "prose-formatter",
     "pytest",
     "pytest-cov",

@@ -96,20 +96,24 @@ class Subpackage(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
         `uv.lock`, so the result changes wherever the subpackage's code, a
         file it reads, or a library it imports does.
 
-        A module hashes as Hamilton hashes a node's own source, leaving out
-        its docstrings and comments, and any other file hashes by its bytes.
-        A `__pycache__` folder is left out, since Python writes it beside
-        the source on a run outside mise.
+        A module hashes as Hamilton hashes a node's own source, leaving
+        out every comment and each function's docstring while keeping the
+        module's, each class's, and each field's docstring, and any other
+        file hashes by its bytes. A `__pycache__` folder is left out, since
+        Python writes it beside the source on a run outside mise.
         """
         return hash_value(
-            {
-                str(path.relative_to(self.folder)): hash_source_code(
-                    path.read_text(encoding="utf-8"),
-                    strip = True
-                ) if path.suffix == ".py" else hash_value(path.read_bytes())
-                for path in self.folder.rglob("*")
-                if path.is_file() and "__pycache__" not in path.parts
-            } | {"uv.lock": lockfile}
+            (
+                {
+                    str(path.relative_to(self.folder)): hash_source_code(
+                        path.read_text(encoding="utf-8"),
+                        strip = True
+                    ) if path.suffix == ".py" else hash_value(path.read_bytes())
+                    for path in self.folder.rglob("*")
+                    if path.is_file() and "__pycache__" not in path.parts
+                },
+                lockfile
+            )
         )
 
     @classmethod
