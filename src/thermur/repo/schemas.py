@@ -230,9 +230,10 @@ class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     The label's color as six lowercase hex digits.
     """
 
-    description: str
+    description: Annotated[str, Field(max_length=100)]
     """
-    What the label covers, in one line.
+    What the label covers, in one line of at most the 100 characters
+    GitHub's label API accepts.
     """
 
     name: str

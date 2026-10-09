@@ -404,6 +404,19 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
             id = "registry-malformed"
         ),
         param(
+            ".github/labels.toml",
+            'description = "Wrong output or a broken run in any domain"',
+            f'description = "{"x" * 101}"',
+            [
+                (
+                    ".github/labels.toml",
+                    "`labels.0.description` in `.github/labels.toml`: String should "
+                    "have at most 100 characters"
+                )
+            ],
+            id = "registry-overlong-description"
+        ),
+        param(
             ".github/release.yml",
             '- labels: ["🐞 bug"]',
             "- labels:\n        - 🐛 bug",

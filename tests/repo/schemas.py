@@ -225,15 +225,20 @@ def test_a_malformed_registry_fails_at_the_key_it_breaks(
     assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == errors
 
 
-def test_a_label_writes_the_command_that_creates_or_updates_it():
+def test_a_label_description_runs_to_100_characters():
     """
-    Asserts that a label writes the `gh label create --force` command
-    carrying its color, its description, and its name, which creates the
-    label or updates the one already carrying that name.
+    Asserts that a description of 100 characters, the most GitHub's label
+    API accepts, validates, whereas one of 101 fails at the description.
     """
-    assert Label.model_validate(ROW).command == [
-        "gh", "label", "create", "--color", "8c055e",
-        "--description", "Wrong output", "--force", "🐞 bug"
+    assert len(
+        Label.model_validate(ROW | {"description": "x" * 100}).description
+    ) == 100
+
+    with raises(ValidationError) as error:
+        Label.model_validate(ROW | {"description": "x" * 101})
+
+    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
+        (("description",), "String should have at most 100 characters")
     ]
 
 
@@ -299,13 +304,16 @@ def test_a_document_reads_the_value_its_suffix_names(
     assert Document.load(suffix, text) == value
 
 
-def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+def test_a_label_writes_the_command_that_creates_or_updates_it():
     """
-    Asserts that a Markdown file whose text opens on anything but front
-    matter fails to read rather than reading as an empty document.
+    Asserts that a label writes the `gh label create --force` command
+    carrying its color, its description, and its name, which creates the
+    label or updates the one already carrying that name.
     """
-    with raises(ValueError, match="opens on no front matter"):
-        Document.load(".md", "name: Bug\n---\n")
+    assert Label.model_validate(ROW).command == [
+        "gh", "label", "create", "--color", "8c055e",
+        "--description", "Wrong output", "--force", "🐞 bug"
+    ]
 
 
 @mark.parametrize(
@@ -327,3 +335,12 @@ def test_a_template_reads_its_labels_from_a_list_or_one_string(
     removed, so an empty string names none.
     """
     assert Template.model_validate({"labels": labels}).labels == names
+
+
+def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+    """
+    Asserts that a Markdown file whose text opens on anything but front
+    matter fails to read rather than reading as an empty document.
+    """
+    with raises(ValueError, match="opens on no front matter"):
+        Document.load(".md", "name: Bug\n---\n")
