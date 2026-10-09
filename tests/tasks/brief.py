@@ -18,7 +18,7 @@ SHA = "0123456789abcdef0123456789abcdef01234567"
 
 
 @fixture
-def brief(
+def readout(
     load_task    : Callable[[str], ModuleType],
     monkeypatch  : MonkeyPatch,
     pytestconfig : Config
@@ -58,7 +58,7 @@ def brief(
             f"Jybbs/thermur/{path}@refs/pull/55/merge"
         )
         monkeypatch.setenv("NEEDS", dumps(needs))
-        return module.Brief.running()
+        return module.Readout.running()
 
     return build
 
@@ -101,9 +101,9 @@ def job(result: str = "success", **outputs: str) -> dict:
     ]
 )
 def test_each_workflow_renders_its_summary(
-    brief    : Callable[[str, dict], object],
     file     : str,
     needs    : dict,
+    readout  : Callable[[str, dict], object],
     snapshot : SnapshotAssertion
 ):
     """
@@ -111,7 +111,7 @@ def test_each_workflow_renders_its_summary(
     template, naming the coverage report the coverage row attached or the
     path the draft cut took, and that any other renders `base.md.j2`.
     """
-    assert brief(file, needs).summary == snapshot
+    assert readout(file, needs).summary == snapshot
 
 
 @mark.parametrize(
@@ -124,7 +124,7 @@ def test_each_workflow_renders_its_summary(
     ]
 )
 def test_the_verdict_passes_only_where_every_job_succeeded(
-    brief   : Callable[[str, dict], object],
+    readout : Callable[[str, dict], object],
     results : list[str],
     status  : int
 ):
@@ -134,13 +134,13 @@ def test_the_verdict_passes_only_where_every_job_succeeded(
     """
     needs = {f"job{index}": job(result) for index, result in enumerate(results)}
 
-    assert brief("warm.yml", needs).write() == status
+    assert readout("warm.yml", needs).write() == status
 
 
 def test_the_summary_appends_to_the_runner_s_summary_file(
-    brief       : Callable[[str, dict], object],
     capsys      : CaptureFixture[str],
     monkeypatch : MonkeyPatch,
+    readout     : Callable[[str, dict], object],
     tmp_path    : Path
 ):
     """
@@ -150,7 +150,7 @@ def test_the_summary_appends_to_the_runner_s_summary_file(
     page = tmp_path / "summary.md"
     page.write_text("earlier\n")
     monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(page))
-    gate = brief("warm.yml", {"kit": job()})
+    gate = readout("warm.yml", {"kit": job()})
 
     gate.write()
 
@@ -172,9 +172,9 @@ def test_the_summary_appends_to_the_runner_s_summary_file(
     ]
 )
 def test_the_commit_and_the_branch_prefer_the_pull_request_s_head(
-    brief       : Callable[[str, dict], object],
     commit      : str,
     monkeypatch : MonkeyPatch,
+    readout     : Callable[[str, dict], object],
     ref         : str,
     variables   : dict[str, str]
 ):
@@ -186,6 +186,6 @@ def test_the_commit_and_the_branch_prefer_the_pull_request_s_head(
     for name, value in variables.items():
         monkeypatch.setenv(name, value)
 
-    gate = brief("warm.yml", {})
+    gate = readout("warm.yml", {})
 
     assert (gate.commit, gate.ref) == (commit, ref)

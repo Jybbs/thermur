@@ -12,7 +12,7 @@ from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re      import findall, search, sub
+from re      import MULTILINE, findall, finditer, search, sub
 from yaml_rs import AliasLimits, YAMLDecodeError, loads
 
 from thermur.repo.checkout import Checkout
@@ -71,27 +71,77 @@ class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         yield from filter(None, (pair.finding for pair in self.pairs))
 
 
-class AliasCheck(Check):
+class AnchorCheck(Check):
     """
-    No composite action's manifest reuses a node through a YAML alias, since
-    GitHub's action-manifest parser rejects the anchor an alias names before
-    any step of a job loading the action runs, whereas a workflow may read
-    one.
+    No composite action's manifest carries a YAML anchor, since GitHub's
+    action-manifest parser rejects one before any step of a job loading the
+    action runs, whereas a workflow may carry one.
+
+    yaml-rs reports no anchor it reads, so the check scans the manifest's
+    text for one and keeps the parser's alias limit for an anchor the scan
+    passes over that an alias reads.
     """
+
+    @staticmethod
+    def anchors(text: str) -> list[str]:
+        """
+        Names each anchor `text` declares, meaning each `&` opening a node
+        at the start of a line, past a `-`, `?`, or `:` indicator and the
+        space after it, or past a flow indicator, and passes over the `&`
+        inside each of these:
+
+        - A quoted scalar
+        - A comment
+        - A block scalar, whose lines sit deeper than the line opening it
+        - A `${{ }}` expression GitHub evaluates
+        """
+        return [
+            match["anchor"]
+            for match in finditer(
+                r"(?<!\S)#.*|\$\{\{.*?\}\}"
+                r"|^(?P<lead> *+)(?:[-?] +)*(?:[^\n]*?:[ \t]+)?"
+                r"[|>][-+1-9]*[ \t]*(?:#.*)?\n(?:[ \t]*\n)*"
+                r"(?P<indent>(?P=lead) +)\S.*(?:\n(?P=indent).*|\n[ \t]*(?=\n))*"
+                r"|(?:^ *(?:[-?] +)*|:[ \t]+|[\[{,][ \t]*)"
+                r"(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'"
+                r"|(?:![^\s]*[ \t]+)?&(?P<anchor>[^\s,\[\]{}]+))",
+                text,
+                MULTILINE
+            )
+            if match["anchor"]
+        ]
+
+    @staticmethod
+    def replays(text: str) -> bool:
+        """
+        Tells whether `text` reuses a node through a YAML alias, which
+        yaml-rs reports by failing the read once its alias limit lets no
+        node be replayed, the manifests having already read cleanly without
+        it.
+        """
+        try:
+            loads(text, alias_limits=AliasLimits(max_total_replayed_events=0))
+        except YAMLDecodeError:
+            return True
+
+        return False
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names each manifest that yaml-rs fails to read once its alias limit
-        allows no node to be replayed, the manifests having already read
-        cleanly without it.
+        Names each anchor a manifest's text declares, or where the scan
+        finds none, a manifest reusing a node through an alias.
         """
         for path in self.checkout.actions:
-            try:
-                loads(
-                    self.checkout.read(path),
-                    alias_limits = AliasLimits(max_total_replayed_events=0)
-                )
-            except YAMLDecodeError:
+            text = self.checkout.read(path)
+            if names := self.anchors(text):
+                for name in names:
+                    yield Finding(
+                        file    = path,
+                        message = f"`{path}` declares the YAML anchor `&{name}`, "
+                        "which GitHub's action-manifest parser rejects"
+                    )
+
+            elif self.replays(text):
                 yield Finding(
                     file    = path,
                     message = f"`{path}` reuses a node through a YAML alias, whose "
@@ -418,12 +468,19 @@ class ProvisionCheck(Check):
     which GitHub only warns about before running the action on its defaults,
     and a push changing any file the action hashes into an archive's key
     runs each workflow saving that archive, so the change saves it afresh.
+
+    The `cache_key` a composite action passes `jdx/mise-action` ends on
+    a `-` and a `hashFiles` call, holding before them only the template
+    variables that stay fixed across the saves of one tool subset, since
+    `gha:prune` keeps the newest of the entries whose keys match up to that
+    `-`.
     """
 
     def scan(self) -> Iterator[Finding]:
         """
         Names each step passing an undeclared input, then each hashed file
-        whose change runs no workflow saving the archive.
+        whose change runs no workflow saving the archive, then each cache
+        key `gha:prune` cannot group by tool subset.
         """
         for name, path in self.checkout.composites.items():
             action = self.checkout.actions[path]
@@ -447,6 +504,32 @@ class ProvisionCheck(Check):
                         message = f"The push filter of `{home}` leaves out `{file}`, "
                         f"which `{path}` hashes"
                     )
+
+            for step in action.steps:
+                if not step.uses.startswith("jdx/mise-action@"):
+                    continue
+
+                if (archive := step.archive) is None:
+                    yield Finding(
+                        file    = path,
+                        message = f"`{path}` passes `jdx/mise-action` no `cache_key` "
+                        "ending on a `-` and a `hashFiles` call, whose hash "
+                        "`gha:prune` drops to group the saves of one tool subset"
+                    )
+                    continue
+
+                for variable in finditer(r"\$?\{\{\s*(.*?)\s*\}\}", archive):
+                    if variable[1] not in {
+                        "bootstrap_hash", "cache_key_prefix", "install_args_hash",
+                        "mise_env", "platform"
+                    }:
+                        yield Finding(
+                            file    = path,
+                            message = f"The `cache_key` in `{path}` holds "
+                            f"`{variable[0]}` before its `hashFiles` call, whereas "
+                            "only a value fixed across the saves of one tool subset "
+                            "keeps `gha:prune` grouping them"
+                        )
 
 
 class RunCheck(Check):

@@ -6,8 +6,8 @@
 # ///
 """
 Writes the summary of a workflow run and exits with the verdict of every job
-its gate waited on, as the `gha:brief` task the `🐦‍⬛ Brief` gate of each
-workflow runs. `Brief` fills in the template `.github/scripts/summaries/`
+its gate waited on, as the `gha:brief` task the `📡 Readout` gate of each
+workflow runs. `Readout` fills in the template `.github/scripts/summaries/`
 holds under the running workflow file's own name, or `base.md.j2` where it
 holds none, through minijinja.
 """
@@ -22,10 +22,11 @@ from typing      import Self
 
 
 @dataclass(frozen=True, kw_only=True)
-class Brief:
+class Readout:
     """
-    The gate job of one workflow run, holding the `needs` context of the
-    jobs it waited on beside what the runner's variables say of the run.
+    The `📡 Readout` gate of one workflow run, holding the `needs` context
+    of the jobs it waited on beside what the runner's variables say of the
+    run.
     """
 
     commit     : str
@@ -112,4 +113,4 @@ class Brief:
 
 
 if __name__ == "__main__":
-    raise SystemExit(Brief.running().write())
+    raise SystemExit(Readout.running().write())

@@ -198,6 +198,23 @@ class Step(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     """
 
     @property
+    def archive(self) -> str | None:
+        """
+        Reads the `cache_key` the step passes up to the `-` before the
+        `hashFiles` call ending it, which names the archive every save of
+        one tool subset shares.
+
+        Returns:
+            The key up to that `-`, or `None` where the step passes no
+            `cache_key` ending on a `-` and a `hashFiles` call.
+        """
+        key = fullmatch(
+            r"(.*)-\$\{\{\s*hashFiles\([^)]*\)\s*\}\}",
+            str(self.inputs.get("cache_key", ""))
+        )
+        return key[1] if key else None
+
+    @property
     def pin(self) -> tuple[str, str] | None:
         """
         Splits `uses` into the action from another repository and the commit

@@ -1,4 +1,4 @@
-::error file=.github/actions/provision/action.yml::`.github/actions/provision/action.yml` reuses a node through a YAML alias, whose anchor GitHub's action-manifest parser rejects
+::error file=.github/actions/provision/action.yml::`.github/actions/provision/action.yml` declares the YAML anchor `&depth`, which GitHub's action-manifest parser rejects
 ::error file=.mise/bin/pytest::`.mise/bin/pytest` is a symlink rather than a copy
 ::error file=.github/workflows/draft.yml::The pin on `actions/checkout` in `.github/workflows/draft.yml` reads `0f0f`, where the pin on it in `.github/actions/provision/action.yml` reads `3d3c42e5aac5ba805825da76410c181273ba90b1`
 ::error file=.github/workflows/ci.yml::The `gate` job in `.github/workflows/ci.yml` sets no name

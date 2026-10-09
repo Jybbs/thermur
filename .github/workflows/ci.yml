@@ -47,13 +47,13 @@ jobs:
     timeout-minutes : &timeout 15
 
   gate:
-    name    : 🐦‍⬛ Brief
+    name    : 📡 Readout
     if      : ${{ always() }}
     needs   : [check]
     runs-on : *image
 
     steps:
-      - name : Provision the tools the brief runs on
+      - name : Provision the tools the gate runs on
         uses : $/.github/actions/provision
         with : { tools: *package }
 

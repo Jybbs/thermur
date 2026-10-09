@@ -6,9 +6,9 @@
 {%- elif cut.state == "kept" %}
  Kept the draft of [*Thermur* {{ cut.version }}]({{ cut.url }}).
 {%- elif cut.state == "skipped" %}
- Drafted nothing, since [*Thermur* {{ cut.version }}]({{ cut.url }}) is already published.
+ Drafted nothing for the published [*Thermur* {{ cut.version }}]({{ cut.url }}).
 {%- elif cut.state == "unchanged" %}
- Drafted nothing, since the version stays at *Thermur* {{ cut.version }}.
+ Drafted nothing for the unchanged *Thermur* {{ cut.version }}.
 {%- else %}
  Drafted nothing.
 {%- endif %}

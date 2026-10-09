@@ -12,7 +12,7 @@ from shutil       import copystat
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import (
-    AliasCheck,
+    AnchorCheck,
     BinCheck,
     Check,
     CommitCheck,
@@ -568,7 +568,7 @@ def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkou
     [
         param("  gate:\n", "  brief:\n", f"`{CI}` ends on no `gate` job", id="no-gate"),
         param(
-            "    name    : 🐦‍⬛ Brief\n",
+            "    name    : 📡 Readout\n",
             "",
             f"The `gate` job in `{CI}` sets no name",
             id = "unnamed"
@@ -847,28 +847,168 @@ def test_a_step_outside_a_gate_writing_the_summary_is_named(
 
 
 @mark.parametrize(
-    ("alias", "named"),
-    [param("*depth", True, id="alias"), param("'false'", False, id="anchor")]
+    ("edits", "message"),
+    [
+        param(
+            {"default     : '1'": "default     : &depth '1'"},
+            f"`{ACTION}` declares the YAML anchor `&depth`, which GitHub's "
+            "action-manifest parser rejects",
+            id = "bare"
+        ),
+        param(
+            {
+                "default     : '1'"     : "default     : &depth '1'",
+                "default     : 'false'" : "default     : *depth"
+            },
+            f"`{ACTION}` declares the YAML anchor `&depth`, which GitHub's "
+            "action-manifest parser rejects",
+            id = "aliased"
+        ),
+        param(
+            {
+                "install_args : ${{ inputs.tools }}": "install_args : *depth",
+                "{ fetch-depth: ": '{ "fetch-depth":&depth '
+            },
+            f"`{ACTION}` reuses a node through a YAML alias, whose anchor GitHub's "
+            "action-manifest parser rejects",
+            id = "aliased-past-the-scan"
+        ),
+        param({"default     : '1'": "default     : 'a: &b'"}, None, id="quoted"),
+        param({"default     : '1'": "default     : '1'  # a: &b"}, None, id="comment"),
+        param({"commits the checkout": "commits & tags the checkout"}, None, id="prose")
+    ]
 )
-def test_an_alias_in_an_action_manifest_is_named(
-    alias    : str,
+def test_an_anchor_in_an_action_manifest_is_named(
     checkout : Checkout,
-    named    : bool
+    edits    : dict[str, str],
+    message  : str | None
 ):
     """
-    Asserts that a composite action's manifest reusing a node through an
-    alias is named, whereas an anchor no alias reads passes.
+    Asserts that a composite action's manifest declaring an anchor is
+    named for it, whether or not an alias reads it, that one reusing a node
+    through an anchor the scan passes over is named for the alias, and that
+    an `&` inside a quoted scalar, a comment, or prose passes.
     """
-    edit(checkout, ACTION, new="default     : &depth '1'", old="default     : '1'")
-    edit(checkout, ACTION, new=f"default     : {alias}", old="default     : 'false'")
+    for old, new in edits.items():
+        edit(checkout, ACTION, new=new, old=old)
 
-    assert AliasCheck(checkout=checkout).findings == [
+    assert AnchorCheck(checkout=checkout).findings == (
+        [Finding(file=Path(ACTION), message=message)] if message else []
+    )
+
+
+@mark.parametrize(
+    ("text", "anchors"),
+    [
+        param("a: &x 1\n", ["x"], id="value"),
+        param("&k key: v\n", ["k"], id="key"),
+        param("- &x\n  a: 1\n- - &y b\n", ["x", "y"], id="entries"),
+        param("a: [&x 1, {b: &y 2}]\n", ["x", "y"], id="flow"),
+        param("a: !!str &x '1'\n", ["x"], id="tagged"),
+        param('a: "x: &y"\nb: "c\\": &d"\n', [], id="double-quoted"),
+        param("a: 'it''s: &q'\n", [], id="single-quoted"),
+        param("a: 1  # c: &r\n# d: &s\n", [], id="comments"),
+        param("d: Tom & Jerry, R&D\n", [], id="prose"),
+        param("e: |\n  && next: &s\n\n  - &t\nf: &x 2\n", ["x"], id="block"),
+        param("- run: |\n    a: &s\n  shell: &x bash\n", ["x"], id="block-in-entry"),
+        param("a:\n  e: |\n  f: &x 1\n", ["x"], id="empty-block"),
+        param("if: ${{ !cancelled() && b }}\nc: { d: &x 1 }\n", ["x"], id="expression")
+    ]
+)
+def test_the_anchor_scan_reads_only_an_ampersand_opening_a_node(
+    anchors : list[str],
+    text    : str
+):
+    """
+    Asserts that the scan names an anchor on a value, a key, a sequence
+    entry, a flow node, or a tagged node, and passes over an `&` inside
+    a quoted scalar, a comment, prose, a block scalar, or a `${{ }}`
+    expression, while still reading the line after a block scalar.
+    """
+    assert AnchorCheck.anchors(text) == anchors
+
+
+@mark.parametrize(
+    ("old", "new", "held"),
+    [
+        param(
+            "-{{install_args_hash}}-",
+            "-{{version}}-{{install_args_hash}}-",
+            "{{version}}",
+            id = "version"
+        ),
+        param(
+            "-{{install_args_hash}}-",
+            "-{{install_args_hash}}-{{file_hash}}-",
+            "{{file_hash}}",
+            id = "file-hash"
+        ),
+        param(
+            "-{{install_args_hash}}-",
+            "-{{install_args_hash}}-${{ github.run_id }}-",
+            "${{ github.run_id }}",
+            id = "expression"
+        ),
+        param(
+            "mise-{{platform}}",
+            "mise-{{cache_key_prefix}}-{{mise_env}}-{{platform}}",
+            None,
+            id = "fixed"
+        )
+    ]
+)
+def test_a_cache_key_holding_a_value_that_can_change_is_named(
+    checkout : Checkout,
+    held     : str | None,
+    new      : str,
+    old      : str
+):
+    """
+    Asserts that the `cache_key` the composite action passes the mise action
+    is named for each value it holds before its `hashFiles` call that can
+    change between saves of one tool subset, and that the variables fixed
+    across those saves pass.
+    """
+    edit(checkout, ACTION, new=new, old=old)
+
+    assert ProvisionCheck(checkout=checkout).findings == [
         Finding(
             file    = Path(ACTION),
-            message = f"`{ACTION}` reuses a node through a YAML alias, whose anchor "
-            "GitHub's action-manifest parser rejects"
+            message = f"The `cache_key` in `{ACTION}` holds `{held}` before its "
+            "`hashFiles` call, whereas only a value fixed across the saves of one "
+            "tool subset keeps `gha:prune` grouping them"
         )
-    ] * named
+    ] * bool(held)
+
+
+@mark.parametrize(
+    ("old", "new"),
+    [
+        param("mise.lock') }}", "mise.lock') }}-v2", id="suffixed"),
+        param("{{install_args_hash}}-$", "{{install_args_hash}}$", id="joined"),
+        param("cache_key    :", "cache_prefix :", id="missing")
+    ]
+)
+def test_a_cache_key_ending_on_anything_but_its_hash_is_named(
+    checkout : Checkout,
+    new      : str,
+    old      : str
+):
+    """
+    Asserts that the composite action is named where the `cache_key` it
+    passes the mise action ends on anything but a `-` and a `hashFiles`
+    call, runs the call into the value before it, or is missing.
+    """
+    edit(checkout, ACTION, new=new, old=old)
+
+    assert ProvisionCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(ACTION),
+            message = f"`{ACTION}` passes `jdx/mise-action` no `cache_key` ending on a "
+            "`-` and a `hashFiles` call, whose hash `gha:prune` drops to group the "
+            "saves of one tool subset"
+        )
+    ]
 
 
 def test_an_undeclared_input_to_a_composite_action_is_named(checkout: Checkout):

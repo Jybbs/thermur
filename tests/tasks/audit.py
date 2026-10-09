@@ -64,7 +64,7 @@ def test_a_broken_checkout_fails_naming_each_finding(
     edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
     edit(checkout, action, new="default     : &depth '1'", old="default     : '1'")
     edit(checkout, action, new="default     : *depth", old="default     : 'false'")
-    edit(checkout, ".github/workflows/ci.yml", new="", old="    name    : 🐦‍⬛ Brief\n")
+    edit(checkout, ".github/workflows/ci.yml", new="", old="    name    : 📡 Readout\n")
     edit(checkout, ".mise/tasks/gha/brief.py", new="==2.23.0", old="==2.24.0")
     edit(
         checkout,
