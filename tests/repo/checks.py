@@ -17,7 +17,6 @@ from thermur.repo.checks   import (
 from thermur.repo.schemas  import Finding, Task
 
 FLOOR = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
-FORM  = "rather than as a list of double-quoted names, the one form the audit reads"
 SHELL = "#!/usr/bin/env -S bash -euo pipefail\n"
 
 
@@ -176,7 +175,7 @@ def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
         ),
         param(
             "CITATION.cff",
-            "  - family-names: Parkington\n    given-names: James\n",
+            "authors:\n  - family-names: Parkington\n    given-names: James\n",
             "",
             "The author list in `CITATION.cff` is missing, where the author list in "
             "`pyproject.toml` reads `James Parkington`",
@@ -407,11 +406,12 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
         param(
             ".github/release.yml",
             '- labels: ["🐞 bug"]',
-            "- labels:\n        - 🐞 bug",
+            "- labels:\n        - 🐛 bug",
             [
                 (
                     ".github/release.yml",
-                    f"`.github/release.yml` lists labels as `- labels:` {FORM}"
+                    "`.github/release.yml` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
                 ),
                 (
                     ".github/release.yml",
@@ -442,15 +442,15 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
         param(
             ".github/ISSUE_TEMPLATE/bug.md",
             'labels: ["🐞 bug"]',
-            "labels: 🐛 bug",
+            "labels: 🐛 bug, 🔬 discovery",
             [
                 (
                     ".github/ISSUE_TEMPLATE/bug.md",
-                    "`.github/ISSUE_TEMPLATE/bug.md` lists labels as "
-                    f"`labels: 🐛 bug` {FORM}"
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
                 )
             ],
-            id = "template-string"
+            id = "template-comma-delimited"
         ),
         param(
             ".github/ISSUE_TEMPLATE/bug.md",
@@ -459,8 +459,8 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
             [
                 (
                     ".github/ISSUE_TEMPLATE/bug.md",
-                    "`.github/ISSUE_TEMPLATE/bug.md` lists labels as "
-                    f"`labels: ['🐛 bug']` {FORM}"
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
                 )
             ],
             id = "template-single-quoted"
@@ -472,7 +472,8 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
             [
                 (
                     ".github/ISSUE_TEMPLATE/bug.md",
-                    f"`.github/ISSUE_TEMPLATE/bug.md` lists labels as `labels:` {FORM}"
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
                 )
             ],
             id = "template-block-list"
@@ -496,7 +497,8 @@ def test_a_file_disagreeing_with_the_label_registry_is_named(
 ):
     """
     Asserts that a release-notes category or an issue template naming a
-    label the registry does not declare, a declared label filed under no
+    label the registry does not declare, in any form YAML writes a list or
+    a template writes one string of names, a declared label filed under no
     category or under two, a guide describing a label otherwise or naming
     one the registry lacks, and a registry failing its own validation are
     each named on the file a reader opens to put it right.
@@ -710,6 +712,13 @@ def test_a_build_requirement_naming_a_range_is_named(
                 "and minor version"
             ],
             id = "unversioned-python"
+        ),
+        param(
+            "CITATION.cff",
+            "  - family-names: Parkington\n    given-names: James\n",
+            "",
+            ["`authors` in `CITATION.cff`: Input should be a valid list"],
+            id = "citation-authors-empty"
         )
     ]
 )
@@ -827,6 +836,92 @@ def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Che
     ]
 
 
+def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+    """
+    Asserts that a Markdown template whose front matter is gone, which
+    GitHub leaves out of its template chooser, is named on its file.
+    """
+    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
+            message = "`.github/ISSUE_TEMPLATE/bug.md`: Input should be a valid "
+            "dictionary or instance of Template"
+        )
+    ]
+
+
+@mark.parametrize(
+    ("name", "text", "findings"),
+    [
+        param(
+            "feature.yml",
+            'name: Feature\nlabels: ["✨ feature"]\n',
+            [
+                Finding(
+                    file    = Path(".github/ISSUE_TEMPLATE/feature.yml"),
+                    message = "`.github/ISSUE_TEMPLATE/feature.yml` names "
+                    "`✨ feature`, a label `.github/labels.toml` does not declare"
+                )
+            ],
+            id = "issue-form"
+        ),
+        param("config.yml", "blank_issues_enabled: false\n", [], id="chooser")
+    ]
+)
+def test_a_file_added_under_the_issue_templates_is_read(
+    checkout : Checkout,
+    name     : str,
+    text     : str,
+    findings : list[Finding]
+):
+    """
+    Asserts that an issue form under `.github/ISSUE_TEMPLATE/`, read beside
+    the Markdown templates, is named where it lists a label the registry
+    does not declare, whereas the template chooser's configuration, which
+    lists no labels, names none.
+    """
+    (checkout.root / ".github/ISSUE_TEMPLATE" / name).write_text(text)
+
+    assert LabelCheck(checkout=checkout).findings == findings
+
+
+@mark.parametrize(
+    ("check", "path", "old", "new"),
+    [
+        param(ParityCheck, "pyproject.toml", "[project]", "[project", id="toml"),
+        param(LabelCheck, ".github/release.yml", '["*"]', '["*"', id="yaml"),
+        param(
+            LabelCheck,
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            'labels: ["🐞 bug"',
+            id = "front-matter"
+        ),
+        param(ParityCheck, "CITATION.cff", "license: MIT", "license: [MIT", id="cff")
+    ]
+)
+def test_a_document_failing_to_parse_is_named_on_its_file(
+    check    : type[Check],
+    checkout : Checkout,
+    path     : str,
+    old      : str,
+    new      : str
+):
+    """
+    Asserts that a document whose TOML or YAML fails to parse, a Markdown
+    template's front matter among them, makes one finding on that document
+    carrying the parser's error rather than ending the audit.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert [
+        (finding.file, finding.message.startswith(f"`{path}`: Value error, "))
+        for finding in check(checkout=checkout).findings
+    ] == [(Path(path), True)]
+
+
 def test_a_validation_error_outside_the_documents_is_raised(
     checkout    : Checkout,
     monkeypatch : MonkeyPatch
@@ -844,25 +939,6 @@ def test_a_validation_error_outside_the_documents_is_raised(
 
     with raises(ValidationError):
         RunCheck(checkout=checkout).findings
-
-
-def test_an_issue_form_naming_an_undeclared_label_is_named(checkout: Checkout):
-    """
-    Asserts that an issue form under `.github/ISSUE_TEMPLATE/`, read beside
-    the Markdown templates, is named where it lists a label the registry
-    does not declare.
-    """
-    (checkout.root / ".github/ISSUE_TEMPLATE/feature.yml").write_text(
-        'name: Feature\nlabels: ["✨ feature"]\n'
-    )
-
-    assert LabelCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".github/ISSUE_TEMPLATE/feature.yml"),
-            message = "`.github/ISSUE_TEMPLATE/feature.yml` names `✨ feature`, a "
-            "label `.github/labels.toml` does not declare"
-        )
-    ]
 
 
 @mark.parametrize(

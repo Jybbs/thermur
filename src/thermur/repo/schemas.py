@@ -1,9 +1,11 @@
 """
 Holds the records the repository audit reads and reports, meaning the
-`Manifest` with its `Author` rows, the `Config`, and the `Labels` with
-their `Label` rows, each validated out of the checkout's TOML through their
-`Document` base, each `Task` mise lists, and each `Finding` a check makes
-beside each `Parity` a check compares.
+`Manifest` with its `Author` rows, the `Config`, and the `Labels` with their
+`Label` rows validated out of the checkout's TOML, and the `Release` with
+its `Category` rows, each `Template`, and the `Citation` with its `Person`
+rows validated out of its YAML, all through their `Document` base. Beside
+them sit each `Task` mise lists and each `Finding` a check makes beside each
+`Parity` a check compares.
 """
 
 from collections            import Counter
@@ -18,11 +20,15 @@ from pydantic               import (
     BeforeValidator,
     Field,
     PlainValidator,
-    field_validator
+    ValidationError,
+    ValidationInfo,
+    field_validator,
+    model_validator
 )
 from re      import search
 from tomllib import loads
 from typing  import Annotated, Self
+from yaml_rs import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
@@ -48,6 +54,17 @@ def read_commands(run: Iterable[str | dict]) -> list[str]:
     return [line for line in run if isinstance(line, str)]
 
 
+def read_labels(labels: str | list[str]) -> list[str]:
+    """
+    Reads the labels an issue template lists, which GitHub takes as a list
+    or as one string separating them by commas.
+    """
+    if isinstance(labels, str):
+        return list(filter(None, map(str.strip, labels.split(","))))
+
+    return labels
+
+
 def read_minor(version: str) -> str:
     """
     Reads the first `<major>.<minor>` in `version`, so `>=3.14` and `3.14.8`
@@ -63,29 +80,112 @@ def read_minor(version: str) -> str:
     raise ValueError("names no major and minor version")
 
 
+class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One release-notes category `.github/release.yml` declares.
+    """
+
+    labels: list[str]
+    """
+    The labels any one of which files a pull request under the category,
+    where `*` files every pull request no earlier category takes.
+    """
+
+
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    A TOML file of the checkout, declaring the fields the checks read and
-    titled with the file's path from the root, which a validation error
-    carries as its title.
+    A TOML or YAML file of the checkout, declaring the fields the checks
+    read and validated from the file's text, whose validation error carries
+    the file's path from the root as its title.
     """
 
     @property
     def file(self) -> Path:
         """
-        Reads the path of the file the model validates, relative to the
+        Reads the path of the file a titled model validates, relative to the
         root, out of its title.
         """
         return Path(self.model_config["title"])
 
+    @staticmethod
+    def load(suffix: str, text: str) -> object:
+        """
+        Reads `text`, the text of a file whose name ends on `suffix`, as
+        TOML where the suffix is `.toml`, as the YAML front matter opening a
+        Markdown file where it is `.md`, and as YAML otherwise.
+
+        Returns:
+            The value the text holds, or `None` where a Markdown file opens
+            on no front matter.
+
+        Raises:
+            ValueError: Where the TOML or the YAML fails to parse, which
+                        validation reports against the whole document.
+        """
+        if suffix == ".toml":
+            return loads(text)
+
+        if suffix == ".md":
+            front = search(r"(?ms)\A---\n(.*?)^---$", text)
+            return from_yaml(front[1]) if front else None
+
+        return from_yaml(text)
+
+    @model_validator(mode="before")
     @classmethod
-    def read(cls, root: Path) -> Self:
+    def parse(cls, data: object, info: ValidationInfo) -> object:
         """
-        Validates the file at the path the title names under `root`.
+        Reads text through `load` under the suffix the context names,
+        passing a mapping already read through unchanged.
         """
-        return cls.model_validate(
-            loads((root / cls.model_config["title"]).read_text(encoding="utf-8"))
-        )
+        if not isinstance(data, str):
+            return data
+
+        return cls.load(info.context["suffix"], data)
+
+    @classmethod
+    def read(cls, root: Path, path: Path | None = None) -> Self:
+        """
+        Validates the file at `path` under `root`, or at the path the title
+        names where `path` is `None`.
+
+        Raises:
+            ValidationError: Titled with the file's path, where the file
+                             fails to parse or to validate.
+        """
+        path = Path(path or cls.model_config["title"])
+        try:
+            return cls.model_validate(
+                (root / path).read_text(encoding="utf-8"),
+                context = {"suffix": path.suffix}
+            )
+        except ValidationError as error:
+            raise ValidationError.from_exception_data(
+                str(path),
+                error.errors()
+            ) from None
+
+
+class Config(Document, title=".mise/config.toml"):
+    """
+    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
+    the path.
+    """
+
+    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
+    """
+    The folder `_.path` puts on the path, relative to the root.
+    """
+
+    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
+    """
+    The major and minor of the `python` mise pins.
+    """
+
+    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
+    """
+    The `uv` release mise pins.
+    """
 
 
 class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -117,28 +217,6 @@ class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             str.maketrans(escapes | {",": "%2C", ":": "%3A"})
         )
         return f"::error file={place}::{self.message.translate(str.maketrans(escapes))}"
-
-
-class Config(Document, title=".mise/config.toml"):
-    """
-    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
-    the path.
-    """
-
-    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
-    """
-    The folder `_.path` puts on the path, relative to the root.
-    """
-
-    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
-    """
-    The major and minor of the `python` mise pins.
-    """
-
-    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
-    """
-    The `uv` release mise pins.
-    """
 
 
 class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -221,6 +299,65 @@ class Labels(Document, extra="forbid", title=".github/labels.toml"):
         return rows
 
 
+class Citation(Document, title="CITATION.cff"):
+    """
+    The declarations `CITATION.cff` restates from the manifest, each `None`
+    where the file leaves it out.
+    """
+
+    authors: list[Person] = []
+    """
+    The people the citation credits, in the order it names them.
+    """
+
+    license: str | None = None
+    """
+    The SPDX expression the citation declares.
+    """
+
+    repository: str | None = Field(None, validation_alias="repository-code")
+    """
+    The address of the repository holding the code.
+    """
+
+    version: str | None = None
+    """
+    The release the citation cites.
+    """
+
+    @property
+    def holders(self) -> str:
+        """
+        Joins the authors' names the way a copyright line names its holders.
+        """
+        return join_names([person.name for person in self.authors])
+
+
+class Person(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One person `CITATION.cff` credits, as the Citation File Format writes
+    a person.
+    """
+
+    family: str = Field(validation_alias="family-names")
+    """
+    The person's family names.
+    """
+
+    given: str = Field(validation_alias="given-names")
+    """
+    The person's given names.
+    """
+
+    @property
+    def name(self) -> str:
+        """
+        Joins the given names and the family names, the order a copyright
+        line gives them in.
+        """
+        return f"{self.given} {self.family}"
+
+
 class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     One declaration a file restates beside the declaration it restates, each
@@ -271,6 +408,45 @@ class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
             message = f"{self.label} {reading}, where {self.origin} reads "
             f"`{self.original}`"
         )
+
+
+class Template(Document):
+    """
+    One issue template under `.github/ISSUE_TEMPLATE/`, either a Markdown
+    file whose front matter declares it or an issue form.
+    """
+
+    labels: Annotated[list[str], BeforeValidator(read_labels)] = []
+    """
+    The labels an issue opened from the template takes.
+    """
+
+
+class Release(Document, title=".github/release.yml"):
+    """
+    The release-notes categories `.github/release.yml` declares.
+    """
+
+    categories: list[Category] = Field(
+        validation_alias = AliasPath("changelog", "categories")
+    )
+    """
+    The categories, in the order GitHub tries them, filing a pull request
+    under the first whose labels it carries.
+    """
+
+    @property
+    def names(self) -> list[str]:
+        """
+        Lists each label a category names, in the order the categories name
+        them, leaving out the `*` that names no label.
+        """
+        return [
+            name
+            for category in self.categories
+            for name in category.labels
+            if name != "*"
+        ]
 
 
 class Manifest(Document, title="pyproject.toml"):

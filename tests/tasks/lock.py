@@ -5,11 +5,12 @@ summary line the pinned mise prints for a lock it writes in full, which the
 task reads to fail where `mise lock` skips a platform, as it does offline.
 """
 
-from collections.abc import Callable
-from pathlib         import Path
-from pytest          import Config, FixtureRequest, MonkeyPatch, fixture, mark, param
-from subprocess      import CompletedProcess, run
-from tomllib         import loads
+from collections.abc  import Callable
+from common.stand_ins import StandIn
+from pathlib          import Path
+from pytest           import Config, FixtureRequest, MonkeyPatch, fixture, mark, param
+from subprocess       import CompletedProcess, run
+from tomllib          import loads
 
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
 SUMMARY = "✓ Updated 14 platform entries ({skipped} skipped)"
@@ -31,7 +32,7 @@ def checked(copy: Path) -> CompletedProcess:
 @fixture
 def copy(
     pytestconfig : Config,
-    stand_in     : Callable[[str, str], None],
+    stand_in     : Callable[[str, str], StandIn],
     tmp_path     : Path
 ) -> Path:
     """
@@ -47,7 +48,7 @@ def copy(
     return tmp_path
 
 
-def test_a_current_lock_passes(copy: Path, stand_in: Callable[[str, str], None]):
+def test_a_current_lock_passes(copy: Path, stand_in: Callable[[str, str], StandIn]):
     """
     Asserts that the task exits `0` where `uv.lock` is current, `mise lock`
     writes every platform and changes nothing, and the dry run installs
@@ -74,7 +75,7 @@ def test_a_current_lock_passes(copy: Path, stand_in: Callable[[str, str], None])
 
 def test_a_failing_uv_check_stops_before_mise_runs(
     copy     : Path,
-    stand_in : Callable[[str, str], None]
+    stand_in : Callable[[str, str], StandIn]
 ):
     """
     Asserts that a `uv.lock` lagging its manifest fails the task with `uv`'s
@@ -88,7 +89,7 @@ def test_a_failing_uv_check_stops_before_mise_runs(
 
 def test_a_rewritten_lock_fails_and_is_restored(
     copy     : Path,
-    stand_in : Callable[[str, str], None]
+    stand_in : Callable[[str, str], StandIn]
 ):
     """
     Asserts that a `mise lock` rewriting `.mise/mise.lock` fails the task,
@@ -111,7 +112,7 @@ def test_a_rewritten_lock_fails_and_is_restored(
 
 
 @fixture
-def mise(request: FixtureRequest, stand_in: Callable[[str, str], None]):
+def mise(request: FixtureRequest, stand_in: Callable[[str, str], StandIn]):
     """
     Writes a stand-in `mise` running the `sh` lines a case passes through
     `request.param`.

@@ -5,19 +5,18 @@ each found through `Check.__subclasses__()` rather than through a list kept
 beside them.
 """
 
-from abc             import abstractmethod
-from collections     import Counter
-from collections.abc import Iterator
-from filecmp         import cmp
-from functools       import cached_property
+from collections            import Counter
+from collections.abc        import Iterator
+from filecmp                import cmp
+from functools              import cached_property
 from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re import findall, fullmatch, search, sub
+from re import findall, search, sub
 
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Parity, join_names
+from thermur.repo.schemas  import Finding, Parity
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -46,17 +45,30 @@ class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             return [
                 Finding(
                     file    = Path(error.title),
-                    message = f"`{'.'.join(map(str, detail['loc']))}` in "
-                    f"`{error.title}`: {detail['msg']}"
+                    message = (
+                        f"`{'.'.join(map(str, detail['loc']))}` in "
+                        if detail["loc"]
+                        else ""
+                    ) + f"`{error.title}`: {detail['msg']}"
                 )
                 for detail in error.errors()
             ]
 
-    @abstractmethod
+    @property
+    def pairs(self) -> list[Parity]:
+        """
+        Pairs each declaration a file restates with the one it restates,
+        which a check comparing no restated declarations leaves empty.
+        """
+        return []
+
     def scan(self) -> Iterator[Finding]:
         """
-        Reads the checkout for every place it breaks this invariant.
+        Reads the checkout for every place it breaks this invariant, which
+        for a check comparing restated declarations is each pair whose copy
+        reads anything but the original.
         """
+        yield from filter(None, (pair.finding for pair in self.pairs))
 
 
 class BinCheck(Check):
@@ -98,10 +110,6 @@ class LabelCheck(Check):
     release-notes categories file each label it declares under one category,
     the issue templates and the contributor guide name only labels it
     declares, and the guide describes each label as the registry does.
-
-    The categories and the templates list their labels in YAML, read here as
-    the double-quoted names on each `labels:` line, so a line listing them
-    in any other form is named rather than read as naming no label.
     """
 
     @cached_property
@@ -124,71 +132,48 @@ class LabelCheck(Check):
         return Path(".github/CONTRIBUTING.md")
 
     @property
-    def listed(self) -> dict[Path, list[str]]:
-        """
-        Maps the release-notes categories and each file under
-        `.github/ISSUE_TEMPLATE/` to every `labels:` line it holds.
-        """
-        root = self.checkout.root
-        return {
-            file: findall(r"(?m)^\s*(?:- )?labels:.*$", self.checkout.read(file))
-            for file in [
-                self.release,
-                *sorted(
-                    path.relative_to(root)
-                    for path in root.glob(".github/ISSUE_TEMPLATE/*")
-                )
-            ]
-        }
-
-    @property
     def named(self) -> dict[Path, list[str]]:
         """
         Maps each file naming labels to every label it names, in the order
         it names them, meaning the release-notes categories, each issue
-        template, and the contributor guide. The categories' `*`, which
-        files every pull request no earlier category takes, names no label.
+        template, and the contributor guide.
         """
-        return {
-            file: [
-                name
-                for line in lines
-                for name in findall(r'"(.+?)"', line)
-                if name != "*"
-            ]
-            for file, lines in self.listed.items()
-        } | {self.guide: list(self.described)}
+        release = self.checkout.release
+        return (
+            {release.file: release.names}
+            | {
+                path: template.labels
+                for path, template in self.checkout.templates.items()
+            }
+            | {self.guide: list(self.described)}
+        )
 
     @property
-    def release(self) -> Path:
+    def pairs(self) -> list[Parity]:
         """
-        Names the release-notes categories, relative to the root.
+        Pairs the description the contributor guide gives each label with
+        the one the registry declares.
         """
-        return Path(".github/release.yml")
+        labels = self.checkout.labels
+        return [
+            Parity(
+                copied   = self.described.get(label.name),
+                file     = self.guide,
+                label    = f"The description of `{label.name}` in `{self.guide}`",
+                origin   = f"its description in `{labels.file}`",
+                original = label.description
+            )
+            for label in labels.rows
+        ]
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names each `labels:` line in a form the audit reads no names from,
-        then each label a file names that the registry does not declare,
+        Names each label a file names that the registry does not declare,
         then each declared label the categories file under any number of
-        categories but one, then each the guide describes otherwise.
+        categories but one, then each label the guide describes otherwise.
         """
         labels = self.checkout.labels
-        named  = self.named
-        for file, lines in self.listed.items():
-            for line in lines:
-                if not fullmatch(
-                    r'\s*(?:- )?labels: \[(?:"[^"]+"(?:, "[^"]+")*)?\]',
-                    line
-                ):
-                    yield Finding(
-                        file    = file,
-                        message = f"`{file}` lists labels as `{line.strip()}` rather "
-                        "than as a list of double-quoted names, the one form the audit "
-                        "reads"
-                    )
-
-        for file, names in named.items():
+        for file, names in self.named.items():
             for name in dict.fromkeys(names):
                 if name not in labels.names:
                     yield Finding(
@@ -197,28 +182,17 @@ class LabelCheck(Check):
                         "does not declare"
                     )
 
-        filed = Counter(named[self.release])
+        release = self.checkout.release
+        filed   = Counter(release.names)
         for name in labels.names:
             if filed[name] != 1:
                 yield Finding(
-                    file    = self.release,
-                    message = f"`{self.release}` files `{name}` under "
+                    file    = release.file,
+                    message = f"`{release.file}` files `{name}` under "
                     f"{filed[name] or 'no'} release-notes categories rather than one"
                 )
 
-        yield from filter(
-            None,
-            (
-                Parity(
-                    copied   = self.described.get(label.name),
-                    file     = self.guide,
-                    label    = f"The description of `{label.name}` in `{self.guide}`",
-                    origin   = f"its description in `{labels.file}`",
-                    original = label.description
-                ).finding
-                for label in labels.rows
-            )
-        )
+        yield from super().scan()
 
 
 class ParityCheck(Check):
@@ -233,8 +207,7 @@ class ParityCheck(Check):
     `[tool.uv]` requires, and the manifest's license and authors are what
     the README's badge and the title and the copyright line of `LICENSE`
     restate. `CITATION.cff` restates the manifest's version, license,
-    repository, and authors, each read off the lines naming it with any
-    quotes around it set aside.
+    repository, and authors.
     """
 
     @property
@@ -242,23 +215,14 @@ class ParityCheck(Check):
         """
         Pairs each restated declaration with the one it restates.
         """
-        citation_path = Path("CITATION.cff")
-        config        = self.checkout.config
-        manifest      = self.checkout.manifest
-        license_path  = Path("LICENSE")
-        readme        = self.checkout.read(manifest.readme)
-        notice        = self.checkout.read(license_path)
-        citation      = self.checkout.read(citation_path)
-        badge         = self.extract(r"badge/License-((?:--|[^-])+)-", readme)
-        python        = f"the floor of `requires-python` in `{manifest.file}`"
-        value         = r"""["']?(.+?)["']?"""
-        cited         = [
-            f"{given} {family}"
-            for family, given in findall(
-                rf"(?m)^\s*- family-names: {value}\n\s+given-names: {value}$",
-                citation
-            )
-        ]
+        citation     = self.checkout.citation
+        config       = self.checkout.config
+        manifest     = self.checkout.manifest
+        license_path = Path("LICENSE")
+        readme       = self.checkout.read(manifest.readme)
+        notice       = self.checkout.read(license_path)
+        badge        = self.extract(r"badge/License-((?:--|[^-])+)-", readme)
+        python       = f"the floor of `requires-python` in `{manifest.file}`"
 
         return [
             Parity(
@@ -312,22 +276,25 @@ class ParityCheck(Check):
             ),
             *(
                 Parity(
-                    copied   = self.extract(rf"(?m)^{key}: {value}$", citation),
-                    file     = citation_path,
-                    label    = f"The `{key}` in `{citation_path}`",
+                    copied   = copied,
+                    file     = citation.file,
+                    label    = f"The `{key}` in `{citation.file}`",
                     origin   = f"the `{name}` in `{manifest.file}`",
                     original = original
                 )
-                for key, name, original in (
-                    ("license", "license", manifest.license),
-                    ("repository-code", "Repository", manifest.repository),
-                    ("version", "version", manifest.version)
+                for key, copied, name, original in (
+                    ("license", citation.license, "license", manifest.license),
+                    (
+                        "repository-code", citation.repository,
+                        "Repository", manifest.repository
+                    ),
+                    ("version", citation.version, "version", manifest.version)
                 )
             ),
             Parity(
-                copied   = join_names(cited) or None,
-                file     = citation_path,
-                label    = f"The author list in `{citation_path}`",
+                copied   = citation.holders or None,
+                file     = citation.file,
+                label    = f"The author list in `{citation.file}`",
                 origin   = f"the author list in `{manifest.file}`",
                 original = manifest.holders
             )
@@ -340,13 +307,6 @@ class ParityCheck(Check):
         `None` where nothing matches.
         """
         return match[1] if (match := search(pattern, text)) else None
-
-    def scan(self) -> Iterator[Finding]:
-        """
-        Names each restated declaration that reads anything but the one
-        it restates.
-        """
-        yield from filter(None, (pair.finding for pair in self.pairs))
 
 
 class PinCheck(Check):

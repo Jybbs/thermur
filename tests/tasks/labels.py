@@ -6,9 +6,9 @@ stops it from writing anything unanswered.
 """
 
 from collections.abc  import Callable
-from pathlib          import Path
-from pytest           import CaptureFixture, MonkeyPatch, TempPathFactory, fixture, mark, param, raises
-from shlex            import join, quote
+from common.stand_ins import StandIn
+from pytest           import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
+from shlex            import join
 from subprocess       import CalledProcessError, DEVNULL, run
 from syrupy.assertion import SnapshotAssertion
 from types            import ModuleType
@@ -16,50 +16,26 @@ from types            import ModuleType
 from thermur.repo.checkout import Checkout
 
 
-def logged(log: Path) -> list[str]:
-    """
-    Reads each command the stand-in `gh` received out of `log`, quoted as a
-    shell reads it.
-    """
-    return [
-        join(["gh", *record.split("\0")[:-1]])
-        for record in log.read_text(encoding="utf-8").splitlines()
-    ]
-
-
 @fixture
-def log(
-    stand_in         : Callable[[str, str], None],
-    tmp_path_factory : TempPathFactory
-) -> Path:
+def gh(stand_in: Callable[[str, str], StandIn]) -> StandIn:
     """
-    Puts a stand-in `gh` on the path that writes each command it receives
-    to a log outside the copy of the checkout, one command a line with each
-    argument closed by a NUL. It answers `api` with the live labels a `live`
-    file beside the log names and exits with the status a `status` file
-    there holds on every other command, `0` where none is written.
-
-    Returns:
-        The log's path.
+    Puts a stand-in `gh` on the path that answers `api` with the live labels
+    `LIVE` holds and exits with the status `GH_STATUS` names on every other
+    command, `0` where none is set.
     """
-    folder = tmp_path_factory.mktemp("gh")
-    stand_in(
+    return stand_in(
         "gh",
-        f"cd {quote(str(folder))}\n"
-        "printf '%s\\0' \"$@\" >> log\n"
-        "printf '\\n' >> log\n"
-        '[ "$1" = api ] && exec cat live\n'
-        "exit $(cat status 2>/dev/null || echo 0)"
+        '[ "$1" = api ] && printf "%s" "$LIVE" && exit 0\n'
+        'exit "${GH_STATUS:-0}"'
     )
-    return folder / "log"
 
 
 @fixture
 def synced(
     capsys      : CaptureFixture[str],
     checkout    : Checkout,
+    gh          : StandIn,
     load_task   : Callable[[str], ModuleType],
-    log         : Path,
     monkeypatch : MonkeyPatch
 ) -> Callable[[list[str]], tuple[list[str], list[str]]]:
     """
@@ -76,28 +52,29 @@ def synced(
         Runs the task's `main` with `gh` answering `api` with `live`, one
         name a line.
         """
-        (log.parent / "live").write_text("".join(f"{name}\n" for name in live))
+        monkeypatch.setenv("LIVE", "\n".join(live))
         load_task(".mise/tasks/repo/labels.py").main()
-        return logged(log), capsys.readouterr().out.splitlines()
+        return gh.commands, capsys.readouterr().out.splitlines()
 
     return sync
 
 
 def test_a_failed_write_stops_the_task_before_any_other(
-    checkout : Checkout,
-    log      : Path,
-    synced   : Callable[[list[str]], tuple[list[str], list[str]]]
+    checkout    : Checkout,
+    gh          : StandIn,
+    monkeypatch : MonkeyPatch,
+    synced      : Callable[[list[str]], tuple[list[str], list[str]]]
 ):
     """
     Asserts that a `label create` that `gh` fails stops the task there,
     sending neither the next label nor the read of the live labels.
     """
-    (log.parent / "status").write_text("1\n")
+    monkeypatch.setenv("GH_STATUS", "1")
 
     with raises(CalledProcessError):
         synced([])
 
-    assert logged(log) == [join(checkout.labels.rows[0].command)]
+    assert gh.commands == [join(checkout.labels.rows[0].command)]
 
 
 def test_each_label_is_written_then_every_live_label_read(
@@ -145,7 +122,7 @@ def test_each_live_label_the_registry_omits_is_listed(
 
 def test_nothing_is_written_without_an_answer_to_the_prompt(
     checkout : Checkout,
-    log      : Path
+    gh       : StandIn
 ):
     """
     Asserts that mise stops the task on its prompt where no terminal can
@@ -161,4 +138,4 @@ def test_nothing_is_written_without_an_answer_to_the_prompt(
 
     assert prompted.returncode == 1
     assert "requires confirmation" in prompted.stderr
-    assert not log.exists()
+    assert gh.commands == []

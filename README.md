@@ -486,7 +486,7 @@ thermur/
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads
-├── pyproject.toml                  # Package configuration, with packaging and pydantic for the audit
+├── pyproject.toml                  # Package configuration, with packaging, pydantic, and yaml-rs for the audit
 └── uv.lock                         # Locked dependencies
 ```
 

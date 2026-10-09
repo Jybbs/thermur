@@ -1,7 +1,7 @@
 """
 Holds `Checkout`, the clone the repository audit reads, which keeps each
 document it validates for every later check that reads it and lists the
-tasks and the programs the clone runs.
+tasks, the programs, and the issue templates the clone holds.
 """
 
 from functools  import cached_property
@@ -10,7 +10,9 @@ from pydantic   import AfterValidator, BaseModel, Field, TypeAdapter
 from subprocess import check_output
 from typing     import Annotated
 
-from thermur.repo.schemas import Config, Labels, Manifest, Task
+from thermur.repo.schemas import (
+    Citation, Config, Labels, Manifest, Release, Task, Template
+)
 
 
 class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -26,6 +28,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     The folder holding `pyproject.toml`, resolved through any symlink, the
     working directory by default.
     """
+
+    @cached_property
+    def citation(self) -> Citation:
+        """
+        Validates `CITATION.cff`.
+        """
+        return Citation.read(self.root)
 
     @cached_property
     def config(self) -> Config:
@@ -64,17 +73,24 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         return Manifest.read(self.root)
 
     @cached_property
+    def release(self) -> Release:
+        """
+        Validates `.github/release.yml`.
+        """
+        return Release.read(self.root)
+
+    @cached_property
     def scripts(self) -> list[Path]:
         """
         Lists every program in the folder the `_.path` of
         `.mise/config.toml` puts on the path, leaving out a dotfile such as
         the `.DS_Store` macOS writes into a folder Finder opens.
         """
-        return sorted(
-            path.relative_to(self.root)
-            for path in (self.root / self.config.bin).iterdir()
+        return [
+            path
+            for path in self.glob(f"{self.config.bin}/*")
             if not path.name.startswith(".")
-        )
+        ]
 
     @cached_property
     def tasks(self) -> list[Task]:
@@ -82,6 +98,24 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Keeps each task mise lists that a file under the root declares.
         """
         return [task for task in self.listed if task.source.is_relative_to(self.root)]
+
+    @cached_property
+    def templates(self) -> dict[Path, Template]:
+        """
+        Validates each issue template under `.github/ISSUE_TEMPLATE/`, by
+        its path.
+        """
+        return {
+            path: Template.read(self.root, path)
+            for path in self.glob(".github/ISSUE_TEMPLATE/*")
+        }
+
+    def glob(self, pattern: str) -> list[Path]:
+        """
+        Finds every file under the root matching `pattern`, relative to the
+        root and in path order.
+        """
+        return sorted(path.relative_to(self.root) for path in self.root.glob(pattern))
 
     def read(self, path: Path) -> str:
         """

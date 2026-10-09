@@ -1,20 +1,20 @@
 """
-Pins the records the repository audit reads and reports, meaning the TOML
-key each document field reads, the annotation a `Finding` prints, the
-finding a `Parity` makes, the holders a `Manifest` names, and the rows a
-`Labels` registry accepts, the command each `Label` writes, and the live
-labels a registry omits.
+Pins the records the repository audit reads and reports, meaning the value
+a document's text reads as and the key each document field reads, the
+annotation a `Finding` prints, the finding a `Parity` makes, the holders
+a `Manifest` names, the labels a `Template` lists, and the rows a `Labels`
+registry accepts, the command each `Label` writes, and the live labels a
+registry omits.
 """
 
 from functools    import reduce
 from pathlib      import Path
 from pydantic     import AliasPath, ValidationError
 from pytest       import Config, mark, param, raises
-from tomllib      import loads
 from urllib.parse import unquote
 
 from thermur.repo.schemas import (
-    Author, Document, Finding, Label, Labels, Manifest, Parity
+    Author, Document, Finding, Label, Labels, Manifest, Parity, Template
 )
 
 ROW = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
@@ -114,12 +114,14 @@ def test_each_required_field_reads_the_key_its_alias_names(
     """
     Asserts that removing the key a required field's alias names from the
     checkout's own file fails validation at exactly that key, so each field
-    reads the TOML key its alias declares.
+    reads the TOML or YAML key its alias declares.
     """
     alias: AliasPath = document.model_fields[field].validation_alias
     *table, key      = alias.path
-    parsed           = loads(
-        (pytestconfig.rootpath / document.model_config["title"]).read_text()
+    file             = Path(document.model_config["title"])
+    parsed           = document.load(
+        file.suffix,
+        (pytestconfig.rootpath / file).read_text(encoding="utf-8")
     )
     del reduce(dict.__getitem__, table, parsed)[key]
 
@@ -255,3 +257,58 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
     the order the live labels arrive, and none where it declares them all.
     """
     assert Labels.model_validate({"labels": [ROW]}).omits(live) == omitted
+
+
+@mark.parametrize(
+    ("suffix", "text", "value"),
+    [
+        param(".toml", 'version = "0.1.0"\n', {"version": "0.1.0"}, id="toml"),
+        param(
+            ".yml",
+            "on: push\nversion: 0.1.0\n",
+            {"on": "push", "version": "0.1.0"},
+            id = "yaml"
+        ),
+        param(".cff", "version: '0.1.0'\n", {"version": "0.1.0"}, id="cff"),
+        param(
+            ".md",
+            "---\nname: Bug\nlabels: []\n---\n\n---\n\nname: Body\n",
+            {"name": "Bug", "labels": []},
+            id = "front-matter"
+        ),
+        param(".md", "name: Bug\n---\n", None, id="no-front-matter")
+    ]
+)
+def test_a_document_reads_the_value_its_suffix_names(
+    suffix : str,
+    text   : str,
+    value  : object
+):
+    """
+    Asserts that a document's text reads as TOML under `.toml`, as YAML 1.2
+    under any other suffix, keeping `on` and a version as the strings they
+    are written as, and as the front matter alone under `.md`, ending at its
+    first closing `---` and reading as `None` where the file opens on none.
+    """
+    assert Document.load(suffix, text) == value
+
+
+@mark.parametrize(
+    ("labels", "names"),
+    [
+        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
+        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
+        param("🐞 bug", ["🐞 bug"], id="one"),
+        param("", [], id="empty")
+    ]
+)
+def test_a_template_reads_its_labels_from_a_list_or_one_string(
+    labels : str | list[str],
+    names  : list[str]
+):
+    """
+    Asserts that a template's labels read from a list as written, and from
+    one string as each name its commas separate with the spaces around it
+    removed, so an empty string names none.
+    """
+    assert Template.model_validate({"labels": labels}).labels == names
