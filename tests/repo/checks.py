@@ -703,6 +703,16 @@ def test_a_validation_error_outside_the_documents_is_raised(
                 "job installs"
             ),
             id = "unread"
+        ),
+        param(
+            "            tools : zizmor\n",
+            "            tool  : zizmor\n",
+            Finding(
+                file    = Path(CI),
+                message = f"`{CI}` installs the `zizmor` subset, whose archive no job "
+                "saves"
+            ),
+            id = "undeclared"
         )
     ]
 )

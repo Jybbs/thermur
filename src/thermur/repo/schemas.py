@@ -541,8 +541,9 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
 
     name: str = ""
     """
-    The name the job's check run carries, or nothing where it takes the job's
-    key.
+    The name the workflow gives the job, where a `${{ matrix.<key> }}`
+    expression names each row's check run for that row's value under
+    `key`, or nothing where the run takes the job's key.
     """
 
     needs: Annotated[tuple[str, ...], BeforeValidator(read_names)] = ()
@@ -587,12 +588,13 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
 
     def expand(self, value: str) -> list[str]:
         """
-        Reads the values `value` takes across the job's rows, where a `${{
-        matrix.<key> }}` expression takes each row's value under `key` and
-        any other value is taken as written.
+        Reads the values `value` takes across the job's rows, which for a
+        `${{ matrix.<key> }}` expression is each row's value under `key`, or
+        an empty string for a row declaring no `key`, as GitHub reads one,
+        and for any other value is the value as written.
         """
         if key := fullmatch(r"\$\{\{\s*matrix\.([\w-]+)\s*\}\}", value):
-            return [row[key[1]] for row in self.rows]
+            return [row.get(key[1], "") for row in self.rows]
 
         return [value]
 

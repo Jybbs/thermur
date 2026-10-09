@@ -230,6 +230,7 @@ def test_a_job_reads_the_jobs_it_waits_for(needs: str, names: tuple[str, ...]):
     [
         param("${{ matrix.tools }}", ["python uv", "zizmor"], id="matrix"),
         param("${{matrix.tools}}", ["python uv", "zizmor"], id="unspaced"),
+        param("${{ matrix.task }}", ["py:check", ""], id="undeclared"),
         param("python uv", ["python uv"], id="literal"),
         param("${{ github.token }}", ["${{ github.token }}"], id="other-context")
     ]

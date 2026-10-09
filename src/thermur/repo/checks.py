@@ -82,8 +82,9 @@ class AnchorCheck(Check):
         """
         Names each anchor a manifest declares or reads through an alias,
         once and in the order PyYAML's parse events carry them, and where
-        PyYAML cannot parse the manifest, names the context and problem its
-        error states without the indented lines locating them in the text.
+        PyYAML cannot parse the manifest, names the error it reports,
+        keeping each line of its message but the indented ones that locate
+        it in the text.
         """
         for path in self.checkout.actions:
             try:
@@ -264,7 +265,7 @@ class KitCheck(Check):
                     tools := step.inputs.get("tools")
                 ):
                     kept = saved if step.saves else installed
-                    for subset in job.expand(tools):
+                    for subset in filter(None, job.expand(tools)):
                         kept.setdefault(subset, path)
 
         return installed, saved
