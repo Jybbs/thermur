@@ -66,7 +66,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         )
 
     @property
-    def lockfile(self) -> str:
+    def lock_digest(self) -> str:
         """
         Hashes `uv.lock` with SHA-256, which pins the version of every
         library the package imports.

@@ -30,7 +30,7 @@ class Run(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True)
     The commit checked out in the clone, as `git rev-parse HEAD` prints it.
     """
 
-    lockfile: Hexadecimal
+    lock_digest: Hexadecimal
     """
     The SHA-256 digest of the clone's `uv.lock`, which pins the version of
     every library the run imported.
@@ -53,9 +53,9 @@ class Run(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True)
         digest of its `uv.lock`, on the platform running the call.
         """
         return cls(
-            commit   = checkout.commit,
-            lockfile = checkout.lockfile,
-            settings = settings
+            commit      = checkout.commit,
+            lock_digest = checkout.lock_digest,
+            settings    = settings
         )
 
 
@@ -90,11 +90,11 @@ class Subpackage(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
 
         return None
 
-    def digest(self, lockfile: str) -> str:
+    def digest(self, lock_digest: str) -> str:
         """
-        Hashes every file under the folder beside `lockfile`, the digest of
-        `uv.lock`, so the result changes wherever the subpackage's code, a
-        file it reads, or a library it imports does.
+        Hashes every file under the folder beside `lock_digest`, the digest
+        of `uv.lock`, so the result changes wherever the subpackage's code,
+        a file it reads, or a library it imports does.
 
         A module hashes as Hamilton hashes a node's own source, leaving
         out every comment and each function's docstring while keeping the
@@ -112,7 +112,7 @@ class Subpackage(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
                     for path in self.folder.rglob("*")
                     if path.is_file() and "__pycache__" not in path.parts
                 },
-                lockfile
+                lock_digest
             )
         )
 

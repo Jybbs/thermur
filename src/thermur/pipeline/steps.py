@@ -17,10 +17,10 @@ from thermur.pipeline.schemas import Subpackage
         for subpackage in Subpackage.listed()
     }
 )
-def digest(lockfile: str, subpackage: Subpackage) -> str:
+def digest(lock_digest: str, subpackage: Subpackage) -> str:
     """
     Hashes the source of one subpackage beside the digest of `uv.lock`,
     computed again on every run, since Hamilton's cache reads none of the
     files the hash covers.
     """
-    return subpackage.digest(lockfile)
+    return subpackage.digest(lock_digest)

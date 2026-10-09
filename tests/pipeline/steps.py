@@ -13,11 +13,11 @@ from thermur.pipeline.schemas import Subpackage
 def test_a_digest_step_computes_its_subpackage_s_digest(pytestconfig: Config):
     """
     Asserts that the pipeline's digest step returns the digest of the
-    pipeline's own folder beside the `lockfile` it reads.
+    pipeline's own folder beside the `lock_digest` it reads.
     """
     computed = Builder().with_modules(steps).build().execute(
         ["pipeline_digest"],
-        inputs = {"lockfile": "lock"}
+        inputs = {"lock_digest": "lock"}
     )
     folder = pytestconfig.rootpath / "src/thermur/pipeline"
 
@@ -26,9 +26,9 @@ def test_a_digest_step_computes_its_subpackage_s_digest(pytestconfig: Config):
 
 def test_each_subpackage_declares_one_digest_step(pytestconfig: Config):
     """
-    Asserts that the steps are one `<subpackage>_digest` per folder under
-    `src/thermur`, each computed again on every run, beside the `lockfile`
-    input they read.
+    Asserts that the steps are one `<subpackage>_digest` per folder
+    under `src/thermur`, each computed again on every run, beside the
+    `lock_digest` input they read.
     """
     behaviors = {
         node.name: node.tags.get("cache.behavior")
@@ -43,4 +43,4 @@ def test_each_subpackage_declares_one_digest_step(pytestconfig: Config):
     assert behaviors == dict.fromkeys(
         (f"{folder.name}_digest" for folder in folders),
         "recompute"
-    ) | {"lockfile": None}
+    ) | {"lock_digest": None}

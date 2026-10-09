@@ -45,14 +45,14 @@ def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
     assert Checkout.installed().root == pytestconfig.rootpath.resolve()
 
 
-def test_lockfile_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
+def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
     """
-    Asserts that the lockfile digest is the SHA-256 digest of `uv.lock`,
-    pinned on an empty file against the digest of empty input.
+    Asserts that the lock digest is the SHA-256 digest of `uv.lock`, pinned
+    on an empty file against the digest of empty input.
     """
     (checkout.root / "uv.lock").write_bytes(b"")
 
-    assert checkout.lockfile == (
+    assert checkout.lock_digest == (
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
 

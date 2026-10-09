@@ -284,7 +284,7 @@ def test_each_run_of_one_graph_keeps_a_record_of_its_own(graphed: Callable[..., 
     ] * 2
 
 
-def test_each_run_records_the_lockfile_as_it_began(
+def test_each_run_records_the_lock_digest_as_it_began(
     clone   : Checkout,
     graphed : Callable[..., Graph]
 ):
@@ -299,7 +299,7 @@ def test_each_run_records_the_lockfile_as_it_began(
     graph.compute("table")
     record = loads(graph.recorder.cache.read(graph.recorder.run_id))
 
-    assert record["config"]["lockfile"] == clone.lockfile
+    assert record["config"]["lock_digest"] == clone.lock_digest
 
 
 @mark.parametrize(

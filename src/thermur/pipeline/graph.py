@@ -110,8 +110,8 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 
     Hamilton calls each step a node and runs a node only once the nodes
     named by its parameters have run. A node reads the settings as
-    `settings`, the digest of `uv.lock` as `lockfile`, and the digest of a
-    subpackage's source as `<subpackage>_digest`.
+    `settings`, the digest of `uv.lock` as `lock_digest`, and the digest of
+    a subpackage's source as `<subpackage>_digest`.
 
     The cache keeps each result under a key hashed from the node's own
     source and the fingerprint of each input, so a rerun computes only the
@@ -203,7 +203,10 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         _, results = self.driver.materialize(
             *savers,
             additional_vars = list(steps),
-            inputs = {"lockfile": self.checkout.lockfile, "settings": self.settings}
+            inputs          = {
+                "lock_digest" : self.checkout.lock_digest,
+                "settings"    : self.settings
+            }
         )
 
         return results

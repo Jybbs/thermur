@@ -70,7 +70,7 @@ def test_a_digest_changes_wherever_the_code_does(
     assert (after != before) is changes
 
 
-def test_a_digest_changes_with_the_lockfile(tmp_path: Path):
+def test_a_digest_changes_with_the_lock_digest(tmp_path: Path):
     """
     Asserts that a subpackage whose files stay unchanged digests apart under
     two digests of `uv.lock`, so a library upgrade computes its steps again.
@@ -94,20 +94,20 @@ def test_a_run_refuses_a_commit_holding_no_hash(commit: str):
     refused, so a record never carries what git printed in place of a hash.
     """
     with raises(ValidationError):
-        Run(commit=commit, lockfile="0" * 64, settings=Settings())
+        Run(commit=commit, lock_digest="0" * 64, settings=Settings())
 
 
-def test_a_run_reads_its_commit_and_lockfile_from_its_clone(clone: Checkout):
+def test_a_run_reads_its_commit_and_lock_digest_from_its_clone(clone: Checkout):
     """
     Asserts that a run pairs its settings with the commit its clone has
     checked out, the digest of the clone's `uv.lock`, and the running
     platform.
     """
     assert Run.from_checkout(clone, Settings()) == Run(
-        commit   = clone.commit,
-        lockfile = clone.lockfile,
-        platform = platform(),
-        settings = Settings()
+        commit      = clone.commit,
+        lock_digest = clone.lock_digest,
+        platform    = platform(),
+        settings    = Settings()
     )
 
 
