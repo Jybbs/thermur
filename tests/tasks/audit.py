@@ -1,16 +1,17 @@
 """
 Pins the verdict `repo:audit` exits with and what it prints, over a copy of
-the checkout as it stands, over one that breaks every check, and over one
-whose manifest fails to validate.
+the checkout as it stands, over one that breaks every check, over one whose
+manifest fails to validate, and over one whose only findings are warnings.
 """
 
 from collections.abc  import Callable
-from common.edits     import edit
+from common.edits     import edit, task
 from pytest           import CaptureFixture, MonkeyPatch, fixture, raises
 from syrupy.assertion import SnapshotAssertion
 from types            import ModuleType
 
 from thermur.repo.checkout import Checkout
+from thermur.repo.schemas  import Issue, Level
 
 
 @fixture
@@ -51,13 +52,37 @@ def test_a_broken_checkout_fails_naming_each_finding(
     Asserts that the audit exits `1` over a checkout breaking every check,
     printing one annotation per finding in the order the checks run.
     """
-    root = checkout.root
+    root   = checkout.root
+    action = ".github/actions/provision/action.yml"
+    draft  = ".github/workflows/draft.yml"
+    warm   = ".github/workflows/warm.yml"
     (root / ".mise/bin/pytest").unlink()
     (root / ".mise/bin/pytest").symlink_to("prose")
     (root / ".mise/tasks/py/test").write_text("#!/bin/sh\nuv run pytest\n")
     (root / "LICENSE").write_text("BSD License\n")
     (root / "src/thermur/repo").rename(root / "repo")
     edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
+    edit(checkout, action, new="default     : &depth '1'", old="default     : '1'")
+    edit(checkout, action, new="default     : *depth", old="default     : 'false'")
+    edit(checkout, ".github/workflows/ci.yml", new="", old="    name    : 🐦‍⬛ Brief\n")
+    edit(checkout, ".mise/tasks/gha/brief.py", new="==2.23.0", old="==2.24.0")
+    edit(
+        checkout,
+        draft,
+        new = "run  : mise run gha:brief",
+        old = "run  : ./.mise/tasks/gha/cut.py"
+    )
+    edit(
+        checkout = checkout,
+        new      = "uses : actions/checkout@0f0f\n\n      - name : Cut",
+        old = "uses : $/.github/actions/provision\n        with : { depth: '2' }\n\n"
+        "      - name : Cut",
+        path = draft
+    )
+    edit(checkout, warm, new="&image ubuntu-24.04", old="&image ubuntu-26.04")
+    edit(checkout, warm, new="", old="          - tools : zizmor\n")
+    edit(checkout, warm, new="]", old=", .mise/mise.lock]")
+    task(checkout, "py/sweep", '#!/bin/sh\n#MISE alias = "audit"\ntrue\n')
 
     status, printed = audited()
 
@@ -90,5 +115,25 @@ def test_a_document_failing_validation_prints_each_error_once(
         [
             "::error file=pyproject.toml::`project.requires-python` in "
             "`pyproject.toml`: Field required"
+        ]
+    )
+
+
+def test_warnings_alone_pass_printing_each(
+    audited     : Callable[[], tuple[int, list[str]]],
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that the audit exits `0` where every finding is a warning,
+    printing each as a warning annotation.
+    """
+    warned = Issue(message="m", severity=Level.WARNING, task="py:test")
+    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [warned]))
+
+    assert audited() == (
+        0,
+        [
+            "::warning file=.mise/tasks/py/test::`mise tasks validate` reports `m` "
+            "on `py:test`"
         ]
     )

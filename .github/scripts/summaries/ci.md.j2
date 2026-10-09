@@ -1,0 +1,7 @@
+{% extends "base.md.j2" %}
+{% block details %}
+{% if needs.check.outputs.coverage %}
+
+The `py:coverage` row attached [its coverage report]({{ needs.check.outputs.coverage }}) to the workflow run as the `coverage` artifact.
+{% endif %}
+{% endblock %}

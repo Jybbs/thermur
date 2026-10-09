@@ -1,0 +1,9 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "vet"
+#MISE description = "Audit the workflows and the composite action through zizmor, online under GitHub Actions and offline elsewhere"
+
+format=plain
+offline=true
+[[ -z "${GITHUB_ACTIONS:-}" ]] || { format=github; offline=false; }
+
+ZIZMOR_OFFLINE=$offline zizmor --cache-dir .cache/zizmor --format "$format" .

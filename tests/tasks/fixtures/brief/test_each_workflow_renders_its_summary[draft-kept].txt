@@ -1,0 +1,7 @@
+## 🔥 Draft
+
+✅ Left [the draft release of `0.2.0`](https://u/d) as it stood, since a draft already carries the version.
+
+| **Job** | **Result** |
+|---|---|
+| `cut` | success |

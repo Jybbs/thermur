@@ -19,12 +19,14 @@ def checkout(
     tmp_path     : Path
 ) -> Checkout:
     """
-    Copies into `tmp_path` every file the audit's checks read, meaning the
-    manifest, the README, the license, `.mise/`, and `src/`, then trusts the
-    copy's mise configuration and returns the `Checkout` rooted there, which
-    a case edits before a check reads it.
+    Copies into `tmp_path` every file the audit's checks read, meaning
+    `.github/`, `.mise/`, the license, the README, the manifest, `src/`,
+    and `uv.lock`, then trusts the copy's mise configuration and returns the
+    `Checkout` rooted there, which a case edits before a check reads it.
     """
-    for name in (".mise", "LICENSE", "README.md", "pyproject.toml", "src"):
+    for name in (
+        ".github", ".mise", "LICENSE", "README.md", "pyproject.toml", "src", "uv.lock"
+    ):
         (pytestconfig.rootpath / name).copy(
             tmp_path / name,
             follow_symlinks   = False,

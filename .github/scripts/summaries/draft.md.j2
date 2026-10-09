@@ -1,0 +1,15 @@
+{% extends "base.md.j2" %}
+{% block verdict %}
+{% set cut = needs.cut.outputs %}
+{% if cut.state == "created" %}
+Created [the draft release of `{{ cut.version }}`]({{ cut.url }}) at {{ commit }}.
+{% elif cut.state == "kept" %}
+Left [the draft release of `{{ cut.version }}`]({{ cut.url }}) as it stood, since a draft already carries the version.
+{% elif cut.state == "skipped" %}
+Skipped the cut, since [the published release of `{{ cut.version }}`]({{ cut.url }}) already carries the version.
+{% elif cut.state == "unchanged" %}
+Cut no draft, since `[project].version` stayed at `{{ cut.version }}` at {{ commit }}.
+{% else %}
+{{ super() -}}
+{% endif %}
+{% endblock %}

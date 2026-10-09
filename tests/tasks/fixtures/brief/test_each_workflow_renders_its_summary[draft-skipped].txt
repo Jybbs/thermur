@@ -1,0 +1,7 @@
+## 🔥 Draft
+
+✅ Skipped the cut, since [the published release of `0.1.0`](https://u/r) already carries the version.
+
+| **Job** | **Result** |
+|---|---|
+| `cut` | success |

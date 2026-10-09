@@ -1,0 +1,55 @@
+name : 🔥 Draft
+
+concurrency:
+  cancel-in-progress : false
+  group              : ${{ github.workflow }}
+
+jobs:
+  cut:
+    name : 🔥 Draft
+
+    outputs:
+      state   : ${{ steps.cut.outputs.state }}
+      url     : ${{ steps.cut.outputs.url }}
+      version : ${{ steps.cut.outputs.version }}
+
+    permissions : { contents: write }
+    runs-on     : &image ubuntu-26.04
+
+    steps:
+      - name : Check out the last two commits
+        uses : $/.github/actions/provision
+        with : { depth: '2' }
+
+      - name : Cut the draft where the version moved
+        env  : { GH_TOKEN: "${{ github.token }}" }
+        id   : cut
+        run  : ./.mise/tasks/gha/cut.py
+
+    timeout-minutes : &timeout 15
+
+  gate:
+    name    : 🐦‍⬛ Brief
+    if      : ${{ always() }}
+    needs   : [cut]
+    runs-on : *image
+
+    steps:
+      - name : Provision the tools the brief runs on
+        uses : $/.github/actions/provision
+        with : { tools: python uv }
+
+      - name : Brief the workflow run and exit with its verdict
+        env  : { NEEDS: "${{ toJSON(needs) }}" }
+        run  : mise run gha:brief
+
+    timeout-minutes : *timeout
+
+on:
+  push:
+    branches : [main]
+    paths    : [pyproject.toml]
+
+  workflow_dispatch:
+
+permissions : { contents: read }

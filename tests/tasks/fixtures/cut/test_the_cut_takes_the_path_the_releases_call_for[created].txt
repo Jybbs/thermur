@@ -1,0 +1,2 @@
+gh api --jq '.[] | select(.tag_name == "0.2.0") | {draft, url: .html_url}' --paginate 'repos/{owner}/{repo}/releases'
+gh release create --draft --generate-notes --target main 0.2.0

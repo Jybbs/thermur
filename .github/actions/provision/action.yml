@@ -1,0 +1,39 @@
+name        : Provision
+description : Check the repository out and, where `tools` names any, install mise at the `min_version` floor `.mise/config.toml` sets and then those tools, restoring their archive and saving it again only where `save` is `'true'`.
+
+inputs:
+  depth:
+    default     : '1'
+    description : The number of commits the checkout fetches, which the draft job raises to `'2'` so it reads the version the previous commit declared.
+
+  save:
+    default     : 'false'
+    description : Whether the archive of `tools` is saved once installed, which only the Kit jobs of `🔥 Warm` pass as `'true'`, so a pull request restores an archive and never writes one.
+
+  tools:
+    default     : ''
+    description : A space-separated subset of the tools `.mise/config.toml` pins, or nothing for a job that only checks the repository out. The mise action hashes the names into the archive's key, so each subset is an archive of its own.
+
+runs:
+  using: composite
+
+  steps:
+    - name : Check out the repository
+      uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with : { fetch-depth: "${{ inputs.depth }}", persist-credentials: false }
+
+    - name  : Read the mise floor `.mise/config.toml` sets
+      id    : floor
+      if    : ${{ inputs.tools != '' }}
+      run   : echo "version=$(python3 -c 'import tomllib; print(tomllib.load(open(".mise/config.toml", "rb"))["min_version"])')" >> "$GITHUB_OUTPUT"
+      shell : bash
+
+    - name : Install mise and the tools
+      if   : ${{ inputs.tools != '' }}
+      uses : jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492
+
+      with:
+        cache_key    : mise-{{platform}}-{{version}}-{{install_args_hash}}-${{ hashFiles('.mise/config.toml', '.mise/mise.lock') }}
+        cache_save   : ${{ inputs.save }}
+        install_args : ${{ inputs.tools }}
+        version      : ${{ steps.floor.outputs.version }}

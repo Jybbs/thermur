@@ -1,0 +1,7 @@
+## 🔥 Draft
+
+✅ Created [the draft release of `0.2.0`](https://u/d) at [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567).
+
+| **Job** | **Result** |
+|---|---|
+| `cut` | success |

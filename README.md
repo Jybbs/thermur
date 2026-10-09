@@ -426,7 +426,7 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 - **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux on x86-64 or arm64, or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records the pinned Python and uv for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
+- **OS**: Linux on x86-64 or arm64, or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records every pinned tool for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
 
 ### Installation
 
@@ -446,10 +446,12 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, and the wheel's `packages` and scripts to modules it carries |
-| `mise lockfile` | Verifies `uv.lock` and `.mise/mise.lock` against `pyproject.toml` and `.mise/config.toml`, and that the lock holds every pinned tool for the running platform |
-| `mise relock` | Re-resolves both lockfiles after either manifest changes |
-| `mise scan` | Holds every package `uv.lock` resolves to the published advisories through `uv audit` |
+| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, and the workflows and the composite action to one gate each, one commit per action, one runner image, the tool subsets `🔥 Warm` saves, and the files a cache key hashes |
+| `mise ci` | Runs `mise doctor project`, then every task a row of the pull-request workflows runs, the way the rows run them |
+| `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
+| `mise relock` | Re-resolves every lockfile after its manifest changes |
+| `mise scan` | Holds every package `uv.lock` and the lockfile beside each task script resolve to the published advisories through `uv audit` |
+| `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 
 ---
 
@@ -459,11 +461,17 @@ The repository holds the pinned toolchain and its tasks, the package the audit r
 
 ```
 thermur/
+├── .github/
+│   ├── actions/provision/          # The composite every job installs mise and its tools through
+│   ├── scripts/summaries/          # The template each workflow's gate writes its summary from
+│   └── workflows/                  # 🔥 CI on every pull request, and 🔥 Draft and 🔥 Warm on main
+│
 ├── .mise/
 │   ├── bin/                        # The script each task runs Prose and pytest through
-│   ├── config.toml                 # Pinned Python and uv, the environment, and the doctor checks
+│   ├── config.toml                 # Pinned Python, uv, and zizmor, the environment, and the doctor checks
+│   ├── lib/                        # The shell functions the lock tasks share
 │   ├── mise.lock                   # Locked tool downloads and checksums
-│   └── tasks/                      # The lock, py, and repo tasks
+│   └── tasks/                      # The gha, lock, py, and repo tasks
 │
 ├── data/
 │   └── raw/                        # NetCDF files from WRF-SFIRE
@@ -475,7 +483,7 @@ thermur/
 ├── src/thermur/repo/               # The checks `mise audit` runs
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
-├── pyproject.toml                  # Package configuration, with packaging and pydantic for the audit
+├── pyproject.toml                  # Package configuration, with packaging, pydantic, and yaml-rs for the audit
 └── uv.lock                         # Locked dependencies
 ```
 

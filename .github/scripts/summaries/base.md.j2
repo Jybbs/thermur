@@ -1,0 +1,12 @@
+## {{ workflow }}
+
+{{ "✅" if passed else "❌" }} {% block verdict %}
+The workflow run on `{{ ref }}` at {{ commit }} {{ "passed" if passed else "failed" }}.
+{% endblock %}
+
+| **Job** | **Result** |
+|---|---|
+{% for job, need in needs | dictsort %}
+| `{{ job }}` | {{ need.result }} |
+{% endfor %}
+{% block details %}{% endblock %}

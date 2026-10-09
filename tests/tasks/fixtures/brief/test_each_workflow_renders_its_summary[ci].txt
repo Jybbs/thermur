@@ -1,0 +1,9 @@
+## 🔥 CI
+
+✅ The workflow run on `55/merge` at [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567) passed.
+
+| **Job** | **Result** |
+|---|---|
+| `check` | success |
+
+The `py:coverage` row attached [its coverage report](https://example.invalid/1) to the workflow run as the `coverage` artifact.

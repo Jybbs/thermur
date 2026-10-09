@@ -1,0 +1,7 @@
+## 🔥 Draft
+
+✅ Cut no draft, since `[project].version` stayed at `0.1.0` at [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567).
+
+| **Job** | **Result** |
+|---|---|
+| `cut` | success |

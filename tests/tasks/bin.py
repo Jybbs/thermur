@@ -5,10 +5,11 @@ it runs, and that each passes every argument it receives to `uv run --exact
 it, whatever folder it runs from.
 """
 
-from collections.abc import Callable
-from pathlib         import Path
-from pytest          import Config, mark
-from subprocess      import run
+from collections.abc  import Callable
+from common.stand_ins import StandIn
+from pathlib          import Path
+from pytest           import Config, mark
+from subprocess       import run
 
 from thermur.repo.checkout import Checkout
 
@@ -19,7 +20,7 @@ PROGRAMS = [path.name for path in Checkout(root=Path(__file__).parents[2]).scrip
 def test_each_program_passes_every_argument_to_a_locked_run(
     program      : str,
     pytestconfig : Config,
-    stand_in     : Callable[[str, str], None],
+    stand_in     : Callable[[str, str], StandIn],
     tmp_path     : Path
 ):
     """
