@@ -59,7 +59,8 @@ class Brief:
         """
         Fills in the template named for the workflow's file, or `base.md.j2`
         where none is, from the `needs` context, so the template reads any
-        output a job the gate waited on declares.
+        output a job the gate waited on declares, naming the workflow by the
+        word its name carries after its glyph.
         """
         folder = Path(".github/scripts/summaries")
         named  = self.file.with_suffix(".md.j2").name
@@ -73,7 +74,7 @@ class Brief:
             needs    = self.needs,
             passed   = self.passed,
             ref      = self.ref,
-            workflow = self.workflow
+            workflow = self.workflow.rpartition(" ")[2]
         )
 
     @classmethod
@@ -105,7 +106,7 @@ class Brief:
         """
         path = environ.get("GITHUB_STEP_SUMMARY")
         with open(path, "a", encoding="utf-8") if path else nullcontext() as page:
-            print(self.summary, end="", file=page)
+            print(self.summary, file=page)
 
         return 0 if self.passed else 1
 

@@ -1,7 +1,3 @@
-## 🔥 Draft
+## 🔥 Thermur Draft
 
-✅ Cut no draft, since `[project].version` stayed at `0.1.0` at [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567).
-
-| **Job** | **Result** |
-|---|---|
-| `cut` | success |
+✅ Run [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567) on `55/merge`. Drafted nothing, since the version stays at *Thermur* 0.1.0.

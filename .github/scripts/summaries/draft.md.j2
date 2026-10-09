@@ -1,15 +1,15 @@
 {% extends "base.md.j2" %}
-{% block verdict %}
+{% block details %}
 {% set cut = needs.cut.outputs %}
 {% if cut.state == "created" %}
-Created [the draft release of `{{ cut.version }}`]({{ cut.url }}) at {{ commit }}.
-{% elif cut.state == "kept" %}
-Left [the draft release of `{{ cut.version }}`]({{ cut.url }}) as it stood, since a draft already carries the version.
-{% elif cut.state == "skipped" %}
-Skipped the cut, since [the published release of `{{ cut.version }}`]({{ cut.url }}) already carries the version.
-{% elif cut.state == "unchanged" %}
-Cut no draft, since `[project].version` stayed at `{{ cut.version }}` at {{ commit }}.
-{% else %}
-{{ super() -}}
-{% endif %}
+ Drafted [*Thermur* {{ cut.version }}]({{ cut.url }}).
+{%- elif cut.state == "kept" %}
+ Kept the draft of [*Thermur* {{ cut.version }}]({{ cut.url }}).
+{%- elif cut.state == "skipped" %}
+ Drafted nothing, since [*Thermur* {{ cut.version }}]({{ cut.url }}) is already published.
+{%- elif cut.state == "unchanged" %}
+ Drafted nothing, since the version stays at *Thermur* {{ cut.version }}.
+{%- else %}
+ Drafted nothing.
+{%- endif %}
 {% endblock %}

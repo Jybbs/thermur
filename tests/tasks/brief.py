@@ -96,7 +96,8 @@ def job(result: str = "success", **outputs: str) -> dict:
             id = "draft-unchanged"
         ),
         param("draft.yml", {"cut": job("failure")}, id="draft-failed"),
-        param("warm.yml", {"kit": job(), "prune": job()}, id="base")
+        param("warm.yml", {"kit": job(), "prune": job()}, id="warm"),
+        param("warm.yml", {"kit": job(), "prune": job("failure")}, id="warm-failed")
     ]
 )
 def test_each_workflow_renders_its_summary(
@@ -153,7 +154,7 @@ def test_the_summary_appends_to_the_runner_s_summary_file(
 
     gate.write()
 
-    assert page.read_text() == f"earlier\n{gate.summary}"
+    assert page.read_text() == f"earlier\n{gate.summary}\n"
     assert capsys.readouterr().out == ""
 
 

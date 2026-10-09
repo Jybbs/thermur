@@ -1,7 +1,3 @@
-## 🔥 Draft
+## 🔥 Thermur Draft
 
-❌ The workflow run on `55/merge` at [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567) failed.
-
-| **Job** | **Result** |
-|---|---|
-| `cut` | failure |
+❌ Run [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567) on `55/merge`. Drafted nothing.

@@ -1,7 +1,3 @@
-## 🔥 Draft
+## 🔥 Thermur Draft
 
-✅ Skipped the cut, since [the published release of `0.1.0`](https://u/r) already carries the version.
-
-| **Job** | **Result** |
-|---|---|
-| `cut` | success |
+✅ Run [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567) on `55/merge`. Drafted nothing, since [*Thermur* 0.1.0](https://u/r) is already published.
