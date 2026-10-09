@@ -62,27 +62,27 @@ def prune(
                 entry(
                     created_at = "2026-10-01T00:00:00Z",
                     id         = 1,
-                    key        = "mise-linux-x64-ubuntu26-2026.9.18-aaa-old"
+                    key        = "mise-linux-x64-ubuntu26-aaa-old"
                 ),
                 entry(
                     created_at = "2026-10-03T00:00:00Z",
                     id         = 2,
-                    key        = "mise-linux-x64-ubuntu26-2026.9.18-aaa-new"
+                    key        = "mise-linux-x64-ubuntu26-aaa-new"
                 ),
                 entry(
                     created_at = "2026-10-02T00:00:00Z",
                     id         = 3,
-                    key        = "mise-linux-x64-ubuntu26-2026.9.18-aaa-mid"
+                    key        = "mise-linux-x64-ubuntu26-aaa-mid"
                 ),
                 entry(
                     created_at = "2026-10-01T00:00:00Z",
                     id         = 4,
-                    key        = "mise-linux-x64-ubuntu26-2026.9.18-bbb-only"
+                    key        = "mise-linux-x64-ubuntu26-bbb-only"
                 ),
                 entry(
                     created_at = "2026-10-01T00:00:00Z",
                     id         = 5,
-                    key        = "mise-linux-x64-ubuntu26-2026.9.18-aaa-pr",
+                    key        = "mise-linux-x64-ubuntu26-aaa-pr",
                     ref        = "refs/pull/7/merge"
                 ),
                 entry("2026-09-01T00:00:00Z", 6, "unhashed"),
@@ -108,9 +108,9 @@ def test_a_refused_deletion_warns_and_the_rest_carry_on(
     prune.Caches.listed().prune()
 
     assert capsys.readouterr().out.splitlines() == [
-        "::warning::mise-linux-x64-ubuntu26-2026.9.18-aaa-old was not deleted, since "
+        "::warning::mise-linux-x64-ubuntu26-aaa-old was not deleted, since "
         "`gh` reports `HTTP 403`",
-        "Deleted mise-linux-x64-ubuntu26-2026.9.18-aaa-mid, freeing 300 bytes",
+        "Deleted mise-linux-x64-ubuntu26-aaa-mid, freeing 300 bytes",
         "Deleted 1 of 2 replaced entries, freeing 300 bytes"
     ]
 
@@ -131,7 +131,7 @@ def test_only_the_entries_a_newer_one_replaced_are_deleted(
 
     assert "\n".join(gh.commands) == snapshot
     assert capsys.readouterr().out.splitlines() == [
-        "Deleted mise-linux-x64-ubuntu26-2026.9.18-aaa-old, freeing 100 bytes",
-        "Deleted mise-linux-x64-ubuntu26-2026.9.18-aaa-mid, freeing 300 bytes",
+        "Deleted mise-linux-x64-ubuntu26-aaa-old, freeing 100 bytes",
+        "Deleted mise-linux-x64-ubuntu26-aaa-mid, freeing 300 bytes",
         "Deleted 2 of 2 replaced entries, freeing 400 bytes"
     ]
