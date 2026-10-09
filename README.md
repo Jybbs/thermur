@@ -446,10 +446,13 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, and the wheel's `packages` and scripts to modules it carries |
+| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, and the wheel's `packages` and scripts to modules it carries |
+| `mise labels` | Creates or updates every label `.github/labels.toml` declares on GitHub after a prompt, then lists each live label it omits |
 | `mise lockfile` | Verifies `uv.lock` and `.mise/mise.lock` against `pyproject.toml` and `.mise/config.toml`, and that the lock holds every pinned tool for the running platform |
 | `mise relock` | Re-resolves both lockfiles after either manifest changes |
 | `mise scan` | Holds every package `uv.lock` resolves to the published advisories through `uv audit` |
+
+[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) takes a contributor from a clone to a merged pull request and lists the labels each issue and pull request takes.
 
 ---
 
@@ -459,6 +462,13 @@ The repository holds the pinned toolchain and its tasks, the package the audit r
 
 ```
 thermur/
+├── .github/
+│   ├── ISSUE_TEMPLATE/             # The spec and bug templates
+│   ├── CONTRIBUTING.md             # From a clone to a pull request, and the labels
+│   ├── PULL_REQUEST_TEMPLATE.md    # The sections every pull request carries
+│   ├── labels.toml                 # Every label with its color and description
+│   └── release.yml                 # The release-notes category each label files under
+│
 ├── .mise/
 │   ├── bin/                        # The script each task runs Prose and pytest through
 │   ├── config.toml                 # Pinned Python and uv, the environment, and the doctor checks
@@ -475,7 +485,8 @@ thermur/
 ├── src/thermur/repo/               # The checks `mise audit` runs
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
-├── pyproject.toml                  # Package configuration, with packaging and pydantic for the audit
+├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads
+├── pyproject.toml                  # Package configuration, its dependencies, and each tool's table
 └── uv.lock                         # Locked dependencies
 ```
 
@@ -483,19 +494,7 @@ thermur/
 
 ## 📖 Citation
 
-If you use Thermur in your research, please cite this repository:
-
-```bibtex
-@software{thermur2024,
-  title     = {Thermur: Teaching Drone Flocks to See Fire Like Starlings See Hawks},
-  author    = {Parkington, James},
-  year      = {2024},
-  url       = {https://github.com/Jybbs/Thermur},
-  note      = {Thermally-constrained flocking for wildfire response}
-}
-```
-
-For the WRF-SFIRE dataset:
+To cite *Thermur*, use the *"Cite this repository"* link in the repository's sidebar, where GitHub offers APA and BibTeX citations built from `CITATION.cff`. For the WRF-SFIRE dataset:
 
 ```bibtex
 @dataset{moisseeva2020wrfsfire,

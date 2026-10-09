@@ -8,6 +8,7 @@ connection only when it carries the `network` mark.
 from common.environment import CLEARED
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
+from subprocess         import check_output
 
 from thermur.repo.checkout import Checkout
 
@@ -16,17 +17,18 @@ from thermur.repo.checkout import Checkout
 def checkout(
     monkeypatch  : MonkeyPatch,
     pytestconfig : Config,
-    tmp_path     : Path
+    tmp_path     : Path,
+    tracked      : list[Path]
 ) -> Checkout:
     """
-    Copies into `tmp_path` every file the audit's checks read, meaning the
-    manifest, the README, the license, `.mise/`, and `src/`, then trusts the
-    copy's mise configuration and returns the `Checkout` rooted there, which
-    a case edits before a check reads it.
+    Copies into `tmp_path` every file `tracked` lists, keeping each
+    program's mode, then trusts the copy's mise configuration and returns
+    the `Checkout` rooted there, which a case edits before a check reads it.
     """
-    for name in (".mise", "LICENSE", "README.md", "pyproject.toml", "src"):
-        (pytestconfig.rootpath / name).copy(
-            tmp_path / name,
+    for path in tracked:
+        (tmp_path / path).parent.mkdir(exist_ok=True, parents=True)
+        (pytestconfig.rootpath / path).copy(
+            tmp_path / path,
             follow_symlinks   = False,
             preserve_metadata = True
         )
@@ -67,6 +69,25 @@ def environment(
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
     monkeypatch.setenv("MISE_IGNORED_CONFIG_PATHS", str(settled))
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(pytestconfig.rootpath))
+
+
+@fixture(scope="session")
+def tracked(pytestconfig: Config) -> list[Path]:
+    """
+    Lists every file of the worktree git tracks or would track, relative to
+    the root, leaving out one moved away before git learns of it, since the
+    index still lists it.
+    """
+    root = pytestconfig.rootpath
+    return [
+        Path(name)
+        for name in check_output(
+            ["git", "ls-files", "--cached", "--exclude-standard", "--others"],
+            cwd  = root,
+            text = True
+        ).splitlines()
+        if (root / name).exists(follow_symlinks=False)
+    ]
 
 
 def pytest_collection_modifyitems(items: list[Item]):

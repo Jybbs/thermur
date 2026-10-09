@@ -1,4 +1,6 @@
 ::error file=.mise/bin/pytest::`.mise/bin/pytest` is a symlink rather than a copy
+::error file=.github/release.yml::`.github/release.yml` names `🐛 bug`, a label `.github/labels.toml` does not declare
+::error file=.github/release.yml::`.github/release.yml` files `🐞 bug` under no release-notes categories rather than one
 ::error file=LICENSE::The title of `LICENSE` reads `BSD License`, where the full name of the `license` in `pyproject.toml` reads `MIT License`
 ::error file=LICENSE::The copyright holder list in `LICENSE` is missing, where the author list in `pyproject.toml` reads `James Parkington`
 ::error file=pyproject.toml::The `requires` of `[build-system]` holds no exact pin on hatchling

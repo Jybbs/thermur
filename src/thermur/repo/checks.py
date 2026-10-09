@@ -5,14 +5,15 @@ each found through `Check.__subclasses__()` rather than through a list kept
 beside them.
 """
 
-from abc             import abstractmethod
-from collections.abc import Iterator
-from filecmp         import cmp
+from collections            import Counter
+from collections.abc        import Iterator
+from filecmp                import cmp
+from functools              import cached_property
 from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re import search, sub
+from re import findall, search, sub
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Finding, Parity
@@ -44,17 +45,30 @@ class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             return [
                 Finding(
                     file    = Path(error.title),
-                    message = f"`{'.'.join(map(str, detail['loc']))}` in "
-                    f"`{error.title}`: {detail['msg']}"
+                    message = (
+                        f"`{'.'.join(map(str, detail['loc']))}` in "
+                        if detail["loc"]
+                        else ""
+                    ) + f"`{error.title}`: {detail['msg']}"
                 )
                 for detail in error.errors()
             ]
 
-    @abstractmethod
+    @property
+    def pairs(self) -> list[Parity]:
+        """
+        Pairs each declaration a file restates with the one it restates,
+        which a check comparing no restated declarations leaves empty.
+        """
+        return []
+
     def scan(self) -> Iterator[Finding]:
         """
-        Reads the checkout for every place it breaks this invariant.
+        Reads the checkout for every place it breaks this invariant, which
+        for a check comparing restated declarations is each pair whose copy
+        reads anything but the original.
         """
+        yield from filter(None, (pair.finding for pair in self.pairs))
 
 
 class BinCheck(Check):
@@ -90,17 +104,110 @@ class BinCheck(Check):
                 )
 
 
+class LabelCheck(Check):
+    """
+    Every file naming a label agrees with `.github/labels.toml`, meaning the
+    release-notes categories file each label it declares under one category,
+    the issue templates and the contributor guide name only labels it
+    declares, and the guide describes each label as the registry does.
+    """
+
+    @cached_property
+    def described(self) -> dict[str, str]:
+        """
+        Maps each label the contributor guide's table names to the
+        description beside it, the table running from its header to the
+        first blank line.
+        """
+        table = self.checkout.read(self.guide).partition(
+            "| **Label** | **Covers** |"
+        )[2]
+        return dict(findall(r"(?m)^\| `(.+?)` \| (.+) \|$", table.partition("\n\n")[0]))
+
+    @property
+    def guide(self) -> Path:
+        """
+        Names the contributor guide, relative to the root.
+        """
+        return Path(".github/CONTRIBUTING.md")
+
+    @property
+    def named(self) -> dict[Path, list[str]]:
+        """
+        Maps each file naming labels to every label it names, in the order
+        it names them, meaning the release-notes categories, each issue
+        template, and the contributor guide.
+        """
+        release = self.checkout.release
+        return (
+            {release.file: release.names}
+            | {
+                path: template.labels
+                for path, template in self.checkout.templates.items()
+            }
+            | {self.guide: list(self.described)}
+        )
+
+    @property
+    def pairs(self) -> list[Parity]:
+        """
+        Pairs the description the contributor guide gives each label with
+        the one the registry declares.
+        """
+        labels = self.checkout.labels
+        return [
+            Parity(
+                copied   = self.described.get(label.name),
+                file     = self.guide,
+                label    = f"The description of `{label.name}` in `{self.guide}`",
+                origin   = f"its description in `{labels.file}`",
+                original = label.description
+            )
+            for label in labels.rows
+        ]
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each label a file names that the registry does not declare,
+        then each declared label the categories file under any number of
+        categories but one, then each label the guide describes otherwise.
+        """
+        labels = self.checkout.labels
+        for file, names in self.named.items():
+            for name in dict.fromkeys(names):
+                if name not in labels.names:
+                    yield Finding(
+                        file    = file,
+                        message = f"`{file}` names `{name}`, a label `{labels.file}` "
+                        "does not declare"
+                    )
+
+        release = self.checkout.release
+        filed   = Counter(release.names)
+        for name in labels.names:
+            if filed[name] != 1:
+                yield Finding(
+                    file    = release.file,
+                    message = f"`{release.file}` files `{name}` under "
+                    f"{filed[name] or 'no'} release-notes categories rather than one"
+                )
+
+        yield from super().scan()
+
+
 class ParityCheck(Check):
     """
-    Every file restating the Python version, the uv release, or the license
-    reads the value `pyproject.toml` or `.mise/config.toml` declares.
+    Every file restating the Python version, the uv release, the license,
+    or the release `CITATION.cff` cites reads the value `pyproject.toml` or
+    `.mise/config.toml` declares.
 
     The manifest's `requires-python` floor is the Python version the
     README's badge, the formatter's `target-version`, and the minor of
     the `python` mise pins each restate. The `uv` mise pins is the release
     `[tool.uv]` requires, and the manifest's license and authors are what
     the README's badge and the title and the copyright line of `LICENSE`
-    restate.
+    restate. `CITATION.cff` restates the manifest's version, license,
+    repository, and authors.
     """
 
     @property
@@ -108,6 +215,7 @@ class ParityCheck(Check):
         """
         Pairs each restated declaration with the one it restates.
         """
+        citation     = self.checkout.citation
         config       = self.checkout.config
         manifest     = self.checkout.manifest
         license_path = Path("LICENSE")
@@ -165,6 +273,30 @@ class ParityCheck(Check):
                 label    = f"The copyright holder list in `{license_path}`",
                 origin   = f"the author list in `{manifest.file}`",
                 original = manifest.holders
+            ),
+            *(
+                Parity(
+                    copied   = copied,
+                    file     = citation.file,
+                    label    = f"The `{key}` in `{citation.file}`",
+                    origin   = f"the `{name}` in `{manifest.file}`",
+                    original = original
+                )
+                for key, copied, name, original in (
+                    ("license", citation.license, "license", manifest.license),
+                    (
+                        "repository-code", citation.repository,
+                        "Repository", manifest.repository
+                    ),
+                    ("version", citation.version, "version", manifest.version)
+                )
+            ),
+            Parity(
+                copied   = citation.holders or None,
+                file     = citation.file,
+                label    = f"The author list in `{citation.file}`",
+                origin   = f"the author list in `{manifest.file}`",
+                original = manifest.holders
             )
         ]
 
@@ -175,13 +307,6 @@ class ParityCheck(Check):
         `None` where nothing matches.
         """
         return match[1] if (match := search(pattern, text)) else None
-
-    def scan(self) -> Iterator[Finding]:
-        """
-        Names each restated declaration that reads anything but the one
-        it restates.
-        """
-        yield from filter(None, (pair.finding for pair in self.pairs))
 
 
 class PinCheck(Check):
