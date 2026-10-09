@@ -39,6 +39,7 @@ def doubled(value: float) -> float:
         ),
         param("norms.toml", "factor = 3\n", True, id="data-file"),
         param("added.py", "LIMIT = 1\n", True, id="new-module"),
+        param("uv.lock", "version = 1\n", True, id="file-named-uv-lock"),
         param("__pycache__/module.cpython-314.pyc", "\x00", False, id="bytecode")
     ]
 )

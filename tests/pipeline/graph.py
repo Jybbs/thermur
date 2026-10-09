@@ -265,18 +265,41 @@ def test_each_recorded_run_saves_its_tables_again(graphed: Callable[..., Graph])
 
 def test_each_run_of_one_graph_keeps_a_record_of_its_own(graphed: Callable[..., Graph]):
     """
-    Asserts that two runs of one recorded graph each keep their record in a
-    folder of their own, so the second never replaces the first or lists the
-    table the first saved.
+    Asserts that two runs of one recorded graph each keep a record of their
+    own, in a folder of their own, holding the `Run` and each input once, so
+    the second never replaces the first or lists the table the first saved.
     """
-    graph   = graphed(recorded=True)
-    records = []
+    graph = graphed(recorded=True)
+    runs  = []
     for step in ("table", "grid"):
         graph.compute(step)
-        records.append(loads(graph.recorder.cache.read(graph.recorder.run_id)))
+        runs.append(graph.recorder.run_id)
+    records = [loads(graph.recorder.cache.read(run)) for run in runs]
 
     assert len({record["run_dir"] for record in records}) == 2
     assert [len(record["materialized"]) for record in records] == [1, 0]
+    assert [len(record["inputs"]) for record in records] == [2, 2]
+    assert [Run.model_validate(record["config"]) for record in records] == [
+        graph.recorder.run
+    ] * 2
+
+
+def test_each_run_records_the_lockfile_as_it_began(
+    clone   : Checkout,
+    graphed : Callable[..., Graph]
+):
+    """
+    Asserts that a run's record carries the digest of `uv.lock` as it stood
+    when the run began, so a later run of the same graph records a new
+    `uv.lock` rather than the first run's.
+    """
+    graph = graphed(recorded=True)
+    graph.compute("table")
+    (clone.root / "uv.lock").write_text("version = 1\n")
+    graph.compute("table")
+    record = loads(graph.recorder.cache.read(graph.recorder.run_id))
+
+    assert record["config"]["lockfile"] == clone.lockfile
 
 
 @mark.parametrize(

@@ -19,7 +19,6 @@ from hamilton.plugins.h_experiments  import ExperimentTracker
 from importlib import import_module
 from jax       import Array
 from numpy     import asarray, ndarray
-from pathlib   import Path
 from pydantic  import BaseModel, Field
 from xarray    import DataArray, DataTree, Dataset
 
@@ -70,30 +69,36 @@ class NetcdfWriter(DataSaver):
 
 class Recorder(ExperimentTracker):
     """
-    The experiment tracker Hamilton ships, recording one `Run` in place of
-    the configuration it records, in the `thermur` experiment.
+    The experiment tracker Hamilton ships, recording a `Run` for each
+    execution of the graph in place of the configuration it records, in the
+    `thermur` experiment.
 
     The tracker names each run by a random identifier, gives it a folder of
     its own under the experiment's folder, and moves into that folder around
     each saver, so a saver writing a bare file name writes into it.
     """
 
-    def __init__(self, folder: Path, run: Run):
+    def __init__(self, checkout: Checkout, settings: Settings):
         """
-        Keeps `folder`, the `data/runs/` of the clone, and the `run` each
-        execution of the graph records.
+        Keeps the `checkout` whose `data/runs/` holds each record and the
+        `settings` each execution of the graph records.
         """
-        self.folder = folder
-        self.run    = run
+        self.checkout = checkout
+        self.settings = settings
 
     def run_before_graph_execution(self, **kwargs: object):
         """
-        Opens a run of its own under `folder` for each execution of the
-        graph, since the tracker fixes its identifier and its folder when
-        built, and stores the run's record as the configuration the tracker
-        writes before recording the execution's inputs.
+        Opens a run of its own under the clone's `data/runs/` for each
+        execution of the graph, since the tracker fixes its identifier and
+        its folder when built, and stores the `Run` read from the clone at
+        that moment as the configuration the tracker writes before recording
+        the execution's inputs.
         """
-        super().__init__(base_directory=str(self.folder), experiment_name="thermur")
+        super().__init__(
+            base_directory  = str(self.checkout.root / "data" / "runs"),
+            experiment_name = "thermur"
+        )
+        self.run    = Run.from_checkout(self.checkout, self.settings)
         self.config = self.run.model_dump(mode="json")
         super().run_before_graph_execution(**kwargs)
 
@@ -165,13 +170,10 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     @cached_property
     def recorder(self) -> Recorder:
         """
-        Opens the record of this graph's runs under the clone's
-        `data/runs/`.
+        Builds the tracker recording each run of this graph under the
+        clone's `data/runs/`.
         """
-        return Recorder(
-            self.checkout.root / "data" / "runs",
-            Run.from_checkout(self.checkout, self.settings)
-        )
+        return Recorder(self.checkout, self.settings)
 
     @cached_property
     def tables(self) -> set[str]:
