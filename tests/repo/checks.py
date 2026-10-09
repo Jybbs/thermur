@@ -447,18 +447,20 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
     ]
 
 
-def test_a_moved_python_floor_names_every_copy(checkout: Checkout):
+def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(checkout: Checkout):
     """
-    Asserts that raising `requires-python` names the README's badge, the
-    formatter's `target-version`, and the minor mise pins, each against the
-    new floor.
+    Asserts that a manifest yaml-rs reads but PyYAML cannot parse, here one
+    whose description holds the NEL that YAML 1.1 reads as a line break, is
+    named for the problem PyYAML reports rather than raising.
     """
-    edit(checkout, "pyproject.toml", new='">=3.15"', old='">=3.14"')
+    edit(checkout, ACTION, new="The number\x85of commits", old="The number of commits")
 
-    assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
-        Path("README.md"),
-        Path("pyproject.toml"),
-        Path(".mise/config.toml")
+    assert AnchorCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(ACTION),
+            message = f"PyYAML cannot parse `{ACTION}`: while scanning a simple key, "
+            "could not find expected ':'"
+        )
     ]
 
 
@@ -482,6 +484,21 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     append(checkout, ".mise/config.toml", f'\n[tasks."py:sweep"]\nrun = {run}\n')
 
     assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
+        Path(".mise/config.toml")
+    ]
+
+
+def test_a_moved_python_floor_names_every_copy(checkout: Checkout):
+    """
+    Asserts that raising `requires-python` names the README's badge, the
+    formatter's `target-version`, and the minor mise pins, each against the
+    new floor.
+    """
+    edit(checkout, "pyproject.toml", new='">=3.15"', old='">=3.14"')
+
+    assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
+        Path("README.md"),
+        Path("pyproject.toml"),
         Path(".mise/config.toml")
     ]
 
@@ -549,20 +566,6 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
 
 
-def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
-    """
-    Asserts that a problem `mise tasks validate` reports on a task, here
-    an alias two tasks share, is named on the file holding the task at the
-    severity mise reports.
-    """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
-
-    assert [
-        (finding.file, finding.level)
-        for finding in TaskCheck(checkout=checkout).findings
-    ] == [(path, Level.ERROR)]
-
-
 @mark.parametrize(
     ("old", "new", "message"),
     [
@@ -606,6 +609,20 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
+def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
+    """
+    Asserts that a problem `mise tasks validate` reports on a task, here
+    an alias two tasks share, is named on the file holding the task at the
+    severity mise reports.
+    """
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+
+    assert [
+        (finding.file, finding.level)
+        for finding in TaskCheck(checkout=checkout).findings
+    ] == [(path, Level.ERROR)]
+
+
 def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
     """
     Asserts that a `tools` input a step passes an action other than a
@@ -639,21 +656,6 @@ def test_a_validation_error_outside_the_documents_is_raised(
 
     with raises(ValidationError):
         RunCheck(checkout=checkout).findings
-
-
-def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
-    """
-    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
-    is reported as one finding on that workflow, whose error names no field.
-    """
-    (checkout.root / CI).write_text("name: one\nname: two\n")
-
-    assert GateCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(CI),
-            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
-        )
-    ]
 
 
 @mark.parametrize(
@@ -697,26 +699,17 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
+def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
     """
-    Asserts that a step pinning an action to a commit other than the one
-    the first step pinning it names is named against that first step, in
-    path order.
+    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
+    is reported as one finding on that workflow, whose error names no field.
     """
-    edit(
-        checkout = checkout,
-        new = "      - name : Check out again\n        uses : actions/checkout@0f0f\n\n"
-        "      - name : Cut the draft",
-        old  = "      - name : Cut the draft",
-        path = DRAFT
-    )
+    (checkout.root / CI).write_text("name: one\nname: two\n")
 
-    assert CommitCheck(checkout=checkout).findings == [
+    assert GateCheck(checkout=checkout).findings == [
         Finding(
-            file    = Path(DRAFT),
-            message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
-            f"the pin on it in `{ACTION}` reads "
-            "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
+            file    = Path(CI),
+            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
         )
     ]
 
@@ -847,119 +840,69 @@ def test_a_step_outside_a_gate_writing_the_summary_is_named(
 
 
 @mark.parametrize(
-    ("edits", "message"),
+    ("prefix", "names"),
     [
-        param(
-            {"default     : '1'": "default     : &depth '1'"},
-            f"`{ACTION}` declares the YAML anchor `&depth`, which GitHub's "
-            "action-manifest parser rejects",
-            id = "bare"
-        ),
-        param(
-            {
-                "default     : '1'"     : "default     : &depth '1'",
-                "default     : 'false'" : "default     : *depth"
-            },
-            f"`{ACTION}` declares the YAML anchor `&depth`, which GitHub's "
-            "action-manifest parser rejects",
-            id = "aliased"
-        ),
-        param(
-            {
-                "install_args : ${{ inputs.tools }}": "install_args : *depth",
-                "{ fetch-depth: ": '{ "fetch-depth":&depth '
-            },
-            f"`{ACTION}` reuses a node through a YAML alias, whose anchor GitHub's "
-            "action-manifest parser rejects",
-            id = "aliased-past-the-scan"
-        ),
-        param({"default     : '1'": "default     : 'a: &b'"}, None, id="quoted"),
-        param({"default     : '1'": "default     : '1'  # a: &b"}, None, id="comment"),
-        param({"commits the checkout": "commits & tags the checkout"}, None, id="prose")
+        param("probe: &x 1\n", ["x"], id="value"),
+        param("probe: &x 1\nalso: *x\nagain: *x\n", ["x"], id="aliased-twice"),
+        param("--- &doc\n", ["doc"], id="document"),
+        param("probe:\n  - &k run: |\n      echo\n", ["k"], id="key-opening-a-block"),
+        param("probe: !!str &x 1\n", ["x"], id="tagged"),
+        param("probe: {k: &x v, j: *x}\n", ["x"], id="flow"),
+        param("probe: x, 'y\nalso: &x 1\nagain: 'z'\n", ["x"], id="quote-inside-prose"),
+        param("probe: &x 1\nalso: &y 2\n", ["x", "y"], id="in-order"),
+        param('probe: "x: &y"\n', [], id="double-quoted"),
+        param("probe: 'p: &q'\n", [], id="single-quoted"),
+        param("probe: 1  # c: &r\n", [], id="comment"),
+        param("probe: this & that\n", [], id="prose"),
+        param("probe: |\n  echo &x\n  - key: &y\n", [], id="block-scalar"),
+        param("probe: ${{ a && b }}\n", [], id="expression")
     ]
 )
-def test_an_anchor_in_an_action_manifest_is_named(
+def test_each_anchor_a_manifest_carries_is_named_once(
     checkout : Checkout,
-    edits    : dict[str, str],
-    message  : str | None
+    names    : list[str],
+    prefix   : str
 ):
     """
-    Asserts that a composite action's manifest declaring an anchor is
-    named for it, whether or not an alias reads it, that one reusing a node
-    through an anchor the scan passes over is named for the alias, and that
-    an `&` inside a quoted scalar, a comment, or prose spacing it apart
-    passes.
+    Asserts that a composite action's manifest is named once for each anchor
+    it declares or reads through an alias, in the order they appear, and
+    that an `&` inside a quoted scalar, a comment, prose, a block scalar, or
+    a `${{ }}` expression passes.
     """
-    for old, new in edits.items():
-        edit(checkout, ACTION, new=new, old=old)
+    edit(checkout, ACTION, new=f"{prefix}name        :", old="name        :")
 
-    assert AnchorCheck(checkout=checkout).findings == (
-        [Finding(file=Path(ACTION), message=message)] if message else []
+    assert AnchorCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(ACTION),
+            message = f"`{ACTION}` carries the YAML anchor `&{name}`, which GitHub's "
+            "action-manifest parser rejects"
+        )
+        for name in names
+    ]
+
+
+def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
+    """
+    Asserts that a step pinning an action to a commit other than the one
+    the first step pinning it names is named against that first step, in
+    path order.
+    """
+    edit(
+        checkout = checkout,
+        new = "      - name : Check out again\n        uses : actions/checkout@0f0f\n\n"
+        "      - name : Cut the draft",
+        old  = "      - name : Cut the draft",
+        path = DRAFT
     )
 
-
-@mark.parametrize(
-    ("text", "anchors"),
-    [
-        param("a: &x 1\n", ["x"], id="value"),
-        param("&k key: v\n", ["k"], id="key"),
-        param("- &x\n  a: 1\n- - &y b\n", ["x", "y"], id="entries"),
-        param("a: [&x 1, {b: &y 2}]\n", ["x", "y"], id="flow"),
-        param("a: !!str &x '1'\n", ["x"], id="tagged"),
-        param('a: "x: &y"\nb: "c\\": &d"\n', [], id="double-quoted"),
-        param("a: 'it''s: &q'\n", [], id="single-quoted"),
-        param("a: 1  # c: &r\n# d: &s\n", [], id="comments"),
-        param("d: Tom & Jerry, R&D\n", [], id="prose"),
-        param("e: |\n  && next: &s\n\n  - &t\nf: &x 2\n", ["x"], id="block"),
-        param("- run: |\n    a: &s\n  shell: &x bash\n", ["x"], id="block-in-entry"),
-        param("a:\n  e: |\n  f: &x 1\n", ["x"], id="empty-block"),
-        param("if: ${{ !cancelled() && b }}\nc: { d: &x 1 }\n", ["x"], id="expression"),
-        param("- run: |\n  shell: &x bash\n", ["x"], id="empty-block-in-entry"),
-        param("a:  # pick: |\n  c: &x 1\n", ["x"], id="comment-ending-on-a-bar"),
-        param("--- &x\na: 1\n", ["x"], id="document"),
-        param("-\t&x 1\n", ["x"], id="tab-after-entry"),
-        param("a: &x 1\nb: &x 2\n", ["x"], id="duplicate"),
-        param("a: |\n\n  b: &s\nc: &x 1\n", ["x"], id="blank-before-block"),
-        param("a: |2\n   b: &s\nc: &x 1\n", ["x"], id="indentation-indicator"),
-        param("a: >-\n  b: &s\n", [], id="chomping-indicator"),
-        param("a: |  # c\n  b: &s\n", [], id="comment-after-block"),
-        param("? |\n  b: &s\n: &x 1\n", ["x"], id="block-key"),
-        param("? &k a\n: 1\n", ["k"], id="explicit-key"),
-        param("a: [x#y, &z 1]\n", ["z"], id="hash-inside-scalar"),
-        param("a:\t&x 1\n", ["x"], id="tab-after-colon"),
-        param("a: [1,  &x 2]\n", ["x"], id="spaces-after-comma"),
-        param(
-            "steps:\n  - run: |\n    shell: &x bash\n",
-            ["x"],
-            id = "indented-empty-block-in-entry"
-        ),
-        param("? a: |\n  b: &x 1\n: v\n", ["x"], id="empty-block-in-explicit-key"),
-        param("- - a: |\n    b: &x 1\n", ["x"], id="empty-block-in-nested-entry"),
-        param("- a:  |\n  b: &x 1\n", ["x"], id="spaces-before-block-in-entry"),
-        param("- a: >\n  b: &x 1\n", ["x"], id="folded-block-in-entry"),
-        param("- a: |-\n  b: &x 1\n", ["x"], id="chomped-block-in-entry"),
-        param("- a: | # c\n  b: &x 1\n", ["x"], id="commented-block-in-entry"),
-        param("e: |\n  x\n  b: &s\nf: &x 1\n", ["x"], id="second-block-line"),
-        param("a: 'p'\nb: &x 1\nc: 'q'\n", ["x"], id="between-single-quoted"),
-        param("a: {&x b: 1}\n", ["x"], id="brace"),
-        param("a:\n  - &x 1\n", ["x"], id="indented-entry"),
-        param("a:  &x 1\n", ["x"], id="spaces-after-colon"),
-        param("- &k run: |\n    echo\n", ["k"], id="anchored-key-before-block"),
-        param('"a #b": |\n  x: &s\nc: &y 1\n', ["y"], id="quoted-key-holding-a-hash")
+    assert CommitCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(DRAFT),
+            message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
+            f"the pin on it in `{ACTION}` reads "
+            "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
+        )
     ]
-)
-def test_the_anchor_scan_reads_only_an_ampersand_opening_a_node(
-    anchors : list[str],
-    text    : str
-):
-    """
-    Asserts that the scan names each anchor once on a value, a key, a
-    sequence entry, a document, a flow node, or a tagged node, and passes
-    over an `&` inside a quoted scalar, a comment, a block scalar, a `${{
-    }}` expression, or prose spacing it apart or holding it inside a word,
-    while still reading the line after a block scalar.
-    """
-    assert AnchorCheck.anchors(text) == anchors
 
 
 @mark.parametrize(

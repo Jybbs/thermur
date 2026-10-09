@@ -12,8 +12,8 @@ from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re      import MULTILINE, findall, finditer, search, sub
-from yaml_rs import AliasLimits, YAMLDecodeError, loads
+from re   import findall, finditer, search, sub
+from yaml import NodeEvent, YAMLError, parse
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Finding, Parity
@@ -76,89 +76,39 @@ class AnchorCheck(Check):
     No composite action's manifest carries a YAML anchor, since GitHub's
     action-manifest parser rejects one before any step of a job loading the
     action runs, whereas a workflow may carry one.
-
-    yaml-rs reports no anchor it reads, so the check scans the manifest's
-    text for one and keeps the parser's alias limit for an anchor the scan
-    passes over that an alias reads.
     """
-
-    @staticmethod
-    def anchors(text: str) -> list[str]:
-        """
-        Names each anchor `text` declares once, meaning each `&` opening
-        a node at the start of a line or past a `---` marker, past a `-`,
-        `?`, or `:` indicator and the space or tab after it, or past a flow
-        indicator, and passes over the `&` inside each of these:
-
-        - A quoted scalar
-        - A comment
-        - A block scalar, whose lines sit deeper than the key opening it, or
-          than its `-` or `?` indicator where no key opens it
-        - A `${{ }}` expression GitHub evaluates
-        """
-        key = (
-            r"(?:\"(?:[^\"\\\n]|\\.)*\"|'(?:[^'\n]|'')*'"
-            r"|[^\n#&]|(?<=\S)#|(?<=[^\s\[{,])&|&(?=\s))*?"
-        )
-        tail = r"[|>][-+1-9]*[ \t]*(?:#.*)?"
-        return list(
-            dict.fromkeys(
-                match["anchor"]
-                for match in finditer(
-                    r"(?<!\S)#.*|\$\{\{.*?\}\}"
-                    rf"|^(?P<lead> *+)(?:[-?][ \t]+)*(?:{key}:[ \t]+)?{tail}\n"
-                    r"(?:[ \t]*\n)*(?P<indent>(?P=lead) +)\S.*"
-                    r"(?:\n(?P=indent).*|\n[ \t]*(?=\n))*"
-                    r"|(?:^ *(?:[-?][ \t]+)*|^---[ \t]+|:[ \t]+|[\[{,][ \t]*)"
-                    r"(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'"
-                    r"|(?:![^\s]*[ \t]+)?&(?P<anchor>[^\s,\[\]{}]+))",
-                    sub(
-                        rf"^( *)((?:[-?][ \t]+)+)(?={key}:[ \t]+{tail}$)",
-                        lambda entry: entry[1] + " " * len(entry[2]),
-                        text,
-                        flags = MULTILINE
-                    ),
-                    MULTILINE
-                )
-                if match["anchor"]
-            )
-        )
-
-    @staticmethod
-    def replays(text: str) -> bool:
-        """
-        Tells whether `text` reuses a node through a YAML alias, which
-        yaml-rs reports by failing the read once its alias limit lets no
-        node be replayed, the manifests having already read cleanly without
-        it.
-        """
-        try:
-            loads(text, alias_limits=AliasLimits(max_total_replayed_events=0))
-        except YAMLDecodeError:
-            return True
-
-        return False
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names each anchor a manifest's text declares, or where the scan
-        finds none, a manifest reusing a node through an alias.
+        Names each anchor a manifest declares or reads through an alias,
+        once and in the order PyYAML's parse events carry them, or the
+        problem PyYAML reports, without its location lines, where it cannot
+        parse the manifest.
         """
         for path in self.checkout.actions:
-            text = self.checkout.read(path)
-            if names := self.anchors(text):
-                for name in names:
-                    yield Finding(
-                        file    = path,
-                        message = f"`{path}` declares the YAML anchor `&{name}`, "
-                        "which GitHub's action-manifest parser rejects"
-                    )
-
-            elif self.replays(text):
+            try:
+                events = list(parse(self.checkout.read(path)))
+            except YAMLError as error:
                 yield Finding(
                     file    = path,
-                    message = f"`{path}` reuses a node through a YAML alias, whose "
-                    "anchor GitHub's action-manifest parser rejects"
+                    message = f"PyYAML cannot parse `{path}`: "
+                    + ", ".join(
+                        line
+                        for line in str(error).splitlines()
+                        if not line.startswith(" ")
+                    )
+                )
+                continue
+
+            for name in dict.fromkeys(
+                event.anchor
+                for event in events
+                if isinstance(event, NodeEvent) and event.anchor
+            ):
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` carries the YAML anchor `&{name}`, which "
+                    "GitHub's action-manifest parser rejects"
                 )
 
 
