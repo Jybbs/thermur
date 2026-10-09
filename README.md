@@ -446,7 +446,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, and the workflows and the composite action to one gate each, one commit per action, one runner image, the tool subsets `🔥 Warm` saves, and the files a cache key hashes |
+| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, every `uv run` a task runs to `--exact --locked`, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate, every action from another repository to one commit, every job to one runner image, the tool subsets `🔥 Warm` saves, and the files a cache key hashes |
 | `mise ci` | Runs `mise doctor project`, then every task a row of the pull-request workflows runs, the way the rows run them |
 | `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
 | `mise relock` | Re-resolves every lockfile after its manifest changes |
@@ -483,7 +483,7 @@ thermur/
 ├── src/thermur/repo/               # The checks `mise audit` runs
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
-├── pyproject.toml                  # Package configuration, with packaging, pydantic, and yaml-rs for the audit
+├── pyproject.toml                  # Package configuration, its dependencies, and each tool's table
 └── uv.lock                         # Locked dependencies
 ```
 

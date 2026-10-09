@@ -64,10 +64,9 @@ class Brief:
         folder = Path(".github/scripts/summaries")
         named  = self.file.with_suffix(".md.j2").name
         return Environment(
-            keep_trailing_newline = True,
-            loader                = load_from_path(folder),
-            lstrip_blocks         = True,
-            trim_blocks           = True
+            loader        = load_from_path(folder),
+            lstrip_blocks = True,
+            trim_blocks   = True
         ).render_template(
             named if (folder / named).is_file() else "base.md.j2",
             commit   = self.link,

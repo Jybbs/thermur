@@ -606,6 +606,22 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
+def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
+    """
+    Asserts that a `tools` input a step passes an action other than a
+    composite action of the checkout names no subset a Kit job must save.
+    """
+    edit(
+        checkout = checkout,
+        new      = "uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
+        "        with : { tools: bun }",
+        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
+        path = DRAFT
+    )
+
+    assert KitCheck(checkout=checkout).findings == []
+
+
 def test_a_validation_error_outside_the_documents_is_raised(
     checkout    : Checkout,
     monkeypatch : MonkeyPatch

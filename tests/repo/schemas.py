@@ -212,7 +212,7 @@ def test_a_yaml_document_reports_its_error_under_its_path(
 @mark.parametrize(
     ("needs", "names"),
     [
-        param("needs: a", ("a",), id="one"),
+        param("needs: check", ("check",), id="one"),
         param("needs: [a, b]", ("a", "b"), id="list"),
         param("", (), id="none")
     ]

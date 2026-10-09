@@ -33,7 +33,7 @@ runs:
       uses : jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492
 
       with:
-        cache_key    : mise-{{platform}}-{{version}}-{{install_args_hash}}-${{ hashFiles('.mise/config.toml', '.mise/mise.lock') }}
+        cache_key    : mise-{{platform}}-{{install_args_hash}}-${{ hashFiles('.mise/config.toml', '.mise/mise.lock') }}
         cache_save   : ${{ inputs.save }}
         install_args : ${{ inputs.tools }}
         version      : ${{ steps.floor.outputs.version }}
