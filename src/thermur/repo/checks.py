@@ -85,31 +85,40 @@ class AnchorCheck(Check):
     @staticmethod
     def anchors(text: str) -> list[str]:
         """
-        Names each anchor `text` declares, meaning each `&` opening a node
-        at the start of a line, past a `-`, `?`, or `:` indicator and the
-        space after it, or past a flow indicator, and passes over the `&`
-        inside each of these:
+        Names each anchor `text` declares once, meaning each `&` opening
+        a node at the start of a line or past a `---` marker, past a `-`,
+        `?`, or `:` indicator and the space or tab after it, or past a flow
+        indicator, and passes over the `&` inside each of these:
 
         - A quoted scalar
         - A comment
-        - A block scalar, whose lines sit deeper than the line opening it
+        - A block scalar, whose lines sit deeper than the key opening it, or
+          than its `-` or `?` indicator where no key opens it
         - A `${{ }}` expression GitHub evaluates
         """
-        return [
-            match["anchor"]
-            for match in finditer(
-                r"(?<!\S)#.*|\$\{\{.*?\}\}"
-                r"|^(?P<lead> *+)(?:[-?] +)*(?:[^\n]*?:[ \t]+)?"
-                r"[|>][-+1-9]*[ \t]*(?:#.*)?\n(?:[ \t]*\n)*"
-                r"(?P<indent>(?P=lead) +)\S.*(?:\n(?P=indent).*|\n[ \t]*(?=\n))*"
-                r"|(?:^ *(?:[-?] +)*|:[ \t]+|[\[{,][ \t]*)"
-                r"(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'"
-                r"|(?:![^\s]*[ \t]+)?&(?P<anchor>[^\s,\[\]{}]+))",
-                text,
-                MULTILINE
+        return list(
+            dict.fromkeys(
+                match["anchor"]
+                for match in finditer(
+                    r"(?<!\S)#.*|\$\{\{.*?\}\}"
+                    r"|^(?P<lead> *+)(?:[-?][ \t]+)*(?:(?:[^\n#]|(?<=\S)#)*?:[ \t]+)?"
+                    r"[|>][-+1-9]*[ \t]*(?:#.*)?\n(?:[ \t]*\n)*"
+                    r"(?P<indent>(?P=lead) +)\S.*(?:\n(?P=indent).*|\n[ \t]*(?=\n))*"
+                    r"|(?:^ *(?:[-?][ \t]+)*|^---[ \t]+|:[ \t]+|[\[{,][ \t]*)"
+                    r"(?:\"(?:[^\"\\]|\\.)*\"|'(?:[^']|'')*'"
+                    r"|(?:![^\s]*[ \t]+)?&(?P<anchor>[^\s,\[\]{}]+))",
+                    sub(
+                        r"^( *)((?:[-?][ \t]+)+)(?=(?:[^\n#]|(?<=\S)#)*?:[ \t]+"
+                        r"[|>][-+1-9]*[ \t]*(?:#.*)?$)",
+                        lambda entry: entry[1] + " " * len(entry[2]),
+                        text,
+                        flags = MULTILINE
+                    ),
+                    MULTILINE
+                )
+                if match["anchor"]
             )
-            if match["anchor"]
-        ]
+        )
 
     @staticmethod
     def replays(text: str) -> bool:
@@ -472,8 +481,8 @@ class ProvisionCheck(Check):
     The `cache_key` a composite action passes `jdx/mise-action` ends on
     a `-` and a `hashFiles` call, holding before them only the template
     variables that stay fixed across the saves of one tool subset, since
-    `gha:prune` keeps the newest of the entries whose keys match up to that
-    `-`.
+    `gha:prune` keeps the newest of the entries one branch saved whose keys
+    match up to that `-`.
     """
 
     def scan(self) -> Iterator[Finding]:

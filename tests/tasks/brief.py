@@ -6,6 +6,7 @@ for the results of the jobs its gate waited on.
 """
 
 from collections.abc  import Callable
+from dataclasses      import replace
 from json             import dumps
 from pathlib          import Path
 from pytest           import CaptureFixture, Config, MonkeyPatch, fixture, mark, param
@@ -112,6 +113,18 @@ def test_each_workflow_renders_its_summary(
     path the draft cut took, and that any other renders `base.md.j2`.
     """
     assert readout(file, needs).summary == snapshot
+
+
+def test_the_heading_keeps_every_word_after_the_glyph(
+    readout: Callable[[str, dict], object]
+):
+    """
+    Asserts that the summary's heading names the workflow by every word its
+    name carries after its glyph, so a name of two words keeps both.
+    """
+    gate = replace(readout("warm.yml", {"kit": job()}), workflow="🔥 Pages Deploy")
+
+    assert gate.summary.partition("\n")[0] == "## 🔥 Thermur Pages Deploy"
 
 
 @mark.parametrize(

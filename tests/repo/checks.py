@@ -887,7 +887,8 @@ def test_an_anchor_in_an_action_manifest_is_named(
     Asserts that a composite action's manifest declaring an anchor is
     named for it, whether or not an alias reads it, that one reusing a node
     through an anchor the scan passes over is named for the alias, and that
-    an `&` inside a quoted scalar, a comment, or prose passes.
+    an `&` inside a quoted scalar, a comment, or prose spacing it apart
+    passes.
     """
     for old, new in edits.items():
         edit(checkout, ACTION, new=new, old=old)
@@ -912,7 +913,21 @@ def test_an_anchor_in_an_action_manifest_is_named(
         param("e: |\n  && next: &s\n\n  - &t\nf: &x 2\n", ["x"], id="block"),
         param("- run: |\n    a: &s\n  shell: &x bash\n", ["x"], id="block-in-entry"),
         param("a:\n  e: |\n  f: &x 1\n", ["x"], id="empty-block"),
-        param("if: ${{ !cancelled() && b }}\nc: { d: &x 1 }\n", ["x"], id="expression")
+        param("if: ${{ !cancelled() && b }}\nc: { d: &x 1 }\n", ["x"], id="expression"),
+        param("- run: |\n  shell: &x bash\n", ["x"], id="empty-block-in-entry"),
+        param("a:  # pick: |\n  c: &x 1\n", ["x"], id="comment-ending-on-a-bar"),
+        param("--- &x\na: 1\n", ["x"], id="document"),
+        param("-\t&x 1\n", ["x"], id="tab-after-entry"),
+        param("a: &x 1\nb: &x 2\n", ["x"], id="duplicate"),
+        param("a: |\n\n  b: &s\nc: &x 1\n", ["x"], id="blank-before-block"),
+        param("a: |2\n   b: &s\nc: &x 1\n", ["x"], id="indentation-indicator"),
+        param("a: >-\n  b: &s\n", [], id="chomping-indicator"),
+        param("a: |  # c\n  b: &s\n", [], id="comment-after-block"),
+        param("? |\n  b: &s\n: &x 1\n", ["x"], id="block-key"),
+        param("? &k a\n: 1\n", ["k"], id="explicit-key"),
+        param("a: [x#y, &z 1]\n", ["z"], id="hash-inside-scalar"),
+        param("a:\t&x 1\n", ["x"], id="tab-after-colon"),
+        param("a: [1,  &x 2]\n", ["x"], id="spaces-after-comma")
     ]
 )
 def test_the_anchor_scan_reads_only_an_ampersand_opening_a_node(
@@ -920,10 +935,11 @@ def test_the_anchor_scan_reads_only_an_ampersand_opening_a_node(
     text    : str
 ):
     """
-    Asserts that the scan names an anchor on a value, a key, a sequence
-    entry, a flow node, or a tagged node, and passes over an `&` inside
-    a quoted scalar, a comment, prose, a block scalar, or a `${{ }}`
-    expression, while still reading the line after a block scalar.
+    Asserts that the scan names each anchor once on a value, a key, a
+    sequence entry, a document, a flow node, or a tagged node, and passes
+    over an `&` inside a quoted scalar, a comment, a block scalar, a `${{
+    }}` expression, or prose spacing it apart or holding it inside a word,
+    while still reading the line after a block scalar.
     """
     assert AnchorCheck.anchors(text) == anchors
 
@@ -951,7 +967,7 @@ def test_the_anchor_scan_reads_only_an_ampersand_opening_a_node(
         ),
         param(
             "mise-{{platform}}",
-            "mise-{{cache_key_prefix}}-{{mise_env}}-{{platform}}",
+            "mise-{{cache_key_prefix}}-{{mise_env}}-{{bootstrap_hash}}-{{platform}}",
             None,
             id = "fixed"
         )

@@ -61,7 +61,7 @@ class Readout:
         Fills in the template named for the workflow's file, or `base.md.j2`
         where none is, from the `needs` context, so the template reads any
         output a job the gate waited on declares, naming the workflow by the
-        word its name carries after its glyph.
+        words its name carries after its glyph.
         """
         folder = Path(".github/scripts/summaries")
         named  = self.file.with_suffix(".md.j2").name
@@ -75,7 +75,7 @@ class Readout:
             needs    = self.needs,
             passed   = self.passed,
             ref      = self.ref,
-            workflow = self.workflow.rpartition(" ")[2]
+            workflow = self.workflow.partition(" ")[2]
         )
 
     @classmethod
