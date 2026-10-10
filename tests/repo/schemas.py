@@ -1,23 +1,61 @@
 """
-Pins the records the repository audit reads and reports, meaning the value
-a document's text reads as and the key each document field reads, the
-annotation a `Finding` prints, the finding a `Parity` makes, the holders
-a `Manifest` names, the labels a `Template` lists, and the rows a `Labels`
-registry accepts, the command each `Label` writes, and the live labels a
-registry omits.
+Pins the records the repository audit reads and reports:
+
+- What a document's text reads as, the key each field reads, and the path
+  its error carries
+- What a workflow's jobs, steps, and triggers derive, and the requirements
+  a task script declares
+- What a `Finding` prints at each level, the findings a `Parity` and an
+  `Issue` make, and the holders a `Manifest` names
+- The labels a `Template` lists, the rows a `Labels` registry accepts, the
+  command a `Label` writes, and the live labels a registry omits
 """
 
-from functools    import reduce
-from pathlib      import Path
-from pydantic     import AliasPath, ValidationError
-from pytest       import Config, mark, param, raises
-from urllib.parse import unquote
+from functools              import reduce
+from packaging.requirements import Requirement
+from pathlib                import Path
+from pydantic               import AliasPath, ValidationError
+from pytest                 import Config, mark, param, raises
+from urllib.parse           import unquote
 
 from thermur.repo.schemas import (
-    Author, Document, Finding, Label, Labels, Manifest, Parity, Template
+    Author,
+    Document,
+    Finding,
+    Issue,
+    Job,
+    Label,
+    Labels,
+    Level,
+    Lock,
+    Manifest,
+    Parity,
+    Step,
+    Task,
+    Template,
+    Trigger,
+    Workflow
 )
 
-ROW = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
+ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
+WORKFLOW = "name: w\non:\n  push:\njobs:\n  a:\n    runs-on: x\n"
+
+
+def test_a_label_description_runs_to_100_characters():
+    """
+    Asserts that a description of 100 characters, the most GitHub's label
+    API accepts, validates, whereas one of 101 fails at the description.
+    """
+    assert len(
+        Label.model_validate(ROW | {"description": "x" * 100}).description
+    ) == 100
+
+    with raises(ValidationError) as error:
+        Label.model_validate(ROW | {"description": "x" * 101})
+
+    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
+        (("description",), "String should have at most 100 characters")
+    ]
 
 
 @mark.parametrize(
@@ -154,6 +192,311 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
 
 
 @mark.parametrize(
+    ("text", "location", "message"),
+    [
+        param("name: w\nname: v\n", (), "duplicate mapping key: 'name'", id="unread"),
+        param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid")
+    ]
+)
+def test_a_yaml_document_reports_its_error_under_its_path(
+    location : tuple,
+    message  : str,
+    text     : str,
+    tmp_path : Path
+):
+    """
+    Asserts that a workflow its YAML fails to read, or that fails to
+    validate, raises one error titled with the workflow's path from the
+    root, located at the field where validation failed and nowhere where
+    reading did.
+    """
+    path = Path(".github/workflows/broken.yml")
+    (tmp_path / path.parent).mkdir(parents=True)
+    (tmp_path / path).write_text(text)
+
+    with raises(ValidationError) as error:
+        Workflow.read(tmp_path, path)
+
+    assert error.value.title == str(path)
+    assert [(
+        detail["loc"],
+        message in detail["msg"]
+    ) for detail in error.value.errors()] == [(location, True)]
+
+
+@mark.parametrize(
+    ("needs", "names"),
+    [
+        param("needs: check", ("check",), id="one"),
+        param("needs: [a, b]", ("a", "b"), id="list"),
+        param("", (), id="none")
+    ]
+)
+def test_a_job_reads_the_jobs_it_waits_for(needs: str, names: tuple[str, ...]):
+    """
+    Asserts that a job waiting for one job, written as its key alone, reads
+    as waiting for that job, as a job written with a list of keys does.
+    """
+    assert workflow(f"{WORKFLOW}    {needs}\n").jobs["a"].needs == names
+
+
+@mark.parametrize(
+    ("value", "values"),
+    [
+        param("${{ matrix.tools }}", ["python uv", "zizmor"], id="matrix"),
+        param("${{matrix.tools}}", ["python uv", "zizmor"], id="unspaced"),
+        param("${{ matrix.task }}", ["py:check", ""], id="undeclared"),
+        param("python uv", ["python uv"], id="literal"),
+        param("${{ github.token }}", ["${{ github.token }}"], id="other-context")
+    ]
+)
+def test_a_job_expands_a_matrix_value_across_its_rows(value: str, values: list[str]):
+    """
+    Asserts that a `${{ matrix.<key> }}` expression takes each row's value
+    under the key, or an empty string for a row declaring no such key, and
+    that any other value is taken as written.
+    """
+    job = Job.model_validate(
+        {
+            "runs-on"  : "x",
+            "strategy" : {
+                "matrix": {
+                    "include": [
+                        {"task": "py:check", "tools": "python uv"},
+                        {"tools": "zizmor"}
+                    ]
+                }
+            }
+        }
+    )
+
+    assert (job.expand(value), job.tasks) == (values, ["py:check"])
+
+
+@mark.parametrize(
+    ("paths", "file", "matches"),
+    [
+        param((), "anything.txt", True, id="no-filter"),
+        param((".mise/config.toml",), ".mise/config.toml", True, id="exact"),
+        param(
+            (".github/actions/provision/**",),
+            ".github/actions/provision/action.yml",
+            True,
+            id = "globstar"
+        ),
+        param(
+            (".github/*",),
+            ".github/actions/provision/action.yml",
+            False,
+            id = "one-segment"
+        ),
+        param(("pyproject.toml",), "uv.lock", False, id="other-file")
+    ]
+)
+def test_a_trigger_matches_the_files_its_globs_name(
+    file    : str,
+    matches : bool,
+    paths   : tuple[str, ...]
+):
+    """
+    Asserts that a filter matches a file a glob names in full, a `**`
+    crossing folders and a `*` staying inside one, and that a trigger naming
+    no paths matches every file.
+    """
+    assert Trigger(paths=paths).matches(file) is matches
+
+
+@mark.parametrize(
+    ("events", "pushes"),
+    [
+        param("  push:\n", True, id="any-push"),
+        param("  push:\n    paths: [uv.lock]\n", True, id="filtered-match"),
+        param("  push:\n    paths: [docs/**]\n", False, id="filtered-miss"),
+        param("  pull_request:\n", False, id="no-push")
+    ]
+)
+def test_a_workflow_runs_on_a_push_its_filter_matches(events: str, pushes: bool):
+    """
+    Asserts that a push changing a file runs a workflow only where it runs
+    on a push whose filter matches the file or names no paths.
+    """
+    assert workflow(f"name: w\njobs: {{}}\non:\n{events}").pushes("uv.lock") is pushes
+
+
+def test_a_label_writes_the_command_that_creates_or_updates_it():
+    """
+    Asserts that a label writes the `gh label create --force` command
+    carrying its color, its description, and its name, which creates the
+    label or updates the one already carrying that name.
+    """
+    assert Label.model_validate(ROW).command == [
+        "gh", "label", "create", "--color", "8c055e",
+        "--description", "Wrong output", "--force", "🐞 bug"
+    ]
+
+
+@mark.parametrize(
+    ("uses", "pin"),
+    [
+        param(
+            "actions/checkout@3d3c42e5",
+            ("actions/checkout", "3d3c42e5"),
+            id = "pinned"
+        ),
+        param("$/.github/actions/provision", None, id="self-repository"),
+        param("", None, id="shell")
+    ]
+)
+def test_a_step_splits_the_action_from_its_commit(uses: str, pin: tuple | None):
+    """
+    Asserts that a step naming an action pinned with `@` splits into the
+    action and the commit, and that one naming an action of the repository
+    or running shell lines holds no pin.
+    """
+    assert Step(uses=uses).pin == pin
+
+
+@mark.parametrize(
+    ("text", "dependencies"),
+    [
+        param(
+            '#!/bin/sh\n# /// script\n# dependencies = ["minijinja==2.24.0"]\n#\n'
+            '# requires-python = ">=3.14"\n# ///\n',
+            [Requirement("minijinja==2.24.0")],
+            id = "declared"
+        ),
+        param("#!/bin/sh\n# /// script\n# ///\n", [], id="empty-block"),
+        param("#!/bin/sh\ntrue\n", [], id="no-block")
+    ]
+)
+def test_a_task_script_reads_the_requirements_its_metadata_declares(
+    dependencies : list[Requirement],
+    text         : str,
+    tmp_path     : Path
+):
+    """
+    Asserts that a task file's inline metadata reads as the requirements its
+    `script` block declares under PEP 723, a comment line holding only `#`
+    included, and as none where the file holds no block with a line inside.
+    """
+    script = tmp_path / "task"
+    script.write_text(text)
+
+    assert Task(
+        file   = script,
+        name   = "t",
+        run    = (),
+        source = script
+    ).dependencies == dependencies
+
+
+def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+    """
+    Asserts that a Markdown file whose text opens on anything but front
+    matter fails to read rather than reading as an empty document.
+    """
+    with raises(ValueError, match="opens on no front matter"):
+        Document.load(".md", "name: Bug\n---\n")
+
+
+@mark.parametrize(
+    ("save", "saves"),
+    [
+        param("'true'", True, id="quoted"),
+        param("true", True, id="unquoted"),
+        param("'false'", False, id="false")
+    ]
+)
+def test_a_step_reads_its_inputs_as_github_hands_them_to_the_action(
+    save  : str,
+    saves : bool
+):
+    """
+    Asserts that a step passing `save` as `true`, quoted or not, saves the
+    archive, since GitHub hands the action the string either way, and that a
+    date passed as an input reads as its text.
+    """
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - uses: $/a\n"
+        f"        with: {{ save: {save}, since: 2026-10-01 }}\n"
+    ).jobs["a"].steps[0]
+
+    assert (step.saves, step.inputs["since"]) == (saves, "2026-10-01")
+
+
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+    """
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
+    """
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
+
+    assert step.env == {"RETRIES": 3}
+
+
+def test_a_toml_task_declares_no_requirements(tmp_path: Path):
+    """
+    Asserts that a task declared in TOML, which holds no file of its own,
+    declares no requirements.
+    """
+    assert Task(
+        file   = None,
+        name   = "t",
+        run    = (),
+        source = tmp_path
+    ).dependencies == []
+
+
+def test_a_warning_prints_as_a_warning_annotation():
+    """
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
+    """
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+
+    assert finding.annotation == "::warning file=a.toml::m"
+
+
+@mark.parametrize(
+    ("details", "message"),
+    [
+        param(
+            "Tasks: a:one, a:two",
+            "`mise tasks validate` reports `Alias 'x' is used by multiple tasks` on "
+            "`a:one` (`Tasks: a:one, a:two`)",
+            id = "details"
+        ),
+        param(
+            "",
+            "`mise tasks validate` reports `Alias 'x' is used by multiple tasks` on "
+            "`a:one`",
+            id = "none"
+        )
+    ]
+)
+def test_an_issue_reads_as_a_finding_at_its_severity(details: str, message: str):
+    """
+    Asserts that a problem mise reports on a task reads as a finding at
+    the severity mise gives it, naming the task and the message beside any
+    details mise adds.
+    """
+    issue = Issue(
+        details  = details,
+        message  = "Alias 'x' is used by multiple tasks",
+        severity = Level.WARNING,
+        task     = "a:one"
+    )
+
+    assert issue.finding(Path("t")) == Finding(
+        file    = Path("t"),
+        level   = Level.WARNING,
+        message = message
+    )
+
+
+@mark.parametrize(
     ("data", "errors"),
     [
         param(
@@ -225,21 +568,28 @@ def test_a_malformed_registry_fails_at_the_key_it_breaks(
     assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == errors
 
 
-def test_a_label_description_runs_to_100_characters():
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
     """
-    Asserts that a description of 100 characters, the most GitHub's label
-    API accepts, validates, whereas one of 101 fails at the description.
+    Asserts that a workflow reads the job under the key `gate`, the jobs it
+    waits for, the tasks its rows run, and whether a step passes a composite
+    action `save: 'true'`.
     """
-    assert len(
-        Label.model_validate(ROW | {"description": "x" * 100}).description
-    ) == 100
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
 
-    with raises(ValidationError) as error:
-        Label.model_validate(ROW | {"description": "x" * 101})
-
-    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
-        (("description",), "String should have at most 100 characters")
-    ]
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.tasks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a"], ["lock:check"], True, False)
+    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize(
@@ -270,6 +620,12 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
     [
         param(".toml", 'version = "0.1.0"\n', {"version": "0.1.0"}, id="toml"),
         param(
+            ".lock",
+            '[[package]]\nname = "a"\n',
+            {"package": [{"name": "a"}]},
+            id = "lock"
+        ),
+        param(
             ".yml",
             "on: push\nversion: 0.1.0\n",
             {"on": "push", "version": "0.1.0"},
@@ -296,24 +652,24 @@ def test_a_document_reads_the_value_its_suffix_names(
     value  : object
 ):
     """
-    Asserts that a document's text reads as TOML under `.toml`, as YAML
-    1.2 under any other suffix, keeping `on`, a version, and a date as the
-    strings they are written as, and as the front matter alone under `.md`,
-    ending at its first closing `---`.
+    Asserts that a document's text reads as TOML under `.toml` and `.lock`,
+    as YAML 1.2 under any other suffix, keeping `on`, a version, and a date
+    as the strings they are written as, and as the front matter alone under
+    `.md`, ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
 
 
-def test_a_label_writes_the_command_that_creates_or_updates_it():
+def test_the_lock_maps_each_package_to_its_version():
     """
-    Asserts that a label writes the `gh label create --force` command
-    carrying its color, its description, and its name, which creates the
-    label or updates the one already carrying that name.
+    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
+    name mapped to the version it resolves.
     """
-    assert Label.model_validate(ROW).command == [
-        "gh", "label", "create", "--color", "8c055e",
-        "--description", "Wrong output", "--force", "🐞 bug"
-    ]
+    rows = {
+        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
+    }
+
+    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
 
 
 @mark.parametrize(
@@ -337,10 +693,8 @@ def test_a_template_reads_its_labels_from_a_list_or_one_string(
     assert Template.model_validate({"labels": labels}).labels == names
 
 
-def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+def workflow(text: str) -> Workflow:
     """
-    Asserts that a Markdown file whose text opens on anything but front
-    matter fails to read rather than reading as an empty document.
+    Validates `text` as a workflow file's YAML.
     """
-    with raises(ValueError, match="opens on no front matter"):
-        Document.load(".md", "name: Bug\n---\n")
+    return Workflow.model_validate(text, context={"suffix": ".yml"})

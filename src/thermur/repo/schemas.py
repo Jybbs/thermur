@@ -1,18 +1,23 @@
 """
-Holds the records the repository audit reads and reports, meaning the
-`Manifest` with its `Author` rows, the `Config`, and the `Labels` with their
-`Label` rows validated out of the checkout's TOML, and the `Release` with
-its `Category` rows, each `Template`, and the `Citation` with its `Person`
-rows validated out of its YAML, all through their `Document` base. Beside
-them sit each `Task` mise lists and each `Finding` a check makes beside each
-`Parity` a check compares.
+Holds the records the repository audit reads and reports:
+
+- The `Document` base and the files it validates, meaning the `Manifest`
+  with its `Author` rows, the `Config`, the `Labels` with their `Label`
+  rows, and the `Lock` out of the TOML, and each `Workflow` with its `Job`,
+  `Step`, and `Trigger` rows, each composite `Action`, the `Release` with
+  its `Category` rows, each issue `Template`, and the `Citation` with its
+  `Person` rows out of the YAML
+- Each `Task` mise lists and each `Issue` mise reports on one
+- Each `Finding` a check makes at its `Level`, and each `Parity` a check
+  compares
 """
 
-from collections            import Counter
-from collections.abc        import Iterable, Sequence
-from operator               import attrgetter
+from collections     import Counter
+from collections.abc import Iterable, Sequence
+from enum            import StrEnum, auto
+from operator        import attrgetter
 from packaging.requirements import Requirement
-from pathlib                import Path
+from pathlib                import Path, PurePosixPath
 from pydantic               import (
     AfterValidator,
     AliasPath,
@@ -25,24 +30,14 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re      import search
+from re      import fullmatch, search
 from tomllib import loads
 from typing  import Annotated, Self
 from yaml_rs import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
-
-
-class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
-    """
-    One author `[project].authors` names.
-    """
-
-    name: str
-    """
-    The author's name as a copyright line gives it.
-    """
+type Scalar     = bool | float | int | str
 
 
 def read_commands(run: Iterable[str | dict]) -> list[str]:
@@ -80,6 +75,32 @@ def read_minor(version: str) -> str:
     raise ValueError("names no major and minor version")
 
 
+def read_names(needs: str | list[str]) -> list[str]:
+    """
+    Reads the jobs a job waits for, which a workflow writes as one name or
+    as a list of them.
+    """
+    return [needs] if isinstance(needs, str) else needs
+
+
+def read_versions(packages: Iterable[dict]) -> dict[str, str]:
+    """
+    Maps each package `uv.lock` resolves to the version it resolves.
+    """
+    return {package["name"]: package["version"] for package in packages}
+
+
+class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One author `[project].authors` names.
+    """
+
+    name: str
+    """
+    The author's name as a copyright line gives it.
+    """
+
+
 class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
     One release-notes category `.github/release.yml` declares.
@@ -94,9 +115,9 @@ class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
 
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    A TOML or YAML file of the checkout, declaring the fields the checks
-    read and validated from the file's text, whose validation error carries
-    the file's path from the root as its title.
+    A TOML or YAML file of the checkout, validated from its text into the
+    fields the checks read, whose validation error carries the file's path
+    from the root as its title.
     """
 
     @property
@@ -111,16 +132,16 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
     def load(suffix: str, text: str) -> object:
         """
         Reads `text`, the text of a file whose name ends on `suffix`, as
-        TOML where the suffix is `.toml`, as the YAML front matter opening
-        a Markdown file where it is `.md`, and as YAML otherwise, keeping a
-        YAML timestamp as its text.
+        TOML where the suffix is `.toml` or `.lock`, as the YAML front
+        matter opening a Markdown file where it is `.md`, and as YAML
+        otherwise, keeping a YAML timestamp as its text.
 
         Raises:
             ValueError: Where the TOML or the YAML fails to parse, or where
                         a Markdown file opens on no front matter, which
                         validation reports against the whole document.
         """
-        if suffix == ".toml":
+        if suffix in (".lock", ".toml"):
             return loads(text)
 
         if suffix == ".md":
@@ -188,37 +209,6 @@ class Config(Document, title=".mise/config.toml"):
     """
 
 
-class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
-    """
-    One place the checkout breaks an invariant the audit holds it to, at the
-    file a reader opens to put it right.
-    """
-
-    file: Path
-    """
-    The file the finding sits in, relative to the root of the checkout.
-    """
-
-    message: str
-    """
-    What is wrong, in a sentence a reader acts on.
-    """
-
-    @property
-    def annotation(self) -> str:
-        """
-        Writes the finding as the GitHub Actions error annotation the runner
-        shows on `file`, percent-encoding each line break and `%`, and each
-        `,` and `:` in the file name, which a workflow command reads as its
-        own syntax.
-        """
-        escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
-        place   = str(self.file).translate(
-            str.maketrans(escapes | {",": "%2C", ":": "%3A"})
-        )
-        return f"::error file={place}::{self.message.translate(str.maketrans(escapes))}"
-
-
 class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     One label `.github/labels.toml` declares, as GitHub shows it on an issue
@@ -254,200 +244,27 @@ class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         ]
 
 
-class Labels(Document, extra="forbid", title=".github/labels.toml"):
+class Level(StrEnum):
     """
-    The labels `.github/labels.toml` declares, the one place a label is
-    written down, holding nothing beside its rows.
-    """
-
-    rows: list[Label] = Field(validation_alias=AliasPath("labels"))
-    """
-    The labels, in the order the registry lists them.
+    How a finding bears on the audit, each member's value the GitHub Actions
+    workflow command that prints it.
     """
 
-    @property
-    def names(self) -> list[str]:
-        """
-        Lists the name of each label, in the order the registry lists them.
-        """
-        return [label.name for label in self.rows]
-
-    def omits(self, live: Iterable[str]) -> list[str]:
-        """
-        Keeps each of the `live` label names the registry declares no label
-        under, in the order `live` gives them.
-        """
-        return [name for name in live if name not in self.names]
-
-    @field_validator("rows")
-    @classmethod
-    def reject_repeats(cls, rows: list[Label]) -> list[Label]:
-        """
-        Passes `rows` through where no two labels share a name or a color.
-
-        Raises:
-            ValueError: Naming each name and each color two or more labels
-                        share, which validation reports against the field.
-        """
-        if repeats := [
-            f"the {field} `{value}`"
-            for field in ("name", "color")
-            for value, count in Counter(map(attrgetter(field), rows)).items()
-            if count > 1
-        ]:
-            raise ValueError(f"declares {join_names(repeats)} more than once")
-
-        return rows
+    ERROR   = auto()
+    WARNING = auto()
 
 
-class Citation(Document, title="CITATION.cff"):
+class Lock(Document, title="uv.lock"):
     """
-    The declarations `CITATION.cff` restates from the manifest, each `None`
-    where the file leaves it out.
-    """
-
-    authors: list[Person] = []
-    """
-    The people the citation credits, in the order it names them.
+    The version `uv.lock` resolves for each package.
     """
 
-    license: str | None = None
-    """
-    The SPDX expression the citation declares.
-    """
-
-    repository: str | None = Field(None, validation_alias="repository-code")
-    """
-    The address of the repository holding the code.
-    """
-
-    version: str | None = None
-    """
-    The release the citation cites.
-    """
-
-    @property
-    def holders(self) -> str:
-        """
-        Joins the authors' names the way a copyright line names its holders.
-        """
-        return join_names([person.name for person in self.authors])
-
-
-class Person(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
-    """
-    One person `CITATION.cff` credits, as the Citation File Format writes
-    a person.
-    """
-
-    family: str = Field(validation_alias="family-names")
-    """
-    The person's family names.
-    """
-
-    given: str = Field(validation_alias="given-names")
-    """
-    The person's given names.
-    """
-
-    @property
-    def name(self) -> str:
-        """
-        Joins the given names and the family names, the order a copyright
-        line gives them in.
-        """
-        return f"{self.given} {self.family}"
-
-
-class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
-    """
-    One declaration a file restates beside the declaration it restates, each
-    named the way a finding reads it.
-    """
-
-    copied: str | None
-    """
-    The value the restated declaration reads, or `None` where the file
-    carries none.
-    """
-
-    file: Path
-    """
-    The file holding the restated declaration.
-    """
-
-    label: str
-    """
-    The restated declaration, named as the opening of a sentence.
-    """
-
-    origin: str
-    """
-    The declaration restated, named as the close of a sentence.
-    """
-
-    original: str
-    """
-    The value the declaration restated reads.
-    """
-
-    @property
-    def finding(self) -> Finding | None:
-        """
-        Names the restated declaration where it reads anything but the
-        original, or where the file carries none.
-
-        Returns:
-            The finding, or `None` where the two agree.
-        """
-        if self.copied == self.original:
-            return None
-
-        reading = "is missing" if self.copied is None else f"reads `{self.copied}`"
-        return Finding(
-            file    = self.file,
-            message = f"{self.label} {reading}, where {self.origin} reads "
-            f"`{self.original}`"
-        )
-
-
-class Template(Document):
-    """
-    One issue template under `.github/ISSUE_TEMPLATE/`, either a Markdown
-    file whose front matter declares it or an issue form.
-    """
-
-    labels: Annotated[list[str], BeforeValidator(read_labels)] = []
-    """
-    The labels an issue opened from the template takes.
-    """
-
-
-class Release(Document, title=".github/release.yml"):
-    """
-    The release-notes categories `.github/release.yml` declares.
-    """
-
-    categories: list[Category] = Field(
-        validation_alias = AliasPath("changelog", "categories")
+    versions: Annotated[dict[str, str], BeforeValidator(read_versions)] = Field(
+        validation_alias = AliasPath("package")
     )
     """
-    The categories, in the order GitHub tries them, filing a pull request
-    under the first whose labels it carries.
+    The version each package resolves to, by its normalized name.
     """
-
-    @property
-    def names(self) -> list[str]:
-        """
-        Lists each label a category names, in the order the categories name
-        them, leaving out the `*` that names no label.
-        """
-        return [
-            name
-            for category in self.categories
-            for name in category.labels
-            if name != "*"
-        ]
 
 
 class Manifest(Document, title="pyproject.toml"):
@@ -547,6 +364,105 @@ class Manifest(Document, title="pyproject.toml"):
         return join_names([author.name for author in self.authors])
 
 
+class Step(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One step a workflow job or a composite action runs, which either names
+    an action or runs shell lines.
+    """
+
+    env: dict[str, Scalar] = {}
+    """
+    The variables the step sets for what it runs, by name.
+    """
+
+    inputs: dict[str, Scalar] = Field({}, validation_alias="with")
+    """
+    The inputs the step passes the action it names, by input.
+    """
+
+    run: str = ""
+    """
+    The shell lines the step runs, or nothing where it names an action.
+    """
+
+    uses: str = ""
+    """
+    The action the step runs, or nothing where it runs shell lines.
+    """
+
+    @property
+    def archive(self) -> str | None:
+        """
+        Reads the `cache_key` the step passes up to the `-` before the
+        `hashFiles` call ending it, which names the archive every save of
+        one tool subset shares.
+
+        Returns:
+            The key up to that `-`, or `None` where the step passes no
+            `cache_key` ending on a `-` and a `hashFiles` call.
+        """
+        key = fullmatch(
+            r"(.*)-\$\{\{\s*hashFiles\([^)]*\)\s*\}\}",
+            str(self.inputs.get("cache_key", ""))
+        )
+        return key[1] if key else None
+
+    @property
+    def pin(self) -> tuple[str, str] | None:
+        """
+        Splits `uses` into the action from another repository and the commit
+        it is pinned to.
+
+        Returns:
+            The action and the commit, or `None` where the step names no
+            action pinned with `@`.
+        """
+        action, at, commit = self.uses.partition("@")
+        return (action, commit) if at else None
+
+    @property
+    def saves(self) -> bool:
+        """
+        Tells whether the step passes the action it names a `save` reading
+        `true`, quoted or not, which saves the archive the action installs.
+        """
+        return str(self.inputs.get("save")).lower() == "true"
+
+    @property
+    def summarizes(self) -> bool:
+        """
+        Tells whether the step writes to the workflow step summary, which it
+        does by naming the variable holding the summary's path or by running
+        `gha:brief`, which reads that variable.
+        """
+        return search(
+            r"GITHUB_STEP_SUMMARY|gha:brief",
+            self.model_dump_json()
+        ) is not None
+
+
+class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One event a workflow runs on, narrowed to the files a change touches.
+    """
+
+    paths: tuple[str, ...] = ()
+    """
+    The globs naming the files whose change runs the workflow on this
+    event, or none where any change runs it.
+    """
+
+    def matches(self, file: str) -> bool:
+        """
+        Tells whether a change to `file`, relative to the root, runs the
+        workflow, which it does under any glob matching the file's whole
+        path and under no globs at all.
+        """
+        return not self.paths or any(
+            PurePosixPath(file).full_match(glob) for glob in self.paths
+        )
+
+
 class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
     One task the checkout declares, as `mise tasks ls --json` lists it. A
@@ -559,6 +475,11 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     The file holding a file task, as mise resolves it.
     """
 
+    name: str
+    """
+    The name a reader runs the task by.
+    """
+
     run: Annotated[tuple[str, ...], BeforeValidator(read_commands)]
     """
     The lines a task declared in TOML runs in a shell.
@@ -568,6 +489,470 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     """
     The file declaring the task, as mise resolves it.
     """
+
+    @property
+    def dependencies(self) -> list[Requirement]:
+        """
+        Reads the requirements the `script` block of the task file's inline
+        metadata declares under PEP 723, or none where the task holds no
+        file or the file no such block.
+        """
+        text  = self.file.read_text(encoding="utf-8") if self.file else ""
+        block = search(r"(?m)^# /// script$\s(?P<body>(^#(| .*)$\s)+)^# ///$", text)
+        if not block:
+            return []
+
+        metadata = loads(
+            "".join(
+                line[2:] or "\n" for line in block["body"].splitlines(keepends=True)
+            )
+        )
+        return [Requirement(entry) for entry in metadata.get("dependencies", [])]
+
+    @property
+    def path(self) -> Path:
+        """
+        Names the file holding the task, or the file declaring it where the
+        task is declared in TOML, as mise resolves it.
+        """
+        return self.file or self.source
+
+
+class Action(Document):
+    """
+    One composite action under `.github/actions/`, with the inputs its
+    manifest declares and the steps it runs.
+    """
+
+    inputs: dict[str, dict[str, Scalar]] = {}
+    """
+    The inputs the manifest declares, by input, each with its default and its
+    description.
+    """
+
+    steps: tuple[Step, ...] = Field(validation_alias=AliasPath("runs", "steps"))
+    """
+    The steps the action runs, in order.
+    """
+
+
+class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One job a workflow runs, with the rows its matrix includes.
+    """
+
+    condition: str = Field("", validation_alias="if")
+    """
+    The expression deciding whether the job runs, or nothing where it runs
+    once every job it waits for succeeds.
+    """
+
+    image: str = Field(validation_alias="runs-on")
+    """
+    The runner image the job runs on.
+    """
+
+    name: str = ""
+    """
+    The name the workflow gives the job, where a `${{ matrix.<key> }}`
+    expression names each row's check run for that row's value under
+    `key`, or nothing where the run takes the job's key, followed on a
+    matrix job by each row's values in parentheses.
+    """
+
+    needs: Annotated[tuple[str, ...], BeforeValidator(read_names)] = ()
+    """
+    The jobs this one waits for, by key.
+    """
+
+    rows: tuple[dict[str, str], ...] = Field(
+        (),
+        validation_alias = AliasPath("strategy", "matrix", "include")
+    )
+    """
+    The rows the job's matrix includes, each running the job once.
+    """
+
+    steps: tuple[Step, ...] = ()
+    """
+    The steps the job runs, in order.
+    """
+
+    @property
+    def always(self) -> bool:
+        """
+        Tells whether the job runs under `always()`, with or without the
+        `${{ }}` GitHub lets a condition leave out, so it runs whatever the
+        jobs it waits for end in.
+        """
+        return (
+            (
+                self.condition.removeprefix("${{")
+                    .removesuffix("}}")
+                    .strip()
+            ) == "always()"
+        )
+
+    @property
+    def tasks(self) -> list[str]:
+        """
+        Lists the task each row runs, for a row naming one under `task`.
+        """
+        return [row["task"] for row in self.rows if "task" in row]
+
+    def expand(self, value: str) -> list[str]:
+        """
+        Reads the values `value` takes across the job's rows:
+
+        - For a `${{ matrix.<key> }}` expression, each row's value under
+          `key`, read as an empty string where the row declares no `key`,
+          as GitHub reads a property the matrix leaves out
+        - For any other value, the value as written
+        """
+        if key := fullmatch(r"\$\{\{\s*matrix\.([\w-]+)\s*\}\}", value):
+            return [row.get(key[1], "") for row in self.rows]
+
+        return [value]
+
+
+class Workflow(Document):
+    """
+    One workflow under `.github/workflows/`, with the events it runs on and
+    the jobs it runs.
+    """
+
+    jobs: dict[str, Job]
+    """
+    The jobs the workflow runs, by key.
+    """
+
+    name: str
+    """
+    The name the workflow's runs carry.
+    """
+
+    events: dict[str, Trigger | None] = Field(validation_alias="on")
+    """
+    The events the workflow runs on, each narrowed by its filters where it
+    carries any.
+    """
+
+    @property
+    def gate(self) -> Job | None:
+        """
+        Reads the job under the key `gate`, which the workflow ends on, or
+        `None` where the workflow holds none.
+        """
+        return self.jobs.get("gate")
+
+    @property
+    def gated(self) -> dict[str, Job]:
+        """
+        Keeps the jobs other than the gate, by key, which the gate waits
+        for.
+        """
+        return {key: job for key, job in self.jobs.items() if key != "gate"}
+
+    @property
+    def tasks(self) -> list[str]:
+        """
+        Lists the task each row of each job runs.
+        """
+        return [task for job in self.jobs.values() for task in job.tasks]
+
+    def pushes(self, file: str) -> bool:
+        """
+        Tells whether a push changing `file`, relative to the root, runs
+        the workflow.
+        """
+        return "push" in self.events and (self.events["push"] or Trigger()).matches(
+            file
+        )
+
+    def saves(self, action: str) -> bool:
+        """
+        Tells whether a step of the workflow passes the composite action
+        that `action` names a `save` reading `true`, which saves the archive
+        it installs.
+        """
+        return any(
+            step.uses == action and step.saves
+            for job in self.jobs.values()
+            for step in job.steps
+        )
+
+
+class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One place the checkout breaks an invariant the audit holds it to, at the
+    file a reader opens to put it right.
+    """
+
+    file: Path
+    """
+    The file the finding sits in, relative to the root of the checkout.
+    """
+
+    message: str
+    """
+    What is wrong, in a sentence a reader acts on.
+    """
+
+    level: Level = Level.ERROR
+    """
+    Whether the finding fails the audit or is printed as a warning alone.
+    """
+
+    @property
+    def annotation(self) -> str:
+        """
+        Writes the finding as the GitHub Actions annotation of its level
+        the runner shows on `file`, percent-encoding each line break and
+        `%`, and each `,` and `:` in the file name, which a workflow command
+        reads as its own syntax.
+        """
+        escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
+        place   = str(self.file).translate(
+            str.maketrans(escapes | {",": "%2C", ":": "%3A"})
+        )
+        return (
+            f"::{self.level} file={place}::"
+            f"{self.message.translate(str.maketrans(escapes))}"
+        )
+
+
+class Labels(Document, extra="forbid", title=".github/labels.toml"):
+    """
+    The labels `.github/labels.toml` declares, the one place a label is
+    written down, holding nothing beside its rows.
+    """
+
+    rows: list[Label] = Field(validation_alias=AliasPath("labels"))
+    """
+    The labels, in the order the registry lists them.
+    """
+
+    @property
+    def names(self) -> list[str]:
+        """
+        Lists the name of each label, in the order the registry lists them.
+        """
+        return [label.name for label in self.rows]
+
+    def omits(self, live: Iterable[str]) -> list[str]:
+        """
+        Keeps each of the `live` label names the registry declares no label
+        under, in the order `live` gives them.
+        """
+        return [name for name in live if name not in self.names]
+
+    @field_validator("rows")
+    @classmethod
+    def reject_repeats(cls, rows: list[Label]) -> list[Label]:
+        """
+        Passes `rows` through where no two labels share a name or a color.
+
+        Raises:
+            ValueError: Naming each name and each color two or more labels
+                        share, which validation reports against the field.
+        """
+        if repeats := [
+            f"the {field} `{value}`"
+            for field in ("name", "color")
+            for value, count in Counter(map(attrgetter(field), rows)).items()
+            if count > 1
+        ]:
+            raise ValueError(f"declares {join_names(repeats)} more than once")
+
+        return rows
+
+
+class Release(Document, title=".github/release.yml"):
+    """
+    The release-notes categories `.github/release.yml` declares.
+    """
+
+    categories: list[Category] = Field(
+        validation_alias = AliasPath("changelog", "categories")
+    )
+    """
+    The categories, in the order GitHub tries them, filing a pull request
+    under the first whose labels it carries.
+    """
+
+    @property
+    def names(self) -> list[str]:
+        """
+        Lists each label a category names, in the order the categories name
+        them, leaving out the `*` that names no label.
+        """
+        return [
+            name
+            for category in self.categories
+            for name in category.labels
+            if name != "*"
+        ]
+
+
+class Issue(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One problem `mise tasks validate --json` reports on a task.
+    """
+
+    message: str
+    """
+    The problem, as mise words it.
+    """
+
+    severity: Level
+    """
+    Whether mise counts the problem as an error or as a warning.
+    """
+
+    task: str
+    """
+    The name of the task the problem sits on.
+    """
+
+    details: str = ""
+    """
+    What mise adds to the message, such as the tasks an alias is shared by.
+    """
+
+    def finding(self, file: Path) -> Finding:
+        """
+        Writes the problem as a finding at its severity on `file`, the file
+        holding or declaring the task.
+        """
+        return Finding(
+            file    = file,
+            level   = self.severity,
+            message = f"`mise tasks validate` reports `{self.message}` on "
+            f"`{self.task}`" + (f" (`{self.details}`)" if self.details else "")
+        )
+
+
+class Citation(Document, title="CITATION.cff"):
+    """
+    The declarations `CITATION.cff` restates from the manifest, each `None`
+    where the file leaves it out.
+    """
+
+    authors: list[Person] = []
+    """
+    The people the citation credits, in the order it names them.
+    """
+
+    license: str | None = None
+    """
+    The SPDX expression the citation declares.
+    """
+
+    repository: str | None = Field(None, validation_alias="repository-code")
+    """
+    The address of the repository holding the code.
+    """
+
+    version: str | None = None
+    """
+    The release the citation cites.
+    """
+
+    @property
+    def holders(self) -> str:
+        """
+        Joins the authors' names the way a copyright line names its holders.
+        """
+        return join_names([person.name for person in self.authors])
+
+
+class Person(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One person `CITATION.cff` credits, as the Citation File Format writes
+    a person.
+    """
+
+    family: str = Field(validation_alias="family-names")
+    """
+    The person's family names.
+    """
+
+    given: str = Field(validation_alias="given-names")
+    """
+    The person's given names.
+    """
+
+    @property
+    def name(self) -> str:
+        """
+        Joins the given names and the family names, the order a copyright
+        line gives them in.
+        """
+        return f"{self.given} {self.family}"
+
+
+class Template(Document):
+    """
+    One issue template under `.github/ISSUE_TEMPLATE/`, either a Markdown
+    file whose front matter declares it or an issue form.
+    """
+
+    labels: Annotated[list[str], BeforeValidator(read_labels)] = []
+    """
+    The labels an issue opened from the template takes.
+    """
+
+
+class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One declaration a file restates beside the declaration it restates, each
+    named the way a finding reads it.
+    """
+
+    copied: str | None
+    """
+    The value the restated declaration reads, or `None` where the file
+    carries none.
+    """
+
+    file: Path
+    """
+    The file holding the restated declaration.
+    """
+
+    label: str
+    """
+    The restated declaration, named as the opening of a sentence.
+    """
+
+    origin: str
+    """
+    The declaration restated, named as the close of a sentence.
+    """
+
+    original: str
+    """
+    The value the declaration restated reads.
+    """
+
+    @property
+    def finding(self) -> Finding | None:
+        """
+        Names the restated declaration where it reads anything but the
+        original, or where the file carries none.
+
+        Returns:
+            The finding, or `None` where the two agree.
+        """
+        if self.copied == self.original:
+            return None
+
+        reading = "is missing" if self.copied is None else f"reads `{self.copied}`"
+        return Finding(
+            file    = self.file,
+            message = f"{self.label} {reading}, where {self.origin} reads "
+            f"`{self.original}`"
+        )
 
 
 def join_names(names: Sequence[str]) -> str:

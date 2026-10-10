@@ -1,8 +1,19 @@
+::error file=.github/actions/provision/action.yml::`.github/actions/provision/action.yml` carries the YAML anchor `&depth`, which GitHub's action-manifest parser rejects
 ::error file=.mise/bin/pytest::`.mise/bin/pytest` is a symlink rather than a copy
+::error file=.github/workflows/draft.yml::The pin on `actions/checkout` in `.github/workflows/draft.yml` reads `0f0f`, where the pin on it in `.github/actions/provision/action.yml` reads `3d3c42e5aac5ba805825da76410c181273ba90b1`
+::error file=.github/workflows/ci.yml::The `gate` job in `.github/workflows/ci.yml` sets no name
+::error file=.github/workflows/warm.yml::The runner image of the `kit` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
+::error file=.github/workflows/warm.yml::The runner image of the `prune` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
+::error file=.github/workflows/warm.yml::The runner image of the `gate` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
+::error file=.github/workflows/ci.yml::`.github/workflows/ci.yml` installs the `zizmor` subset, whose archive no job saves
 ::error file=.github/release.yml::`.github/release.yml` names `🐛 bug`, a label `.github/labels.toml` does not declare
 ::error file=.github/release.yml::`.github/release.yml` files `🐞 bug` under no release-notes categories rather than one
 ::error file=LICENSE::The title of `LICENSE` reads `BSD License`, where the full name of the `license` in `pyproject.toml` reads `MIT License`
 ::error file=LICENSE::The copyright holder list in `LICENSE` is missing, where the author list in `pyproject.toml` reads `James Parkington`
 ::error file=pyproject.toml::The `requires` of `[build-system]` holds no exact pin on hatchling
+::error file=.github/workflows/warm.yml::The push filter of `.github/workflows/warm.yml` leaves out `.mise/mise.lock`, which `.github/actions/provision/action.yml` hashes
 ::error file=.mise/tasks/py/test::`.mise/tasks/py/test` runs `uv run` without `--exact --locked` opening its arguments
+::error file=.mise/tasks/gha/brief.py::The pin on `minijinja` in `.mise/tasks/gha/brief.py` reads `==2.23.0`, where the version `uv.lock` resolves reads `==2.24.0`
+::error file=.github/workflows/draft.yml::The `cut` job in `.github/workflows/draft.yml` writes to the workflow step summary, which only a `gate` job writes
+::error file=.mise/tasks/py/sweep::`mise tasks validate` reports `Alias 'audit' is used by multiple tasks` on `py:sweep` (`Tasks: py:sweep, repo:audit.py`)
 ::error file=pyproject.toml::The wheel `packages` entry `src/thermur` holds no module

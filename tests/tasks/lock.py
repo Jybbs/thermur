@@ -1,8 +1,10 @@
 """
 Pins the path `lock:check` takes for each answer `uv` and `mise` give it,
-each case running a copy of the task beside a lockfile of its own, and the
-summary line the pinned mise prints for a lock it writes in full, which the
-task reads to fail where `mise lock` skips a platform, as it does offline.
+each case running a copy of the task beside a lockfile of its own, the
+lockfile beside each task script declaring its own dependencies that every
+`lock` task checks, audits, or writes, and the summary line the pinned mise
+prints for a lock it writes in full, which `lock:check` reads to fail where
+`mise lock` skips a platform, as it does offline.
 """
 
 from collections.abc  import Callable
@@ -31,19 +33,27 @@ def checked(copy: Path) -> CompletedProcess:
 
 @fixture
 def copy(
+    monkeypatch  : MonkeyPatch,
     pytestconfig : Config,
     stand_in     : Callable[[str, str], StandIn],
     tmp_path     : Path
 ) -> Path:
     """
-    Copies `lock:check`, `.mise/config.toml`, and `.mise/mise.lock` into
-    `tmp_path`, keeping each file's mode, behind a stand-in `uv` that
-    reports `uv.lock` current, and returns `tmp_path`.
+    Copies the `lock` tasks, the library they source, `.mise/config.toml`,
+    and `.mise/mise.lock` into `tmp_path`, keeping each file's mode,
+    names the copy as the root a task sources its library from, and puts a
+    stand-in `uv` that reports `uv.lock` current ahead on the path.
+
+    Returns:
+        The copy's root.
     """
-    (tmp_path / ".mise/tasks/lock").mkdir(parents=True)
-    for path in (".mise/config.toml", ".mise/mise.lock", ".mise/tasks/lock/check"):
+    (tmp_path / ".mise/tasks").mkdir(parents=True)
+    for path in (
+        ".mise/config.toml", ".mise/lib", ".mise/mise.lock", ".mise/tasks/lock"
+    ):
         (pytestconfig.rootpath / path).copy(tmp_path / path, preserve_metadata=True)
 
+    monkeypatch.setenv("MISE_PROJECT_ROOT", str(tmp_path))
     stand_in("uv", "exit 0")
     return tmp_path
 
@@ -197,3 +207,51 @@ def test_mise_lock_writes_every_platform_online(
     assert f"✓ Updated {entries} platform entries (0 skipped)" in (
         locked.stdout + locked.stderr
     ).splitlines()
+
+
+@mark.parametrize(
+    ("task", "ran"),
+    [
+        param("check", ["lock --check", "lock --check --script {script}"], id="check"),
+        param(
+            "scan",
+            [
+                "audit --preview-features audit-command",
+                "audit --preview-features audit-command --script {script}"
+            ],
+            id = "scan"
+        ),
+        param(
+            "sync",
+            ["lock --no-locked", "lock --no-locked --script {script}"],
+            id = "sync"
+        )
+    ]
+)
+def test_each_lock_task_reaches_the_lockfile_beside_a_script(
+    copy     : Path,
+    ran      : list[str],
+    stand_in : Callable[[str, str], StandIn],
+    task     : str
+):
+    """
+    Asserts that each `lock` task runs its `uv` command over `uv.lock` and
+    then over the lockfile beside each task script whose inline metadata
+    opens a `script` block, leaving out a script declaring none.
+    """
+    script = ".mise/tasks/gha/declared.py"
+    (copy / ".mise/tasks/gha").mkdir()
+    (copy / script).write_text('# /// script\n# dependencies = ["minijinja"]\n# ///\n')
+    (copy / ".mise/tasks/gha/plain.py").write_text('"""\nDeclares nothing.\n"""\n')
+    uv = stand_in("uv", "exit 0")
+    stand_in("mise", f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}"\nexit 0')
+
+    finished = run(
+        [copy / ".mise/tasks/lock" / task],
+        capture_output = True,
+        cwd            = copy,
+        text           = True
+    )
+
+    assert finished.returncode == 0
+    assert uv.commands == [f"uv {command.format(script=script)}" for command in ran]

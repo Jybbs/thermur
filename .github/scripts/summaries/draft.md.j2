@@ -1,0 +1,15 @@
+{% extends "base.md.j2" %}
+{% block details %}
+{% set cut = needs.cut.outputs %}
+{% if cut.state == "created" %}
+ Drafted [*Thermur* {{ cut.version }}]({{ cut.url }}).
+{%- elif cut.state == "kept" %}
+ Kept the draft of [*Thermur* {{ cut.version }}]({{ cut.url }}).
+{%- elif cut.state == "skipped" %}
+ Drafted nothing for the published [*Thermur* {{ cut.version }}]({{ cut.url }}).
+{%- elif cut.state == "unchanged" %}
+ Drafted nothing for the unchanged *Thermur* {{ cut.version }}.
+{%- else %}
+ Drafted nothing.
+{%- endif %}
+{% endblock %}

@@ -1,24 +1,26 @@
 """
 Holds `Checkout`, the clone the repository audit reads, which keeps each
 document it validates for every later check that reads it and lists the
-tasks, the programs, and the issue templates the clone holds.
+tasks, the programs, the workflows, the composite actions, and the issue
+templates the clone holds.
 """
 
 from functools  import cached_property
+from json       import loads
 from pathlib    import Path
 from pydantic   import AfterValidator, BaseModel, Field, TypeAdapter
-from subprocess import check_output
+from subprocess import check_output, run
 from typing     import Annotated
 
 from thermur.repo.schemas import (
-    Citation, Config, Labels, Manifest, Release, Task, Template
+    Action, Citation, Config, Issue, Job, Labels, Lock, Manifest, Release, Step, Task, Template, Workflow
 )
 
 
 class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    The clone the audit reads, rooted at `root`, listing each program
-    relative to that root and each task at the path mise resolves.
+    The clone the audit reads, rooted at `root`, naming each file relative
+    to that root and each task at the path mise resolves.
     """
 
     root: Annotated[Path, AfterValidator(Path.resolve)] = Field(
@@ -30,11 +32,30 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     """
 
     @cached_property
+    def actions(self) -> dict[Path, Action]:
+        """
+        Validates the manifest of each composite action under
+        `.github/actions/`, by its path.
+        """
+        return {
+            path: Action.read(self.root, path)
+            for path in self.glob(".github/actions/*/action.y*ml")
+        }
+
+    @cached_property
     def citation(self) -> Citation:
         """
         Validates `CITATION.cff`.
         """
         return Citation.read(self.root)
+
+    @property
+    def composites(self) -> dict[str, Path]:
+        """
+        Maps the name a step's `uses` gives each composite action, in the
+        self-repository form, to the path of its manifest.
+        """
+        return {f"$/{path.parent}": path for path in self.actions}
 
     @cached_property
     def config(self) -> Config:
@@ -42,6 +63,35 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
+
+    @cached_property
+    def issues(self) -> list[Issue]:
+        """
+        Reads every problem `mise tasks validate` reports on the tasks mise
+        lists for the checkout, which it prints whatever status it exits
+        with.
+        """
+        validated = run(
+            ["mise", "tasks", "validate", "--json"],
+            capture_output = True,
+            cwd            = self.root,
+            text           = True
+        )
+        return TypeAdapter(list[Issue]).validate_python(
+            loads(validated.stdout)["issues"]
+        )
+
+    @property
+    def jobs(self) -> list[tuple[Path, str, Job]]:
+        """
+        Lists every job of every workflow beside the workflow's path and the
+        job's key.
+        """
+        return [
+            (path, key, job)
+            for path, workflow in self.workflows.items()
+            for key, job in workflow.jobs.items()
+        ]
 
     @cached_property
     def labels(self) -> Labels:
@@ -66,6 +116,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         )
 
     @cached_property
+    def lock(self) -> Lock:
+        """
+        Validates `uv.lock`.
+        """
+        return Lock.read(self.root)
+
+    @cached_property
     def manifest(self) -> Manifest:
         """
         Validates `pyproject.toml`.
@@ -79,6 +136,19 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         """
         return Release.read(self.root)
 
+    @property
+    def rows(self) -> list[str]:
+        """
+        Lists the task each row of each workflow running on a pull request
+        runs, in the order the workflows and their rows declare them.
+        """
+        return [
+            task
+            for workflow in self.workflows.values()
+            if "pull_request" in workflow.events
+            for task in workflow.tasks
+        ]
+
     @cached_property
     def scripts(self) -> list[Path]:
         """
@@ -86,6 +156,21 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         `.mise/config.toml` puts on the path.
         """
         return self.glob(f"{self.config.bin}/*")
+
+    @property
+    def steps(self) -> list[tuple[Path, Step]]:
+        """
+        Lists every step each composite action and each workflow job runs
+        beside the path of the file declaring it, in path order.
+        """
+        return [
+            (path, step)
+            for path, holder in [
+                *self.actions.items(),
+                *((path, job) for path, _, job in self.jobs)
+            ]
+            for step in holder.steps
+        ]
 
     @cached_property
     def tasks(self) -> list[Task]:
@@ -103,6 +188,16 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         return {
             path: Template.read(self.root, path)
             for path in self.glob(".github/ISSUE_TEMPLATE/*")
+        }
+
+    @cached_property
+    def workflows(self) -> dict[Path, Workflow]:
+        """
+        Validates each workflow under `.github/workflows/`, by its path.
+        """
+        return {
+            path: Workflow.read(self.root, path)
+            for path in self.glob(".github/workflows/*.y*ml")
         }
 
     def glob(self, pattern: str) -> list[Path]:

@@ -4,7 +4,7 @@ requires      = ["hatchling==1.32.4"]
 
 [project]
 authors         = [{ name = "James Parkington" }]
-dependencies    = ["packaging", "pydantic", "yaml-rs"]
+dependencies    = ["packaging", "pydantic", "pyyaml", "yaml-rs"]
 description     = "Thermally-constrained flocking for wildfires."
 license         = "MIT"
 name            = "thermur"
@@ -18,6 +18,7 @@ Repository = "https://github.com/Jybbs/thermur"
 
 [dependency-groups]
 dev = [
+    "minijinja",
     "prose-formatter",
     "pytest",
     "pytest-cov",
