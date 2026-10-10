@@ -122,9 +122,9 @@ def test_the_heading_keeps_every_word_after_the_glyph(
     Asserts that the summary's heading names the workflow by every word its
     name carries after its glyph, so a name of two words keeps both.
     """
-    gate = replace(readout("warm.yml", {"kit": job()}), workflow="🔥 Pages Deploy")
+    gate = replace(readout("warm.yml", {"kit": job()}), workflow="🐦‍⬛ Pages Deploy")
 
-    assert gate.summary.partition("\n")[0] == "## 🔥 Thermur Pages Deploy"
+    assert gate.summary.partition("\n")[0] == "## 🐦‍⬛ Thermur Pages Deploy"
 
 
 @mark.parametrize(

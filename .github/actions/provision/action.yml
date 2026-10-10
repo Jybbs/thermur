@@ -8,7 +8,7 @@ inputs:
 
   save:
     default     : 'false'
-    description : Whether the archive of `tools` is saved once installed, which only the Kit jobs of `🔥 Warm` pass as `'true'`, so a pull request restores an archive and never writes one.
+    description : Whether the archive of `tools` is saved once installed, which only the Kit jobs of `🐦‍⬛ Warm` pass as `'true'`, so a pull request restores an archive and never writes one.
 
   tools:
     default     : ''

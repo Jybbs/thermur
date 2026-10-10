@@ -2,7 +2,7 @@
 # MISE description = "Draft the release of `[project].version` where a push moved it"
 """
 Drafts the GitHub release of the `[project].version` that `pyproject.toml`
-declares, as the `gha:cut` task the draft job of `🔥 Draft` runs on the
+declares, as the `gha:cut` task the draft job of `🐦‍⬛ Draft` runs on the
 runner's own interpreter and the `gh` it carries. `Draft.cut` cuts nothing
 where a push left the version where it stood, creates the draft where
 no release carries the version, leaves a draft that already carries it

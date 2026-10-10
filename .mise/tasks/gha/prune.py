@@ -2,11 +2,11 @@
 # MISE description = "Delete each cache entry a newer one of its generation replaced"
 """
 Deletes the Actions cache entries newer ones replaced, as the `gha:prune`
-task the prune job of `🔥 Warm` runs on the runner's own interpreter and the
-`gh` it carries. `Caches.prune` groups the entries by generation, keeps the
-newest entry of each, and deletes the rest through `gh cache delete`, which
-needs the `actions: write` the prune job holds, printing a warning for a
-deletion GitHub refuses rather than stopping.
+task the prune job of `🐦‍⬛ Warm` runs on the runner's own interpreter and
+the `gh` it carries. `Caches.prune` groups the entries by generation, keeps
+the newest entry of each, and deletes the rest through `gh cache delete`,
+which needs the `actions: write` the prune job holds, printing a warning for
+a deletion GitHub refuses rather than stopping.
 """
 
 from dataclasses import dataclass, fields

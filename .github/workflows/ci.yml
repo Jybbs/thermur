@@ -1,4 +1,4 @@
-name : 🔥 CI
+name : 🐦‍⬛ CI
 
 concurrency:
   cancel-in-progress : ${{ github.event_name == 'pull_request' }}
