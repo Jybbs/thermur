@@ -4,9 +4,10 @@ folders the formatter reads, the reports coverage writes, every argument a
 reader adds, and the annotations `py:check` prints under GitHub Actions.
 """
 
-from collections.abc import Callable
-from pytest          import Config, MonkeyPatch, mark, param
-from subprocess      import run
+from collections.abc  import Callable
+from common.stand_ins import StandIn
+from pytest           import Config, MonkeyPatch, mark, param
+from subprocess       import run
 
 FOLDERS = [".mise/tasks", "src", "tests"]
 
@@ -47,7 +48,7 @@ def test_each_task_hands_its_program_every_argument(
     monkeypatch  : MonkeyPatch,
     passed       : list[str],
     pytestconfig : Config,
-    stand_in     : Callable[[str, str], None],
+    stand_in     : Callable[[str, str], StandIn],
     task         : str
 ):
     """

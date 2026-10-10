@@ -1,0 +1,3 @@
+## 🐦‍⬛ Thermur CI
+
+✅ Run [`0123456`](https://github.com/Jybbs/thermur/commit/0123456789abcdef0123456789abcdef01234567) on `55/merge`. Attached the coverage report as [`coverage`](https://example.invalid/1).

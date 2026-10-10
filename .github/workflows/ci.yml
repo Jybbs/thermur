@@ -1,0 +1,76 @@
+name : 🐦‍⬛ CI
+
+concurrency:
+  cancel-in-progress : ${{ github.event_name == 'pull_request' }}
+  group              : ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+
+jobs:
+  check:
+    name    : ${{ matrix.name }}
+    outputs : { coverage: "${{ steps.attach.outputs.artifact-url }}" }
+    runs-on : &image ubuntu-26.04
+
+    steps:
+      - name : Provision the tools the row's task runs
+        uses : $/.github/actions/provision
+        with : { tools: "${{ matrix.tools }}" }
+
+      - name : Run the row's task
+        env  : { GITHUB_TOKEN: "${{ github.token }}", TASK: "${{ matrix.task }}" }
+        run  : mise run "$TASK"
+
+      - name : Attach the coverage report
+        id   : attach
+        if   : ${{ !cancelled() && matrix.report }}
+        uses : actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with : { if-no-files-found: error, name: "${{ matrix.report }}", path: .cache/coverage/html, retention-days: 14 }
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - name  : 🪵 Lockfiles
+            task  : lock:check
+            tools : &package python uv
+          - name  : ⛈️ Advisories
+            task  : lock:scan
+            tools : *package
+          - name  : 🪻 Prose
+            task  : py:check
+            tools : *package
+          - name   : ☂️ Coverage
+            report : coverage
+            task   : py:coverage
+            tools  : *package
+          - name  : 🧯 Audit
+            task  : repo:audit
+            tools : *package
+          - name  : 🗝️ Workflows
+            task  : repo:vet
+            tools : zizmor
+
+    timeout-minutes : &timeout 15
+
+  gate:
+    name    : 📡 Readout
+    if      : ${{ always() }}
+    needs   : [check]
+    runs-on : *image
+
+    steps:
+      - name : Provision the tools the gate runs on
+        uses : $/.github/actions/provision
+        with : { tools: *package }
+
+      - name : Brief the workflow run and exit with its verdict
+        env  : { COMMIT: "${{ github.event.pull_request.head.sha || github.sha }}", NEEDS: "${{ toJSON(needs) }}" }
+        run  : mise run gha:brief
+
+    timeout-minutes : *timeout
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions : { contents: read }

@@ -1,0 +1,3 @@
+gh api --jq '.actions_caches[]' --paginate 'repos/{owner}/{repo}/actions/caches'
+gh cache delete 1
+gh cache delete 3
