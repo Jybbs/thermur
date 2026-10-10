@@ -543,7 +543,8 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
     """
     The name the workflow gives the job, where a `${{ matrix.<key> }}`
     expression names each row's check run for that row's value under
-    `key`, or nothing where the run takes the job's key.
+    `key`, or nothing where the run takes the job's key, followed on a
+    matrix job by each row's values in parentheses.
     """
 
     needs: Annotated[tuple[str, ...], BeforeValidator(read_names)] = ()

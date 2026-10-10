@@ -128,6 +128,31 @@ def test_the_heading_keeps_every_word_after_the_glyph(
 
 
 @mark.parametrize(
+    ("file", "needs"),
+    [
+        param("ci.yml", {"check": job()}, id="ci"),
+        param("draft.yml", {"cut": job("failure")}, id="draft"),
+        param("warm.yml", {"kit": job()}, id="warm")
+    ]
+)
+def test_each_workflow_s_name_opens_on_the_glyph_its_heading_opens_on(
+    file    : str,
+    needs   : dict,
+    readout : Callable[[str, dict], object]
+):
+    """
+    Asserts that each workflow's name opens on the glyph the heading of its
+    summary opens on, so a workflow renamed onto another mark fails rather
+    than rendering a heading its name no longer matches.
+    """
+    gate = readout(file, needs)
+
+    assert gate.summary.partition("\n")[0] == (
+        f"## {gate.workflow.replace(' ', ' Thermur ', 1)}"
+    )
+
+
+@mark.parametrize(
     ("results", "status"),
     [
         param(["success", "success"], 0, id="passed"),
