@@ -238,7 +238,8 @@ def test_a_job_reads_the_jobs_it_waits_for(needs: str, names: tuple[str, ...]):
 def test_a_job_expands_a_matrix_value_across_its_rows(value: str, values: list[str]):
     """
     Asserts that a `${{ matrix.<key> }}` expression takes each row's value
-    under the key, and any other value is taken as written.
+    under the key, or an empty string for a row declaring no such key, and
+    that any other value is taken as written.
     """
     job = Job.model_validate(
         {

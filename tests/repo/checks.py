@@ -725,7 +725,7 @@ def test_a_subset_installed_or_saved_alone_is_named(
     """
     Asserts that a subset the jobs install that no job saves, and a subset
     a job saves that no job installs, are each named on the workflow naming
-    it.
+    it, a Kit row declaring no `tools` saving no subset.
     """
     edit(checkout, WARM, new=new, old=old)
 

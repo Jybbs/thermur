@@ -256,16 +256,18 @@ class KitCheck(Check):
         """
         Maps each subset the jobs install through a composite action without
         saving it, and then each subset a job saves, to the first workflow
-        naming it.
+        naming it, leaving out a step whose `tools` names no subset, for
+        which the composite installs nothing.
         """
         installed, saved = {}, {}
         for path, _, job in self.checkout.jobs:
             for step in job.steps:
-                if step.uses in self.checkout.composites and (
-                    tools := step.inputs.get("tools")
-                ):
+                if step.uses in self.checkout.composites:
                     kept = saved if step.saves else installed
-                    for subset in filter(None, job.expand(tools)):
+                    for subset in filter(
+                        None,
+                        job.expand(step.inputs.get("tools", ""))
+                    ):
                         kept.setdefault(subset, path)
 
         return installed, saved

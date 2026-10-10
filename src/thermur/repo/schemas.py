@@ -588,10 +588,12 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
 
     def expand(self, value: str) -> list[str]:
         """
-        Reads the values `value` takes across the job's rows, which for a
-        `${{ matrix.<key> }}` expression is each row's value under `key`, or
-        an empty string for a row declaring no `key`, as GitHub reads one,
-        and for any other value is the value as written.
+        Reads the values `value` takes across the job's rows:
+
+        - For a `${{ matrix.<key> }}` expression, each row's value under
+          `key`, read as an empty string where the row declares no `key`,
+          as GitHub reads a property the matrix leaves out
+        - For any other value, the value as written
         """
         if key := fullmatch(r"\$\{\{\s*matrix\.([\w-]+)\s*\}\}", value):
             return [row.get(key[1], "") for row in self.rows]
