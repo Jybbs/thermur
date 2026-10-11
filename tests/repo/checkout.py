@@ -38,6 +38,18 @@ def test_rows_lists_the_tasks_of_pull_request_workflows_alone(checkout: Checkout
     assert checkout.rows == ["b:two", "a:one"]
 
 
+def test_rulesets_reads_each_ruleset_by_its_path(checkout: Checkout):
+    """
+    Asserts that the rulesets are the JSON files under `.github/rulesets/`,
+    each by its path from the root in path order and validated under the
+    name it carries on GitHub.
+    """
+    assert [(path, ruleset.name) for path, ruleset in checkout.rulesets.items()] == [
+        (Path(".github/rulesets/main.json"), "main branch protection"),
+        (Path(".github/rulesets/tags.json"), "release tag protection")
+    ]
+
+
 def test_scripts_lists_each_program_but_a_dotfile(checkout: Checkout):
     """
     Asserts that the programs are every file in the folder `_.path` names,

@@ -1,15 +1,18 @@
 """
-Pins the records the repository audit reads and reports, meaning the key
-each document field reads, the path a document's error carries, what a
-workflow's jobs, steps, and triggers derive, the annotation a `Finding`
-prints at each level, the findings a `Parity` and an `Issue` make, the
-requirements a task script declares, and the holders a `Manifest` names.
+Pins the records the repository audit and `repo:rulesets` read and report,
+meaning the key each document field reads, the path a document's error
+carries, what a workflow's jobs, steps, and triggers derive, the annotation
+a `Finding` prints at each level, the findings a `Parity` and an `Issue`
+make, the requirements a task script declares, the holders a `Manifest`
+names, the checks a `Ruleset` requires, the keys `Settings` accepts, and the
+command and body each `Request` sends.
 """
 
-from functools              import reduce
+from functools import reduce
+from json      import loads as from_json
 from packaging.requirements import Requirement
 from pathlib                import Path
-from pydantic               import AliasPath, ValidationError
+from pydantic               import ValidationError
 from pytest                 import Config, mark, param, raises
 from tomllib                import loads
 from urllib.parse           import unquote
@@ -24,8 +27,12 @@ from thermur.repo.schemas import (
     Lock,
     Manifest,
     Parity,
+    Request,
+    Ruleset,
+    Settings,
     Step,
     Task,
+    Toggles,
     Trigger,
     Workflow
 )
@@ -33,16 +40,30 @@ from thermur.repo.schemas import (
 WORKFLOW = "name: w\non:\n  push:\njobs:\n  a:\n    runs-on: x\n"
 
 
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+def test_a_required_check_naming_no_app_sends_no_app():
     """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
+    Asserts that a required check naming no `integration_id` is sent without
+    one rather than as `null`, which the rulesets API reads as no integer,
+    so the body matches the ruleset as written key for key.
     """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
+    written = {
+        "enforcement"   : "active",
+        "name"          : "a",
+        "target"        : "branch",
+        "bypass_actors" : [],
+        "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
+        "rules"         : [
+            {
+                "type"       : "required_status_checks",
+                "parameters" : {
+                    "strict_required_status_checks_policy" : True,
+                    "required_status_checks"               : [{"context": "c"}]
+                }
+            }
+        ]
+    }
 
-    assert step.env == {"RETRIES": 3}
+    assert Ruleset.model_validate(written).request(None).body == written
 
 
 @mark.parametrize(
@@ -138,13 +159,18 @@ def test_each_required_field_reads_the_key_its_alias_names(
     pytestconfig : Config
 ):
     """
-    Asserts that removing the key a required field's alias names from the
-    checkout's own file fails validation at exactly that key, so each field
-    reads the TOML key its alias declares.
+    Asserts that removing the key a required field's alias names, or the
+    key named for the field where it takes no alias, from the checkout's own
+    file fails validation at exactly that key, so each field reads the TOML
+    key it declares.
     """
-    alias: AliasPath = document.model_fields[field].validation_alias
-    *table, key      = alias.path
-    parsed           = loads(
+    path: list[str] = getattr(
+        document.model_fields[field].validation_alias,
+        "path",
+        [field]
+    )
+    *table, key = path
+    parsed      = loads(
         (pytestconfig.rootpath / document.model_config["title"]).read_text()
     )
     del reduce(dict.__getitem__, table, parsed)[key]
@@ -152,7 +178,7 @@ def test_each_required_field_reads_the_key_its_alias_names(
     with raises(ValidationError) as error:
         document.model_validate(parsed)
 
-    assert [detail["loc"] for detail in error.value.errors()] == [tuple(alias.path)]
+    assert [detail["loc"] for detail in error.value.errors()] == [tuple(path)]
 
 
 @mark.parametrize(
@@ -308,17 +334,16 @@ def test_a_workflow_runs_on_a_push_its_filter_matches(events: str, pushes: bool)
     assert workflow(f"name: w\njobs: {{}}\non:\n{events}").pushes("uv.lock") is pushes
 
 
-def test_a_toml_task_declares_no_requirements(tmp_path: Path):
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
     """
-    Asserts that a task declared in TOML, which holds no file of its own,
-    declares no requirements.
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
     """
-    assert Task(
-        file   = None,
-        name   = "t",
-        run    = (),
-        source = tmp_path
-    ).dependencies == []
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
+
+    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -376,14 +401,27 @@ def test_a_task_script_reads_the_requirements_its_metadata_declares(
     ).dependencies == dependencies
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_toggle_turns_its_endpoint_on_or_off():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that each toggle reads as the endpoint it names, which `PUT`
+    turns on and `DELETE` turns off, in the order the record declares its
+    fields whatever order the table lists them in.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+    toggles = Toggles.model_validate(
+        {
+            "automated-security-fixes"        : False,
+            "immutable-releases"              : True,
+            "private-vulnerability-reporting" : True,
+            "vulnerability-alerts"            : False
+        }
+    )
 
-    assert finding.annotation == "::warning file=a.toml::m"
+    assert [(call.method, call.endpoint) for call in toggles.requests] == [
+        ("DELETE", "automated-security-fixes"),
+        ("PUT", "immutable-releases"),
+        ("PUT", "private-vulnerability-reporting"),
+        ("DELETE", "vulnerability-alerts")
+    ]
 
 
 @mark.parametrize(
@@ -411,6 +449,29 @@ def test_a_step_reads_its_inputs_as_github_hands_them_to_the_action(
     assert (step.saves, step.inputs["since"]) == (saves, "2026-10-01")
 
 
+def test_a_toml_task_declares_no_requirements(tmp_path: Path):
+    """
+    Asserts that a task declared in TOML, which holds no file of its own,
+    declares no requirements.
+    """
+    assert Task(
+        file   = None,
+        name   = "t",
+        run    = (),
+        source = tmp_path
+    ).dependencies == []
+
+
+def test_a_warning_prints_as_a_warning_annotation():
+    """
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
+    """
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+
+    assert finding.annotation == "::warning file=a.toml::m"
+
+
 def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
     """
     Asserts that a workflow reads the job under the key `gate`, the jobs it
@@ -433,25 +494,6 @@ def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
         read.saves("$/b")
     ) == ("x", ["a"], ["lock:check"], True, False)
     assert workflow(WORKFLOW).gate is None
-
-
-def test_the_lock_maps_each_package_to_its_version():
-    """
-    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
-    name mapped to the version it resolves.
-    """
-    rows = {
-        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
-    }
-
-    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
-
-
-def workflow(text: str) -> Workflow:
-    """
-    Validates `text` as a workflow file's YAML.
-    """
-    return Workflow.model_validate(text, context={"suffix": ".yml"})
 
 
 @mark.parametrize(
@@ -489,3 +531,168 @@ def test_an_issue_reads_as_a_finding_at_its_severity(details: str, message: str)
         level   = Level.WARNING,
         message = message
     )
+
+
+@mark.parametrize(
+    ("call", "command", "payload"),
+    [
+        param(
+            Request(body={"names": ["jax"]}, endpoint="topics", method="PUT"),
+            [
+                "gh", "api", "--input", "-",
+                "--method", "PUT", "--silent", "repos/{owner}/{repo}/topics"
+            ],
+            b'{"names":["jax"]}',
+            id = "body"
+        ),
+        param(
+            Request(body={}, endpoint="", method="PATCH"),
+            [
+                "gh", "api", "--input", "-",
+                "--method", "PATCH", "--silent", "repos/{owner}/{repo}"
+            ],
+            b"{}",
+            id = "empty-body"
+        ),
+        param(
+            Request(endpoint="vulnerability-alerts", method="DELETE"),
+            [
+                "gh", "api", "--method",
+                "DELETE", "--silent", "repos/{owner}/{repo}/vulnerability-alerts"
+            ],
+            None,
+            id = "no-body"
+        )
+    ]
+)
+def test_a_request_sends_its_body_on_standard_input(
+    call    : Request,
+    command : list[str],
+    payload : bytes | None
+):
+    """
+    Asserts that a request carrying a body, an empty one included, reads
+    it from standard input as compact JSON, that one carrying none reads
+    nothing, and that an empty endpoint reaches the repository itself.
+    """
+    assert (call.command, call.payload) == (command, payload)
+
+
+@mark.parametrize(
+    ("live", "method", "endpoint"),
+    [
+        param(24390266, "PUT", "rulesets/24390266", id="update"),
+        param(None, "POST", "rulesets", id="create")
+    ]
+)
+def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
+    endpoint     : str,
+    live         : int | None,
+    method       : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that a ruleset updates the live ruleset whose id it is handed
+    in place and creates itself where it is handed none, sending exactly the
+    JSON its file holds, with no default filled in.
+    """
+    path    = Path(".github/rulesets/main.json")
+    request = Ruleset.read(pytestconfig.rootpath, path).request(live)
+
+    assert (request.method, request.endpoint, request.body) == (
+        method, endpoint,
+        from_json((pytestconfig.rootpath / path).read_text())
+    )
+
+
+@mark.parametrize(
+    ("name", "contexts"),
+    [param("main", {"📡 Readout"}, id="main"), param("tags", set(), id="tags")]
+)
+def test_a_ruleset_reads_the_checks_it_requires(
+    contexts     : set[str],
+    name         : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that the `main` ruleset requires the `📡 Readout` check alone
+    and the tag ruleset, holding no `required_status_checks` rule, requires
+    none.
+    """
+    path = Path(f".github/rulesets/{name}.json")
+
+    assert Ruleset.read(pytestconfig.rootpath, path).contexts == contexts
+
+
+@mark.parametrize(
+    ("old", "new", "locations"),
+    [
+        param("[token]", "[tokens]", [("token",), ("tokens",)], id="table"),
+        param(
+            "has_wiki",
+            "has_wiky",
+            [("repository", "has_wiki"), ("repository", "has_wiky")],
+            id = "key"
+        ),
+        param(
+            "immutable-releases",
+            "immutable_releases",
+            [("toggles", "immutable-releases"), ("toggles", "immutable_releases")],
+            id = "toggle"
+        )
+    ]
+)
+def test_a_misspelled_table_or_key_fails_the_settings(
+    locations    : list[tuple[str, ...]],
+    new          : str,
+    old          : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that a misspelled table, a misspelled key, and a toggle spelled
+    with the underscore its field takes rather than the endpoint's hyphen
+    each fail validation, naming the setting missing beside the one the file
+    carries in its place.
+    """
+    text = (pytestconfig.rootpath / ".github/settings.toml").read_text()
+
+    assert old in text
+    with raises(ValidationError) as error:
+        Settings.model_validate(text.replace(old, new), context={"suffix": ".toml"})
+
+    assert [detail["loc"] for detail in error.value.errors()] == locations
+
+
+def test_the_lock_maps_each_package_to_its_version():
+    """
+    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
+    name mapped to the version it resolves.
+    """
+    rows = {
+        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
+    }
+
+    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
+
+
+@mark.parametrize(
+    ("events", "pulls"),
+    [
+        param("  pull_request:\n", True, id="pull-request"),
+        param("  pull_request:\n  push:\n", True, id="both"),
+        param("  push:\n", False, id="push")
+    ]
+)
+def test_a_workflow_reads_whether_it_runs_on_a_pull_request(events: str, pulls: bool):
+    """
+    Asserts that a workflow runs on a pull request only where `pull_request`
+    is among its events, whatever else it runs on.
+    """
+    assert workflow(f"name: w\njobs: {{}}\non:\n{events}").on_pull_request is pulls
+
+
+def workflow(text: str) -> Workflow:
+    """
+    Validates `text` as a workflow file's YAML.
+    """
+    return Workflow.model_validate(text, context={"suffix": ".yml"})

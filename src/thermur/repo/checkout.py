@@ -1,8 +1,8 @@
 """
-Holds `Checkout`, the clone the repository audit reads, which keeps each
-document it validates for every later check that reads it and lists the
-tasks, the programs, the workflows, and the composite actions the clone
-runs.
+Holds `Checkout`, the clone the repository audit and `repo:rulesets` read,
+which keeps each document it validates for every later check that reads it
+and lists the tasks, the programs, the workflows, the composite actions, and
+the rulesets the clone holds.
 """
 
 from functools  import cached_property
@@ -13,14 +13,25 @@ from subprocess import check_output, run
 from typing     import Annotated
 
 from thermur.repo.schemas import (
-    Action, Config, Issue, Job, Lock, Manifest, Step, Task, Workflow
+    Action,
+    Config,
+    Document,
+    Issue,
+    Job,
+    Lock,
+    Manifest,
+    Ruleset,
+    Settings,
+    Step,
+    Task,
+    Workflow
 )
 
 
 class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    The clone the audit reads, rooted at `root`, naming each file relative
-    to that root and each task at the path mise resolves.
+    The clone the audit and `repo:rulesets` read, rooted at `root`, naming
+    each file relative to that root and each task at the path mise resolves.
     """
 
     root: Annotated[Path, AfterValidator(Path.resolve)] = Field(
@@ -37,10 +48,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates the manifest of each composite action under
         `.github/actions/`, by its path.
         """
-        return {
-            path: Action.read(self.root, path)
-            for path in self.glob(".github/actions/*/action.y*ml")
-        }
+        return self.documents(Action, ".github/actions/*/action.y*ml")
 
     @property
     def composites(self) -> dict[str, Path]:
@@ -124,9 +132,16 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         return [
             task
             for workflow in self.workflows.values()
-            if "pull_request" in workflow.events
+            if workflow.on_pull_request
             for task in workflow.tasks
         ]
+
+    @cached_property
+    def rulesets(self) -> dict[Path, Ruleset]:
+        """
+        Validates each ruleset under `.github/rulesets/`, by its path.
+        """
+        return self.documents(Ruleset, ".github/rulesets/*.json")
 
     @cached_property
     def scripts(self) -> list[Path]:
@@ -140,6 +155,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             for path in self.glob(f"{self.config.bin}/*")
             if not path.name.startswith(".")
         ]
+
+    @cached_property
+    def settings(self) -> Settings:
+        """
+        Validates `.github/settings.toml`.
+        """
+        return Settings.read(self.root)
 
     @property
     def steps(self) -> list[tuple[Path, Step]]:
@@ -168,10 +190,14 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         """
         Validates each workflow under `.github/workflows/`, by its path.
         """
-        return {
-            path: Workflow.read(self.root, path)
-            for path in self.glob(".github/workflows/*.y*ml")
-        }
+        return self.documents(Workflow, ".github/workflows/*.y*ml")
+
+    def documents[D: Document](self, kind: type[D], pattern: str) -> dict[Path, D]:
+        """
+        Validates each file under the root matching `pattern` as `kind`, by
+        its path.
+        """
+        return {path: kind.read(self.root, path) for path in self.glob(pattern)}
 
     def glob(self, pattern: str) -> list[Path]:
         """
