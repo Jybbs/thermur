@@ -2,13 +2,13 @@
 Holds the records the repository audit and `repo:rulesets` read and report:
 
 - The `Document` base and the files it validates, meaning the `Manifest`
-  with its `Author` rows, the `Config`, the `Lock`, and the `GithubSettings` with
-  its `Actions`, `Repository`, `Toggles`, and `Token` tables, whose values
-  with a closed set take the `Policy`, `Scope`, `SquashMessage`,
-  `SquashTitle`, and `State` enums, out of the
-  TOML, each `Workflow` with its `Job`, `Step`, and `Trigger` rows and
-  each composite `Action` out of the YAML under `.github/`, and each
-  `Ruleset` with its `Rule` rows out of the JSON under `.github/rulesets/`
+  with its `Author` rows, the `Config`, the `Lock`, and the `GithubSettings`
+  with its `Actions`, `Repository`, `Toggles`, and `Token` tables out of the
+  TOML, each `Workflow` with its `Job`, `Step`, and `Trigger` rows and each
+  composite `Action` out of the YAML under `.github/`, and each `Ruleset`
+  with its `Rule` rows out of the JSON under `.github/rulesets/`
+- The `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and `State` enums
+  each closed-set value in `.github/settings.toml` takes
 - Each `Request` `repo:rulesets` sends GitHub
 - Each `Task` mise lists and each `Issue` mise reports on one
 - Each `Finding` a check makes at its `Level`, and each `Parity` a check
@@ -128,7 +128,7 @@ class Actions(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         Writes the call setting the GitHub Actions permissions.
         """
         return Request(
-            body     = self.model_dump(mode="json"),
+            body     = self.model_dump(),
             endpoint = "actions/permissions",
             method   = "PUT"
         )
@@ -463,7 +463,7 @@ class Feature(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
 
     status: State
     """
-    The feature's state, `enabled` or `disabled`.
+    Whether the feature runs.
     """
 
 
@@ -1008,7 +1008,7 @@ class Repository(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
         """
         Writes the call setting the repository's own settings.
         """
-        return Request(body=self.model_dump(mode="json"), endpoint="", method="PATCH")
+        return Request(body=self.model_dump(), endpoint="", method="PATCH")
 
 
 class Rule(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -1154,8 +1154,7 @@ class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 
     default_workflow_permissions: Scope
     """
-    The scope the token takes where a workflow sets no `permissions`, `read`
-    or `write`.
+    The scope the token takes where a workflow sets no `permissions`.
     """
 
     @property
@@ -1164,7 +1163,7 @@ class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         Writes the call setting the defaults of the token.
         """
         return Request(
-            body     = self.model_dump(mode="json"),
+            body     = self.model_dump(),
             endpoint = "actions/permissions/workflow",
             method   = "PUT"
         )
@@ -1221,8 +1220,8 @@ class Policy(StrEnum):
 
 class Scope(StrEnum):
     """
-    The scope the token each workflow run receives takes where a workflow
-    sets no `permissions`, as `default_workflow_permissions` names it.
+    The scope a workflow run's token takes where the workflow sets no
+    `permissions`, as `default_workflow_permissions` names it.
     """
 
     READ  = auto()
