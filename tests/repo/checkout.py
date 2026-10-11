@@ -41,12 +41,16 @@ def test_commit_reads_the_commit_checked_out(clone: Checkout):
 
 
 def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
-    pytestconfig: Config
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config,
+    tmp_path     : Path
 ):
     """
     Asserts that the installed checkout sits at the worktree `uv sync`
-    installed the package from, which is the root the suite runs in.
+    installed the package from, whatever the working directory.
     """
+    monkeypatch.chdir(tmp_path)
+
     assert Checkout.installed().root == pytestconfig.rootpath.resolve()
 
 

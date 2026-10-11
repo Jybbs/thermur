@@ -6,11 +6,13 @@ connection only when it carries the `network` mark.
 """
 
 from common.environment import CLEARED
+from os                 import environ
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
 from subprocess         import check_output, run
 
-from thermur.repo.checkout import Checkout
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
 
 
 @fixture
@@ -78,8 +80,10 @@ def environment(
     turn on mise's `yes` setting, which answers a task's `confirm` prompt
     without asking. The rest name the folders where a tool keeps its cache,
     configuration, data, and state, which the XDG convention defines. It
-    then points `HOME` at an empty folder the test owns, so a tool that
-    falls back to `~` finds none of the developer's files there.
+    also clears every variable opening on the `env_prefix` of `Settings`,
+    each of which sets the field it names. It then points `HOME` at an empty
+    folder the test owns, so a tool that falls back to `~` finds none of the
+    developer's files there.
 
     mise reads a configuration file out of every folder above the one
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
@@ -88,7 +92,8 @@ def environment(
     told to trust. The two `MISE_` variables name that file as one to skip
     and this checkout as one to trust, so a test can run mise over it.
     """
-    for name in CLEARED:
+    prefix = Settings.model_config["env_prefix"]
+    for name in [*CLEARED, *(name for name in environ if name.startswith(prefix))]:
         monkeypatch.delenv(name, raising=False)
 
     settled = Path.home() / ".config" / "mise" / "config.toml"

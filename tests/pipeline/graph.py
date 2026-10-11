@@ -104,8 +104,8 @@ def computed(graph: Graph) -> set[str]:
             id = "tree-child-values"
         ),
         param(
-            Tuned(heading=Heading(coupling_per_s=1.0)),
-            Tuned(heading=Heading(coupling_per_s=2.0)),
+            Tuned.model_construct(heading=Heading(coupling_per_s=1.0)),
+            Tuned.model_construct(heading=Heading(coupling_per_s=2.0)),
             id = "record-component"
         ),
         param(
@@ -119,7 +119,11 @@ def computed(graph: Graph) -> set[str]:
             id = "tree-attributes"
         ),
         param(Holder(numpy.zeros(3)), Holder(numpy.ones(3)), id="module-values"),
-        param(Tuned(radius_m=1.0), Tuned(radius_m=2.0), id="record-values")
+        param(
+            Tuned.model_construct(radius_m=1.0),
+            Tuned.model_construct(radius_m=2.0),
+            id = "record-values"
+        )
     ]
 )
 def test_values_differing_in_any_part_fingerprint_apart(one: object, other: object):
