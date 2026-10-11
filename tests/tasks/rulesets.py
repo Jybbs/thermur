@@ -267,7 +267,7 @@ def test_a_failed_call_stops_the_task_before_any_other(
             ".github/rulesets/tags.json",
             '"target": "tag"\n',
             '"target": "tag",\n  "target": "branch"\n',
-            "holds `target` more than once",
+            "names `target` more than once",
             id = "repeated-key"
         ),
         param(

@@ -17,6 +17,7 @@ from pydantic    import ValidationError
 from subprocess  import check_output, run
 
 from thermur.repo.checkout import Checkout
+from thermur.repo.schemas  import join_names
 
 
 def main():
@@ -44,7 +45,7 @@ def main():
         raise SystemExit(
             "More than one file under `.github/rulesets/` names each of these "
             "rulesets, which the task matches to a live ruleset by name: "
-            + ", ".join(shared)
+            + join_names(shared)
         )
 
     live = dict(

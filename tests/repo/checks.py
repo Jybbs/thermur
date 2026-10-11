@@ -1,7 +1,7 @@
 """
 Pins what each check `repo:audit` runs reports over a copy of the checkout,
 nothing for the copy as it stands and one finding for each way a case breaks
-it.
+it, the label registry's agreement with each file naming a label among them.
 """
 
 from common.edits import append, edit, task
@@ -17,8 +17,10 @@ from thermur.repo.checks   import (
     Check,
     CommitCheck,
     GateCheck,
+    GuideCheck,
     ImageCheck,
     KitCheck,
+    LabelCheck,
     ParityCheck,
     PinCheck,
     ProvisionCheck,
@@ -50,21 +52,34 @@ def test_a_check_declaring_nothing_makes_no_finding(checkout: Checkout):
     assert Check(checkout=checkout).findings == []
 
 
-def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
+def test_a_citation_naming_each_author_passes(checkout: Checkout):
     """
-    Asserts that a program whose bytes differ from the first program's is
-    named against that first program, even where the two match in size and
-    in modification time.
+    Asserts that two authors, each written in `CITATION.cff` as a
+    `family-names` line over a `given-names` line, read in order and join
+    the way the manifest's authors do, so a citation, a manifest, and a
+    copyright line naming the same two make no finding.
     """
-    edit(checkout, ".mise/bin/pytest", new="--frozen", old="--locked")
-    copystat(checkout.root / ".mise/bin/prose", checkout.root / ".mise/bin/pytest")
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"James Parkington" }, { name = "Ada Lovelace" }]',
+        old = '"James Parkington" }]'
+    )
+    edit(
+        checkout,
+        "CITATION.cff",
+        new = "    given-names: James\n  - family-names: Lovelace\n"
+        "    given-names: Ada\n",
+        old = "    given-names: James\n"
+    )
+    edit(
+        checkout,
+        "LICENSE",
+        new = "James Parkington and Ada Lovelace",
+        old = "James Parkington"
+    )
 
-    assert BinCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".mise/bin/pytest"),
-            message = "`.mise/bin/pytest` differs byte for byte from `.mise/bin/prose`"
-        )
-    ]
+    assert ParityCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -131,6 +146,55 @@ def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
             "The copyright holder list in `LICENSE` reads `Jybbs`, where the author "
             "list in `pyproject.toml` reads `James Parkington`",
             id = "license-holders"
+        ),
+        param(
+            "CITATION.cff",
+            "version: 0.1.0",
+            "version: 0.2.0",
+            "The `version` in `CITATION.cff` reads `0.2.0`, where the `version` in "
+            "`pyproject.toml` reads `0.1.0`",
+            id = "citation-version"
+        ),
+        param(
+            "CITATION.cff",
+            "license: MIT",
+            "license: Apache-2.0",
+            "The `license` in `CITATION.cff` reads `Apache-2.0`, where the `license` "
+            "in `pyproject.toml` reads `MIT`",
+            id = "citation-license"
+        ),
+        param(
+            "CITATION.cff",
+            "repository-code: https://github.com/Jybbs/thermur",
+            "repository-code: https://github.com/Jybbs/Thermur",
+            "The `repository-code` in `CITATION.cff` reads "
+            "`https://github.com/Jybbs/Thermur`, where the `Repository` in "
+            "`pyproject.toml` reads `https://github.com/Jybbs/thermur`",
+            id = "citation-repository"
+        ),
+        param(
+            "CITATION.cff",
+            "given-names: James",
+            "given-names: Jim",
+            "The author list in `CITATION.cff` reads `Jim Parkington`, where the "
+            "author list in `pyproject.toml` reads `James Parkington`",
+            id = "citation-authors"
+        ),
+        param(
+            "CITATION.cff",
+            "version: 0.1.0\n",
+            "",
+            "The `version` in `CITATION.cff` is missing, where the `version` in "
+            "`pyproject.toml` reads `0.1.0`",
+            id = "citation-version-missing"
+        ),
+        param(
+            "CITATION.cff",
+            "authors:\n  - family-names: Parkington\n    given-names: James\n",
+            "",
+            "The author list in `CITATION.cff` is missing, where the author list in "
+            "`pyproject.toml` reads `James Parkington`",
+            id = "citation-authors-missing"
         )
     ]
 )
@@ -142,9 +206,9 @@ def test_a_restated_declaration_that_drifts_is_named(
     message  : str
 ):
     """
-    Asserts that each file restating the Python version, the uv release,
-    or the license is named once its copy drifts from the declaration it
-    restates, or once the file stops carrying it.
+    Asserts that each file restating the Python version, the uv release, the
+    license, or what `CITATION.cff` cites is named once its copy drifts from
+    the declaration it restates, or once the file stops carrying it.
     """
     edit(checkout, path, new=new, old=old)
 
@@ -153,14 +217,21 @@ def test_a_restated_declaration_that_drifts_is_named(
     ]
 
 
-def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
+def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
     """
-    Asserts that a copyright line naming a range of years, as a license
-    carried past its first year does, reads the holders after the range.
+    Asserts that a program whose bytes differ from the first program's is
+    named against that first program, even where the two match in size and
+    in modification time.
     """
-    edit(checkout, "LICENSE", new="Copyright (c) 2025-2026", old="Copyright (c) 2025")
+    edit(checkout, ".mise/bin/pytest", new="--frozen", old="--locked")
+    copystat(checkout.root / ".mise/bin/prose", checkout.root / ".mise/bin/pytest")
 
-    assert ParityCheck(checkout=checkout).findings == []
+    assert BinCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".mise/bin/pytest"),
+            message = "`.mise/bin/pytest` differs byte for byte from `.mise/bin/prose`"
+        )
+    ]
 
 
 @mark.parametrize(
@@ -217,6 +288,16 @@ def test_a_task_is_named_where_its_uv_run_is_not_locked(
     ] * named
 
 
+def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
+    """
+    Asserts that a copyright line naming a range of years, as a license
+    carried past its first year does, reads the holders after the range.
+    """
+    edit(checkout, "LICENSE", new="Copyright (c) 2025-2026", old="Copyright (c) 2025")
+
+    assert ParityCheck(checkout=checkout).findings == []
+
+
 def test_a_gate_running_under_a_bare_always_passes(checkout: Checkout):
     """
     Asserts that a gate whose condition is `always()` written without the
@@ -227,33 +308,25 @@ def test_a_gate_running_under_a_bare_always_passes(checkout: Checkout):
     assert GateCheck(checkout=checkout).findings == []
 
 
-def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
+def test_a_guide_without_its_checks_table_lists_no_check(checkout: Checkout):
     """
-    Asserts that an exact pin naming hatchling in another spelling its
-    normalized name allows passes, since a package's name compares case
-    insensitively.
+    Asserts that a contributor guide whose checks table loses its header
+    reads as listing no check, so every row of a pull-request workflow is
+    named as missing from it.
     """
     edit(
         checkout,
-        "pyproject.toml",
-        new = '"Hatchling==1.32.4"',
-        old = '"hatchling==1.32.4"'
+        ".github/CONTRIBUTING.md",
+        new = "| **Name** | **Runs Locally** |",
+        old = "| **Check** | **Runs Locally** |"
     )
 
-    assert PinCheck(checkout=checkout).findings == []
+    commands = {task.name: task.command for task in checkout.tasks}
 
-
-def test_a_job_on_a_second_runner_image_is_named(checkout: Checkout):
-    """
-    Asserts that each job running on an image other than the first job's is
-    named against that first job, in path order.
-    """
-    edit(checkout, WARM, new="&image ubuntu-24.04", old="&image ubuntu-26.04")
-
-    assert [finding.message for finding in ImageCheck(checkout=checkout).findings] == [
-        f"The runner image of the `{key}` job in `{WARM}` reads `ubuntu-24.04`, where "
-        f"the one the `check` job in `{CI}` runs on reads `ubuntu-26.04`"
-        for key in checkout.workflows[Path(WARM)].jobs
+    assert [finding.message for finding in GuideCheck(checkout=checkout).findings] == [
+        f"The command beside `{name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where the command running `{task}` reads `{commands[task]}`"
+        for name, task in checkout.checks
     ]
 
 
@@ -303,20 +376,23 @@ def test_a_script_is_named_where_its_module_is_not_carried(
     ] * named
 
 
-def test_a_linked_program_is_named(checkout: Checkout):
+def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
     """
-    Asserts that a program written as a symlink is named once, and is left
-    out of the byte comparison it would otherwise fail.
+    Asserts that a contributor guide whose label table loses its header
+    reads as describing no label, so every label the registry declares is
+    named as missing from it.
     """
-    linked = checkout.root / ".mise/bin/pytest"
-    linked.unlink()
-    linked.symlink_to("../config.toml")
+    edit(
+        checkout,
+        ".github/CONTRIBUTING.md",
+        new = "| **Name** | **Covers** |",
+        old = "| **Label** | **Covers** |"
+    )
 
-    assert BinCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".mise/bin/pytest"),
-            message = "`.mise/bin/pytest` is a symlink rather than a copy"
-        )
+    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
+        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where its description in `.github/labels.toml` reads `{label.description}`"
+        for label in checkout.labels.rows
     ]
 
 
@@ -427,6 +503,13 @@ def test_a_build_requirement_naming_a_range_is_named(
                 "and minor version"
             ],
             id = "unversioned-python"
+        ),
+        param(
+            "CITATION.cff",
+            "  - family-names: Parkington\n    given-names: James\n",
+            "",
+            ["`authors` in `CITATION.cff`: Input should be a valid list"],
+            id = "citation-authors-empty"
         )
     ]
 )
@@ -511,18 +594,50 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     ]
 
 
-def test_a_moved_python_floor_names_every_copy(checkout: Checkout):
+def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
     """
-    Asserts that raising `requires-python` names the README's badge, the
-    formatter's `target-version`, and the minor mise pins, each against the
-    new floor.
+    Asserts that an exact pin naming hatchling in another spelling its
+    normalized name allows passes, since a package's name compares case
+    insensitively.
     """
-    edit(checkout, "pyproject.toml", new='">=3.15"', old='">=3.14"')
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"Hatchling==1.32.4"',
+        old = '"hatchling==1.32.4"'
+    )
 
-    assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
-        Path("README.md"),
-        Path("pyproject.toml"),
-        Path(".mise/config.toml")
+    assert PinCheck(checkout=checkout).findings == []
+
+
+def test_a_job_on_a_second_runner_image_is_named(checkout: Checkout):
+    """
+    Asserts that each job running on an image other than the first job's is
+    named against that first job, in path order.
+    """
+    edit(checkout, WARM, new="&image ubuntu-24.04", old="&image ubuntu-26.04")
+
+    assert [finding.message for finding in ImageCheck(checkout=checkout).findings] == [
+        f"The runner image of the `{key}` job in `{WARM}` reads `ubuntu-24.04`, where "
+        f"the one the `check` job in `{CI}` runs on reads `ubuntu-26.04`"
+        for key in checkout.workflows[Path(WARM)].jobs
+    ]
+
+
+def test_a_linked_program_is_named(checkout: Checkout):
+    """
+    Asserts that a program written as a symlink is named once, and is left
+    out of the byte comparison it would otherwise fail.
+    """
+    linked = checkout.root / ".mise/bin/pytest"
+    linked.unlink()
+    linked.symlink_to("../config.toml")
+
+    assert BinCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".mise/bin/pytest"),
+            message = "`.mise/bin/pytest` is a symlink rather than a copy"
+        )
     ]
 
 
@@ -544,49 +659,6 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
             message = "The wheel `packages` entry `src/config` holds no module"
         )
     ]
-
-
-def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
-    checkout    : Checkout,
-    monkeypatch : MonkeyPatch
-):
-    """
-    Asserts that a problem `mise tasks validate` reports on a task no file
-    of the checkout declares, such as one a global configuration adds, makes
-    no finding.
-    """
-    outside = Issue(message="m", severity=Level.ERROR, task="global:task")
-    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
-
-    assert TaskCheck(checkout=checkout).findings == []
-
-
-def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
-    """
-    Asserts that a program under `.mise/bin/` is held to `--exact --locked`
-    as a task is.
-    """
-    edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
-
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
-        Path(".mise/bin/pytest")
-    ]
-
-
-def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
-    """
-    Asserts that a Python task is held to the `uv run` its shebang runs and
-    not to one its docstring mentions.
-    """
-    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
-    task(
-        checkout = checkout,
-        name     = "repo/sweep.py",
-        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
-    )
-    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
-
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
 
 
 @mark.parametrize(
@@ -632,88 +704,47 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
-@mark.parametrize(
-    ("path", "old", "new", "context"),
-    [
-        param(
-            MAIN,
-            '"context": "📡 Readout"',
-            '"context": "🐦‍⬛ CI"',
-            "🐦‍⬛ CI",
-            id = "required"
-        ),
-        param(
-            CI,
-            "name    : 📡 Readout",
-            "name    : 📡 Report",
-            "📡 Readout",
-            id = "gate"
-        ),
-        param(
-            MAIN,
-            '"integration_id": 15368 }]',
-            '"integration_id": 15368 }, { "context": "🐦‍⬛ CI" }]',
-            "🐦‍⬛ CI",
-            id = "second"
-        ),
-        param(CI, "  gate:\n", "  brief:\n", "📡 Readout", id="no-gate")
-    ]
-)
-def test_a_required_check_no_pull_request_gate_names_is_named(
-    checkout : Checkout,
-    context  : str,
-    new      : str,
-    old      : str,
-    path     : str
+def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
 ):
     """
-    Asserts that renaming the check the `main` ruleset requires, adding a
-    second required check beside it, renaming the gate of the one workflow
-    running on a pull request, or ending that workflow on no gate makes one
-    finding on the ruleset naming the required check no such gate carries,
-    although the gates of the push workflows still carry `📡 Readout`.
+    Asserts that a problem `mise tasks validate` reports on a task no file
+    of the checkout declares, such as one a global configuration adds, makes
+    no finding.
     """
-    edit(checkout, path, new=new, old=old)
+    outside = Issue(message="m", severity=Level.ERROR, task="global:task")
+    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
 
-    assert RulesetCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(MAIN),
-            message = f"`{MAIN}` requires the `{context}` check, which no gate of a "
-            "workflow running on a pull request names"
-        )
+    assert TaskCheck(checkout=checkout).findings == []
+
+
+def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
+    """
+    Asserts that a program under `.mise/bin/` is held to `--exact --locked`
+    as a task is.
+    """
+    edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
+
+    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
+        Path(".mise/bin/pytest")
     ]
 
 
-def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
+def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     """
-    Asserts that a ruleset carrying a key the rulesets API does not take
-    is named on its own file, one finding per field, rather than ending
-    the audit.
+    Asserts that a Python task is held to the `uv run` its shebang runs and
+    not to one its docstring mentions.
     """
-    tags = ".github/rulesets/tags.json"
-    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
+    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
+    task(
+        checkout = checkout,
+        name     = "repo/sweep.py",
+        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
+    )
+    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
 
-    assert RulesetCheck(checkout=checkout).findings == [
-        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
-        Finding(
-            file    = Path(tags),
-            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
-        )
-    ]
-
-
-def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
-    """
-    Asserts that a problem `mise tasks validate` reports on a task, here
-    an alias two tasks share, is named on the file holding the task at the
-    severity mise reports.
-    """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
-
-    assert [
-        (finding.file, finding.level)
-        for finding in TaskCheck(checkout=checkout).findings
-    ] == [(path, Level.ERROR)]
+    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
 
 
 @mark.parametrize(
@@ -769,20 +800,24 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
+def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
     """
-    Asserts that a `tools` input a step passes an action other than a
-    composite action of the checkout names no subset a Kit job must save.
+    Asserts that renaming a label in the registry alone names the
+    release-notes categories, the bug and spec templates in that order, and
+    the guide, each still naming the old label, then the new label filed
+    under no category and missing from the guide.
     """
-    edit(
-        checkout = checkout,
-        new      = "uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
-        "        with : { tools: bun }",
-        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
-        path = DRAFT
-    )
+    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
+    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
 
-    assert KitCheck(checkout=checkout).findings == []
+    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
+        Path(".github/release.yml"),
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md"),
+        Path(".github/CONTRIBUTING.md"),
+        Path(".github/release.yml"),
+        Path(".github/CONTRIBUTING.md")
+    ]
 
 
 @mark.parametrize(
@@ -952,23 +987,22 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_validation_error_outside_the_documents_is_raised(
-    checkout    : Checkout,
-    monkeypatch : MonkeyPatch
-):
+def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
     """
-    Asserts that a task listing failing validation, whose error names no
-    file of the checkout, ends the audit rather than reading as a finding on
-    a file that does not exist.
+    Asserts that a ruleset carrying a key the rulesets API does not take
+    is named on its own file, one finding per field, rather than ending
+    the audit.
     """
-    monkeypatch.setattr(
-        Checkout,
-        "tasks",
-        property(lambda checkout: TypeAdapter(list[Task]).validate_python([{}]))
-    )
+    tags = ".github/rulesets/tags.json"
+    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
 
-    with raises(ValidationError):
-        RunCheck(checkout=checkout).findings
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
+        Finding(
+            file    = Path(tags),
+            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
+        )
+    ]
 
 
 @mark.parametrize(
@@ -1054,6 +1088,327 @@ def test_a_cache_key_ending_on_anything_but_its_hash_is_named(
     ]
 
 
+def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
+    """
+    Asserts that a problem `mise tasks validate` reports on a task, here
+    an alias two tasks share, is named on the file holding the task at the
+    severity mise reports.
+    """
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+
+    assert [
+        (finding.file, finding.level)
+        for finding in TaskCheck(checkout=checkout).findings
+    ] == [(path, Level.ERROR)]
+
+
+def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+    """
+    Asserts that a Markdown template opening on no front matter is named on
+    its file rather than read as naming no label.
+    """
+    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
+            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
+            "front matter"
+        )
+    ]
+
+
+def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
+    """
+    Asserts that a `tools` input a step passes an action other than a
+    composite action of the checkout names no subset a Kit job must save.
+    """
+    edit(
+        checkout = checkout,
+        new      = "uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
+        "        with : { tools: bun }",
+        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
+        path = DRAFT
+    )
+
+    assert KitCheck(checkout=checkout).findings == []
+
+
+@mark.parametrize(
+    ("path", "old", "new", "findings"),
+    [
+        param(
+            ".github/release.yml",
+            '["🐞 bug"]',
+            '["🐛 bug"]',
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                ),
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under no release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-undeclared"
+        ),
+        param(
+            ".github/release.yml",
+            '["🦜 cli"]',
+            '["🦜 cli", "🐞 bug"]',
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under 2 release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-twice"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            '["🐞 bug"]',
+            '["🐞bug"]',
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐞bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "template-undeclared"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🦜 cli` | The command line |",
+            "| `🦜 cli` | The commands |",
+            [
+                (
+                    ".github/CONTRIBUTING.md",
+                    "The description of `🦜 cli` in `.github/CONTRIBUTING.md` reads "
+                    "`The commands`, where its description in `.github/labels.toml` "
+                    "reads `The command line`"
+                )
+            ],
+            id = "guide-description"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🦜 cli` | The command line |\n",
+            "",
+            [
+                (
+                    ".github/CONTRIBUTING.md",
+                    "The description of `🦜 cli` in `.github/CONTRIBUTING.md` is "
+                    "missing, where its description in `.github/labels.toml` reads "
+                    "`The command line`"
+                )
+            ],
+            id = "guide-missing"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🦜 cli` | The command line |\n",
+            "| `🦜 cli` | The command line |\n| `✨ feature` | A new capability |\n",
+            [
+                (
+                    ".github/CONTRIBUTING.md",
+                    "`.github/CONTRIBUTING.md` names `✨ feature`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "guide-undeclared"
+        ),
+        param(
+            ".github/labels.toml",
+            'color       = "8c055e"',
+            'color       = "8C055E"',
+            [
+                (
+                    ".github/labels.toml",
+                    "`labels.0.color` in `.github/labels.toml`: String should match "
+                    "pattern '^[0-9a-f]{6}$'"
+                )
+            ],
+            id = "registry-malformed"
+        ),
+        param(
+            ".github/labels.toml",
+            'description = "Wrong output or a broken run in any domain"',
+            f'description = "{"x" * 101}"',
+            [
+                (
+                    ".github/labels.toml",
+                    "`labels.0.description` in `.github/labels.toml`: String should "
+                    "have at most 100 characters"
+                )
+            ],
+            id = "registry-overlong-description"
+        ),
+        param(
+            ".github/release.yml",
+            '- labels: ["🐞 bug"]',
+            "- labels:\n        - 🐛 bug",
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                ),
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🐞 bug` under no release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-block-list"
+        ),
+        param(
+            ".github/release.yml",
+            '["🦜 cli"]',
+            '["🐛 bug", "🐛 bug"]',
+            [
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                ),
+                (
+                    ".github/release.yml",
+                    "`.github/release.yml` files `🦜 cli` under no release-notes "
+                    "categories rather than one"
+                )
+            ],
+            id = "release-repeated"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            "labels: 🐛 bug, 🔬 discovery",
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "template-comma-delimited"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            "labels: ['🐛 bug']",
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "template-single-quoted"
+        ),
+        param(
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            "labels:\n  - 🐛 bug",
+            [
+                (
+                    ".github/ISSUE_TEMPLATE/bug.md",
+                    "`.github/ISSUE_TEMPLATE/bug.md` names `🐛 bug`, a label "
+                    "`.github/labels.toml` does not declare"
+                )
+            ],
+            id = "template-block-list"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🧰 tooling` | The packaging, dependencies, workflows, and release |\n",
+            "| `🧰 tooling` | The packaging, dependencies, workflows, and release |\n"
+            "\nA paragraph.\n\n| `✨ feature` | A new capability |\n",
+            [],
+            id = "guide-later-table"
+        )
+    ]
+)
+def test_a_file_disagreeing_with_the_label_registry_is_named(
+    checkout : Checkout,
+    path     : str,
+    old      : str,
+    new      : str,
+    findings : list[tuple[str, str]]
+):
+    """
+    Asserts that a release-notes category or an issue template naming a
+    label the registry does not declare, in any form YAML writes a list or
+    a template writes one string of names, a declared label filed under no
+    category or under two, a guide describing a label otherwise or naming
+    one the registry lacks, and a registry failing its own validation are
+    each named on the file a reader opens to put it right.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(file=Path(file), message=message) for file, message in findings
+    ]
+
+
+@mark.parametrize(
+    ("old", "new", "files"),
+    [
+        param(
+            '">=3.14"',
+            '">=3.15"',
+            ["README.md", "pyproject.toml", ".mise/config.toml"],
+            id = "python-floor"
+        ),
+        param(
+            'version         = "0.1.0"',
+            'version         = "0.2.0"',
+            ["CITATION.cff"],
+            id = "version"
+        )
+    ]
+)
+def test_a_moved_manifest_declaration_names_every_copy(
+    checkout : Checkout,
+    old      : str,
+    new      : str,
+    files    : list[str]
+):
+    """
+    Asserts that raising `requires-python` names the README's badge, the
+    formatter's `target-version`, and the minor mise pins, and that moving
+    `[project].version` names `CITATION.cff`, each against the new value.
+    """
+    edit(checkout, "pyproject.toml", new=new, old=old)
+
+    assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
+        Path(file) for file in files
+    ]
+
+
+def test_a_validation_error_outside_the_documents_is_raised(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a task listing failing validation, whose error names no
+    file of the checkout, ends the audit rather than reading as a finding on
+    a file that does not exist.
+    """
+    monkeypatch.setattr(
+        Checkout,
+        "tasks",
+        property(lambda checkout: TypeAdapter(list[Task]).validate_python([{}]))
+    )
+
+    with raises(ValidationError):
+        RunCheck(checkout=checkout).findings
+
+
 def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
     """
     Asserts that a workflow yaml-rs cannot read, here one repeating a key,
@@ -1066,6 +1421,187 @@ def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
             file    = Path(CI),
             message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
         )
+    ]
+
+
+@mark.parametrize(
+    ("name", "text", "findings"),
+    [
+        param(
+            "feature.yml",
+            'name: Feature\nlabels: ["✨ feature"]\n',
+            [
+                Finding(
+                    file    = Path(".github/ISSUE_TEMPLATE/feature.yml"),
+                    message = "`.github/ISSUE_TEMPLATE/feature.yml` names "
+                    "`✨ feature`, a label `.github/labels.toml` does not declare"
+                )
+            ],
+            id = "issue-form"
+        ),
+        param("config.yml", "blank_issues_enabled: false\n", [], id="chooser")
+    ]
+)
+def test_a_file_added_under_the_issue_templates_is_read(
+    checkout : Checkout,
+    name     : str,
+    text     : str,
+    findings : list[Finding]
+):
+    """
+    Asserts that an issue form under `.github/ISSUE_TEMPLATE/`, read beside
+    the Markdown templates, is named where it lists a label the registry
+    does not declare, whereas the template chooser's configuration, which
+    lists no labels, names none.
+    """
+    (checkout.root / ".github/ISSUE_TEMPLATE" / name).write_text(text)
+
+    assert LabelCheck(checkout=checkout).findings == findings
+
+
+@mark.parametrize(
+    ("check", "path", "old", "new"),
+    [
+        param(ParityCheck, "pyproject.toml", "[project]", "[project", id="toml"),
+        param(LabelCheck, ".github/release.yml", '["*"]', '["*"', id="yaml"),
+        param(
+            LabelCheck,
+            ".github/ISSUE_TEMPLATE/bug.md",
+            'labels: ["🐞 bug"]',
+            'labels: ["🐞 bug"',
+            id = "front-matter"
+        ),
+        param(ParityCheck, "CITATION.cff", "license: MIT", "license: [MIT", id="cff")
+    ]
+)
+def test_a_document_failing_to_parse_is_named_on_its_file(
+    check    : type[Check],
+    checkout : Checkout,
+    path     : str,
+    old      : str,
+    new      : str
+):
+    """
+    Asserts that a document whose TOML or YAML fails to parse, a Markdown
+    template's front matter among them, makes one finding on that document
+    carrying the parser's error rather than ending the audit.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert [
+        (finding.file, finding.message.startswith(f"`{path}`: Value error, "))
+        for finding in check(checkout=checkout).findings
+    ] == [(Path(path), True)]
+
+
+@mark.parametrize(
+    ("old", "new"),
+    [
+        param("version: 0.1.0", 'version: "0.1.0"', id="version"),
+        param("license: MIT", "license: 'MIT'", id="license"),
+        param(
+            "repository-code: https://github.com/Jybbs/thermur",
+            'repository-code: "https://github.com/Jybbs/thermur"',
+            id = "repository-code"
+        ),
+        param("given-names: James", 'given-names: "James"', id="authors")
+    ]
+)
+def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
+    checkout : Checkout,
+    old      : str,
+    new      : str
+):
+    """
+    Asserts that a `CITATION.cff` value written in single or double quotes,
+    which YAML reads as the same string, agrees with the manifest as the
+    plain value does.
+    """
+    edit(checkout, "CITATION.cff", new=new, old=old)
+
+    assert ParityCheck(checkout=checkout).findings == []
+
+
+@mark.parametrize(
+    ("path", "old", "new", "messages"),
+    [
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🪵 Lockfiles` | `mise lockfile` |",
+            "| `🪵 Lockfiles` | `mise run lock:check` |",
+            [
+                "The command beside `🪵 Lockfiles` in `.github/CONTRIBUTING.md` reads "
+                "`mise run lock:check`, where the command running "
+                "`lock:check` reads `mise lockfile`"
+            ],
+            id = "command"
+        ),
+        param(
+            CI,
+            "name  : 🪵 Lockfiles",
+            "name  : 🪵 Locks",
+            [
+                "`.github/CONTRIBUTING.md` lists `🪵 Lockfiles`, a check no row of a "
+                "pull-request workflow runs",
+                "The command beside `🪵 Locks` in `.github/CONTRIBUTING.md` is "
+                "missing, where the command running `lock:check` reads "
+                "`mise lockfile`"
+            ],
+            id = "renamed-row"
+        ),
+        param(
+            CI,
+            "task  : repo:vet",
+            "task  : gha:brief",
+            [
+                "The command beside `🗝️ Workflows` in `.github/CONTRIBUTING.md` "
+                "reads `mise vet`, where the command running `gha:brief` "
+                "reads `mise run gha:brief`"
+            ],
+            id = "task-without-alias"
+        ),
+        param(
+            CI,
+            "task  : repo:vet",
+            "task  : repo:gone",
+            [
+                "The command beside `🗝️ Workflows` in `.github/CONTRIBUTING.md` "
+                "reads `mise vet`, where the command running `repo:gone` "
+                "reads `mise run repo:gone`"
+            ],
+            id = "unlisted-task"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🪵 Lockfiles` | `mise lockfile` |",
+            "| `🪵 Lockfiles` | x | x |\n| `🪵 Lockfiles` | `mise lockfile` |",
+            [
+                "`checks` in `.github/CONTRIBUTING.md`: Value error, names "
+                "`🪵 Lockfiles` more than once"
+            ],
+            id = "repeated-row"
+        )
+    ]
+)
+def test_a_guide_out_of_step_with_the_rows_is_named(
+    checkout : Checkout,
+    messages : list[str],
+    new      : str,
+    old      : str,
+    path     : str
+):
+    """
+    Asserts that the contributor guide giving a row's check a command other
+    than the one running its task, whether or not mise lists that task or it
+    declares an alias, the guide listing a check no row runs while leaving
+    out one a row does, and the guide listing one check in two rows are each
+    named on the guide.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert GuideCheck(checkout=checkout).findings == [
+        Finding(file=Path(".github/CONTRIBUTING.md"), message=message)
+        for message in messages
     ]
 
 
@@ -1089,6 +1625,58 @@ def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
             message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
             f"the pin on it in `{ACTION}` reads "
             "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
+        )
+    ]
+
+
+@mark.parametrize(
+    ("path", "old", "new", "context"),
+    [
+        param(
+            MAIN,
+            '"context": "📡 Readout"',
+            '"context": "🐦‍⬛ CI"',
+            "🐦‍⬛ CI",
+            id = "required"
+        ),
+        param(
+            CI,
+            "name    : 📡 Readout",
+            "name    : 📡 Report",
+            "📡 Readout",
+            id = "gate"
+        ),
+        param(
+            MAIN,
+            '"integration_id": 15368 }]',
+            '"integration_id": 15368 }, { "context": "🐦‍⬛ CI" }]',
+            "🐦‍⬛ CI",
+            id = "second"
+        ),
+        param(CI, "  gate:\n", "  brief:\n", "📡 Readout", id="no-gate")
+    ]
+)
+def test_a_required_check_no_pull_request_gate_names_is_named(
+    checkout : Checkout,
+    context  : str,
+    new      : str,
+    old      : str,
+    path     : str
+):
+    """
+    Asserts that renaming the check the `main` ruleset requires, adding a
+    second required check beside it, renaming the gate of the one workflow
+    running on a pull request, or ending that workflow on no gate makes one
+    finding on the ruleset naming the required check no such gate carries,
+    although the gates of the push workflows still carry `📡 Readout`.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(MAIN),
+            message = f"`{MAIN}` requires the `{context}` check, which no gate of a "
+            "workflow running on a pull request names"
         )
     ]
 

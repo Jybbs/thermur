@@ -5,6 +5,7 @@ each found through `Check.__subclasses__()` rather than through a list kept
 beside them.
 """
 
+from collections            import Counter
 from collections.abc        import Iterator
 from filecmp                import cmp
 from itertools              import product
@@ -217,6 +218,51 @@ class GateCheck(Check):
                 )
 
 
+class GuideCheck(Check):
+    """
+    The contributor guide's checks table lists each row of every workflow
+    running on a pull request under the name its check run takes, beside the
+    command running the row's task, and lists no other check.
+    """
+
+    @property
+    def pairs(self) -> list[Parity]:
+        """
+        Pairs the command the guide gives each row's check with the command
+        running the task the row runs.
+        """
+        guide    = self.checkout.guide
+        commands = {task.name: task.command for task in self.checkout.tasks}
+        return [
+            Parity(
+                copied   = guide.checks.get(name),
+                file     = guide.file,
+                label    = f"The command beside `{name}` in `{guide.file}`",
+                origin   = f"the command running `{task}`",
+                original = commands.get(task, f"mise run {task}")
+            )
+            for name, task in self.checkout.checks
+        ]
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each check the guide lists that no row of a pull-request
+        workflow runs, then each row whose command the guide gives
+        otherwise.
+        """
+        guide = self.checkout.guide
+        run   = {name for name, _ in self.checkout.checks}
+        for name in guide.checks:
+            if name not in run:
+                yield Finding(
+                    file    = guide.file,
+                    message = f"`{guide.file}` lists `{name}`, a check no row of a "
+                    "pull-request workflow runs"
+                )
+
+        yield from super().scan()
+
+
 class ImageCheck(Check):
     """
     Every job runs on one runner image, so a reviewed bump moves the tools
@@ -296,17 +342,91 @@ class KitCheck(Check):
                 )
 
 
+class LabelCheck(Check):
+    """
+    Every file naming a label agrees with `.github/labels.toml`, meaning the
+    release-notes categories file each label it declares under one category,
+    the issue templates and the contributor guide name only labels it
+    declares, and the guide describes each label as the registry does.
+    """
+
+    @property
+    def named(self) -> dict[Path, list[str]]:
+        """
+        Maps each file naming labels to every label it names, in the order
+        it names them, meaning the release-notes categories, each issue
+        template, and the contributor guide.
+        """
+        guide, release = self.checkout.guide, self.checkout.release
+        return (
+            {release.file: release.names}
+            | {
+                path: template.labels
+                for path, template in self.checkout.templates.items()
+            }
+            | {guide.file: list(guide.labels)}
+        )
+
+    @property
+    def pairs(self) -> list[Parity]:
+        """
+        Pairs the description the contributor guide gives each label with
+        the one the registry declares.
+        """
+        guide, labels = self.checkout.guide, self.checkout.labels
+        return [
+            Parity(
+                copied   = guide.labels.get(label.name),
+                file     = guide.file,
+                label    = f"The description of `{label.name}` in `{guide.file}`",
+                origin   = f"its description in `{labels.file}`",
+                original = label.description
+            )
+            for label in labels.rows
+        ]
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each label a file names that the registry does not declare,
+        then each declared label the categories file under any number of
+        categories but one, then each label the guide describes otherwise.
+        """
+        labels = self.checkout.labels
+        for file, names in self.named.items():
+            for name in dict.fromkeys(names):
+                if name not in labels.names:
+                    yield Finding(
+                        file    = file,
+                        message = f"`{file}` names `{name}`, a label `{labels.file}` "
+                        "does not declare"
+                    )
+
+        release = self.checkout.release
+        filed   = Counter(release.names)
+        for name in labels.names:
+            if filed[name] != 1:
+                yield Finding(
+                    file    = release.file,
+                    message = f"`{release.file}` files `{name}` under "
+                    f"{filed[name] or 'no'} release-notes categories rather than one"
+                )
+
+        yield from super().scan()
+
+
 class ParityCheck(Check):
     """
-    Every file restating the Python version, the uv release, or the license
-    reads the value `pyproject.toml` or `.mise/config.toml` declares.
+    Every file restating the Python version, the uv release, the license,
+    or the release `CITATION.cff` cites reads the value `pyproject.toml` or
+    `.mise/config.toml` declares.
 
     The manifest's `requires-python` floor is the Python version the
     README's badge, the formatter's `target-version`, and the minor of
     the `python` mise pins each restate. The `uv` mise pins is the release
     `[tool.uv]` requires, and the manifest's license and authors are what
     the README's badge and the title and the copyright line of `LICENSE`
-    restate.
+    restate. `CITATION.cff` restates the manifest's version, license,
+    repository, and authors.
     """
 
     @property
@@ -314,6 +434,7 @@ class ParityCheck(Check):
         """
         Pairs each restated declaration with the one it restates.
         """
+        citation     = self.checkout.citation
         config       = self.checkout.config
         manifest     = self.checkout.manifest
         license_path = Path("LICENSE")
@@ -369,6 +490,30 @@ class ParityCheck(Check):
                 copied   = self.extract(r"Copyright \(c\) [\d-]+ (.+)", notice),
                 file     = license_path,
                 label    = f"The copyright holder list in `{license_path}`",
+                origin   = f"the author list in `{manifest.file}`",
+                original = manifest.holders
+            ),
+            *(
+                Parity(
+                    copied   = copied,
+                    file     = citation.file,
+                    label    = f"The `{key}` in `{citation.file}`",
+                    origin   = f"the `{name}` in `{manifest.file}`",
+                    original = original
+                )
+                for key, copied, name, original in (
+                    ("license", citation.license, "license", manifest.license),
+                    (
+                        "repository-code", citation.repository,
+                        "Repository", manifest.repository
+                    ),
+                    ("version", citation.version, "version", manifest.version)
+                )
+            ),
+            Parity(
+                copied   = citation.holders or None,
+                file     = citation.file,
+                label    = f"The author list in `{citation.file}`",
                 origin   = f"the author list in `{manifest.file}`",
                 original = manifest.holders
             )
