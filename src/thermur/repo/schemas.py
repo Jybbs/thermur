@@ -3,7 +3,7 @@ Holds the records the repository audit and `repo:rulesets` read and report:
 
 - The `Document` base and the files it validates, meaning the `Manifest`
   with its `Author` rows, the `Config`, the `Lock`, and the `GithubSettings` with
-  their `Actions`, `Repository`, `Toggles`, and `Token` tables out of the
+  its `Actions`, `Repository`, `Toggles`, and `Token` tables out of the
   TOML, each `Workflow` with its `Job`, `Step`, and `Trigger` rows and
   each composite `Action` out of the YAML under `.github/`, and each
   `Ruleset` with its `Rule` rows out of the JSON under `.github/rulesets/`
@@ -13,6 +13,7 @@ Holds the records the repository audit and `repo:rulesets` read and report:
   compares
 """
 
+from collections     import Counter
 from collections.abc import Iterable
 from enum            import StrEnum, auto
 from http            import HTTPMethod
@@ -72,6 +73,22 @@ def read_names(needs: str | list[str]) -> list[str]:
     as a list of them.
     """
     return [needs] if isinstance(needs, str) else needs
+
+
+def read_object(pairs: list[tuple[str, JsonValue]]) -> dict[str, JsonValue]:
+    """
+    Builds one JSON object out of the key and value pairs it holds.
+
+    Raises:
+        ValueError: Where the object holds a key more than once, which
+                    validation reports against the document.
+    """
+    if repeated := sorted(
+        key for key, count in Counter(key for key, _ in pairs).items() if count > 1
+    ):
+        raise ValueError(f"holds `{'`, `'.join(repeated)}` more than once")
+
+    return dict(pairs)
 
 
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
@@ -157,7 +174,7 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
             return loads(data)
 
         if info.context["suffix"] == ".json":
-            return from_json(data)
+            return from_json(data, object_pairs_hook=read_object)
 
         return from_yaml(data, parse_datetime=False)
 

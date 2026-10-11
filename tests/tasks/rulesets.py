@@ -139,6 +139,13 @@ def test_a_failed_call_stops_the_task_before_any_other(
             id = "trailing-comma"
         ),
         param(
+            ".github/rulesets/tags.json",
+            '"target": "tag"\n',
+            '"target": "tag",\n  "target": "branch"\n',
+            "holds `target` more than once",
+            id = "repeated-key"
+        ),
+        param(
             "pyproject.toml",
             "keywords        = [",
             "topics          = [",
@@ -157,11 +164,11 @@ def test_a_file_failing_validation_fails_before_anything_reaches_github(
     path     : str
 ):
     """
-    Asserts that a misspelled settings key, a key the rulesets API does
-    not take at any depth the ruleset validates, a ruleset file that is
-    not JSON, and a manifest leaving out `[project].keywords` each end the
-    task on the validation error naming it, before the task reads or sends
-    anything.
+    Asserts that a misspelled settings key, a key the rulesets API does not
+    take at any depth the ruleset validates, a ruleset file that is not JSON
+    or that repeats a key, and a manifest leaving out `[project].keywords`
+    each end the task on the validation error naming it, before the task
+    reads or sends anything.
     """
     edit(checkout, path, new=new, old=old)
 
