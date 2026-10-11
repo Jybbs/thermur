@@ -172,6 +172,57 @@ def test_a_failed_call_stops_the_task_before_any_other(
             id = "ruleset"
         ),
         param(
+            ".github/rulesets/tags.json",
+            '"enforcement": "active"',
+            '"enforcement": "actve"',
+            "enforcement\n  Input should be 'active', 'disabled' or 'evaluate'",
+            id = "enforcement"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '"target": "tag"',
+            '"target": "tags"',
+            "target\n  Input should be 'branch', 'push' or 'tag'",
+            id = "target"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '{ "type": "deletion" }',
+            '{ "type": "deletoin" }',
+            "rules.1.type\n  Input should be 'branch_name_pattern'",
+            id = "rule-type"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '"bypass_actors": []',
+            '"bypass_actors": [{ "actor_id": 1, "actor_type": "Teams" }]',
+            (
+                "bypass_actors.0.actor_type\n  Input should be 'DeployKey', "
+                "'Integration', 'OrganizationAdmin', 'RepositoryRole', 'Team' or 'User'"
+            ),
+            id = "actor-type"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '"bypass_actors": []',
+            '"bypass_actors": [{ "actor_type": "Team", "bypass_mode": "alway" }]',
+            (
+                "bypass_actors.0.bypass_mode\n  "
+                "Input should be 'always', 'exempt' or 'pull_request'"
+            ),
+            id = "bypass-mode"
+        ),
+        param(
+            ".github/rulesets/main.json",
+            '["squash"]',
+            '["sqaush"]',
+            (
+                "rules.0.parameters.allowed_merge_methods.0\n  "
+                "Input should be 'merge', 'rebase' or 'squash'"
+            ),
+            id = "merge-method"
+        ),
+        param(
             ".github/rulesets/main.json",
             '"parameters"',
             '"parameter"',
@@ -218,12 +269,12 @@ def test_a_file_failing_validation_fails_before_anything_reaches_github(
     path     : str
 ):
     """
-    Asserts that a misspelled settings key, a settings value outside the
-    closed set its field takes, a key the rulesets API does not take at any
-    depth the ruleset validates, a ruleset file that is not JSON or that
-    repeats a key, and a manifest leaving out `[project].keywords` each end
-    the task on the validation error naming it, before the task reads or
-    sends anything.
+    Asserts that a misspelled settings key, a settings or ruleset value
+    outside the closed set its field takes, a key the rulesets API does not
+    take at any depth the ruleset validates, a ruleset file that is not JSON
+    or that repeats a key, and a manifest leaving out `[project].keywords`
+    each end the task on the validation error naming it, before the task
+    reads or sends anything.
     """
     edit(checkout, path, new=new, old=old)
 

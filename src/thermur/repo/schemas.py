@@ -6,9 +6,12 @@ Holds the records the repository audit and `repo:rulesets` read and report:
   with its `Actions`, `Repository`, `Toggles`, and `Token` tables out of the
   TOML, each `Workflow` with its `Job`, `Step`, and `Trigger` rows and each
   composite `Action` out of the YAML under `.github/`, and each `Ruleset`
-  with its `Rule` rows out of the JSON under `.github/rulesets/`
+  with its `Rule` and `Actor` rows out of the JSON under
+  `.github/rulesets/`
 - The `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and `State` enums
-  each closed-set value in `.github/settings.toml` takes
+  each closed-set value in `.github/settings.toml` takes, and the
+  `ActorType`, `BypassMode`, `Enforcement`, `MergeMethod`, `RuleType`, and
+  `Target` enums each closed-set value of a ruleset takes
 - Each `Request` `repo:rulesets` sends GitHub
 - Each `Task` mise lists and each `Issue` mise reports on one
 - Each `Finding` a check makes at its `Level`, and each `Parity` a check
@@ -831,8 +834,14 @@ class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
 
 class Parameters(BaseModel, extra="allow", frozen=True, use_attribute_docstrings=True):
     """
-    The parameters one rule of a ruleset takes, validated for the checks a
-    `required_status_checks` rule requires and kept as written otherwise.
+    The parameters one rule of a ruleset takes, validated for the
+    merge methods a `pull_request` rule allows and the checks a
+    `required_status_checks` rule requires, and kept as written otherwise.
+    """
+
+    allowed_merge_methods: tuple[MergeMethod, ...] = ()
+    """
+    The merge methods the rule allows, or none for a rule of another type.
     """
 
     required_status_checks: tuple[Status, ...] = ()
@@ -1016,12 +1025,12 @@ class Rule(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     One rule a ruleset holds its refs to.
     """
 
-    type: str
+    type: RuleType
     """
     The kind of rule, as the rulesets API names it.
     """
 
-    parameters: Parameters = Parameters()
+    parameters: Parameters = Field(default_factory=Parameters)
     """
     The parameters the rule takes, or none for a rule taking none.
     """
@@ -1033,7 +1042,7 @@ class Ruleset(Document, extra="forbid"):
     API takes for creating or updating a ruleset on a repository.
     """
 
-    bypass_actors: tuple[dict[str, JsonValue], ...]
+    bypass_actors: tuple[Actor, ...]
     """
     The actors who may bypass the ruleset.
     """
@@ -1043,9 +1052,9 @@ class Ruleset(Document, extra="forbid"):
     The refs the ruleset applies to, by the patterns they match.
     """
 
-    enforcement: str
+    enforcement: Enforcement
     """
-    Whether the ruleset is enforced, such as `active` or `disabled`.
+    Whether the ruleset is enforced.
     """
 
     name: str
@@ -1059,9 +1068,9 @@ class Ruleset(Document, extra="forbid"):
     The rules the ruleset holds its refs to.
     """
 
-    target: str
+    target: Target
     """
-    The kind of ref the ruleset applies to, such as `branch` or `tag`.
+    The kind of ref the ruleset applies to.
     """
 
     @property
@@ -1249,6 +1258,81 @@ class SquashTitle(StrEnum):
     PR_TITLE           = "PR_TITLE"
 
 
+class ActorType(StrEnum):
+    """
+    The kind of actor a ruleset lets bypass it, as `actor_type` names it.
+    """
+
+    DEPLOY_KEY         = "DeployKey"
+    INTEGRATION        = "Integration"
+    ORGANIZATION_ADMIN = "OrganizationAdmin"
+    REPOSITORY_ROLE    = "RepositoryRole"
+    TEAM               = "Team"
+    USER               = "User"
+
+
+class BypassMode(StrEnum):
+    """
+    When an actor may bypass a ruleset, as `bypass_mode` names it.
+    """
+
+    ALWAYS       = auto()
+    EXEMPT       = auto()
+    PULL_REQUEST = auto()
+
+
+class Enforcement(StrEnum):
+    """
+    Whether a ruleset is enforced, as `enforcement` names it.
+    """
+
+    ACTIVE   = auto()
+    DISABLED = auto()
+    EVALUATE = auto()
+
+
+class MergeMethod(StrEnum):
+    """
+    A way a pull request may merge, as `allowed_merge_methods` names it.
+    """
+
+    MERGE  = auto()
+    REBASE = auto()
+    SQUASH = auto()
+
+
+class RuleType(StrEnum):
+    """
+    The kind of rule a ruleset holds, as each rule's `type` names it.
+    """
+
+    BRANCH_NAME_PATTERN         = auto()
+    CODE_COVERAGE               = auto()
+    CODE_QUALITY                = auto()
+    CODE_SCANNING               = auto()
+    COMMIT_AUTHOR_EMAIL_PATTERN = auto()
+    COMMIT_MESSAGE_PATTERN      = auto()
+    COMMITTER_EMAIL_PATTERN     = auto()
+    COPILOT_CODE_REVIEW         = auto()
+    CREATION = auto()
+    DELETION = auto()
+    FILE_EXTENSION_RESTRICTION  = auto()
+    FILE_PATH_RESTRICTION       = auto()
+    LICENSE_COMPLIANCE_SCANNING = auto()
+    MAX_FILE_PATH_LENGTH        = auto()
+    MAX_FILE_SIZE               = auto()
+    MERGE_QUEUE                 = auto()
+    NON_FAST_FORWARD            = auto()
+    PULL_REQUEST                = auto()
+    REQUIRED_DEPLOYMENTS        = auto()
+    REQUIRED_LINEAR_HISTORY     = auto()
+    REQUIRED_SIGNATURES         = auto()
+    REQUIRED_STATUS_CHECKS      = auto()
+    TAG_NAME_PATTERN            = auto()
+    UPDATE    = auto()
+    WORKFLOWS = auto()
+
+
 class State(StrEnum):
     """
     Whether a security and analysis feature runs, as its `status` names it.
@@ -1256,3 +1340,36 @@ class State(StrEnum):
 
     DISABLED = auto()
     ENABLED  = auto()
+
+
+class Target(StrEnum):
+    """
+    The kind of ref a ruleset applies to, as `target` names it.
+    """
+
+    BRANCH = auto()
+    PUSH   = auto()
+    TAG    = auto()
+
+
+class Actor(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One actor who may bypass a ruleset.
+    """
+
+    actor_type: ActorType
+    """
+    The kind of actor.
+    """
+
+    actor_id: int | None = None
+    """
+    The id of the actor, or `None` for a kind of actor the rulesets API
+    names by its type alone.
+    """
+
+    bypass_mode: BypassMode = BypassMode.ALWAYS
+    """
+    When the actor may bypass the ruleset, which the rulesets API takes as
+    `always` where the file sets none.
+    """
