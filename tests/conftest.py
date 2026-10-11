@@ -44,16 +44,18 @@ def environment(
     tmp_path_factory : TempPathFactory
 ):
     """
-    Clears every shell variable `CLEARED` names, any of which would let the
-    machine running the suite change a result. Some set whether a console
-    prints color, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name the files a
-    GitHub Actions runner collects a workflow step's outputs and a workflow
-    run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT` name the
-    branch and the commit `gha:brief` prefers over the ones a case sets. The
-    rest name the folders where a tool keeps its cache, configuration, data,
-    and state, which the XDG convention defines. It then points `HOME` at an
-    empty folder the test owns, so a tool that falls back to `~` finds none
-    of the developer's files there.
+    Clears every shell variable `CLEARED` names, any of which would let
+    the machine running the suite change a result. Some set whether a
+    console prints color, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name
+    the files a GitHub Actions runner collects a workflow step's outputs and
+    a workflow run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT`
+    name the branch and the commit `gha:brief` prefers over the ones a case
+    sets. `CI`, which a GitHub Actions runner sets, and `MISE_YES` each
+    turn on mise's `yes` setting, which answers a task's `confirm` prompt
+    without asking. The rest name the folders where a tool keeps its cache,
+    configuration, data, and state, which the XDG convention defines. It
+    then points `HOME` at an empty folder the test owns, so a tool that
+    falls back to `~` finds none of the developer's files there.
 
     mise reads a configuration file out of every folder above the one
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
