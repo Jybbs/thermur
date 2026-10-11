@@ -81,9 +81,9 @@ def environment(
     without asking. The rest name the folders where a tool keeps its cache,
     configuration, data, and state, which the XDG convention defines. It
     also clears every variable opening on the `env_prefix` of `Settings`,
-    each of which sets the field it names. It then points `HOME` at an empty
-    folder the test owns, so a tool that falls back to `~` finds none of the
-    developer's files there.
+    which pydantic-settings matches to the field it names whatever its case.
+    It then points `HOME` at an empty folder the test owns, so a tool that
+    falls back to `~` finds none of the developer's files there.
 
     mise reads a configuration file out of every folder above the one
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
@@ -92,8 +92,11 @@ def environment(
     told to trust. The two `MISE_` variables name that file as one to skip
     and this checkout as one to trust, so a test can run mise over it.
     """
-    prefix = Settings.model_config["env_prefix"]
-    for name in [*CLEARED, *(name for name in environ if name.startswith(prefix))]:
+    prefix = Settings.model_config["env_prefix"].lower()
+    for name in [
+        *CLEARED,
+        *(name for name in environ if name.lower().startswith(prefix))
+    ]:
         monkeypatch.delenv(name, raising=False)
 
     settled = Path.home() / ".config" / "mise" / "config.toml"
