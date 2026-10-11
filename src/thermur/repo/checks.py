@@ -8,7 +8,6 @@ beside them.
 from collections            import Counter
 from collections.abc        import Iterator
 from filecmp                import cmp
-from functools              import cached_property
 from itertools              import product
 from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
@@ -219,6 +218,51 @@ class GateCheck(Check):
                 )
 
 
+class GuideCheck(Check):
+    """
+    The contributor guide's checks table lists each row of every workflow
+    running on a pull request under the name its check run takes, beside the
+    shortest command running the row's task, and lists no other check.
+    """
+
+    @property
+    def pairs(self) -> list[Parity]:
+        """
+        Pairs the command the guide gives each row's check with the shortest
+        command running the task the row runs.
+        """
+        guide    = self.checkout.guide
+        commands = {task.name: task.command for task in self.checkout.tasks}
+        return [
+            Parity(
+                copied   = guide.checks.get(name),
+                file     = guide.file,
+                label    = f"The command beside `{name}` in `{guide.file}`",
+                origin   = f"the shortest command running `{task}`",
+                original = commands.get(task, f"mise run {task}")
+            )
+            for _, name, task in self.checkout.checks
+        ]
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each check the guide lists that no row of a pull-request
+        workflow runs, then each row whose command the guide gives
+        otherwise.
+        """
+        guide = self.checkout.guide
+        run   = {name for _, name, _ in self.checkout.checks}
+        for name in guide.checks:
+            if name not in run:
+                yield Finding(
+                    file    = guide.file,
+                    message = f"`{guide.file}` lists `{name}`, a check no row of a "
+                    "pull-request workflow runs"
+                )
+
+        yield from super().scan()
+
+
 class ImageCheck(Check):
     """
     Every job runs on one runner image, so a reviewed bump moves the tools
@@ -306,25 +350,6 @@ class LabelCheck(Check):
     declares, and the guide describes each label as the registry does.
     """
 
-    @cached_property
-    def described(self) -> dict[str, str]:
-        """
-        Maps each label the contributor guide's table names to the
-        description beside it, the table running from its header to the
-        first blank line.
-        """
-        table = self.checkout.read(self.guide).partition(
-            "| **Label** | **Covers** |"
-        )[2]
-        return dict(findall(r"(?m)^\| `(.+?)` \| (.+) \|$", table.partition("\n\n")[0]))
-
-    @property
-    def guide(self) -> Path:
-        """
-        Names the contributor guide, relative to the root.
-        """
-        return Path(".github/CONTRIBUTING.md")
-
     @property
     def named(self) -> dict[Path, list[str]]:
         """
@@ -332,14 +357,14 @@ class LabelCheck(Check):
         it names them, meaning the release-notes categories, each issue
         template, and the contributor guide.
         """
-        release = self.checkout.release
+        guide, release = self.checkout.guide, self.checkout.release
         return (
             {release.file: release.names}
             | {
                 path: template.labels
                 for path, template in self.checkout.templates.items()
             }
-            | {self.guide: list(self.described)}
+            | {guide.file: list(guide.labels)}
         )
 
     @property
@@ -348,12 +373,12 @@ class LabelCheck(Check):
         Pairs the description the contributor guide gives each label with
         the one the registry declares.
         """
-        labels = self.checkout.labels
+        guide, labels = self.checkout.guide, self.checkout.labels
         return [
             Parity(
-                copied   = self.described.get(label.name),
-                file     = self.guide,
-                label    = f"The description of `{label.name}` in `{self.guide}`",
+                copied   = guide.labels.get(label.name),
+                file     = guide.file,
+                label    = f"The description of `{label.name}` in `{guide.file}`",
                 origin   = f"its description in `{labels.file}`",
                 original = label.description
             )

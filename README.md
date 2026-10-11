@@ -446,7 +446,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
+| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists to the rows of each pull-request workflow, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
 | `mise ci` | Runs `mise doctor project`, then every task a row of the pull-request workflows runs, the way the rows run them |
 | `mise labels` | Creates or updates every label `.github/labels.toml` declares on GitHub after a prompt, then lists each live label it omits |
 | `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
@@ -454,7 +454,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise scan` | Holds every package `uv.lock` and the lockfile beside each task script resolve to the published advisories through `uv audit` |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 
-[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) takes a contributor from a clone to a merged pull request and lists the labels each issue and pull request takes.
+[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) takes a contributor from a clone to a merged pull request, then sets out the code's style, the checks each pull request runs, and the labels each issue and pull request takes.
 
 ---
 
@@ -466,7 +466,7 @@ The repository holds the pinned toolchain and its tasks, the package the audit r
 thermur/
 ├── .github/
 │   ├── actions/provision/          # The composite every job installs mise and its tools through
-│   ├── CONTRIBUTING.md             # From a clone to a pull request, and the labels
+│   ├── CONTRIBUTING.md             # From a clone to a pull request, the style, the checks, and the labels
 │   ├── ISSUE_TEMPLATE/             # The spec and bug templates
 │   ├── labels.toml                 # Every label with its color and description
 │   ├── PULL_REQUEST_TEMPLATE.md    # The sections every pull request carries

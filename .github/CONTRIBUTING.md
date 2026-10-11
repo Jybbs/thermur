@@ -1,6 +1,6 @@
 # Contributing to Thermur
 
-Every change to *Thermur* starts from an issue, lands on a branch named for that issue, and reaches `main` through a pull request that Jybbs reviews and squash-merges. This guide follows that path from a fresh clone to a merged pull request and closes on the labels that sort each issue and pull request.
+Every change to *Thermur* starts from an issue, lands on a branch named for that issue, and reaches `main` through a pull request that Jybbs reviews and squash-merges. This guide follows that path from a fresh clone to a merged pull request, then sets out the style the code takes, the checks each pull request runs, and the labels that sort each issue and pull request.
 
 ## Setting Up the Clone
 
@@ -11,11 +11,30 @@ Every change to *Thermur* starts from an issue, lands on a branch named for that
 
 1. Open an issue through the [spec or bug template](https://github.com/Jybbs/thermur/issues/new/choose), naming what is wrong and what has to change, which Jybbs labels from the table under Labels below.
 2. Branch from `main` as `<issue>/<slug>`, the issue's number followed by at most three words from its title (*`12/seeded-trajectories`*).
-3. Write the change beside the tests that pin it, then run `mise format` and run `mise check`, `mise test`, and `mise audit` until each passes. After editing `pyproject.toml` or `.mise/config.toml`, run `mise relock`, so the lockfile it rewrites lands in the same commit.
+3. Write the change beside the tests that pin it, then run `mise format` and run `mise ci`, which runs every check under [Checks](#checks) below, until it passes. After editing `pyproject.toml` or `.mise/config.toml`, run `mise relock`, so the lockfile it rewrites lands in the same commit.
 4. Commit in the form `type(scope): description`, its type one of `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`, and its scope the part of the package the commit touches (*`cli`, `config`, `controller`, `environment`, `metrics`*) or `docs`, `build`, or `ci`.
 5. Open a pull request titled `[<issue>] <the issue's title>`, filling in the sections its template carries, whose Related Issues line closes the issue on merge.
 
 Jybbs squash-merges each pull request into one commit on `main` titled after the pull request, which is why the title rather than any commit on the branch carries the issue's number.
+
+## Code Style
+
+[*Prose*](https://prose.fyi) settles the style of the Python under `.mise/tasks`, `src`, and `tests` from the one `[tool.prose]` table in `pyproject.toml`. `mise format` rewrites the source to that style, and `mise check` reports every rewrite the formatter would make beside every lint finding. A lint finding is fixed in the source or held out with `# prose: ignore[<rule>]` on the line it anchors on, which silences that one rule on that one line. A `# prose: skip` trailing the opening line of a construct keeps a layout or a place among its siblings that the formatter would rewrite, and silences no lint finding.
+
+## Checks
+
+Every pull request runs `🐦‍⬛ CI`, whose rows each run one task, so the command beside each check below runs the same task on a laptop:
+
+| **Check** | **Runs Locally** | **Fails When** |
+|---|---|---|
+| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, or the lockfile beside a task script drifts from its manifest |
+| `⛈️ Advisories` | `mise scan` | A package `uv.lock` or a task script's lockfile resolves carries a published advisory, or the advisory service cannot be reached |
+| `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the changed line |
+| `☂️ Coverage` | `mise coverage` | A test fails under coverage |
+| `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` finds a file disagreeing with what it restates, such as this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
+| `🗝️ Workflows` | `mise vet` | [zizmor](https://docs.zizmor.sh/) finds a hazard in a workflow or the composite action, such as template injection, an unpinned action, an over-broad permission, checkout credentials left on disk, or a cache a privileged job restores |
+
+`📡 Readout` waits on every row and fails where any of them fails, so it is the one check a pull request has to pass, and `mise ci` runs every row's task once `mise doctor project` passes.
 
 ## Labels
 

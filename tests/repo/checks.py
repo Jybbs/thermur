@@ -17,6 +17,7 @@ from thermur.repo.checks   import (
     Check,
     CommitCheck,
     GateCheck,
+    GuideCheck,
     ImageCheck,
     KitCheck,
     LabelCheck,
@@ -305,23 +306,25 @@ def test_a_gate_running_under_a_bare_always_passes(checkout: Checkout):
     assert GateCheck(checkout=checkout).findings == []
 
 
-def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
+def test_a_guide_without_its_checks_table_lists_no_check(checkout: Checkout):
     """
-    Asserts that a contributor guide whose label table loses its header
-    reads as describing no label, so every label the registry declares is
+    Asserts that a contributor guide whose checks table loses its header
+    reads as listing no check, so every row of a pull-request workflow is
     named as missing from it.
     """
     edit(
         checkout,
         ".github/CONTRIBUTING.md",
-        new = "| **Name** | **Covers** |",
-        old = "| **Label** | **Covers** |"
+        new = "| **Name** | **Runs Locally** |",
+        old = "| **Check** | **Runs Locally** |"
     )
 
-    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
-        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
-        f"where its description in `.github/labels.toml` reads `{label.description}`"
-        for label in checkout.labels.rows
+    commands = {task.name: task.command for task in checkout.tasks}
+
+    assert [finding.message for finding in GuideCheck(checkout=checkout).findings] == [
+        f"The command beside `{name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where the shortest command running `{task}` reads `{commands[task]}`"
+        for _, name, task in checkout.checks
     ]
 
 
@@ -371,20 +374,24 @@ def test_a_script_is_named_where_its_module_is_not_carried(
     ] * named
 
 
-def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
+def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
     """
-    Asserts that an exact pin naming hatchling in another spelling its
-    normalized name allows passes, since a package's name compares case
-    insensitively.
+    Asserts that a contributor guide whose label table loses its header
+    reads as describing no label, so every label the registry declares is
+    named as missing from it.
     """
     edit(
         checkout,
-        "pyproject.toml",
-        new = '"Hatchling==1.32.4"',
-        old = '"hatchling==1.32.4"'
+        ".github/CONTRIBUTING.md",
+        new = "| **Name** | **Covers** |",
+        old = "| **Label** | **Covers** |"
     )
 
-    assert PinCheck(checkout=checkout).findings == []
+    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
+        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where its description in `.github/labels.toml` reads `{label.description}`"
+        for label in checkout.labels.rows
+    ]
 
 
 @mark.parametrize(
@@ -585,6 +592,22 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     ]
 
 
+def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
+    """
+    Asserts that an exact pin naming hatchling in another spelling its
+    normalized name allows passes, since a package's name compares case
+    insensitively.
+    """
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"Hatchling==1.32.4"',
+        old = '"hatchling==1.32.4"'
+    )
+
+    assert PinCheck(checkout=checkout).findings == []
+
+
 def test_a_job_on_a_second_runner_image_is_named(checkout: Checkout):
     """
     Asserts that each job running on an image other than the first job's is
@@ -636,21 +659,6 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
     ]
 
 
-def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
-    checkout    : Checkout,
-    monkeypatch : MonkeyPatch
-):
-    """
-    Asserts that a problem `mise tasks validate` reports on a task no file
-    of the checkout declares, such as one a global configuration adds, makes
-    no finding.
-    """
-    outside = Issue(message="m", severity=Level.ERROR, task="global:task")
-    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
-
-    assert TaskCheck(checkout=checkout).findings == []
-
-
 @mark.parametrize(
     ("old", "new", "message"),
     [
@@ -694,6 +702,21 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
+def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a problem `mise tasks validate` reports on a task no file
+    of the checkout declares, such as one a global configuration adds, makes
+    no finding.
+    """
+    outside = Issue(message="m", severity=Level.ERROR, task="global:task")
+    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
+
+    assert TaskCheck(checkout=checkout).findings == []
+
+
 def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
     """
     Asserts that a program under `.mise/bin/` is held to `--exact --locked`
@@ -720,26 +743,6 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
 
     assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
-
-
-def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
-    """
-    Asserts that renaming a label in the registry alone names the
-    release-notes categories, the bug and spec templates in that order, and
-    the guide, each still naming the old label, then the new label filed
-    under no category and missing from the guide.
-    """
-    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
-    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
-
-    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
-        Path(".github/release.yml"),
-        Path(".github/ISSUE_TEMPLATE/bug.md"),
-        Path(".github/ISSUE_TEMPLATE/spec.md"),
-        Path(".github/CONTRIBUTING.md"),
-        Path(".github/release.yml"),
-        Path(".github/CONTRIBUTING.md")
-    ]
 
 
 @mark.parametrize(
@@ -795,18 +798,24 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
+def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
     """
-    Asserts that a problem `mise tasks validate` reports on a task, here
-    an alias two tasks share, is named on the file holding the task at the
-    severity mise reports.
+    Asserts that renaming a label in the registry alone names the
+    release-notes categories, the bug and spec templates in that order, and
+    the guide, each still naming the old label, then the new label filed
+    under no category and missing from the guide.
     """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
+    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
 
-    assert [
-        (finding.file, finding.level)
-        for finding in TaskCheck(checkout=checkout).findings
-    ] == [(path, Level.ERROR)]
+    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
+        Path(".github/release.yml"),
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md"),
+        Path(".github/CONTRIBUTING.md"),
+        Path(".github/release.yml"),
+        Path(".github/CONTRIBUTING.md")
+    ]
 
 
 @mark.parametrize(
@@ -976,20 +985,18 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
     """
-    Asserts that a Markdown template opening on no front matter is named on
-    its file rather than read as naming no label.
+    Asserts that a problem `mise tasks validate` reports on a task, here
+    an alias two tasks share, is named on the file holding the task at the
+    severity mise reports.
     """
-    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
 
-    assert LabelCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
-            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
-            "front matter"
-        )
-    ]
+    assert [
+        (finding.file, finding.level)
+        for finding in TaskCheck(checkout=checkout).findings
+    ] == [(path, Level.ERROR)]
 
 
 @mark.parametrize(
@@ -1075,6 +1082,22 @@ def test_a_cache_key_ending_on_anything_but_its_hash_is_named(
     ]
 
 
+def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+    """
+    Asserts that a Markdown template opening on no front matter is named on
+    its file rather than read as naming no label.
+    """
+    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
+            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
+            "front matter"
+        )
+    ]
+
+
 def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
     """
     Asserts that a `tools` input a step passes an action other than a
@@ -1108,21 +1131,6 @@ def test_a_validation_error_outside_the_documents_is_raised(
 
     with raises(ValidationError):
         RunCheck(checkout=checkout).findings
-
-
-def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
-    """
-    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
-    is reported as one finding on that workflow, whose error names no field.
-    """
-    (checkout.root / CI).write_text("name: one\nname: two\n")
-
-    assert GateCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(CI),
-            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
-        )
-    ]
 
 
 @mark.parametrize(
@@ -1381,6 +1389,21 @@ def test_a_moved_manifest_declaration_names_every_copy(
     ]
 
 
+def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
+    """
+    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
+    is reported as one finding on that workflow, whose error names no field.
+    """
+    (checkout.root / CI).write_text("name: one\nname: two\n")
+
+    assert GateCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(CI),
+            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
+        )
+    ]
+
+
 def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
     """
     Asserts that a step pinning an action to a commit other than the one
@@ -1401,27 +1424,6 @@ def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
             message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
             f"the pin on it in `{ACTION}` reads "
             "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
-        )
-    ]
-
-
-def test_an_undeclared_input_to_a_composite_action_is_named(checkout: Checkout):
-    """
-    Asserts that a step passing a composite action an input its manifest
-    does not declare is named on the workflow holding the step.
-    """
-    edit(
-        checkout = checkout,
-        new      = "with : { cache: 'false', tools: *package }",
-        old      = "with : { tools: *package }",
-        path     = CI
-    )
-
-    assert ProvisionCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(CI),
-            message = f"`{CI}` passes `$/.github/actions/provision` the input `cache`, "
-            f"which `{ACTION}` does not declare"
         )
     ]
 
@@ -1522,3 +1524,96 @@ def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
     edit(checkout, "CITATION.cff", new=new, old=old)
 
     assert ParityCheck(checkout=checkout).findings == []
+
+
+@mark.parametrize(
+    ("path", "old", "new", "messages"),
+    [
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🪵 Lockfiles` | `mise lockfile` |",
+            "| `🪵 Lockfiles` | `mise run lock:check` |",
+            [
+                "The command beside `🪵 Lockfiles` in `.github/CONTRIBUTING.md` reads "
+                "`mise run lock:check`, where the shortest command running "
+                "`lock:check` reads `mise lockfile`"
+            ],
+            id = "command"
+        ),
+        param(
+            CI,
+            "name  : 🪵 Lockfiles",
+            "name  : 🪵 Locks",
+            [
+                "`.github/CONTRIBUTING.md` lists `🪵 Lockfiles`, a check no row of a "
+                "pull-request workflow runs",
+                "The command beside `🪵 Locks` in `.github/CONTRIBUTING.md` is "
+                "missing, where the shortest command running `lock:check` reads "
+                "`mise lockfile`"
+            ],
+            id = "renamed-row"
+        ),
+        param(
+            CI,
+            "task  : repo:vet",
+            "task  : gha:brief",
+            [
+                "The command beside `🗝️ Workflows` in `.github/CONTRIBUTING.md` "
+                "reads `mise vet`, where the shortest command running `gha:brief` "
+                "reads `mise run gha:brief`"
+            ],
+            id = "task-without-alias"
+        ),
+        param(
+            CI,
+            "task  : repo:vet",
+            "task  : repo:gone",
+            [
+                "The command beside `🗝️ Workflows` in `.github/CONTRIBUTING.md` "
+                "reads `mise vet`, where the shortest command running `repo:gone` "
+                "reads `mise run repo:gone`"
+            ],
+            id = "unlisted-task"
+        )
+    ]
+)
+def test_a_guide_out_of_step_with_the_rows_is_named(
+    checkout : Checkout,
+    messages : list[str],
+    new      : str,
+    old      : str,
+    path     : str
+):
+    """
+    Asserts that the contributor guide giving a row's check another command
+    than the shortest one running its task, whether or not mise lists that
+    task or it declares an alias, and the guide listing a check no row runs
+    while leaving out one a row does, are each named on the guide.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert GuideCheck(checkout=checkout).findings == [
+        Finding(file=Path(".github/CONTRIBUTING.md"), message=message)
+        for message in messages
+    ]
+
+
+def test_an_undeclared_input_to_a_composite_action_is_named(checkout: Checkout):
+    """
+    Asserts that a step passing a composite action an input its manifest
+    does not declare is named on the workflow holding the step.
+    """
+    edit(
+        checkout = checkout,
+        new      = "with : { cache: 'false', tools: *package }",
+        old      = "with : { tools: *package }",
+        path     = CI
+    )
+
+    assert ProvisionCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(CI),
+            message = f"`{CI}` passes `$/.github/actions/provision` the input `cache`, "
+            f"which `{ACTION}` does not declare"
+        )
+    ]

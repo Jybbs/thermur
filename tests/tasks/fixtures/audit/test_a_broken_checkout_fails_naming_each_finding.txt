@@ -2,6 +2,7 @@
 ::error file=.mise/bin/pytest::`.mise/bin/pytest` is a symlink rather than a copy
 ::error file=.github/workflows/draft.yml::The pin on `actions/checkout` in `.github/workflows/draft.yml` reads `0f0f`, where the pin on it in `.github/actions/provision/action.yml` reads `3d3c42e5aac5ba805825da76410c181273ba90b1`
 ::error file=.github/workflows/ci.yml::The `gate` job in `.github/workflows/ci.yml` sets no name
+::error file=.github/CONTRIBUTING.md::The command beside `⛈️ Advisories` in `.github/CONTRIBUTING.md` reads `mise run lock:scan`, where the shortest command running `lock:scan` reads `mise scan`
 ::error file=.github/workflows/warm.yml::The runner image of the `kit` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
 ::error file=.github/workflows/warm.yml::The runner image of the `prune` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
 ::error file=.github/workflows/warm.yml::The runner image of the `gate` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`

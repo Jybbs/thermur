@@ -1,13 +1,15 @@
 """
-Pins what `Checkout` lists for the checks, meaning the tasks mise lists for
-the clone, the programs on its path, the tasks its pull-request rows run,
-the steps its workflows and composite actions run, and its issue templates.
+Pins what `Checkout` lists for the checks, meaning the tasks mise lists
+for the clone, the programs on its path, the check run and the task of each
+pull-request row, the steps its workflows and composite actions run, and its
+issue templates.
 """
 
 from common.edits import append, task
 from os           import X_OK, access, pathsep
 from pathlib      import Path
 from pytest       import MonkeyPatch, TempPathFactory, mark, param
+from re           import findall
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
@@ -41,28 +43,33 @@ def test_a_listing_leaves_out_a_dotfile(
     assert list(getattr(checkout, member)) == [Path(folder, name) for name in names]
 
 
-def test_rows_lists_the_tasks_of_pull_request_workflows_alone(checkout: Checkout):
+def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkout):
     """
-    Asserts that the rows are the tasks the matrix rows of each workflow
-    running on a pull request name, in the order they declare them, leaving
-    out a row of a workflow running only on a push and a row naming no task.
+    Asserts that the checks are the matrix rows of each workflow running on
+    a pull request, each as the workflow's path, the name of its check run,
+    and its task, and the rows are those tasks, both in the order the rows
+    are declared, leaving out a row of a workflow running only on a push and
+    a row naming no task.
     """
     folder = checkout.root / ".github/workflows"
     for path in folder.iterdir():
         path.unlink()
 
     matrix = (
-        "jobs:\n  a:\n    runs-on: x\n    strategy:\n      matrix:\n"
-        "        include:\n"
+        "jobs:\n  a:\n    name: ${{ matrix.name }}\n    runs-on: x\n"
+        "    strategy:\n      matrix:\n        include:\n"
     )
     (folder / "pull.yml").write_text(
         f"name: pull\non:\n  pull_request:\n{matrix}"
-        "          - task: b:two\n          - task: a:one\n          - tools: x\n"
+        "          - { name: B, task: b:two }\n          - { name: A, task: a:one }\n"
+        "          - { name: K, tools: x }\n"
     )
     (folder / "push.yml").write_text(
-        f"name: push\non:\n  push:\n{matrix}          - task: c:three\n"
+        f"name: push\non:\n  push:\n{matrix}          - {{ name: C, task: c:three }}\n"
     )
+    pull = Path(".github/workflows/pull.yml")
 
+    assert checkout.checks == [(pull, "B", "b:two"), (pull, "A", "a:one")]
     assert checkout.rows == ["b:two", "a:one"]
 
 
@@ -142,7 +149,8 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
     """
     Asserts that each executable file under `.mise/tasks/` reads as a task
     held in that file and declared there, at the path mise resolves, named
-    for its folder and its stem.
+    for its folder and its stem, beside the alias its `MISE alias` line
+    declares.
     """
     folder = checkout.root / ".mise/tasks"
     files  = {path for path in folder.rglob("*") if path.is_file() and access(
@@ -152,6 +160,9 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
 
     assert set(checkout.tasks) == {
         Task(
+            aliases = tuple(
+                findall(r'(?m)^# ?MISE alias *= "([^"]+)"', path.read_text())
+            ),
             file   = path,
             name   = ":".join(path.relative_to(folder).with_suffix("").parts),
             run    = (),

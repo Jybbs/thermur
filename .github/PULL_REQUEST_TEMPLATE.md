@@ -1,10 +1,10 @@
-### 🔥 Quick Summary
+### 🐦‍⬛ Quick Summary
 
 <!-- Two or three sentences naming what the pull request delivers, opening on the verb the issue's title opens on wherever that verb fits. -->
 
 ---
 
-### 🐦‍⬛ Key Changes
+### 🔥 Key Changes
 
 <!-- One bullet per change someone outside the diff notices, each a sentence in the present tense naming what changed, where it lives, and what a reader notices, with the bullets a blank line apart. -->
 

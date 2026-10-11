@@ -63,6 +63,12 @@ def test_a_broken_checkout_fails_naming_each_finding(
     (root / "src/thermur/repo").rename(root / "repo")
     edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
     edit(checkout, ".github/release.yml", new='["🐛 bug"]', old='["🐞 bug"]')
+    edit(
+        checkout,
+        ".github/CONTRIBUTING.md",
+        new = "`mise run lock:scan`",
+        old = "`mise scan`"
+    )
     edit(checkout, action, new="default     : &depth '1'", old="default     : '1'")
     edit(checkout, action, new="default     : *depth", old="default     : 'false'")
     edit(checkout, ".github/workflows/ci.yml", new="", old="    name    : 📡 Readout\n")

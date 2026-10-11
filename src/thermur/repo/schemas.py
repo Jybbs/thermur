@@ -7,6 +7,7 @@ Holds the records the repository audit reads and reports:
   `Step`, and `Trigger` rows, each composite `Action`, the `Release` with
   its `Category` rows, each issue `Template`, and the `Citation` with its
   `Person` rows out of the YAML
+- The `Guide` with the tables the contributor guide holds
 - Each `Task` mise lists and each `Issue` mise reports on one
 - Each `Finding` a check makes at its `Level`, and each `Parity` a check
   compares
@@ -15,6 +16,7 @@ Holds the records the repository audit reads and reports:
 from collections     import Counter
 from collections.abc import Iterable, Sequence
 from enum            import StrEnum, auto
+from itertools       import cycle
 from operator        import attrgetter
 from packaging.requirements import Requirement
 from pathlib                import Path, PurePosixPath
@@ -30,9 +32,9 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re      import fullmatch, search
+from re      import findall, fullmatch, search, sub
 from tomllib import loads
-from typing  import Annotated, Self
+from typing  import Annotated, ClassVar, Self
 from yaml_rs import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
@@ -58,6 +60,17 @@ def read_labels(labels: str | list[str]) -> list[str]:
         return list(filter(None, map(str.strip, labels.split(","))))
 
     return labels
+
+
+class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One author `[project].authors` names.
+    """
+
+    name: str
+    """
+    The author's name as a copyright line gives it.
+    """
 
 
 def read_minor(version: str) -> str:
@@ -88,17 +101,6 @@ def read_versions(packages: Iterable[dict]) -> dict[str, str]:
     Maps each package `uv.lock` resolves to the version it resolves.
     """
     return {package["name"]: package["version"] for package in packages}
-
-
-class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
-    """
-    One author `[project].authors` names.
-    """
-
-    name: str
-    """
-    The author's name as a copyright line gives it.
-    """
 
 
 class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
@@ -185,6 +187,39 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
                 str(path),
                 error.errors()
             ) from None
+
+
+class Guide(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The tables `.github/CONTRIBUTING.md` holds, each empty where the guide
+    carries no table under its header.
+    """
+
+    file: ClassVar[Path] = Path(".github/CONTRIBUTING.md")
+
+    checks: dict[str, str]
+    """
+    The command the checks table gives each check for a laptop, by the
+    name of the check.
+    """
+
+    labels: dict[str, str]
+    """
+    The description the labels table gives each label, by the label's
+    name.
+    """
+
+    @classmethod
+    def read(cls, root: Path) -> Self:
+        """
+        Reads the checks table and the labels table out of the guide under
+        `root`.
+        """
+        text = (root / cls.file).read_text(encoding="utf-8")
+        return cls(
+            checks = read_table("**Check**", text),
+            labels = read_table("**Label**", text)
+        )
 
 
 class Config(Document, title=".mise/config.toml"):
@@ -490,6 +525,20 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     The file declaring the task, as mise resolves it.
     """
 
+    aliases: tuple[str, ...] = ()
+    """
+    The other names a reader runs the task by, in the order the task
+    declares them.
+    """
+
+    @property
+    def command(self) -> str:
+        """
+        Writes the shortest command running the task, `mise` and its first
+        alias where it declares one and `mise run` and its name otherwise.
+        """
+        return f"mise {self.aliases[0]}" if self.aliases else f"mise run {self.name}"
+
     @property
     def dependencies(self) -> list[Requirement]:
         """
@@ -594,11 +643,18 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
         )
 
     @property
-    def tasks(self) -> list[str]:
+    def checks(self) -> list[tuple[str, str]]:
         """
-        Lists the task each row runs, for a row naming one under `task`.
+        Pairs the name each row's check run takes with the task the row
+        runs, for a row naming one under `task`, reading the name through a
+        `${{ matrix.<key> }}` expression in the job's `name` and as written
+        for every row where `name` holds none.
         """
-        return [row["task"] for row in self.rows if "task" in row]
+        return [
+            (name, row["task"])
+            for name, row in zip(cycle(self.expand(self.name)), self.rows)
+            if "task" in row
+        ]
 
     def expand(self, value: str) -> list[str]:
         """
@@ -638,6 +694,14 @@ class Workflow(Document):
     """
 
     @property
+    def checks(self) -> list[tuple[str, str]]:
+        """
+        Pairs the name each row of each job gives its check run with the
+        task the row runs.
+        """
+        return [check for job in self.jobs.values() for check in job.checks]
+
+    @property
     def gate(self) -> Job | None:
         """
         Reads the job under the key `gate`, which the workflow ends on, or
@@ -652,13 +716,6 @@ class Workflow(Document):
         for.
         """
         return {key: job for key, job in self.jobs.items() if key != "gate"}
-
-    @property
-    def tasks(self) -> list[str]:
-        """
-        Lists the task each row of each job runs.
-        """
-        return [task for job in self.jobs.values() for task in job.tasks]
 
     def pushes(self, file: str) -> bool:
         """
@@ -965,3 +1022,17 @@ def join_names(names: Sequence[str]) -> str:
         return " and ".join(names)
 
     return f"{', '.join(names[:-1])}, and {names[-1]}"
+
+
+def read_table(header: str, text: str) -> dict[str, str]:
+    """
+    Maps the first cell of each row of the Markdown table in `text` whose
+    header row opens on the cell `header` to the row's second cell, reading
+    a cell filled by one code span without its backticks, the table running
+    from the row under its divider to the first blank line.
+    """
+    body = text.partition(f"\n| {header} |")[2].partition("\n\n")[0]
+    return dict(
+        [sub(r"^`([^`]*)`$", r"\1", cell) for cell in row]
+        for row in findall(r"(?m)^\| (.+?) \| (.+?) \|", body)
+    )

@@ -2,7 +2,7 @@
 Holds `Checkout`, the clone the repository audit reads, which keeps each
 document it validates for every later check that reads it and lists the
 tasks, the programs, the workflows, the composite actions, and the issue
-templates the clone holds.
+templates the clone holds, beside the checks each pull request runs.
 """
 
 from functools  import cached_property
@@ -13,7 +13,7 @@ from subprocess import check_output, run
 from typing     import Annotated
 
 from thermur.repo.schemas import (
-    Action, Citation, Config, Issue, Job, Labels, Lock, Manifest, Release, Step, Task, Template, Workflow
+    Action, Citation, Config, Guide, Issue, Job, Labels, Lock, Manifest, Release, Step, Task, Template, Workflow
 )
 
 
@@ -42,6 +42,21 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             for path in self.glob(".github/actions/*/action.y*ml")
         }
 
+    @property
+    def checks(self) -> list[tuple[Path, str, str]]:
+        """
+        Lists each row of each workflow running on a pull request as the
+        workflow's path, the name the row's check run takes, and the task
+        the row runs, in the order the workflows and their rows declare
+        them.
+        """
+        return [
+            (path, name, task)
+            for path, workflow in self.workflows.items()
+            if "pull_request" in workflow.events
+            for name, task in workflow.checks
+        ]
+
     @cached_property
     def citation(self) -> Citation:
         """
@@ -63,6 +78,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
+
+    @cached_property
+    def guide(self) -> Guide:
+        """
+        Reads the tables of `.github/CONTRIBUTING.md`.
+        """
+        return Guide.read(self.root)
 
     @cached_property
     def issues(self) -> list[Issue]:
@@ -142,12 +164,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Lists the task each row of each workflow running on a pull request
         runs, in the order the workflows and their rows declare them.
         """
-        return [
-            task
-            for workflow in self.workflows.values()
-            if "pull_request" in workflow.events
-            for task in workflow.tasks
-        ]
+        return [task for *_, task in self.checks]
 
     @cached_property
     def scripts(self) -> list[Path]:
