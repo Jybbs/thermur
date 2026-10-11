@@ -81,7 +81,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     @cached_property
     def guide(self) -> Guide:
         """
-        Reads the tables of `.github/CONTRIBUTING.md`.
+        Validates the tables of `.github/CONTRIBUTING.md`.
         """
         return Guide.read(self.root)
 

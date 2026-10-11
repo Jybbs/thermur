@@ -19,7 +19,7 @@ Jybbs squash-merges each pull request into one commit on `main` titled after the
 
 ## Code Style
 
-[*Prose*](https://prose.fyi) settles the style of the Python under `.mise/tasks`, `src`, and `tests` from the one `[tool.prose]` table in `pyproject.toml`. `mise format` rewrites the source to that style, and `mise check` reports every rewrite the formatter would make beside every lint finding. A lint finding is fixed in the source or held out with `# prose: ignore[<rule>]` on the line it anchors on, which silences that one rule on that one line. A `# prose: skip` trailing the opening line of a construct keeps the line breaks the formatter would reflow there and the construct's place among its siblings, while the lines inside it still take the formatter's other rewrites, and it silences no lint finding.
+[*Prose*](https://prose.fyi) settles the style of the Python under `.mise/tasks`, `src`, and `tests` from the one `[tool.prose]` table in `pyproject.toml`. `mise format` rewrites the source to that style, and `mise check` reports every rewrite the formatter would make beside every lint finding. A lint finding is fixed in the source or held out with `# prose: ignore[<rule>]` on the line it anchors on, which silences that one rule on that one line. A `# prose: skip` trailing the opening line of a construct keeps the line breaks the formatter would reflow there and the construct's place among its siblings, while the lines inside it still take the formatter's other rewrites. The marker silences no lint finding.
 
 ## Checks
 

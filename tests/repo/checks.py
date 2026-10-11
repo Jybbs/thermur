@@ -1595,7 +1595,7 @@ def test_a_guide_out_of_step_with_the_rows_is_named(
     path     : str
 ):
     """
-    Asserts that the contributor guide giving a row's check another command
+    Asserts that the contributor guide giving a row's check a command other
     than the one running its task, whether or not mise lists that task or it
     declares an alias, the guide listing a check no row runs while leaving
     out one a row does, and the guide listing one check in two rows are each

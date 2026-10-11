@@ -44,14 +44,15 @@ WORKFLOW = "name: w\non:\n  push:\njobs:\n  a:\n    runs-on: x\n"
 
 def test_a_guide_listing_a_name_in_two_rows_fails_under_its_path(tmp_path: Path):
     """
-    Asserts that a guide whose table lists one name in two rows fails
-    validation at that table, under an error titled with the guide's path,
-    rather than keeping whichever row comes last.
+    Asserts that a guide whose table lists each of two names in two rows
+    fails validation at that table, naming both under an error titled with
+    the guide's path, rather than keeping whichever row comes last.
     """
     (tmp_path / ".github").mkdir()
     (tmp_path / ".github/CONTRIBUTING.md").write_text(
         "Intro.\n\n| **Label** | **Covers** |\n|---|---|\n"
-        "| `🐞 bug` | Stale |\n| `🐞 bug` | Wrong output |\n"
+        "| `🐞 bug` | Stale |\n| `🦜 cli` | Old |\n"
+        "| `🐞 bug` | Wrong output |\n| `🦜 cli` | The command line |\n"
     )
 
     with raises(ValidationError) as error:
@@ -59,7 +60,7 @@ def test_a_guide_listing_a_name_in_two_rows_fails_under_its_path(tmp_path: Path)
 
     assert error.value.title == ".github/CONTRIBUTING.md"
     assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
-        (("labels",), "Value error, lists `🐞 bug` in more than one row")
+        (("labels",), "Value error, lists `🐞 bug` and `🦜 cli` in more than one row")
     ]
 
 
@@ -147,7 +148,7 @@ def test_a_parity_names_a_copy_that_drifts(copied: str | None, finding: Finding 
         for document in Document.__subclasses__()
         if "title" in document.model_config
         for name, info in document.model_fields.items()
-        if info.is_required()
+        if info.is_required() and info.validation_alias
     ]
 )
 def test_each_required_field_reads_the_key_its_alias_names(

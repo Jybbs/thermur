@@ -6,8 +6,8 @@ Holds the records the repository audit reads and reports:
   rows, and the `Lock` out of the TOML, and each `Workflow` with its `Job`,
   `Step`, and `Trigger` rows, each composite `Action`, the `Release` with
   its `Category` rows, each issue `Template`, and the `Citation` with its
-  `Person` rows out of the YAML
-- The `Guide` with the tables the contributor guide holds
+  `Person` rows out of the YAML, and the `Guide` out of the contributor
+  guide's tables
 - Each `Task` mise lists and each `Issue` mise reports on one
 - Each `Finding` a check makes at its `Level`, and each `Parity` a check
   compares
@@ -135,9 +135,9 @@ class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
 
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    A TOML or YAML file of the checkout, validated from its text into the
-    fields the checks read, whose validation error carries the file's path
-    from the root as its title.
+    A file of the checkout, validated from its text into the fields the
+    checks read, whose validation error carries the file's path from the
+    root as its title.
     """
 
     @property
@@ -763,17 +763,10 @@ class Workflow(Document):
         )
 
 
-class Guide(
-    BaseModel,
-    extra                    = "forbid",
-    frozen                   = True,
-    title                    = ".github/CONTRIBUTING.md",
-    use_attribute_docstrings = True
-):
+class Guide(Document, extra="forbid", title=".github/CONTRIBUTING.md"):
     """
     The tables `.github/CONTRIBUTING.md` holds, each empty where the guide
-    carries no table under its header, whose validation error carries the
-    guide's path from the root as its title.
+    carries no table under its header.
     """
 
     checks: Annotated[dict[str, str], BeforeValidator(read_rows)]
@@ -788,30 +781,16 @@ class Guide(
     name.
     """
 
-    @property
-    def file(self) -> Path:
+    @staticmethod
+    def load(suffix: str, text: str) -> dict[str, list[tuple[str, str]]]:
         """
-        Reads the path of the guide, relative to the root, out of its title.
+        Reads the rows of the checks table and of the labels table out of
+        the guide's text, whatever its suffix.
         """
-        return Path(self.model_config["title"])
-
-    @classmethod
-    def read(cls, root: Path) -> Self:
-        """
-        Validates the checks table and the labels table out of the guide
-        under `root`.
-
-        Raises:
-            ValidationError: Titled with the guide's path, where a table
-                             lists one name in more than one row.
-        """
-        text = (root / cls.model_config["title"]).read_text(encoding="utf-8")
-        return cls.model_validate(
-            {
-                "checks" : read_table("**Check**", text),
-                "labels" : read_table("**Label**", text)
-            }
-        )
+        return {
+            "checks" : read_table("**Check**", text),
+            "labels" : read_table("**Label**", text)
+        }
 
 
 class Labels(Document, extra="forbid", title=".github/labels.toml"):
@@ -1060,7 +1039,7 @@ def join_names(names: Sequence[str]) -> str:
     return f"{', '.join(names[:-1])}, and {names[-1]}"
 
 
-def read_table(header: str, text: str) -> list[tuple[str, ...]]:
+def read_table(header: str, text: str) -> list[tuple[str, str]]:
     """
     Reads the first two cells of each row of the Markdown table in `text`
     whose header row opens on the cell `header`, reading a cell filled by
