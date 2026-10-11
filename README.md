@@ -446,9 +446,10 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists, and the command beside each, to the rows of each pull-request workflow and the tasks they run, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
+| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists, and the command beside each, to the rows of each pull-request workflow and the tasks they run, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every check a ruleset requires to the gate a pull-request workflow ends on, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
 | `mise ci` | Runs `mise doctor project`, then every task a row of the pull-request workflows runs, the way the rows run them |
 | `mise labels` | Creates or updates every label `.github/labels.toml` declares on GitHub after a prompt, then lists each live label it omits |
+| `mise rulesets` | Applies the rulesets under `.github/rulesets/` and every setting `.github/settings.toml` declares to GitHub after a prompt, beside the description and the topics `pyproject.toml` declares, and lists each live ruleset no file names |
 | `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
 | `mise relock` | Re-resolves every lockfile after its manifest changes |
 | `mise scan` | Holds every package `uv.lock` and the lockfile beside each task script resolve to the published advisories through `uv audit` |
@@ -471,7 +472,9 @@ thermur/
 │   ├── labels.toml                 # Every label with its color and description
 │   ├── PULL_REQUEST_TEMPLATE.md    # The sections every pull request carries
 │   ├── release.yml                 # The release-notes category each label files under
+│   ├── rulesets/                   # The protection on main and on every tag, which mise rulesets applies
 │   ├── scripts/summaries/          # The template each workflow's gate writes its summary from
+│   ├── settings.toml               # Every repository setting no ruleset carries
 │   └── workflows/                  # 🐦‍⬛ CI on every pull request, and 🐦‍⬛ Draft and 🐦‍⬛ Warm on main
 │
 ├── .mise/
@@ -488,7 +491,7 @@ thermur/
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
-├── src/thermur/repo/               # The checks `mise audit` runs
+├── src/thermur/repo/               # The checks `mise audit` runs and the records `mise rulesets` sends
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads

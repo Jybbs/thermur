@@ -5,7 +5,18 @@ requires      = ["hatchling==1.32.4"]
 [project]
 authors         = [{ name = "James Parkington" }]
 dependencies    = ["packaging", "pydantic", "pyyaml", "yaml-rs"]
-description     = "Thermally-constrained flocking for wildfires."
+description     = "Flies a drone flock as a starling murmuration that breaks around a wildfire the way it breaks around a falcon."
+keywords        = [
+    "agent-based-modeling",
+    "drones",
+    "jax",
+    "multi-agent-systems",
+    "python",
+    "simulation",
+    "swarm-intelligence",
+    "swarm-robotics",
+    "wildfire"
+]
 license         = "MIT"
 name            = "thermur"
 readme          = "README.md"
