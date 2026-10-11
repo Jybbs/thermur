@@ -1,15 +1,17 @@
 """
-Holds the records the repository audit and `repo:rulesets` read and report:
+Holds the records the `repo` tasks read and report:
 
 - The `Document` base and the files it validates, meaning the `Manifest`
   with its `Author` rows, the `Config`, the `GithubSettings` with its
-  `Actions`, `Repository`, `Toggles`, and `Token` tables, the `Labels` with
-  their `Label` rows, and the `Lock` out of the TOML, each `Workflow` with
-  its `Job`, `Step`, and `Trigger` rows, each composite `Action`, the
-  `Release` with its `Category` rows, each issue `Template`, and the
-  `Citation` with its `Person` rows out of the YAML, each `Ruleset` with its
-  `Rule` and `Actor` rows out of the JSON under `.github/rulesets/`, and the
-  `Guide` out of the contributor guide's tables
+  `Actions`, `Repository`, `Toggles`, and `Token` tables and the `Analysis`
+  of `Feature` rows its `Repository` holds, the `Labels` with their `Label`
+  rows, and the `Lock` out of the TOML, each `Workflow` with its `Job`,
+  `Step`, and `Trigger` rows, each composite `Action`, the `Release` with
+  its `Category` rows, each issue `Template`, and the `Citation` with its
+  `Person` rows out of the YAML, each `Ruleset` with its `Rule` and `Actor`
+  rows and the `Parameters` of `Status` rows each rule takes out of the JSON
+  under `.github/rulesets/`, and the `Guide` out of the contributor guide's
+  tables
 - The `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and `State` enums
   each closed-set value in `.github/settings.toml` takes, and the
   `ActorType`, `BypassMode`, `Enforcement`, `MergeMethod`, `RuleType`, and
@@ -118,14 +120,18 @@ def read_pairs[V](pairs: list[tuple[str, V]]) -> dict[str, V]:
         ValueError: Naming each key two or more pairs share, which
                     validation reports against the field or the document.
     """
-    if repeats := [
-        f"`{key}`" for key, count in Counter(
-            key for key, _ in pairs
-        ).items() if count > 1
-    ]:
+    if repeats := [f"`{key}`" for key in repeated(key for key, _ in pairs)]:
         raise ValueError(f"names {join_names(repeats)} more than once")
 
     return dict(pairs)
+
+
+def repeated[T](values: Iterable[T]) -> list[T]:
+    """
+    Keeps each of `values` that appears more than once, in the order of its
+    first appearance.
+    """
+    return [value for value, count in Counter(values).items() if count > 1]
 
 
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
@@ -149,8 +155,8 @@ class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=Tr
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
     A file of the checkout, validated from its text into the fields the
-    checks and `repo:rulesets` read, whose validation error carries the
-    file's path from the root as its title.
+    `repo` tasks read, whose validation error carries the file's path from
+    the root as its title.
     """
 
     @property
@@ -861,8 +867,7 @@ class Labels(Document, extra="forbid", title=".github/labels.toml"):
         if repeats := [
             f"the {field} `{value}`"
             for field in ("name", "color")
-            for value, count in Counter(map(attrgetter(field), rows)).items()
-            if count > 1
+            for value in repeated(map(attrgetter(field), rows))
         ]:
             raise ValueError(f"declares {join_names(repeats)} more than once")
 

@@ -1,9 +1,8 @@
 """
-Holds `Checkout`, the clone the repository audit and `repo:rulesets` read,
-which keeps each document it validates for every later check that reads it
-and lists the tasks, the programs, the workflows, the composite actions, the
-issue templates, and the rulesets the clone holds, beside the checks each
-pull request runs.
+Holds `Checkout`, the clone the `repo` tasks read, which keeps each document
+it validates for every later check that reads it and lists the tasks, the
+programs, the workflows, the composite actions, the issue templates, and the
+rulesets the clone holds, beside the checks each pull request runs.
 """
 
 from functools  import cached_property
@@ -36,8 +35,8 @@ from thermur.repo.schemas import (
 
 class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    The clone the audit and `repo:rulesets` read, rooted at `root`, naming
-    each file relative to that root and each task at the path mise resolves.
+    The clone the `repo` tasks read, rooted at `root`, naming each file
+    relative to that root and each task at the path mise resolves.
     """
 
     root: Annotated[Path, AfterValidator(Path.resolve)] = Field(

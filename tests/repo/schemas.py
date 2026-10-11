@@ -1,5 +1,5 @@
 """
-Pins the records the repository audit reads and reports:
+Pins the records the `repo` tasks read and report:
 
 - What a document's text reads as, the key each field reads, and the path
   its error carries
@@ -665,6 +665,12 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
             id = "lock"
         ),
         param(
+            ".json",
+            '{"on": "push", "version": "0.1.0"}\n',
+            {"on": "push", "version": "0.1.0"},
+            id = "json"
+        ),
+        param(
             ".yml",
             "on: push\nversion: 0.1.0\n",
             {"on": "push", "version": "0.1.0"},
@@ -692,9 +698,9 @@ def test_a_document_reads_the_value_its_suffix_names(
 ):
     """
     Asserts that a document's text reads as TOML under `.toml` and `.lock`,
-    as YAML 1.2 under any other suffix, keeping `on`, a version, and a date
-    as the strings they are written as, and as the front matter alone under
-    `.md`, ending at its first closing `---`.
+    as JSON under `.json`, as YAML 1.2 under any other suffix, keeping `on`,
+    a version, and a date as the strings they are written as, and as the
+    front matter alone under `.md`, ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
 

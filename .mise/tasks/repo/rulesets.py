@@ -11,13 +11,12 @@ each live ruleset no file names, which stays on GitHub until a deletion
 by hand.
 """
 
-from collections import Counter
-from json        import loads as from_json
-from pydantic    import ValidationError
-from subprocess  import check_output, run
+from json       import loads as from_json
+from pydantic   import ValidationError
+from subprocess import check_output, run
 
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import join_names
+from thermur.repo.schemas  import join_names, repeated
 
 
 def main():
@@ -37,11 +36,7 @@ def main():
     except ValidationError as error:
         raise SystemExit(error) from None
 
-    if shared := sorted(
-        name
-        for name, count in Counter(ruleset.name for ruleset in rulesets).items()
-        if count > 1
-    ):
+    if shared := sorted(repeated(ruleset.name for ruleset in rulesets)):
         raise SystemExit(
             "More than one file under `.github/rulesets/` names each of these "
             "rulesets, which the task matches to a live ruleset by name: "
