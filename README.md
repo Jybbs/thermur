@@ -494,7 +494,7 @@ thermur/
 │
 ├── src/thermur/
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
-│   └── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, and the clone both read
+│   └── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, and the clone the `repo` tasks and the pipeline read
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads

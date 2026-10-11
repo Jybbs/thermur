@@ -1,5 +1,6 @@
 """
-Pins what `Checkout` reads from the clone and lists for the `repo` tasks:
+Pins what `Checkout` reads from the clone and lists for the `repo` tasks
+and the pipeline:
 
 - The tasks mise lists for the clone and the programs on its path
 - The check run and the task of each pull-request row, the steps its
