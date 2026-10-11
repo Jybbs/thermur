@@ -111,6 +111,60 @@ def test_a_failed_call_stops_the_task_before_any_other(
             id = "settings"
         ),
         param(
+            ".github/settings.toml",
+            '= "all"',
+            '= "al"',
+            (
+                "actions.allowed_actions\n  "
+                "Input should be 'all', 'local_only' or 'selected'"
+            ),
+            id = "allowed-actions"
+        ),
+        param(
+            ".github/settings.toml",
+            '"read"',
+            '"reed"',
+            "token.default_workflow_permissions\n  Input should be 'read' or 'write'",
+            id = "workflow-permissions"
+        ),
+        param(
+            ".github/settings.toml",
+            '{ status = "enabled" }',
+            '{ status = "enabeld" }',
+            "secret_scanning.status\n  Input should be 'disabled' or 'enabled'",
+            id = "secret-scanning"
+        ),
+        param(
+            ".github/settings.toml",
+            'secret_scanning_push_protection = { status = "enabled" }',
+            'secret_scanning_push_protection = { status = "enabeld" }',
+            (
+                "secret_scanning_push_protection.status\n  "
+                "Input should be 'disabled' or 'enabled'"
+            ),
+            id = "push-protection"
+        ),
+        param(
+            ".github/settings.toml",
+            '"PR_TITLE"',
+            '"PR_TILTE"',
+            (
+                "repository.squash_merge_commit_title\n  "
+                "Input should be 'COMMIT_OR_PR_TITLE' or 'PR_TITLE'"
+            ),
+            id = "squash-title"
+        ),
+        param(
+            ".github/settings.toml",
+            '"PR_BODY"',
+            '"PR_BODDY"',
+            (
+                "repository.squash_merge_commit_message\n  "
+                "Input should be 'BLANK', 'COMMIT_MESSAGES' or 'PR_BODY'"
+            ),
+            id = "squash-message"
+        ),
+        param(
             ".github/rulesets/tags.json",
             '"enforcement"',
             '"enforcment"',
@@ -164,11 +218,12 @@ def test_a_file_failing_validation_fails_before_anything_reaches_github(
     path     : str
 ):
     """
-    Asserts that a misspelled settings key, a key the rulesets API does not
-    take at any depth the ruleset validates, a ruleset file that is not JSON
-    or that repeats a key, and a manifest leaving out `[project].keywords`
-    each end the task on the validation error naming it, before the task
-    reads or sends anything.
+    Asserts that a misspelled settings key, a settings value outside the
+    closed set its field takes, a key the rulesets API does not take at any
+    depth the ruleset validates, a ruleset file that is not JSON or that
+    repeats a key, and a manifest leaving out `[project].keywords` each end
+    the task on the validation error naming it, before the task reads or
+    sends anything.
     """
     edit(checkout, path, new=new, old=old)
 

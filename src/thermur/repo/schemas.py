@@ -3,7 +3,9 @@ Holds the records the repository audit and `repo:rulesets` read and report:
 
 - The `Document` base and the files it validates, meaning the `Manifest`
   with its `Author` rows, the `Config`, the `Lock`, and the `GithubSettings` with
-  its `Actions`, `Repository`, `Toggles`, and `Token` tables out of the
+  its `Actions`, `Repository`, `Toggles`, and `Token` tables, whose values
+  with a closed set take the `Policy`, `Scope`, `SquashMessage`,
+  `SquashTitle`, and `State` enums, out of the
   TOML, each `Workflow` with its `Job`, `Step`, and `Trigger` rows and
   each composite `Action` out of the YAML under `.github/`, and each
   `Ruleset` with its `Rule` rows out of the JSON under `.github/rulesets/`
@@ -104,7 +106,7 @@ class Actions(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     the `actions/permissions` endpoint reads.
     """
 
-    allowed_actions: str
+    allowed_actions: Policy
     """
     The actions a workflow may run, `all` letting it run any.
     """
@@ -126,7 +128,7 @@ class Actions(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         Writes the call setting the GitHub Actions permissions.
         """
         return Request(
-            body     = self.model_dump(),
+            body     = self.model_dump(mode="json"),
             endpoint = "actions/permissions",
             method   = "PUT"
         )
@@ -459,7 +461,7 @@ class Feature(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     One feature `security_and_analysis` turns on or off.
     """
 
-    status: str
+    status: State
     """
     The feature's state, `enabled` or `disabled`.
     """
@@ -991,12 +993,12 @@ class Repository(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
     The security and analysis features the repository runs.
     """
 
-    squash_merge_commit_message: str
+    squash_merge_commit_message: SquashMessage
     """
     The message a squash merge's commit takes by default.
     """
 
-    squash_merge_commit_title: str
+    squash_merge_commit_title: SquashTitle
     """
     The title a squash merge's commit takes by default.
     """
@@ -1006,7 +1008,7 @@ class Repository(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
         """
         Writes the call setting the repository's own settings.
         """
-        return Request(body=self.model_dump(), endpoint="", method="PATCH")
+        return Request(body=self.model_dump(mode="json"), endpoint="", method="PATCH")
 
 
 class Rule(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -1150,7 +1152,7 @@ class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     Whether a workflow can approve a pull request through the token.
     """
 
-    default_workflow_permissions: str
+    default_workflow_permissions: Scope
     """
     The scope the token takes where a workflow sets no `permissions`, `read`
     or `write`.
@@ -1162,7 +1164,7 @@ class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         Writes the call setting the defaults of the token.
         """
         return Request(
-            body     = self.model_dump(),
+            body     = self.model_dump(mode="json"),
             endpoint = "actions/permissions/workflow",
             method   = "PUT"
         )
@@ -1205,3 +1207,53 @@ class GithubSettings(Document, extra="forbid", title=".github/settings.toml"):
             self.repository.request, self.actions.request, self.token.request,
             *self.toggles.requests
         ]
+
+
+class Policy(StrEnum):
+    """
+    The actions a workflow may run, as `allowed_actions` names them.
+    """
+
+    ALL        = auto()
+    LOCAL_ONLY = auto()
+    SELECTED   = auto()
+
+
+class Scope(StrEnum):
+    """
+    The scope the token each workflow run receives takes where a workflow
+    sets no `permissions`, as `default_workflow_permissions` names it.
+    """
+
+    READ  = auto()
+    WRITE = auto()
+
+
+class SquashMessage(StrEnum):
+    """
+    The message a squash merge's commit takes by default, as
+    `squash_merge_commit_message` names it.
+    """
+
+    BLANK           = "BLANK"
+    COMMIT_MESSAGES = "COMMIT_MESSAGES"
+    PR_BODY         = "PR_BODY"
+
+
+class SquashTitle(StrEnum):
+    """
+    The title a squash merge's commit takes by default, as
+    `squash_merge_commit_title` names it.
+    """
+
+    COMMIT_OR_PR_TITLE = "COMMIT_OR_PR_TITLE"
+    PR_TITLE           = "PR_TITLE"
+
+
+class State(StrEnum):
+    """
+    Whether a security and analysis feature runs, as its `status` names it.
+    """
+
+    DISABLED = auto()
+    ENABLED  = auto()
