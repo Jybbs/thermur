@@ -8,6 +8,7 @@ connection only when it carries the `network` mark.
 from common.environment import CLEARED
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
+from subprocess         import check_output
 
 from thermur.repo.checkout import Checkout
 
@@ -16,19 +17,18 @@ from thermur.repo.checkout import Checkout
 def checkout(
     monkeypatch  : MonkeyPatch,
     pytestconfig : Config,
-    tmp_path     : Path
+    tmp_path     : Path,
+    tracked      : list[Path]
 ) -> Checkout:
     """
-    Copies into `tmp_path` every file the audit's checks read, meaning
-    `.github/`, `.mise/`, the license, the README, the manifest, `src/`,
-    and `uv.lock`, then trusts the copy's mise configuration and returns the
-    `Checkout` rooted there, which a case edits before a check reads it.
+    Copies into `tmp_path` every file `tracked` lists, keeping each
+    program's mode, then trusts the copy's mise configuration and returns
+    the `Checkout` rooted there, which a case edits before a check reads it.
     """
-    for name in (
-        ".github", ".mise", "LICENSE", "README.md", "pyproject.toml", "src", "uv.lock"
-    ):
-        (pytestconfig.rootpath / name).copy(
-            tmp_path / name,
+    for path in tracked:
+        (tmp_path / path).parent.mkdir(exist_ok=True, parents=True)
+        (pytestconfig.rootpath / path).copy(
+            tmp_path / path,
             follow_symlinks   = False,
             preserve_metadata = True
         )
@@ -44,16 +44,18 @@ def environment(
     tmp_path_factory : TempPathFactory
 ):
     """
-    Clears every shell variable `CLEARED` names, any of which would let the
-    machine running the suite change a result. Some set whether a console
-    prints color, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name the files a
-    GitHub Actions runner collects a workflow step's outputs and a workflow
-    run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT` name the
-    branch and the commit `gha:brief` prefers over the ones a case sets. The
-    rest name the folders where a tool keeps its cache, configuration, data,
-    and state, which the XDG convention defines. It then points `HOME` at an
-    empty folder the test owns, so a tool that falls back to `~` finds none
-    of the developer's files there.
+    Clears every shell variable `CLEARED` names, any of which would let
+    the machine running the suite change a result. Some set whether a
+    console prints color, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name
+    the files a GitHub Actions runner collects a workflow step's outputs and
+    a workflow run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT`
+    name the branch and the commit `gha:brief` prefers over the ones a case
+    sets. `CI`, which a GitHub Actions runner sets, and `MISE_YES` each
+    turn on mise's `yes` setting, which answers a task's `confirm` prompt
+    without asking. The rest name the folders where a tool keeps its cache,
+    configuration, data, and state, which the XDG convention defines. It
+    then points `HOME` at an empty folder the test owns, so a tool that
+    falls back to `~` finds none of the developer's files there.
 
     mise reads a configuration file out of every folder above the one
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
@@ -70,6 +72,25 @@ def environment(
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
     monkeypatch.setenv("MISE_IGNORED_CONFIG_PATHS", str(settled))
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(pytestconfig.rootpath))
+
+
+@fixture(scope="session")
+def tracked(pytestconfig: Config) -> list[Path]:
+    """
+    Lists every file of the worktree git tracks or would track, relative to
+    the root, leaving out one moved away before git learns of it, since the
+    index still lists it.
+    """
+    root = pytestconfig.rootpath
+    return [
+        Path(name)
+        for name in check_output(
+            ["git", "ls-files", "--cached", "--exclude-standard", "--others"],
+            cwd  = root,
+            text = True
+        ).splitlines()
+        if (root / name).exists(follow_symlinks=False)
+    ]
 
 
 def pytest_collection_modifyitems(items: list[Item]):
