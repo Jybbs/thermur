@@ -1,13 +1,15 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "lockfile"
-#MISE description = "Verify `uv.lock` and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for this platform"
+#MISE description = "Verify `uv.lock`, the lockfile beside each task script declaring its own dependencies, and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for this platform"
+
+source "$MISE_PROJECT_ROOT/.mise/lib/lockfiles.sh"
 
 restore() {
   cmp -s "$snapshot" .mise/mise.lock || mv -f "$snapshot" .mise/mise.lock
   rm -f "$snapshot"
 }
 
-uv lock --check
+each_lockfile uv lock --check
 snapshot=$(mktemp)
 cp -p .mise/mise.lock "$snapshot"
 trap restore EXIT

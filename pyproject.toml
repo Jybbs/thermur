@@ -13,7 +13,9 @@ dependencies    = [
     "packaging",
     "pydantic",
     "pydantic-settings",
-    "xarray"
+    "pyyaml",
+    "xarray",
+    "yaml-rs"
 ]
 description     = "Thermally-constrained flocking for wildfires."
 license         = "MIT"
@@ -28,6 +30,7 @@ Repository = "https://github.com/Jybbs/thermur"
 
 [dependency-groups]
 dev = [
+    "minijinja",
     "prose-formatter",
     "pytest",
     "pytest-cov",

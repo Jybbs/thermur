@@ -1,0 +1,11 @@
+authors:
+  - family-names: Parkington
+    given-names: James
+cff-version: 1.2.0
+date-released: 2026-10-02
+license: MIT
+message: If you use Thermur, please cite it with the metadata in this file.
+repository-code: https://github.com/Jybbs/thermur
+title: Thermur
+type: software
+version: 0.1.0

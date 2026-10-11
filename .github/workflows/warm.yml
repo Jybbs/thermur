@@ -1,0 +1,70 @@
+name : 🐦‍⬛ Warm
+
+concurrency:
+  cancel-in-progress : false
+  group              : ${{ github.workflow }}
+
+jobs:
+  kit:
+    name    : ${{ matrix.name }}
+    runs-on : &image ubuntu-26.04
+
+    steps:
+      - name : Install the subset and save its archive
+        uses : $/.github/actions/provision
+        with : { save: 'true', tools: "${{ matrix.tools }}" }
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - name  : 🎒 Kit · Package
+            tools : &package python uv
+          - name  : 🎒 Kit · Workflows
+            tools : zizmor
+
+    timeout-minutes : &timeout 15
+
+  prune:
+    name        : 🍂 Prune
+    needs       : [kit]
+    permissions : { actions: write, contents: read }
+    runs-on     : *image
+
+    steps:
+      - name : Check out the repository
+        uses : $/.github/actions/provision
+
+      - name              : Delete the cache entries newer ones replaced
+        continue-on-error : true
+        env               : { GH_TOKEN: "${{ github.token }}" }
+        run               : ./.mise/tasks/gha/prune.py
+
+    timeout-minutes : *timeout
+
+  gate:
+    name    : 📡 Readout
+    if      : ${{ always() }}
+    needs   : [kit, prune]
+    runs-on : *image
+
+    steps:
+      - name : Provision the tools the gate runs on
+        uses : $/.github/actions/provision
+        with : { tools: *package }
+
+      - name : Brief the workflow run and exit with its verdict
+        env  : { NEEDS: "${{ toJSON(needs) }}" }
+        run  : mise run gha:brief
+
+    timeout-minutes : *timeout
+
+on:
+  push:
+    branches : [main]
+    paths    : [.github/actions/provision/**, .github/workflows/warm.yml, .mise/config.toml, .mise/mise.lock]
+
+  workflow_dispatch:
+
+permissions : { contents: read }

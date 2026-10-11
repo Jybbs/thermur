@@ -1,13 +1,18 @@
 """
-Pins what `Checkout` reads from the clone, meaning the tasks mise lists
-for it, the programs on its path, the commit checked out, the digest of its
-`uv.lock`, and the clone the package was installed from.
+Pins what `Checkout` reads from the clone and lists for the checks:
+
+- The tasks mise lists for the clone and the programs on its path
+- The check run and the task of each pull-request row, the steps its
+  workflows and composite actions run, and its issue templates
+- The commit checked out, the digest of its `uv.lock`, and the clone the
+  package was installed from
 """
 
 from common.edits import append, task
-from os           import pathsep
+from os           import X_OK, access, pathsep
 from pathlib      import Path
-from pytest       import Config, MonkeyPatch, TempPathFactory, raises
+from pytest       import Config, MonkeyPatch, TempPathFactory, mark, param, raises
+from re           import findall
 from subprocess   import CalledProcessError, check_output
 
 from thermur.repo.checkout import Checkout
@@ -57,14 +62,71 @@ def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
     )
 
 
-def test_scripts_lists_each_program_but_a_dotfile(checkout: Checkout):
+@mark.parametrize(
+    ("folder", "member", "names"),
+    [
+        param(
+            ".github/ISSUE_TEMPLATE",
+            "templates",
+            ["bug.md", "spec.md"],
+            id = "templates"
+        ),
+        param(".mise/bin", "scripts", ["prose", "pytest"], id="scripts")
+    ]
+)
+def test_a_listing_leaves_out_a_dotfile(
+    checkout : Checkout,
+    folder   : str,
+    member   : str,
+    names    : list[str]
+):
     """
-    Asserts that the programs are every file in the folder `_.path` names,
-    relative to the root and in name order, leaving out a `.DS_Store`.
+    Asserts that the issue templates and the programs are every file in
+    their folder, relative to the root and in name order, leaving out a
+    `.DS_Store`, which holds no UTF-8 text.
     """
-    (checkout.root / ".mise/bin/.DS_Store").write_bytes(b"\x00")
+    (checkout.root / folder / ".DS_Store").write_bytes(b"\x00\xff")
 
-    assert checkout.scripts == [Path(".mise/bin/prose"), Path(".mise/bin/pytest")]
+    assert list(getattr(checkout, member)) == [Path(folder, name) for name in names]
+
+
+def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkout):
+    """
+    Asserts that the checks are the matrix rows of each workflow running on
+    a pull request, each as the name of its check run and its task, and the
+    rows are those tasks, both in the order the rows are declared, leaving
+    out a row of a workflow running only on a push and a row naming no task.
+    """
+    folder = checkout.root / ".github/workflows"
+    for path in folder.iterdir():
+        path.unlink()
+
+    matrix = (
+        "jobs:\n  a:\n    name: ${{ matrix.name }}\n    runs-on: x\n"
+        "    strategy:\n      matrix:\n        include:\n"
+    )
+    (folder / "pull.yml").write_text(
+        f"name: pull\non:\n  pull_request:\n{matrix}"
+        "          - { name: B, task: b:two }\n          - { name: A, task: a:one }\n"
+        "          - { name: K, tools: x }\n"
+    )
+    (folder / "push.yml").write_text(
+        f"name: push\non:\n  push:\n{matrix}          - {{ name: C, task: c:three }}\n"
+    )
+
+    assert checkout.checks == [("B", "b:two"), ("A", "a:one")]
+    assert checkout.rows == ["b:two", "a:one"]
+
+
+def test_steps_lists_the_actions_ahead_of_the_workflows(checkout: Checkout):
+    """
+    Asserts that every step reads beside its file's path from the root, the
+    composite action's steps ahead of the workflows' in path order.
+    """
+    paths = [path for path, _ in checkout.steps]
+
+    assert paths == sorted(paths)
+    assert set(paths) == {*checkout.actions, *checkout.workflows}
 
 
 def test_tasks_carries_the_lines_a_toml_task_runs(checkout: Checkout):
@@ -80,6 +142,7 @@ def test_tasks_carries_the_lines_a_toml_task_runs(checkout: Checkout):
 
     assert Task(
         file   = None,
+        name   = "py:sweep",
         run    = ("prose check src", "pytest"),
         source = checkout.root / ".mise/config.toml"
     ) in checkout.tasks
@@ -119,19 +182,38 @@ def test_tasks_lists_a_hidden_task(checkout: Checkout):
     """
     path = checkout.root / task(checkout, "py/hidden", "#!/bin/sh\n#MISE hide = true\n")
 
-    assert Task(file=path, run=(), source=path) in checkout.tasks
+    assert Task(
+        file   = path,
+        name   = "py:hidden",
+        run    = (),
+        source = path
+    ) in checkout.tasks
 
 
 def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
     """
-    Asserts that each file under `.mise/tasks/` reads as a task held in that
-    file and declared there, at the path mise resolves.
+    Asserts that each executable file under `.mise/tasks/` reads as a task
+    held in that file and declared there, at the path mise resolves, named
+    for its folder and its stem, beside the alias its `MISE alias` line
+    declares.
     """
     folder = checkout.root / ".mise/tasks"
-    files  = {path for path in folder.rglob("*") if path.is_file()}
+    files  = {path for path in folder.rglob("*") if path.is_file() and access(
+        path,
+        X_OK
+    )}
 
     assert set(checkout.tasks) == {
-        Task(file=path, run=(), source=path) for path in files
+        Task(
+            aliases = tuple(
+                findall(r'(?m)^# ?MISE alias *= "([^"]+)"', path.read_text())
+            ),
+            file   = path,
+            name   = ":".join(path.relative_to(folder).with_suffix("").parts),
+            run    = (),
+            source = path
+        )
+        for path in files
     }
 
 
