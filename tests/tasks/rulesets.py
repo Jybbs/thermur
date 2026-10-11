@@ -205,12 +205,32 @@ def test_a_failed_call_stops_the_task_before_any_other(
         param(
             ".github/rulesets/tags.json",
             '"bypass_actors": []',
-            '"bypass_actors": [{ "actor_type": "Team", "bypass_mode": "alway" }]',
+            (
+                '"bypass_actors": '
+                '[{ "actor_id": 1, "actor_type": "Team", "bypass_mode": "alway" }]'
+            ),
             (
                 "bypass_actors.0.bypass_mode\n  "
                 "Input should be 'always', 'exempt' or 'pull_request'"
             ),
             id = "bypass-mode"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '"bypass_actors": []',
+            (
+                '"bypass_actors": '
+                '[{ "actor_id": 1, "actor_type": "Team", "bypas_mode": "always" }]'
+            ),
+            "bypass_actors.0.bypas_mode\n  Extra inputs are not permitted",
+            id = "bypass-actor"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '"bypass_actors": []',
+            '"bypass_actors": [{ "actor_id": "one", "actor_type": "Team" }]',
+            "bypass_actors.0.actor_id\n  Input should be a valid integer",
+            id = "actor-id"
         ),
         param(
             ".github/rulesets/main.json",

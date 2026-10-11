@@ -1070,7 +1070,7 @@ class Ruleset(Document, extra="forbid"):
 
     target: Target
     """
-    The kind of ref the ruleset applies to.
+    What the ruleset applies to, meaning branches, tags, or every push.
     """
 
     @property
@@ -1344,7 +1344,8 @@ class State(StrEnum):
 
 class Target(StrEnum):
     """
-    The kind of ref a ruleset applies to, as `target` names it.
+    What a ruleset applies to, meaning branches, tags, or every push to the
+    repository, as `target` names it.
     """
 
     BRANCH = auto()
@@ -1364,8 +1365,9 @@ class Actor(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 
     actor_id: int | None = None
     """
-    The id of the actor, or `None` for a kind of actor the rulesets API
-    names by its type alone.
+    The id of the actor, which the rulesets API requires for an
+    `Integration`, `RepositoryRole`, `Team`, or `User`, ignores for an
+    `OrganizationAdmin`, and takes as `None` for a `DeployKey`.
     """
 
     bypass_mode: BypassMode = BypassMode.ALWAYS

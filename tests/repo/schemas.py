@@ -40,27 +40,19 @@ from thermur.repo.schemas import (
 WORKFLOW = "name: w\non:\n  push:\njobs:\n  a:\n    runs-on: x\n"
 
 
-def test_a_required_check_naming_no_app_sends_no_app():
+def test_a_bypass_actor_naming_no_mode_sends_no_mode():
     """
-    Asserts that a required check naming no `integration_id` is sent without
-    one rather than as `null`, which the rulesets API reads as no integer,
-    so the body matches the ruleset as written key for key.
+    Asserts that a bypass actor naming no `actor_id` or `bypass_mode` is
+    sent without either rather than with the record's defaults, so the body
+    matches the ruleset as written key for key.
     """
     written = {
         "enforcement"   : "active",
         "name"          : "a",
         "target"        : "branch",
-        "bypass_actors" : [],
+        "bypass_actors" : [{"actor_type": "OrganizationAdmin"}],
         "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
-        "rules"         : [
-            {
-                "type"       : "required_status_checks",
-                "parameters" : {
-                    "strict_required_status_checks_policy" : True,
-                    "required_status_checks"               : [{"context": "c"}]
-                }
-            }
-        ]
+        "rules"         : [{"type": "deletion"}]
     }
 
     assert Ruleset.model_validate(written).request(None).body == written
@@ -334,16 +326,30 @@ def test_a_workflow_runs_on_a_push_its_filter_matches(events: str, pushes: bool)
     assert workflow(f"name: w\njobs: {{}}\non:\n{events}").pushes("uv.lock") is pushes
 
 
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+def test_a_required_check_naming_no_app_sends_no_app():
     """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
+    Asserts that a required check naming no `integration_id` is sent without
+    one rather than as `null`, which the rulesets API reads as no integer,
+    so the body matches the ruleset as written key for key.
     """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
+    written = {
+        "enforcement"   : "active",
+        "name"          : "a",
+        "target"        : "branch",
+        "bypass_actors" : [],
+        "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
+        "rules"         : [
+            {
+                "type"       : "required_status_checks",
+                "parameters" : {
+                    "strict_required_status_checks_policy" : True,
+                    "required_status_checks"               : [{"context": "c"}]
+                }
+            }
+        ]
+    }
 
-    assert step.env == {"RETRIES": 3}
+    assert Ruleset.model_validate(written).request(None).body == written
 
 
 @mark.parametrize(
@@ -401,27 +407,16 @@ def test_a_task_script_reads_the_requirements_its_metadata_declares(
     ).dependencies == dependencies
 
 
-def test_a_toggle_turns_its_endpoint_on_or_off():
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
     """
-    Asserts that each toggle reads as the endpoint it names, which `PUT`
-    turns on and `DELETE` turns off, in the order the record declares its
-    fields whatever order the table lists them in.
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
     """
-    toggles = Toggles.model_validate(
-        {
-            "automated-security-fixes"        : False,
-            "immutable-releases"              : True,
-            "private-vulnerability-reporting" : True,
-            "vulnerability-alerts"            : False
-        }
-    )
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
 
-    assert [(call.method, call.endpoint) for call in toggles.requests] == [
-        ("DELETE", "automated-security-fixes"),
-        ("PUT", "immutable-releases"),
-        ("PUT", "private-vulnerability-reporting"),
-        ("DELETE", "vulnerability-alerts")
-    ]
+    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -449,6 +444,29 @@ def test_a_step_reads_its_inputs_as_github_hands_them_to_the_action(
     assert (step.saves, step.inputs["since"]) == (saves, "2026-10-01")
 
 
+def test_a_toggle_turns_its_endpoint_on_or_off():
+    """
+    Asserts that each toggle reads as the endpoint it names, which `PUT`
+    turns on and `DELETE` turns off, in the order the record declares its
+    fields whatever order the table lists them in.
+    """
+    toggles = Toggles.model_validate(
+        {
+            "automated-security-fixes"        : False,
+            "immutable-releases"              : True,
+            "private-vulnerability-reporting" : True,
+            "vulnerability-alerts"            : False
+        }
+    )
+
+    assert [(call.method, call.endpoint) for call in toggles.requests] == [
+        ("DELETE", "automated-security-fixes"),
+        ("PUT", "immutable-releases"),
+        ("PUT", "private-vulnerability-reporting"),
+        ("DELETE", "vulnerability-alerts")
+    ]
+
+
 def test_a_toml_task_declares_no_requirements(tmp_path: Path):
     """
     Asserts that a task declared in TOML, which holds no file of its own,
@@ -470,30 +488,6 @@ def test_a_warning_prints_as_a_warning_annotation():
     finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
 
     assert finding.annotation == "::warning file=a.toml::m"
-
-
-def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
-    """
-    Asserts that a workflow reads the job under the key `gate`, the jobs it
-    waits for, the tasks its rows run, and whether a step passes a composite
-    action `save: 'true'`.
-    """
-    text = (
-        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
-        "          - task: lock:check\n    steps:\n"
-        "      - uses: $/a\n        with: { save: 'true' }\n"
-        "  gate:\n    runs-on: x\n"
-    )
-    read = workflow(text)
-
-    assert (
-        read.gate.image,
-        list(read.gated),
-        read.tasks,
-        read.saves("$/a"),
-        read.saves("$/b")
-    ) == ("x", ["a"], ["lock:check"], True, False)
-    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize(
@@ -699,16 +693,28 @@ def test_a_misspelled_table_or_key_fails_the_settings(
     assert [detail["loc"] for detail in error.value.errors()] == locations
 
 
-def test_the_lock_maps_each_package_to_its_version():
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
     """
-    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
-    name mapped to the version it resolves.
+    Asserts that a workflow reads the job under the key `gate`, the jobs it
+    waits for, the tasks its rows run, and whether a step passes a composite
+    action `save: 'true'`.
     """
-    rows = {
-        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
-    }
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
 
-    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.tasks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a"], ["lock:check"], True, False)
+    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize(
@@ -725,6 +731,18 @@ def test_a_workflow_reads_whether_it_runs_on_a_pull_request(events: str, pulls: 
     is among its events, whatever else it runs on.
     """
     assert workflow(f"name: w\njobs: {{}}\non:\n{events}").on_pull_request is pulls
+
+
+def test_the_lock_maps_each_package_to_its_version():
+    """
+    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
+    name mapped to the version it resolves.
+    """
+    rows = {
+        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
+    }
+
+    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
 
 
 def workflow(text: str) -> Workflow:
