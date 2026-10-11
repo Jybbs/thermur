@@ -1,5 +1,5 @@
 """
-Pins the records the repository audit reads and reports:
+Pins the records the `repo` tasks read and report:
 
 - What a document's text reads as, the key each field reads, and the path
   its error carries
@@ -9,9 +9,13 @@ Pins the records the repository audit reads and reports:
   `Issue` make, and the holders a `Manifest` names
 - The labels a `Template` lists, the rows a `Labels` registry accepts, the
   command a `Label` writes, and the live labels a registry omits
+- The keys and values `GithubSettings` accepts, the calls `Toggles` writes,
+  the checks a `Ruleset` requires and the call it writes, and the command
+  and body each `Request` sends
 """
 
-from functools              import reduce
+from functools import reduce
+from json      import loads as from_json
 from packaging.requirements import Requirement
 from pathlib                import Path
 from pydantic               import AliasPath, ValidationError
@@ -22,6 +26,7 @@ from thermur.repo.schemas import (
     Author,
     Document,
     Finding,
+    GithubSettings,
     Guide,
     Issue,
     Job,
@@ -31,9 +36,12 @@ from thermur.repo.schemas import (
     Lock,
     Manifest,
     Parity,
+    Request,
+    Ruleset,
     Step,
     Task,
     Template,
+    Toggles,
     Trigger,
     Workflow
 )
@@ -42,26 +50,22 @@ ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"
 WORKFLOW = "name: w\non:\n  push:\njobs:\n  a:\n    runs-on: x\n"
 
 
-def test_a_guide_listing_a_name_in_two_rows_fails_under_its_path(tmp_path: Path):
+def test_a_bypass_actor_naming_no_mode_sends_no_mode():
     """
-    Asserts that a guide whose table lists each of two names in two rows
-    fails validation at that table, naming both under an error titled with
-    the guide's path, rather than keeping whichever row comes last.
+    Asserts that a bypass actor naming no `actor_id` or `bypass_mode` is
+    sent without either rather than with the record's defaults, so the body
+    matches the ruleset as written key for key.
     """
-    (tmp_path / ".github").mkdir()
-    (tmp_path / ".github/CONTRIBUTING.md").write_text(
-        "Intro.\n\n| **Label** | **Covers** |\n|---|---|\n"
-        "| `🐞 bug` | Stale |\n| `🦜 cli` | Old |\n"
-        "| `🐞 bug` | Wrong output |\n| `🦜 cli` | The command line |\n"
-    )
+    written = {
+        "enforcement"   : "active",
+        "name"          : "a",
+        "target"        : "branch",
+        "bypass_actors" : [{"actor_type": "OrganizationAdmin"}],
+        "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
+        "rules"         : [{"type": "deletion"}]
+    }
 
-    with raises(ValidationError) as error:
-        Guide.read(tmp_path)
-
-    assert error.value.title == ".github/CONTRIBUTING.md"
-    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
-        (("labels",), "Value error, lists `🐞 bug` and `🦜 cli` in more than one row")
-    ]
+    assert Ruleset.model_validate(written).request(None).body == written
 
 
 @mark.parametrize(
@@ -329,27 +333,26 @@ def test_a_workflow_runs_on_a_push_its_filter_matches(events: str, pushes: bool)
     assert workflow(f"name: w\njobs: {{}}\non:\n{events}").pushes("uv.lock") is pushes
 
 
-def test_a_guide_reads_each_table_from_its_divider_to_a_blank_line(tmp_path: Path):
+def test_a_guide_listing_a_name_in_two_rows_fails_under_its_path(tmp_path: Path):
     """
-    Asserts that the guide reads each table under the header naming it,
-    from the row under its divider to the first blank line, keeping a cell
-    as written unless one code span fills it, and that a guide carrying no
-    table under a header reads that table as empty.
+    Asserts that a guide whose table lists each of two names in two rows
+    fails validation at that table, naming both under an error titled with
+    the guide's path, rather than keeping whichever row comes last.
     """
     (tmp_path / ".github").mkdir()
     (tmp_path / ".github/CONTRIBUTING.md").write_text(
         "Intro.\n\n| **Label** | **Covers** |\n|---|---|\n"
-        "| `🐞 bug` | Wrong output in `src` |\n| `🦜 cli` | The command line |\n"
-        "\n| `📚 docs` | Past the blank line |\n"
+        "| `🐞 bug` | Stale |\n| `🦜 cli` | Old |\n"
+        "| `🐞 bug` | Wrong output |\n| `🦜 cli` | The command line |\n"
     )
 
-    guide = Guide.read(tmp_path)
+    with raises(ValidationError) as error:
+        Guide.read(tmp_path)
 
-    assert guide.checks == {}
-    assert guide.labels == {
-        "🐞 bug" : "Wrong output in `src`",
-        "🦜 cli" : "The command line"
-    }
+    assert error.value.title == ".github/CONTRIBUTING.md"
+    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
+        (("labels",), "Value error, names `🐞 bug` and `🦜 cli` more than once")
+    ]
 
 
 @mark.parametrize(
@@ -407,21 +410,27 @@ def test_a_task_script_reads_the_requirements_its_metadata_declares(
     ).dependencies == dependencies
 
 
-def test_a_label_description_runs_to_100_characters():
+def test_a_guide_reads_each_table_from_its_divider_to_a_blank_line(tmp_path: Path):
     """
-    Asserts that a description of 100 characters, the most GitHub's label
-    API accepts, validates, whereas one of 101 fails at the description.
+    Asserts that the guide reads each table under the header naming it,
+    from the row under its divider to the first blank line, keeping a cell
+    as written unless one code span fills it, and that a guide carrying no
+    table under a header reads that table as empty.
     """
-    assert len(
-        Label.model_validate(ROW | {"description": "x" * 100}).description
-    ) == 100
+    (tmp_path / ".github").mkdir()
+    (tmp_path / ".github/CONTRIBUTING.md").write_text(
+        "Intro.\n\n| **Label** | **Covers** |\n|---|---|\n"
+        "| `🐞 bug` | Wrong output in `src` |\n| `🦜 cli` | The command line |\n"
+        "\n| `📚 docs` | Past the blank line |\n"
+    )
 
-    with raises(ValidationError) as error:
-        Label.model_validate(ROW | {"description": "x" * 101})
+    guide = Guide.read(tmp_path)
 
-    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
-        (("description",), "String should have at most 100 characters")
-    ]
+    assert guide.checks == {}
+    assert guide.labels == {
+        "🐞 bug" : "Wrong output in `src`",
+        "🦜 cli" : "The command line"
+    }
 
 
 @mark.parametrize(
@@ -449,6 +458,23 @@ def test_a_step_reads_its_inputs_as_github_hands_them_to_the_action(
     assert (step.saves, step.inputs["since"]) == (saves, "2026-10-01")
 
 
+def test_a_label_description_runs_to_100_characters():
+    """
+    Asserts that a description of 100 characters, the most GitHub's label
+    API accepts, validates, whereas one of 101 fails at the description.
+    """
+    assert len(
+        Label.model_validate(ROW | {"description": "x" * 100}).description
+    ) == 100
+
+    with raises(ValidationError) as error:
+        Label.model_validate(ROW | {"description": "x" * 101})
+
+    assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == [
+        (("description",), "String should have at most 100 characters")
+    ]
+
+
 def test_a_label_writes_the_command_that_creates_or_updates_it():
     """
     Asserts that a label writes the `gh label create --force` command
@@ -468,18 +494,6 @@ def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
     """
     with raises(ValueError, match="opens on no front matter"):
         Document.load(".md", "name: Bug\n---\n")
-
-
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
-    """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
-    """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
-
-    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -591,17 +605,30 @@ def test_a_malformed_registry_fails_at_the_key_it_breaks(
     assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == errors
 
 
-def test_a_toml_task_declares_no_requirements(tmp_path: Path):
+def test_a_required_check_naming_no_app_sends_no_app():
     """
-    Asserts that a task declared in TOML, which holds no file of its own,
-    declares no requirements.
+    Asserts that a required check naming no `integration_id` is sent without
+    one rather than as `null`, which the rulesets API reads as no integer,
+    so the body matches the ruleset as written key for key.
     """
-    assert Task(
-        file   = None,
-        name   = "t",
-        run    = (),
-        source = tmp_path
-    ).dependencies == []
+    written = {
+        "enforcement"   : "active",
+        "name"          : "a",
+        "target"        : "branch",
+        "bypass_actors" : [],
+        "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
+        "rules"         : [
+            {
+                "type"       : "required_status_checks",
+                "parameters" : {
+                    "strict_required_status_checks_policy" : True,
+                    "required_status_checks"               : [{"context": "c"}]
+                }
+            }
+        ]
+    }
+
+    assert Ruleset.model_validate(written).request(None).body == written
 
 
 @mark.parametrize(
@@ -638,6 +665,12 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
             id = "lock"
         ),
         param(
+            ".json",
+            '{"on": "push", "version": "0.1.0"}\n',
+            {"on": "push", "version": "0.1.0"},
+            id = "json"
+        ),
+        param(
             ".yml",
             "on: push\nversion: 0.1.0\n",
             {"on": "push", "version": "0.1.0"},
@@ -665,21 +698,23 @@ def test_a_document_reads_the_value_its_suffix_names(
 ):
     """
     Asserts that a document's text reads as TOML under `.toml` and `.lock`,
-    as YAML 1.2 under any other suffix, keeping `on`, a version, and a date
-    as the strings they are written as, and as the front matter alone under
-    `.md`, ending at its first closing `---`.
+    as JSON under `.json`, as YAML 1.2 under any other suffix, keeping `on`,
+    a version, and a date as the strings they are written as, and as the
+    front matter alone under `.md`, ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
 
-    assert finding.annotation == "::warning file=a.toml::m"
+    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -703,30 +738,27 @@ def test_a_template_reads_its_labels_from_a_list_or_one_string(
     assert Template.model_validate({"labels": labels}).labels == names
 
 
-def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
+def test_a_toggle_turns_its_endpoint_on_or_off():
     """
-    Asserts that a workflow reads the job under the key `gate`, the jobs
-    it waits for, the check run and the task of each row of each job, and
-    whether a step passes a composite action `save: 'true'`.
+    Asserts that each toggle reads as the endpoint it names, which `PUT`
+    turns on and `DELETE` turns off, in the order the record declares its
+    fields whatever order the table lists them in.
     """
-    text = (
-        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
-        "          - task: lock:check\n    steps:\n"
-        "      - uses: $/a\n        with: { save: 'true' }\n"
-        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
-        "        include:\n          - task: py:check\n"
-        "  gate:\n    runs-on: x\n"
+    toggles = Toggles.model_validate(
+        {
+            "automated-security-fixes"        : False,
+            "immutable-releases"              : True,
+            "private-vulnerability-reporting" : True,
+            "vulnerability-alerts"            : False
+        }
     )
-    read = workflow(text)
 
-    assert (
-        read.gate.image,
-        list(read.gated),
-        read.checks,
-        read.saves("$/a"),
-        read.saves("$/b")
-    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
-    assert workflow(WORKFLOW).gate is None
+    assert [(call.method, call.endpoint) for call in toggles.requests] == [
+        ("DELETE", "automated-security-fixes"),
+        ("PUT", "immutable-releases"),
+        ("PUT", "private-vulnerability-reporting"),
+        ("DELETE", "vulnerability-alerts")
+    ]
 
 
 @mark.parametrize(
@@ -799,6 +831,175 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
+def test_a_toml_task_declares_no_requirements(tmp_path: Path):
+    """
+    Asserts that a task declared in TOML, which holds no file of its own,
+    declares no requirements.
+    """
+    assert Task(
+        file   = None,
+        name   = "t",
+        run    = (),
+        source = tmp_path
+    ).dependencies == []
+
+
+def test_a_warning_prints_as_a_warning_annotation():
+    """
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
+    """
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+
+    assert finding.annotation == "::warning file=a.toml::m"
+
+
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
+    """
+    Asserts that a workflow reads the job under the key `gate`, the jobs
+    it waits for, the check run and the task of each row of each job, and
+    whether a step passes a composite action `save: 'true'`.
+    """
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
+        "        include:\n          - task: py:check\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
+
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.checks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
+    assert workflow(WORKFLOW).gate is None
+
+
+@mark.parametrize(
+    ("old", "new", "locations"),
+    [
+        param("[token]", "[tokens]", [("token",), ("tokens",)], id="table"),
+        param(
+            "has_wiki",
+            "has_wiky",
+            [("repository", "has_wiki"), ("repository", "has_wiky")],
+            id = "key"
+        ),
+        param(
+            "immutable-releases",
+            "immutable_releases",
+            [("toggles", "immutable-releases"), ("toggles", "immutable_releases")],
+            id = "toggle"
+        ),
+        param(
+            "sha_pinning_required",
+            "sha_pining_required",
+            [("actions", "sha_pinning_required"), ("actions", "sha_pining_required")],
+            id = "actions"
+        ),
+        param(
+            "secret_scanning ",
+            "secret_scaning ",
+            [
+                ("repository", "security_and_analysis", "secret_scanning"),
+                ("repository", "security_and_analysis", "secret_scaning")
+            ],
+            id = "analysis"
+        ),
+        param(
+            '{ status = "enabled" }\nsecret',
+            '{ state = "enabled" }\nsecret',
+            [
+                ("repository", "security_and_analysis", "secret_scanning", "status"),
+                ("repository", "security_and_analysis", "secret_scanning", "state")
+            ],
+            id = "feature"
+        ),
+        param(
+            "default_workflow_permissions",
+            "default_workflow_permisions",
+            [
+                ("token", "default_workflow_permissions"),
+                ("token", "default_workflow_permisions")
+            ],
+            id = "token"
+        )
+    ]
+)
+def test_a_misspelled_table_or_key_fails_the_settings(
+    locations    : list[tuple[str, ...]],
+    new          : str,
+    old          : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that a misspelled table, a misspelled key in each table or in
+    a feature it nests, and a toggle spelled with the underscore its field
+    takes rather than the endpoint's hyphen each fail validation, naming the
+    setting missing beside the one the file carries in its place.
+    """
+    text = (pytestconfig.rootpath / ".github/settings.toml").read_text()
+
+    assert old in text
+    with raises(ValidationError) as error:
+        GithubSettings.model_validate(
+            text.replace(old, new),
+            context = {"suffix": ".toml"}
+        )
+
+    assert [detail["loc"] for detail in error.value.errors()] == locations
+
+
+@mark.parametrize(
+    ("call", "command", "payload"),
+    [
+        param(
+            Request(body={"names": ["jax"]}, endpoint="topics", method="PUT"),
+            [
+                "gh", "api", "--input", "-",
+                "--method", "PUT", "--silent", "repos/{owner}/{repo}/topics"
+            ],
+            b'{"names":["jax"]}',
+            id = "body"
+        ),
+        param(
+            Request(body={}, endpoint="", method="PATCH"),
+            [
+                "gh", "api", "--input", "-",
+                "--method", "PATCH", "--silent", "repos/{owner}/{repo}"
+            ],
+            b"{}",
+            id = "empty-body"
+        ),
+        param(
+            Request(endpoint="vulnerability-alerts", method="DELETE"),
+            [
+                "gh", "api", "--method",
+                "DELETE", "--silent", "repos/{owner}/{repo}/vulnerability-alerts"
+            ],
+            None,
+            id = "no-body"
+        )
+    ]
+)
+def test_a_request_sends_its_body_on_standard_input(
+    call    : Request,
+    command : list[str],
+    payload : bytes | None
+):
+    """
+    Asserts that a request carrying a body, an empty one included, reads
+    it from standard input as compact JSON, that one carrying none reads
+    nothing, and that an empty endpoint reaches the repository itself.
+    """
+    assert (call.command, call.payload) == (command, payload)
+
+
 def test_the_lock_maps_each_package_to_its_version():
     """
     Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
@@ -811,8 +1012,88 @@ def test_the_lock_maps_each_package_to_its_version():
     assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
 
 
+@mark.parametrize(
+    ("name", "contexts"),
+    [param("main", {"📡 Readout"}, id="main"), param("tags", set(), id="tags")]
+)
+def test_a_ruleset_reads_the_checks_it_requires(
+    contexts     : set[str],
+    name         : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that the `main` ruleset requires the `📡 Readout` check alone
+    and the tag ruleset, holding no `required_status_checks` rule, requires
+    none.
+    """
+    path = Path(f".github/rulesets/{name}.json")
+
+    assert Ruleset.read(pytestconfig.rootpath, path).contexts == contexts
+
+
+@mark.parametrize(
+    ("live", "method", "endpoint"),
+    [
+        param(24390266, "PUT", "rulesets/24390266", id="update"),
+        param(None, "POST", "rulesets", id="create")
+    ]
+)
+def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
+    endpoint     : str,
+    live         : int | None,
+    method       : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that a ruleset updates the live ruleset whose id it is handed
+    in place and creates itself where it is handed none, sending exactly the
+    JSON its file holds, with no default filled in.
+    """
+    path    = Path(".github/rulesets/main.json")
+    request = Ruleset.read(pytestconfig.rootpath, path).request(live)
+
+    assert (request.method, request.endpoint, request.body) == (
+        method, endpoint,
+        from_json((pytestconfig.rootpath / path).read_text())
+    )
+
+
 def workflow(text: str) -> Workflow:
     """
     Validates `text` as a workflow file's YAML.
     """
     return Workflow.model_validate(text, context={"suffix": ".yml"})
+
+
+@mark.parametrize(
+    ("events", "pulls"),
+    [
+        param("  pull_request:\n", True, id="pull-request"),
+        param("  pull_request:\n  push:\n", True, id="both"),
+        param("  push:\n", False, id="push")
+    ]
+)
+def test_a_workflow_reads_whether_it_runs_on_a_pull_request(events: str, pulls: bool):
+    """
+    Asserts that a workflow runs on a pull request only where `pull_request`
+    is among its events, whatever else it runs on.
+    """
+    assert workflow(f"name: w\njobs: {{}}\non:\n{events}").on_pull_request is pulls
+
+
+@mark.parametrize("table", list(GithubSettings.model_fields))
+def test_a_deleted_table_fails_the_settings(pytestconfig: Config, table: str):
+    """
+    Asserts that a settings file missing any one table fails validation
+    naming that table, before any call reaches GitHub.
+    """
+    parsed = GithubSettings.load(
+        ".toml",
+        (pytestconfig.rootpath / ".github/settings.toml").read_text(encoding="utf-8")
+    )
+    del parsed[table]
+
+    with raises(ValidationError) as error:
+        GithubSettings.model_validate(parsed)
+
+    assert [detail["loc"] for detail in error.value.errors()] == [(table,)]

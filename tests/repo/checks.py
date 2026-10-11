@@ -24,6 +24,7 @@ from thermur.repo.checks   import (
     ParityCheck,
     PinCheck,
     ProvisionCheck,
+    RulesetCheck,
     RunCheck,
     ScriptCheck,
     SummaryCheck,
@@ -37,6 +38,7 @@ BRIEF  = ".mise/tasks/gha/brief.py"
 CI     = ".github/workflows/ci.yml"
 DRAFT  = ".github/workflows/draft.yml"
 FLOOR  = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
+MAIN   = ".github/rulesets/main.json"
 SHELL  = "#!/usr/bin/env -S bash -euo pipefail\n"
 WARM   = ".github/workflows/warm.yml"
 
@@ -985,18 +987,22 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
+def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
     """
-    Asserts that a problem `mise tasks validate` reports on a task, here
-    an alias two tasks share, is named on the file holding the task at the
-    severity mise reports.
+    Asserts that a ruleset carrying a key the rulesets API does not take
+    is named on its own file, one finding per field, rather than ending
+    the audit.
     """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+    tags = ".github/rulesets/tags.json"
+    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
 
-    assert [
-        (finding.file, finding.level)
-        for finding in TaskCheck(checkout=checkout).findings
-    ] == [(path, Level.ERROR)]
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
+        Finding(
+            file    = Path(tags),
+            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
+        )
+    ]
 
 
 @mark.parametrize(
@@ -1082,6 +1088,20 @@ def test_a_cache_key_ending_on_anything_but_its_hash_is_named(
     ]
 
 
+def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
+    """
+    Asserts that a problem `mise tasks validate` reports on a task, here
+    an alias two tasks share, is named on the file holding the task at the
+    severity mise reports.
+    """
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+
+    assert [
+        (finding.file, finding.level)
+        for finding in TaskCheck(checkout=checkout).findings
+    ] == [(path, Level.ERROR)]
+
+
 def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
     """
     Asserts that a Markdown template opening on no front matter is named on
@@ -1112,25 +1132,6 @@ def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
     )
 
     assert KitCheck(checkout=checkout).findings == []
-
-
-def test_a_validation_error_outside_the_documents_is_raised(
-    checkout    : Checkout,
-    monkeypatch : MonkeyPatch
-):
-    """
-    Asserts that a task listing failing validation, whose error names no
-    file of the checkout, ends the audit rather than reading as a finding on
-    a file that does not exist.
-    """
-    monkeypatch.setattr(
-        Checkout,
-        "tasks",
-        property(lambda checkout: TypeAdapter(list[Task]).validate_python([{}]))
-    )
-
-    with raises(ValidationError):
-        RunCheck(checkout=checkout).findings
 
 
 @mark.parametrize(
@@ -1389,6 +1390,25 @@ def test_a_moved_manifest_declaration_names_every_copy(
     ]
 
 
+def test_a_validation_error_outside_the_documents_is_raised(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a task listing failing validation, whose error names no
+    file of the checkout, ends the audit rather than reading as a finding on
+    a file that does not exist.
+    """
+    monkeypatch.setattr(
+        Checkout,
+        "tasks",
+        property(lambda checkout: TypeAdapter(list[Task]).validate_python([{}]))
+    )
+
+    with raises(ValidationError):
+        RunCheck(checkout=checkout).findings
+
+
 def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
     """
     Asserts that a workflow yaml-rs cannot read, here one repeating a key,
@@ -1400,30 +1420,6 @@ def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
         Finding(
             file    = Path(CI),
             message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
-        )
-    ]
-
-
-def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
-    """
-    Asserts that a step pinning an action to a commit other than the one
-    the first step pinning it names is named against that first step, in
-    path order.
-    """
-    edit(
-        checkout = checkout,
-        new = "      - name : Check out again\n        uses : actions/checkout@0f0f\n\n"
-        "      - name : Cut the draft",
-        old  = "      - name : Cut the draft",
-        path = DRAFT
-    )
-
-    assert CommitCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(DRAFT),
-            message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
-            f"the pin on it in `{ACTION}` reads "
-            "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
         )
     ]
 
@@ -1580,8 +1576,8 @@ def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
             "| `🪵 Lockfiles` | `mise lockfile` |",
             "| `🪵 Lockfiles` | x | x |\n| `🪵 Lockfiles` | `mise lockfile` |",
             [
-                "`checks` in `.github/CONTRIBUTING.md`: Value error, lists "
-                "`🪵 Lockfiles` in more than one row"
+                "`checks` in `.github/CONTRIBUTING.md`: Value error, names "
+                "`🪵 Lockfiles` more than once"
             ],
             id = "repeated-row"
         )
@@ -1606,6 +1602,82 @@ def test_a_guide_out_of_step_with_the_rows_is_named(
     assert GuideCheck(checkout=checkout).findings == [
         Finding(file=Path(".github/CONTRIBUTING.md"), message=message)
         for message in messages
+    ]
+
+
+def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
+    """
+    Asserts that a step pinning an action to a commit other than the one
+    the first step pinning it names is named against that first step, in
+    path order.
+    """
+    edit(
+        checkout = checkout,
+        new = "      - name : Check out again\n        uses : actions/checkout@0f0f\n\n"
+        "      - name : Cut the draft",
+        old  = "      - name : Cut the draft",
+        path = DRAFT
+    )
+
+    assert CommitCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(DRAFT),
+            message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
+            f"the pin on it in `{ACTION}` reads "
+            "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
+        )
+    ]
+
+
+@mark.parametrize(
+    ("path", "old", "new", "context"),
+    [
+        param(
+            MAIN,
+            '"context": "📡 Readout"',
+            '"context": "🐦‍⬛ CI"',
+            "🐦‍⬛ CI",
+            id = "required"
+        ),
+        param(
+            CI,
+            "name    : 📡 Readout",
+            "name    : 📡 Report",
+            "📡 Readout",
+            id = "gate"
+        ),
+        param(
+            MAIN,
+            '"integration_id": 15368 }]',
+            '"integration_id": 15368 }, { "context": "🐦‍⬛ CI" }]',
+            "🐦‍⬛ CI",
+            id = "second"
+        ),
+        param(CI, "  gate:\n", "  brief:\n", "📡 Readout", id="no-gate")
+    ]
+)
+def test_a_required_check_no_pull_request_gate_names_is_named(
+    checkout : Checkout,
+    context  : str,
+    new      : str,
+    old      : str,
+    path     : str
+):
+    """
+    Asserts that renaming the check the `main` ruleset requires, adding a
+    second required check beside it, renaming the gate of the one workflow
+    running on a pull request, or ending that workflow on no gate makes one
+    finding on the ruleset naming the required check no such gate carries,
+    although the gates of the push workflows still carry `📡 Readout`.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(MAIN),
+            message = f"`{MAIN}` requires the `{context}` check, which no gate of a "
+            "workflow running on a pull request names"
+        )
     ]
 
 

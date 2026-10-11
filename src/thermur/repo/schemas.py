@@ -1,13 +1,22 @@
 """
-Holds the records the repository audit reads and reports:
+Holds the records the `repo` tasks read and report:
 
 - The `Document` base and the files it validates, meaning the `Manifest`
-  with its `Author` rows, the `Config`, the `Labels` with their `Label`
-  rows, and the `Lock` out of the TOML, and each `Workflow` with its `Job`,
+  with its `Author` rows, the `Config`, the `GithubSettings` with its
+  `Actions`, `Repository`, `Toggles`, and `Token` tables and the `Analysis`
+  of `Feature` rows its `Repository` holds, the `Labels` with their `Label`
+  rows, and the `Lock` out of the TOML, each `Workflow` with its `Job`,
   `Step`, and `Trigger` rows, each composite `Action`, the `Release` with
   its `Category` rows, each issue `Template`, and the `Citation` with its
-  `Person` rows out of the YAML, and the `Guide` out of the contributor
-  guide's tables
+  `Person` rows out of the YAML, each `Ruleset` with its `Rule` and `Actor`
+  rows and the `Parameters` of `Status` rows each rule takes out of the JSON
+  under `.github/rulesets/`, and the `Guide` out of the contributor guide's
+  tables
+- The `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and `State` enums
+  each closed-set value in `.github/settings.toml` takes, and the
+  `ActorType`, `BypassMode`, `Enforcement`, `MergeMethod`, `RuleType`, and
+  `Target` enums each closed-set value of a ruleset takes
+- Each `Request` `repo:rulesets` sends GitHub
 - Each `Task` mise lists and each `Issue` mise reports on one
 - Each `Finding` a check makes at its `Level`, and each `Parity` a check
   compares
@@ -16,7 +25,9 @@ Holds the records the repository audit reads and reports:
 from collections     import Counter
 from collections.abc import Iterable, Sequence
 from enum            import StrEnum, auto
+from http            import HTTPMethod
 from itertools       import cycle
+from json            import loads as from_json
 from operator        import attrgetter
 from packaging.requirements import Requirement
 from pathlib                import Path, PurePosixPath
@@ -26,7 +37,9 @@ from pydantic               import (
     BaseModel,
     BeforeValidator,
     Field,
+    JsonValue,
     PlainValidator,
+    TypeAdapter,
     ValidationError,
     ValidationInfo,
     field_validator,
@@ -62,15 +75,17 @@ def read_labels(labels: str | list[str]) -> list[str]:
     return labels
 
 
-class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+class ActorType(StrEnum):
     """
-    One author `[project].authors` names.
+    The kind of actor a ruleset lets bypass it, as `actor_type` names it.
     """
 
-    name: str
-    """
-    The author's name as a copyright line gives it.
-    """
+    DEPLOY_KEY         = "DeployKey"
+    INTEGRATION        = "Integration"
+    ORGANIZATION_ADMIN = "OrganizationAdmin"
+    REPOSITORY_ROLE    = "RepositoryRole"
+    TEAM               = "Team"
+    USER               = "User"
 
 
 def read_minor(version: str) -> str:
@@ -96,22 +111,27 @@ def read_names(needs: str | list[str]) -> list[str]:
     return [needs] if isinstance(needs, str) else needs
 
 
-def read_rows(rows: list[tuple[str, str]]) -> dict[str, str]:
+def read_pairs[V](pairs: list[tuple[str, V]]) -> dict[str, V]:
     """
-    Maps the first cell of each row a table holds to the row's second cell.
+    Builds one mapping out of key and value pairs, such as the rows of a
+    table or the members of a JSON object.
 
     Raises:
-        ValueError: Naming each first cell two or more rows share, which
-                    validation reports against the field.
+        ValueError: Naming each key two or more pairs share, which
+                    validation reports against the field or the document.
     """
-    if repeats := [
-        f"`{name}`"
-        for name, count in Counter(name for name, _ in rows).items()
-        if count > 1
-    ]:
-        raise ValueError(f"lists {join_names(repeats)} in more than one row")
+    if repeats := [f"`{key}`" for key in repeated(key for key, _ in pairs)]:
+        raise ValueError(f"names {join_names(repeats)} more than once")
 
-    return dict(rows)
+    return dict(pairs)
+
+
+def repeated[T](values: Iterable[T]) -> list[T]:
+    """
+    Keeps each of `values` that appears more than once, in the order of its
+    first appearance.
+    """
+    return [value for value, count in Counter(values).items() if count > 1]
 
 
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
@@ -121,23 +141,22 @@ def read_versions(packages: Iterable[dict]) -> dict[str, str]:
     return {package["name"]: package["version"] for package in packages}
 
 
-class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    One release-notes category `.github/release.yml` declares.
+    One author `[project].authors` names.
     """
 
-    labels: list[str]
+    name: str
     """
-    The labels any one of which files a pull request under the category,
-    where `*` files every pull request no earlier category takes.
+    The author's name as a copyright line gives it.
     """
 
 
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
     A file of the checkout, validated from its text into the fields the
-    checks read, whose validation error carries the file's path from the
-    root as its title.
+    `repo` tasks read, whose validation error carries the file's path from
+    the root as its title.
     """
 
     @property
@@ -152,17 +171,23 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
     def load(suffix: str, text: str) -> object:
         """
         Reads `text`, the text of a file whose name ends on `suffix`, as
-        TOML where the suffix is `.toml` or `.lock`, as the YAML front
-        matter opening a Markdown file where it is `.md`, and as YAML
-        otherwise, keeping a YAML timestamp as its text.
+        TOML where the suffix is `.toml` or `.lock`, as JSON where it is
+        `.json`, as the YAML front matter opening a Markdown file where it
+        is `.md`, and as YAML otherwise, keeping a YAML timestamp as its
+        text.
 
         Raises:
-            ValueError: Where the TOML or the YAML fails to parse, or where
-                        a Markdown file opens on no front matter, which
-                        validation reports against the whole document.
+            ValueError: Where the TOML, the JSON, or the YAML fails to
+                        parse, where a JSON object names a key more than
+                        once, or where a Markdown file opens on no front
+                        matter, which validation reports against the whole
+                        document.
         """
         if suffix in (".lock", ".toml"):
             return loads(text)
+
+        if suffix == ".json":
+            return from_json(text, object_pairs_hook=read_pairs)
 
         if suffix == ".md":
             if front := search(r"(?ms)\A---\n(.*?)^---$", text):
@@ -207,6 +232,38 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
             ) from None
 
 
+class BypassMode(StrEnum):
+    """
+    When an actor may bypass a ruleset, as `bypass_mode` names it.
+    """
+
+    ALWAYS       = auto()
+    EXEMPT       = auto()
+    PULL_REQUEST = auto()
+
+
+class Config(Document, title=".mise/config.toml"):
+    """
+    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
+    the path.
+    """
+
+    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
+    """
+    The folder `_.path` puts on the path, relative to the root.
+    """
+
+    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
+    """
+    The major and minor of the `python` mise pins.
+    """
+
+    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
+    """
+    The `uv` release mise pins.
+    """
+
+
 class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     One label `.github/labels.toml` declares, as GitHub shows it on an issue
@@ -240,38 +297,6 @@ class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             "gh", "label", "create", "--color", self.color,
             "--description", self.description, "--force", self.name
         ]
-
-
-class Config(Document, title=".mise/config.toml"):
-    """
-    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
-    the path.
-    """
-
-    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
-    """
-    The folder `_.path` puts on the path, relative to the root.
-    """
-
-    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
-    """
-    The major and minor of the `python` mise pins.
-    """
-
-    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
-    """
-    The `uv` release mise pins.
-    """
-
-
-class Level(StrEnum):
-    """
-    How a finding bears on the audit, each member's value the GitHub Actions
-    workflow command that prints it.
-    """
-
-    ERROR   = auto()
-    WARNING = auto()
 
 
 class Step(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
@@ -383,9 +408,21 @@ class Manifest(Document, title="pyproject.toml"):
     The build constraints `[tool.uv]` holds hatchling's own dependencies to.
     """
 
+    description: str = Field(validation_alias=AliasPath("project", "description"))
+    """
+    The sentence `[project]` describes the project in, which `repo:rulesets`
+    sends as the repository's description.
+    """
+
     floor: Minor = Field(validation_alias=AliasPath("project", "requires-python"))
     """
     The major and minor `requires-python` sets as the floor.
+    """
+
+    keywords: list[str] = Field(validation_alias=AliasPath("project", "keywords"))
+    """
+    The keywords `[project]` lists, which `repo:rulesets` sends as the
+    repository's topics.
     """
 
     license: str = Field(validation_alias=AliasPath("project", "license"))
@@ -459,6 +496,23 @@ class Manifest(Document, title="pyproject.toml"):
         Joins the authors' names the way a copyright line names its holders.
         """
         return join_names([author.name for author in self.authors])
+
+    @property
+    def requests(self) -> list[Request]:
+        """
+        Writes the calls sending the description `[project]` declares
+        as the repository's description and the keywords it lists as the
+        repository's topics, which replace every topic the repository
+        carries.
+        """
+        return [
+            Request(
+                body     = {"description": self.description},
+                endpoint = "",
+                method   = "PATCH"
+            ),
+            Request(body={"names": self.keywords}, endpoint="topics", method="PUT")
+        ]
 
 
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
@@ -570,43 +624,16 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
         return self.file or self.source
 
 
-class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+class Category(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    One place the checkout breaks an invariant the audit holds it to, at the
-    file a reader opens to put it right.
-    """
-
-    file: Path
-    """
-    The file the finding sits in, relative to the root of the checkout.
+    One release-notes category `.github/release.yml` declares.
     """
 
-    message: str
+    labels: list[str]
     """
-    What is wrong, in a sentence a reader acts on.
+    The labels any one of which files a pull request under the category,
+    where `*` files every pull request no earlier category takes.
     """
-
-    level: Level = Level.ERROR
-    """
-    Whether the finding fails the audit or is printed as a warning alone.
-    """
-
-    @property
-    def annotation(self) -> str:
-        """
-        Writes the finding as the GitHub Actions annotation of its level
-        the runner shows on `file`, percent-encoding each line break and
-        `%`, and each `,` and `:` in the file name, which a workflow command
-        reads as its own syntax.
-        """
-        escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
-        place   = str(self.file).translate(
-            str.maketrans(escapes | {",": "%2C", ":": "%3A"})
-        )
-        return (
-            f"::{self.level} file={place}::"
-            f"{self.message.translate(str.maketrans(escapes))}"
-        )
 
 
 class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
@@ -741,6 +768,15 @@ class Workflow(Document):
         """
         return {key: job for key, job in self.jobs.items() if key != "gate"}
 
+    @property
+    def on_pull_request(self) -> bool:
+        """
+        Tells whether the workflow runs on a pull request, which makes its
+        gate a check a ruleset can require and its rows the checks `repo:ci`
+        runs.
+        """
+        return "pull_request" in self.events
+
     def pushes(self, file: str) -> bool:
         """
         Tells whether a push changing `file`, relative to the root, runs
@@ -769,13 +805,13 @@ class Guide(Document, extra="forbid", title=".github/CONTRIBUTING.md"):
     carries no table under its header.
     """
 
-    checks: Annotated[dict[str, str], BeforeValidator(read_rows)]
+    checks: Annotated[dict[str, str], BeforeValidator(read_pairs)]
     """
     The command the checks table gives each check for a laptop, by the
     name of the check.
     """
 
-    labels: Annotated[dict[str, str], BeforeValidator(read_rows)]
+    labels: Annotated[dict[str, str], BeforeValidator(read_pairs)]
     """
     The description the labels table gives each label, by the label's
     name.
@@ -831,8 +867,7 @@ class Labels(Document, extra="forbid", title=".github/labels.toml"):
         if repeats := [
             f"the {field} `{value}`"
             for field in ("name", "color")
-            for value, count in Counter(map(attrgetter(field), rows)).items()
-            if count > 1
+            for value in repeated(map(attrgetter(field), rows))
         ]:
             raise ValueError(f"declares {join_names(repeats)} more than once")
 
@@ -866,42 +901,14 @@ class Release(Document, title=".github/release.yml"):
         ]
 
 
-class Issue(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+class Enforcement(StrEnum):
     """
-    One problem `mise tasks validate --json` reports on a task.
-    """
-
-    message: str
-    """
-    The problem, as mise words it.
+    Whether a ruleset is enforced, as `enforcement` names it.
     """
 
-    severity: Level
-    """
-    Whether mise counts the problem as an error or as a warning.
-    """
-
-    task: str
-    """
-    The name of the task the problem sits on.
-    """
-
-    details: str = ""
-    """
-    What mise adds to the message, such as the tasks an alias is shared by.
-    """
-
-    def finding(self, file: Path) -> Finding:
-        """
-        Writes the problem as a finding at its severity on `file`, the file
-        holding or declaring the task.
-        """
-        return Finding(
-            file    = file,
-            level   = self.severity,
-            message = f"`mise tasks validate` reports `{self.message}` on "
-            f"`{self.task}`" + (f" (`{self.details}`)" if self.details else "")
-        )
+    ACTIVE   = auto()
+    DISABLED = auto()
+    EVALUATE = auto()
 
 
 class Citation(Document, title="CITATION.cff"):
@@ -975,6 +982,180 @@ class Template(Document):
     """
 
 
+class Level(StrEnum):
+    """
+    How a finding bears on the audit, each member's value the GitHub Actions
+    workflow command that prints it.
+    """
+
+    ERROR   = auto()
+    WARNING = auto()
+
+
+class MergeMethod(StrEnum):
+    """
+    A way a pull request may merge, as `allowed_merge_methods` names it.
+    """
+
+    MERGE  = auto()
+    REBASE = auto()
+    SQUASH = auto()
+
+
+class Actor(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One actor who may bypass a ruleset.
+    """
+
+    actor_type: ActorType
+    """
+    The kind of actor.
+    """
+
+    actor_id: int | None = None
+    """
+    The id of the actor, which the rulesets API requires for an
+    `Integration`, `RepositoryRole`, `Team`, or `User`, ignores for an
+    `OrganizationAdmin`, and takes as `None` for a `DeployKey`.
+    """
+
+    bypass_mode: BypassMode = BypassMode.ALWAYS
+    """
+    When the actor may bypass the ruleset, which the rulesets API takes as
+    `always` where the file sets none.
+    """
+
+
+class Actions(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The GitHub Actions permissions `[actions]` declares, by the field names
+    the `actions/permissions` endpoint reads.
+    """
+
+    allowed_actions: Policy
+    """
+    The actions a workflow may run, `all` letting it run any.
+    """
+
+    enabled: bool
+    """
+    Whether GitHub Actions runs on the repository.
+    """
+
+    sha_pinning_required: bool
+    """
+    Whether a workflow must pin each action from another repository to a
+    full commit SHA.
+    """
+
+    @property
+    def request(self) -> Request:
+        """
+        Writes the call setting the GitHub Actions permissions.
+        """
+        return Request(
+            body     = self.model_dump(),
+            endpoint = "actions/permissions",
+            method   = "PUT"
+        )
+
+
+class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One place the checkout breaks an invariant the audit holds it to, at the
+    file a reader opens to put it right.
+    """
+
+    file: Path
+    """
+    The file the finding sits in, relative to the root of the checkout.
+    """
+
+    message: str
+    """
+    What is wrong, in a sentence a reader acts on.
+    """
+
+    level: Level = Level.ERROR
+    """
+    Whether the finding fails the audit or is printed as a warning alone.
+    """
+
+    @property
+    def annotation(self) -> str:
+        """
+        Writes the finding as the GitHub Actions annotation of its level
+        the runner shows on `file`, percent-encoding each line break and
+        `%`, and each `,` and `:` in the file name, which a workflow command
+        reads as its own syntax.
+        """
+        escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
+        place   = str(self.file).translate(
+            str.maketrans(escapes | {",": "%2C", ":": "%3A"})
+        )
+        return (
+            f"::{self.level} file={place}::"
+            f"{self.message.translate(str.maketrans(escapes))}"
+        )
+
+
+class Analysis(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The security and analysis features `.github/settings.toml` sets, by the
+    name GitHub's API gives each.
+    """
+
+    secret_scanning: Feature
+    """
+    Secret scanning, which raises an alert on a credential pushed to the
+    repository.
+    """
+
+    secret_scanning_push_protection: Feature
+    """
+    Push protection, which blocks a push carrying a credential secret
+    scanning recognizes.
+    """
+
+
+class Issue(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One problem `mise tasks validate --json` reports on a task.
+    """
+
+    message: str
+    """
+    The problem, as mise words it.
+    """
+
+    severity: Level
+    """
+    Whether mise counts the problem as an error or as a warning.
+    """
+
+    task: str
+    """
+    The name of the task the problem sits on.
+    """
+
+    details: str = ""
+    """
+    What mise adds to the message, such as the tasks an alias is shared by.
+    """
+
+    def finding(self, file: Path) -> Finding:
+        """
+        Writes the problem as a finding at its severity on `file`, the file
+        holding or declaring the task.
+        """
+        return Finding(
+            file    = file,
+            level   = self.severity,
+            message = f"`mise tasks validate` reports `{self.message}` on "
+            f"`{self.task}`" + (f" (`{self.details}`)" if self.details else "")
+        )
+
+
 class Parity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     One declaration a file restates beside the declaration it restates, each
@@ -1039,6 +1220,56 @@ def join_names(names: Sequence[str]) -> str:
     return f"{', '.join(names[:-1])}, and {names[-1]}"
 
 
+class Feature(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One feature `security_and_analysis` turns on or off.
+    """
+
+    status: State
+    """
+    Whether the feature runs.
+    """
+
+
+class GithubSettings(Document, extra="forbid", title=".github/settings.toml"):
+    """
+    Every repository setting no ruleset carries, as `.github/settings.toml`
+    declares it, holding nothing beside its tables.
+    """
+
+    actions: Actions
+    """
+    The GitHub Actions permissions.
+    """
+
+    repository: Repository
+    """
+    The repository's own settings.
+    """
+
+    toggles: Toggles
+    """
+    The settings GitHub serves each as an endpoint of its own.
+    """
+
+    token: Token
+    """
+    The defaults of the token each workflow run receives.
+    """
+
+    @property
+    def requests(self) -> list[Request]:
+        """
+        Writes the call sending each table, the repository's own settings
+        first, then the Actions permissions, the token's defaults, and each
+        toggle.
+        """
+        return [
+            self.repository.request, self.actions.request, self.token.request,
+            *self.toggles.requests
+        ]
+
+
 def read_table(header: str, text: str) -> list[tuple[str, str]]:
     """
     Reads the first two cells of each row of the Markdown table in `text`
@@ -1051,3 +1282,418 @@ def read_table(header: str, text: str) -> list[tuple[str, str]]:
         tuple(sub(r"^`([^`]*)`$", r"\1", cell) for cell in row)
         for row in findall(r"(?m)^\| (.+?) \| (.+?) \|", body)
     ]
+
+
+class Parameters(BaseModel, extra="allow", frozen=True, use_attribute_docstrings=True):
+    """
+    The parameters one rule of a ruleset takes, validated for the
+    merge methods a `pull_request` rule allows and the checks a
+    `required_status_checks` rule requires, and kept as written otherwise.
+    """
+
+    allowed_merge_methods: tuple[MergeMethod, ...] = ()
+    """
+    The merge methods the rule allows, or none for a rule of another type.
+    """
+
+    required_status_checks: tuple[Status, ...] = ()
+    """
+    The checks the rule requires, or none for a rule of another type.
+    """
+
+
+class Policy(StrEnum):
+    """
+    The actions a workflow may run, as `allowed_actions` names them.
+    """
+
+    ALL        = auto()
+    LOCAL_ONLY = auto()
+    SELECTED   = auto()
+
+
+class Repository(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The repository's own settings `[repository]` declares, by the field
+    names `PATCH /repos/{owner}/{repo}` reads.
+    """
+
+    allow_auto_merge: bool
+    """
+    Whether a pull request can be set to merge once its checks pass.
+    """
+
+    allow_merge_commit: bool
+    """
+    Whether a pull request can merge as a merge commit.
+    """
+
+    allow_rebase_merge: bool
+    """
+    Whether a pull request can merge by rebasing its commits.
+    """
+
+    allow_squash_merge: bool
+    """
+    Whether a pull request can merge as one squashed commit.
+    """
+
+    allow_update_branch: bool
+    """
+    Whether a pull request offers to take in its base branch once it falls
+    behind.
+    """
+
+    delete_branch_on_merge: bool
+    """
+    Whether a pull request's head branch is deleted once it merges.
+    """
+
+    has_discussions: bool
+    """
+    Whether the repository shows the Discussions tab.
+    """
+
+    has_issues: bool
+    """
+    Whether the repository takes issues.
+    """
+
+    has_projects: bool
+    """
+    Whether the repository shows the Projects tab.
+    """
+
+    has_wiki: bool
+    """
+    Whether the repository shows the wiki.
+    """
+
+    security_and_analysis: Analysis
+    """
+    The security and analysis features the repository runs.
+    """
+
+    squash_merge_commit_message: SquashMessage
+    """
+    The message a squash merge's commit takes by default.
+    """
+
+    squash_merge_commit_title: SquashTitle
+    """
+    The title a squash merge's commit takes by default.
+    """
+
+    @property
+    def request(self) -> Request:
+        """
+        Writes the call setting the repository's own settings.
+        """
+        return Request(body=self.model_dump(), endpoint="", method="PATCH")
+
+
+class Request(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One call `repo:rulesets` makes to GitHub's REST API through `gh api`, on
+    the repository the checkout's remote names, which `gh` fills in for the
+    `{owner}` and `{repo}` placeholders.
+    """
+
+    endpoint: str
+    """
+    The path of the call under `repos/{owner}/{repo}`, empty for the
+    repository itself.
+    """
+
+    method: HTTPMethod
+    """
+    The HTTP method the call takes.
+    """
+
+    body: dict[str, JsonValue] | None = None
+    """
+    The JSON body the call sends, or `None` where it sends none.
+    """
+
+    @property
+    def command(self) -> list[str]:
+        """
+        Writes the `gh api` command making the call, which reads the body
+        from its standard input where the call sends one and prints no
+        response.
+        """
+        return [
+            "gh", "api",
+            *(["--input", "-"] if self.body is not None else []),
+            "--method", self.method, "--silent",
+            str(PurePosixPath("repos/{owner}/{repo}", self.endpoint))
+        ]
+
+    @property
+    def payload(self) -> bytes | None:
+        """
+        Encodes the body as the JSON `command` reads from its standard
+        input, or `None` where the call sends no body.
+        """
+        return None if self.body is None else TypeAdapter(JsonValue).dump_json(
+            self.body
+        )
+
+
+class Rule(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One rule a ruleset holds its refs to.
+    """
+
+    type: RuleType
+    """
+    The kind of rule, as the rulesets API names it.
+    """
+
+    parameters: Parameters = Field(default_factory=Parameters)
+    """
+    The parameters the rule takes, or none for a rule taking none.
+    """
+
+
+class RuleType(StrEnum):
+    """
+    The kind of rule a ruleset holds, as each rule's `type` names it.
+    """
+
+    BRANCH_NAME_PATTERN         = auto()
+    CODE_COVERAGE               = auto()
+    CODE_QUALITY                = auto()
+    CODE_SCANNING               = auto()
+    COMMIT_AUTHOR_EMAIL_PATTERN = auto()
+    COMMIT_MESSAGE_PATTERN      = auto()
+    COMMITTER_EMAIL_PATTERN     = auto()
+    COPILOT_CODE_REVIEW         = auto()
+    CREATION = auto()
+    DELETION = auto()
+    FILE_EXTENSION_RESTRICTION  = auto()
+    FILE_PATH_RESTRICTION       = auto()
+    LICENSE_COMPLIANCE_SCANNING = auto()
+    MAX_FILE_PATH_LENGTH        = auto()
+    MAX_FILE_SIZE               = auto()
+    MERGE_QUEUE                 = auto()
+    NON_FAST_FORWARD            = auto()
+    PULL_REQUEST                = auto()
+    REQUIRED_DEPLOYMENTS        = auto()
+    REQUIRED_LINEAR_HISTORY     = auto()
+    REQUIRED_SIGNATURES         = auto()
+    REQUIRED_STATUS_CHECKS      = auto()
+    TAG_NAME_PATTERN            = auto()
+    UPDATE    = auto()
+    WORKFLOWS = auto()
+
+
+class Ruleset(Document, extra="forbid"):
+    """
+    One ruleset under `.github/rulesets/`, holding the fields the rulesets
+    API takes for creating or updating a ruleset on a repository.
+    """
+
+    bypass_actors: tuple[Actor, ...]
+    """
+    The actors who may bypass the ruleset.
+    """
+
+    conditions: dict[str, JsonValue]
+    """
+    The refs the ruleset applies to, by the patterns they match.
+    """
+
+    enforcement: Enforcement
+    """
+    Whether the ruleset is enforced.
+    """
+
+    name: str
+    """
+    The name the ruleset carries on GitHub, which `repo:rulesets` finds the
+    live ruleset by.
+    """
+
+    rules: tuple[Rule, ...]
+    """
+    The rules the ruleset holds its refs to.
+    """
+
+    target: Target
+    """
+    What the ruleset applies to, meaning branches, tags, or every push.
+    """
+
+    @property
+    def contexts(self) -> set[str]:
+        """
+        Collects the context of each check the ruleset requires to pass.
+        """
+        return {
+            check.context
+            for rule in self.rules
+            for check in rule.parameters.required_status_checks
+        }
+
+    def request(self, live: int | None) -> Request:
+        """
+        Writes the call updating the live ruleset whose id is `live` in
+        place, or creating the ruleset where `live` is `None`, sending each
+        field as the file declares it.
+        """
+        endpoint, method = (
+            ("rulesets", "POST") if live is None else (f"rulesets/{live}", "PUT")
+        )
+        return Request(
+            body     = self.model_dump(exclude_unset=True, mode="json"),
+            endpoint = endpoint,
+            method   = method
+        )
+
+
+class Scope(StrEnum):
+    """
+    The scope a workflow run's token takes where the workflow sets no
+    `permissions`, as `default_workflow_permissions` names it.
+    """
+
+    READ  = auto()
+    WRITE = auto()
+
+
+class SquashMessage(StrEnum):
+    """
+    The message a squash merge's commit takes by default, as
+    `squash_merge_commit_message` names it.
+    """
+
+    BLANK           = "BLANK"
+    COMMIT_MESSAGES = "COMMIT_MESSAGES"
+    PR_BODY         = "PR_BODY"
+
+
+class SquashTitle(StrEnum):
+    """
+    The title a squash merge's commit takes by default, as
+    `squash_merge_commit_title` names it.
+    """
+
+    COMMIT_OR_PR_TITLE = "COMMIT_OR_PR_TITLE"
+    PR_TITLE           = "PR_TITLE"
+
+
+class State(StrEnum):
+    """
+    Whether a security and analysis feature runs, as its `status` names it.
+    """
+
+    DISABLED = auto()
+    ENABLED  = auto()
+
+
+class Status(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One check a `required_status_checks` rule requires to pass.
+    """
+
+    context: str
+    """
+    The name the check reports under, which for a GitHub Actions job is the
+    job's `name`.
+    """
+
+    integration_id: int | None = None
+    """
+    The id of the app the check must come from, or `None` where any app
+    may report it.
+    """
+
+
+class Target(StrEnum):
+    """
+    What a ruleset applies to, meaning branches, tags, or every push to the
+    repository, as `target` names it.
+    """
+
+    BRANCH = auto()
+    PUSH   = auto()
+    TAG    = auto()
+
+
+class Toggles(
+    BaseModel,
+    alias_generator          = lambda name: name.replace("_", "-"),
+    extra                    = "forbid",
+    frozen                   = True,
+    use_attribute_docstrings = True
+):
+    """
+    The settings GitHub serves each as an endpoint of its own under
+    `/repos/{owner}/{repo}`, which `PUT` turns on and `DELETE` turns off,
+    keyed under `[toggles]` by the endpoint's name.
+    """
+
+    automated_security_fixes: bool
+    """
+    Dependabot security updates, which open a pull request moving a
+    vulnerable pin.
+    """
+
+    immutable_releases: bool
+    """
+    Immutable releases, which keep a published release's tag and assets
+    from changing.
+    """
+
+    private_vulnerability_reporting: bool
+    """
+    Private vulnerability reporting, which lets a reporter send a
+    vulnerability privately.
+    """
+
+    vulnerability_alerts: bool
+    """
+    Dependabot alerts, raised on a dependency carrying a published
+    vulnerability.
+    """
+
+    @property
+    def requests(self) -> list[Request]:
+        """
+        Writes the call turning each setting on or off, in the order the
+        record declares its fields.
+        """
+        return [
+            Request(endpoint=endpoint, method="PUT" if on else "DELETE")
+            for endpoint, on in self.model_dump(by_alias=True).items()
+        ]
+
+
+class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The defaults of the token each workflow run receives, which `[token]`
+    declares by the field names the `actions/permissions/workflow` endpoint
+    reads.
+    """
+
+    can_approve_pull_request_reviews: bool
+    """
+    Whether a workflow can approve a pull request through the token.
+    """
+
+    default_workflow_permissions: Scope
+    """
+    The scope the token takes where a workflow sets no `permissions`.
+    """
+
+    @property
+    def request(self) -> Request:
+        """
+        Writes the call setting the defaults of the token.
+        """
+        return Request(
+            body     = self.model_dump(),
+            endpoint = "actions/permissions/workflow",
+            method   = "PUT"
+        )

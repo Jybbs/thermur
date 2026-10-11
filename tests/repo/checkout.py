@@ -1,9 +1,9 @@
 """
-Pins what `Checkout` reads from the clone and lists for the checks:
+Pins what `Checkout` reads from the clone and lists for the `repo` tasks:
 
 - The tasks mise lists for the clone and the programs on its path
 - The check run and the task of each pull-request row, the steps its
-  workflows and composite actions run, and its issue templates
+  workflows and composite actions run, its issue templates, and its rulesets
 - The commit checked out, the digest of its `uv.lock`, and the clone the
   package was installed from
 """
@@ -120,6 +120,18 @@ def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkou
 
     assert checkout.checks == [("B", "b:two"), ("A", "a:one")]
     assert checkout.rows == ["b:two", "a:one"]
+
+
+def test_rulesets_reads_each_ruleset_by_its_path(checkout: Checkout):
+    """
+    Asserts that the rulesets are the JSON files under `.github/rulesets/`,
+    each by its path from the root in path order and validated under the
+    name it carries on GitHub.
+    """
+    assert [(path, ruleset.name) for path, ruleset in checkout.rulesets.items()] == [
+        (Path(".github/rulesets/main.json"), "main branch protection"),
+        (Path(".github/rulesets/tags.json"), "release tag protection")
+    ]
 
 
 def test_steps_lists_the_actions_ahead_of_the_workflows(checkout: Checkout):

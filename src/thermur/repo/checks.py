@@ -643,6 +643,35 @@ class ProvisionCheck(Check):
                         )
 
 
+class RulesetCheck(Check):
+    """
+    Every check a ruleset under `.github/rulesets/` requires is the name of
+    the gate a workflow running on a pull request ends on.
+
+    A required check no pull request reports leaves every pull request
+    waiting on it, so this check fails the pull request that renames a gate
+    before the rename strands the ruleset.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each check a ruleset requires that no gate of a workflow
+        running on a pull request names.
+        """
+        gates = {
+            workflow.gate.name
+            for workflow in self.checkout.workflows.values()
+            if workflow.on_pull_request and workflow.gate
+        }
+        for path, ruleset in self.checkout.rulesets.items():
+            for context in sorted(ruleset.contexts - gates):
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` requires the `{context}` check, which no "
+                    "gate of a workflow running on a pull request names"
+                )
+
+
 class RunCheck(Check):
     """
     Every `uv run` a task or a program on the path runs opens its arguments
