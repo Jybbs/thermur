@@ -1,8 +1,8 @@
 """
-Pins what `Checkout` lists for the checks, meaning the tasks mise lists
-for the clone, the programs on its path, the check run and the task of each
-pull-request row, the steps its workflows and composite actions run, and its
-issue templates.
+Pins what `Checkout` lists for the `repo` tasks, meaning the tasks mise
+lists for the clone, the programs on its path, the check run and the task
+of each pull-request row, the steps its workflows and composite actions run,
+its issue templates, and its rulesets.
 """
 
 from common.edits import append, task

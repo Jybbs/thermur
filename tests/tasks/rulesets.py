@@ -427,19 +427,21 @@ def test_two_rulesets_sharing_a_name_fail_before_anything_reaches_github(
     gh       : StandIn
 ):
     """
-    Asserts that two files under `.github/rulesets/` carrying one name end
-    the task naming it, before the task reads or sends anything, since the
-    task matches each file to a live ruleset by the name it carries.
+    Asserts that files under `.github/rulesets/` sharing a name end the
+    task naming each shared name in order, before the task reads or sends
+    anything, since the task matches each file to a live ruleset by the name
+    it carries.
     """
     rulesets = checkout.root / ".github/rulesets"
     (rulesets / "tags.json").copy(rulesets / "copy.json")
+    (rulesets / "main.json").copy(rulesets / "main-copy.json")
 
     with raises(SystemExit) as exited:
         applied(LIVE)
 
     assert exited.value.code == (
         "More than one file under `.github/rulesets/` names each of these "
-        "rulesets, which the task matches to a live ruleset by name: release tag "
-        "protection"
+        "rulesets, which the task matches to a live ruleset by name: main branch "
+        "protection and release tag protection"
     )
     assert gh.commands == []

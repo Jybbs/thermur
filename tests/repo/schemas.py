@@ -1079,3 +1079,21 @@ def test_a_workflow_reads_whether_it_runs_on_a_pull_request(events: str, pulls: 
     is among its events, whatever else it runs on.
     """
     assert workflow(f"name: w\njobs: {{}}\non:\n{events}").on_pull_request is pulls
+
+
+@mark.parametrize("table", list(GithubSettings.model_fields))
+def test_a_deleted_table_fails_the_settings(pytestconfig: Config, table: str):
+    """
+    Asserts that a settings file missing any one table fails validation
+    naming that table, before any call reaches GitHub.
+    """
+    parsed = GithubSettings.load(
+        ".toml",
+        (pytestconfig.rootpath / ".github/settings.toml").read_text(encoding="utf-8")
+    )
+    del parsed[table]
+
+    with raises(ValidationError) as error:
+        GithubSettings.model_validate(parsed)
+
+    assert [detail["loc"] for detail in error.value.errors()] == [(table,)]
