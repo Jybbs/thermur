@@ -46,10 +46,9 @@ def test_a_listing_leaves_out_a_dotfile(
 def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkout):
     """
     Asserts that the checks are the matrix rows of each workflow running on
-    a pull request, each as the workflow's path, the name of its check run,
-    and its task, and the rows are those tasks, both in the order the rows
-    are declared, leaving out a row of a workflow running only on a push and
-    a row naming no task.
+    a pull request, each as the name of its check run and its task, and the
+    rows are those tasks, both in the order the rows are declared, leaving
+    out a row of a workflow running only on a push and a row naming no task.
     """
     folder = checkout.root / ".github/workflows"
     for path in folder.iterdir():
@@ -67,9 +66,8 @@ def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkou
     (folder / "push.yml").write_text(
         f"name: push\non:\n  push:\n{matrix}          - {{ name: C, task: c:three }}\n"
     )
-    pull = Path(".github/workflows/pull.yml")
 
-    assert checkout.checks == [(pull, "B", "b:two"), (pull, "A", "a:one")]
+    assert checkout.checks == [("B", "b:two"), ("A", "a:one")]
     assert checkout.rows == ["b:two", "a:one"]
 
 

@@ -19,7 +19,7 @@ Jybbs squash-merges each pull request into one commit on `main` titled after the
 
 ## Code Style
 
-[*Prose*](https://prose.fyi) settles the style of the Python under `.mise/tasks`, `src`, and `tests` from the one `[tool.prose]` table in `pyproject.toml`. `mise format` rewrites the source to that style, and `mise check` reports every rewrite the formatter would make beside every lint finding. A lint finding is fixed in the source or held out with `# prose: ignore[<rule>]` on the line it anchors on, which silences that one rule on that one line. A `# prose: skip` trailing the opening line of a construct keeps a layout or a place among its siblings that the formatter would rewrite, and silences no lint finding.
+[*Prose*](https://prose.fyi) settles the style of the Python under `.mise/tasks`, `src`, and `tests` from the one `[tool.prose]` table in `pyproject.toml`. `mise format` rewrites the source to that style, and `mise check` reports every rewrite the formatter would make beside every lint finding. A lint finding is fixed in the source or held out with `# prose: ignore[<rule>]` on the line it anchors on, which silences that one rule on that one line. A `# prose: skip` trailing the opening line of a construct keeps the line breaks the formatter would reflow there and the construct's place among its siblings, while the lines inside it still take the formatter's other rewrites, and it silences no lint finding.
 
 ## Checks
 
@@ -27,12 +27,12 @@ Every pull request runs `🐦‍⬛ CI`, whose rows each run one task, so the co
 
 | **Check** | **Runs Locally** | **Fails When** |
 |---|---|---|
-| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, or the lockfile beside a task script drifts from its manifest |
+| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, or the lockfile beside a task script drifts from its manifest, or `.mise/mise.lock` lacks a pinned tool for the running platform |
 | `⛈️ Advisories` | `mise scan` | A package `uv.lock` or a task script's lockfile resolves carries a published advisory, or the advisory service cannot be reached |
-| `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the changed line |
-| `☂️ Coverage` | `mise coverage` | A test fails under coverage |
-| `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` finds a file disagreeing with what it restates, such as this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
-| `🗝️ Workflows` | `mise vet` | [zizmor](https://docs.zizmor.sh/) finds a hazard in a workflow or the composite action, such as template injection, an unpinned action, an over-broad permission, checkout credentials left on disk, or a cache a privileged job restores |
+| `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the line it concerns |
+| `☂️ Coverage` | `mise coverage` | A test fails under coverage, or the suite fails to collect |
+| `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` makes a finding at the error level, such as a file restating a value otherwise than its source, or this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
+| `🗝️ Workflows` | `mise vet` | [zizmor](https://docs.zizmor.sh/) cannot parse a workflow or the composite action, or finds a hazard in one, such as template injection, an unpinned action, an over-broad permission, checkout credentials left on disk, or a cache a privileged job restores |
 
 `📡 Readout` waits on every row and fails where any of them fails, so it is the one check a pull request has to pass, and `mise ci` runs every row's task once `mise doctor project` passes.
 

@@ -43,18 +43,17 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         }
 
     @property
-    def checks(self) -> list[tuple[Path, str, str]]:
+    def checks(self) -> list[tuple[str, str]]:
         """
         Lists each row of each workflow running on a pull request as the
-        workflow's path, the name the row's check run takes, and the task
-        the row runs, in the order the workflows and their rows declare
-        them.
+        name the row's check run takes and the task the row runs, in the
+        order the workflows and their rows declare them.
         """
         return [
-            (path, name, task)
-            for path, workflow in self.workflows.items()
+            check
+            for workflow in self.workflows.values()
             if "pull_request" in workflow.events
-            for name, task in workflow.checks
+            for check in workflow.checks
         ]
 
     @cached_property
@@ -164,7 +163,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Lists the task each row of each workflow running on a pull request
         runs, in the order the workflows and their rows declare them.
         """
-        return [task for *_, task in self.checks]
+        return [task for _, task in self.checks]
 
     @cached_property
     def scripts(self) -> list[Path]:

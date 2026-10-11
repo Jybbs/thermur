@@ -323,8 +323,8 @@ def test_a_guide_without_its_checks_table_lists_no_check(checkout: Checkout):
 
     assert [finding.message for finding in GuideCheck(checkout=checkout).findings] == [
         f"The command beside `{name}` in `.github/CONTRIBUTING.md` is missing, "
-        f"where the shortest command running `{task}` reads `{commands[task]}`"
-        for _, name, task in checkout.checks
+        f"where the command running `{task}` reads `{commands[task]}`"
+        for name, task in checkout.checks
     ]
 
 
@@ -1535,7 +1535,7 @@ def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
             "| `🪵 Lockfiles` | `mise run lock:check` |",
             [
                 "The command beside `🪵 Lockfiles` in `.github/CONTRIBUTING.md` reads "
-                "`mise run lock:check`, where the shortest command running "
+                "`mise run lock:check`, where the command running "
                 "`lock:check` reads `mise lockfile`"
             ],
             id = "command"
@@ -1548,7 +1548,7 @@ def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
                 "`.github/CONTRIBUTING.md` lists `🪵 Lockfiles`, a check no row of a "
                 "pull-request workflow runs",
                 "The command beside `🪵 Locks` in `.github/CONTRIBUTING.md` is "
-                "missing, where the shortest command running `lock:check` reads "
+                "missing, where the command running `lock:check` reads "
                 "`mise lockfile`"
             ],
             id = "renamed-row"
@@ -1559,7 +1559,7 @@ def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
             "task  : gha:brief",
             [
                 "The command beside `🗝️ Workflows` in `.github/CONTRIBUTING.md` "
-                "reads `mise vet`, where the shortest command running `gha:brief` "
+                "reads `mise vet`, where the command running `gha:brief` "
                 "reads `mise run gha:brief`"
             ],
             id = "task-without-alias"
@@ -1570,10 +1570,20 @@ def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
             "task  : repo:gone",
             [
                 "The command beside `🗝️ Workflows` in `.github/CONTRIBUTING.md` "
-                "reads `mise vet`, where the shortest command running `repo:gone` "
+                "reads `mise vet`, where the command running `repo:gone` "
                 "reads `mise run repo:gone`"
             ],
             id = "unlisted-task"
+        ),
+        param(
+            ".github/CONTRIBUTING.md",
+            "| `🪵 Lockfiles` | `mise lockfile` |",
+            "| `🪵 Lockfiles` | x | x |\n| `🪵 Lockfiles` | `mise lockfile` |",
+            [
+                "`checks` in `.github/CONTRIBUTING.md`: Value error, lists "
+                "`🪵 Lockfiles` in more than one row"
+            ],
+            id = "repeated-row"
         )
     ]
 )
@@ -1586,9 +1596,10 @@ def test_a_guide_out_of_step_with_the_rows_is_named(
 ):
     """
     Asserts that the contributor guide giving a row's check another command
-    than the shortest one running its task, whether or not mise lists that
-    task or it declares an alias, and the guide listing a check no row runs
-    while leaving out one a row does, are each named on the guide.
+    than the one running its task, whether or not mise lists that task or it
+    declares an alias, the guide listing a check no row runs while leaving
+    out one a row does, and the guide listing one check in two rows are each
+    named on the guide.
     """
     edit(checkout, path, new=new, old=old)
 

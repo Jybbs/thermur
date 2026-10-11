@@ -34,7 +34,7 @@ from pydantic               import (
 )
 from re      import findall, fullmatch, search, sub
 from tomllib import loads
-from typing  import Annotated, ClassVar, Self
+from typing  import Annotated, Self
 from yaml_rs import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
@@ -94,6 +94,24 @@ def read_names(needs: str | list[str]) -> list[str]:
     as a list of them.
     """
     return [needs] if isinstance(needs, str) else needs
+
+
+def read_rows(rows: list[tuple[str, str]]) -> dict[str, str]:
+    """
+    Maps the first cell of each row a table holds to the row's second cell.
+
+    Raises:
+        ValueError: Naming each first cell two or more rows share, which
+                    validation reports against the field.
+    """
+    if repeats := [
+        f"`{name}`"
+        for name, count in Counter(name for name, _ in rows).items()
+        if count > 1
+    ]:
+        raise ValueError(f"lists {join_names(repeats)} in more than one row")
+
+    return dict(rows)
 
 
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
@@ -189,61 +207,6 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
             ) from None
 
 
-class Guide(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
-    """
-    The tables `.github/CONTRIBUTING.md` holds, each empty where the guide
-    carries no table under its header.
-    """
-
-    file: ClassVar[Path] = Path(".github/CONTRIBUTING.md")
-
-    checks: dict[str, str]
-    """
-    The command the checks table gives each check for a laptop, by the
-    name of the check.
-    """
-
-    labels: dict[str, str]
-    """
-    The description the labels table gives each label, by the label's
-    name.
-    """
-
-    @classmethod
-    def read(cls, root: Path) -> Self:
-        """
-        Reads the checks table and the labels table out of the guide under
-        `root`.
-        """
-        text = (root / cls.file).read_text(encoding="utf-8")
-        return cls(
-            checks = read_table("**Check**", text),
-            labels = read_table("**Label**", text)
-        )
-
-
-class Config(Document, title=".mise/config.toml"):
-    """
-    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
-    the path.
-    """
-
-    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
-    """
-    The folder `_.path` puts on the path, relative to the root.
-    """
-
-    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
-    """
-    The major and minor of the `python` mise pins.
-    """
-
-    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
-    """
-    The `uv` release mise pins.
-    """
-
-
 class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     One label `.github/labels.toml` declares, as GitHub shows it on an issue
@@ -279,6 +242,28 @@ class Label(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         ]
 
 
+class Config(Document, title=".mise/config.toml"):
+    """
+    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
+    the path.
+    """
+
+    bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
+    """
+    The folder `_.path` puts on the path, relative to the root.
+    """
+
+    python: Minor = Field(validation_alias=AliasPath("tools", "python"))
+    """
+    The major and minor of the `python` mise pins.
+    """
+
+    uv: str = Field(validation_alias=AliasPath("tools", "uv"))
+    """
+    The `uv` release mise pins.
+    """
+
+
 class Level(StrEnum):
     """
     How a finding bears on the audit, each member's value the GitHub Actions
@@ -287,6 +272,83 @@ class Level(StrEnum):
 
     ERROR   = auto()
     WARNING = auto()
+
+
+class Step(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    One step a workflow job or a composite action runs, which either names
+    an action or runs shell lines.
+    """
+
+    env: dict[str, Scalar] = {}
+    """
+    The variables the step sets for what it runs, by name.
+    """
+
+    inputs: dict[str, Scalar] = Field({}, validation_alias="with")
+    """
+    The inputs the step passes the action it names, by input.
+    """
+
+    run: str = ""
+    """
+    The shell lines the step runs, or nothing where it names an action.
+    """
+
+    uses: str = ""
+    """
+    The action the step runs, or nothing where it runs shell lines.
+    """
+
+    @property
+    def archive(self) -> str | None:
+        """
+        Reads the `cache_key` the step passes up to the `-` before the
+        `hashFiles` call ending it, which names the archive every save of
+        one tool subset shares.
+
+        Returns:
+            The key up to that `-`, or `None` where the step passes no
+            `cache_key` ending on a `-` and a `hashFiles` call.
+        """
+        key = fullmatch(
+            r"(.*)-\$\{\{\s*hashFiles\([^)]*\)\s*\}\}",
+            str(self.inputs.get("cache_key", ""))
+        )
+        return key[1] if key else None
+
+    @property
+    def pin(self) -> tuple[str, str] | None:
+        """
+        Splits `uses` into the action from another repository and the commit
+        it is pinned to.
+
+        Returns:
+            The action and the commit, or `None` where the step names no
+            action pinned with `@`.
+        """
+        action, at, commit = self.uses.partition("@")
+        return (action, commit) if at else None
+
+    @property
+    def saves(self) -> bool:
+        """
+        Tells whether the step passes the action it names a `save` reading
+        `true`, quoted or not, which saves the archive the action installs.
+        """
+        return str(self.inputs.get("save")).lower() == "true"
+
+    @property
+    def summarizes(self) -> bool:
+        """
+        Tells whether the step writes to the workflow step summary, which it
+        does by naming the variable holding the summary's path or by running
+        `gha:brief`, which reads that variable.
+        """
+        return search(
+            r"GITHUB_STEP_SUMMARY|gha:brief",
+            self.model_dump_json()
+        ) is not None
 
 
 class Lock(Document, title="uv.lock"):
@@ -399,83 +461,6 @@ class Manifest(Document, title="pyproject.toml"):
         return join_names([author.name for author in self.authors])
 
 
-class Step(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
-    """
-    One step a workflow job or a composite action runs, which either names
-    an action or runs shell lines.
-    """
-
-    env: dict[str, Scalar] = {}
-    """
-    The variables the step sets for what it runs, by name.
-    """
-
-    inputs: dict[str, Scalar] = Field({}, validation_alias="with")
-    """
-    The inputs the step passes the action it names, by input.
-    """
-
-    run: str = ""
-    """
-    The shell lines the step runs, or nothing where it names an action.
-    """
-
-    uses: str = ""
-    """
-    The action the step runs, or nothing where it runs shell lines.
-    """
-
-    @property
-    def archive(self) -> str | None:
-        """
-        Reads the `cache_key` the step passes up to the `-` before the
-        `hashFiles` call ending it, which names the archive every save of
-        one tool subset shares.
-
-        Returns:
-            The key up to that `-`, or `None` where the step passes no
-            `cache_key` ending on a `-` and a `hashFiles` call.
-        """
-        key = fullmatch(
-            r"(.*)-\$\{\{\s*hashFiles\([^)]*\)\s*\}\}",
-            str(self.inputs.get("cache_key", ""))
-        )
-        return key[1] if key else None
-
-    @property
-    def pin(self) -> tuple[str, str] | None:
-        """
-        Splits `uses` into the action from another repository and the commit
-        it is pinned to.
-
-        Returns:
-            The action and the commit, or `None` where the step names no
-            action pinned with `@`.
-        """
-        action, at, commit = self.uses.partition("@")
-        return (action, commit) if at else None
-
-    @property
-    def saves(self) -> bool:
-        """
-        Tells whether the step passes the action it names a `save` reading
-        `true`, quoted or not, which saves the archive the action installs.
-        """
-        return str(self.inputs.get("save")).lower() == "true"
-
-    @property
-    def summarizes(self) -> bool:
-        """
-        Tells whether the step writes to the workflow step summary, which it
-        does by naming the variable holding the summary's path or by running
-        `gha:brief`, which reads that variable.
-        """
-        return search(
-            r"GITHUB_STEP_SUMMARY|gha:brief",
-            self.model_dump_json()
-        ) is not None
-
-
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
     One event a workflow runs on, narrowed to the files a change touches.
@@ -496,6 +481,24 @@ class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=T
         return not self.paths or any(
             PurePosixPath(file).full_match(glob) for glob in self.paths
         )
+
+
+class Action(Document):
+    """
+    One composite action under `.github/actions/`, with the inputs its
+    manifest declares and the steps it runs.
+    """
+
+    inputs: dict[str, dict[str, Scalar]] = {}
+    """
+    The inputs the manifest declares, by input, each with its default and its
+    description.
+    """
+
+    steps: tuple[Step, ...] = Field(validation_alias=AliasPath("runs", "steps"))
+    """
+    The steps the action runs, in order.
+    """
 
 
 class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
@@ -534,8 +537,8 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     @property
     def command(self) -> str:
         """
-        Writes the shortest command running the task, `mise` and its first
-        alias where it declares one and `mise run` and its name otherwise.
+        Writes the command running the task, `mise` and its first alias
+        where it declares one and `mise run` and its name otherwise.
         """
         return f"mise {self.aliases[0]}" if self.aliases else f"mise run {self.name}"
 
@@ -567,22 +570,43 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
         return self.file or self.source
 
 
-class Action(Document):
+class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    One composite action under `.github/actions/`, with the inputs its
-    manifest declares and the steps it runs.
-    """
-
-    inputs: dict[str, dict[str, Scalar]] = {}
-    """
-    The inputs the manifest declares, by input, each with its default and its
-    description.
+    One place the checkout breaks an invariant the audit holds it to, at the
+    file a reader opens to put it right.
     """
 
-    steps: tuple[Step, ...] = Field(validation_alias=AliasPath("runs", "steps"))
+    file: Path
     """
-    The steps the action runs, in order.
+    The file the finding sits in, relative to the root of the checkout.
     """
+
+    message: str
+    """
+    What is wrong, in a sentence a reader acts on.
+    """
+
+    level: Level = Level.ERROR
+    """
+    Whether the finding fails the audit or is printed as a warning alone.
+    """
+
+    @property
+    def annotation(self) -> str:
+        """
+        Writes the finding as the GitHub Actions annotation of its level
+        the runner shows on `file`, percent-encoding each line break and
+        `%`, and each `,` and `:` in the file name, which a workflow command
+        reads as its own syntax.
+        """
+        escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
+        place   = str(self.file).translate(
+            str.maketrans(escapes | {",": "%2C", ":": "%3A"})
+        )
+        return (
+            f"::{self.level} file={place}::"
+            f"{self.message.translate(str.maketrans(escapes))}"
+        )
 
 
 class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
@@ -739,42 +763,54 @@ class Workflow(Document):
         )
 
 
-class Finding(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+class Guide(
+    BaseModel,
+    extra                    = "forbid",
+    frozen                   = True,
+    title                    = ".github/CONTRIBUTING.md",
+    use_attribute_docstrings = True
+):
     """
-    One place the checkout breaks an invariant the audit holds it to, at the
-    file a reader opens to put it right.
-    """
-
-    file: Path
-    """
-    The file the finding sits in, relative to the root of the checkout.
-    """
-
-    message: str
-    """
-    What is wrong, in a sentence a reader acts on.
+    The tables `.github/CONTRIBUTING.md` holds, each empty where the guide
+    carries no table under its header, whose validation error carries the
+    guide's path from the root as its title.
     """
 
-    level: Level = Level.ERROR
+    checks: Annotated[dict[str, str], BeforeValidator(read_rows)]
     """
-    Whether the finding fails the audit or is printed as a warning alone.
+    The command the checks table gives each check for a laptop, by the
+    name of the check.
+    """
+
+    labels: Annotated[dict[str, str], BeforeValidator(read_rows)]
+    """
+    The description the labels table gives each label, by the label's
+    name.
     """
 
     @property
-    def annotation(self) -> str:
+    def file(self) -> Path:
         """
-        Writes the finding as the GitHub Actions annotation of its level
-        the runner shows on `file`, percent-encoding each line break and
-        `%`, and each `,` and `:` in the file name, which a workflow command
-        reads as its own syntax.
+        Reads the path of the guide, relative to the root, out of its title.
         """
-        escapes = {"%": "%25", "\n": "%0A", "\r": "%0D"}
-        place   = str(self.file).translate(
-            str.maketrans(escapes | {",": "%2C", ":": "%3A"})
-        )
-        return (
-            f"::{self.level} file={place}::"
-            f"{self.message.translate(str.maketrans(escapes))}"
+        return Path(self.model_config["title"])
+
+    @classmethod
+    def read(cls, root: Path) -> Self:
+        """
+        Validates the checks table and the labels table out of the guide
+        under `root`.
+
+        Raises:
+            ValidationError: Titled with the guide's path, where a table
+                             lists one name in more than one row.
+        """
+        text = (root / cls.model_config["title"]).read_text(encoding="utf-8")
+        return cls.model_validate(
+            {
+                "checks" : read_table("**Check**", text),
+                "labels" : read_table("**Label**", text)
+            }
         )
 
 
@@ -1024,15 +1060,15 @@ def join_names(names: Sequence[str]) -> str:
     return f"{', '.join(names[:-1])}, and {names[-1]}"
 
 
-def read_table(header: str, text: str) -> dict[str, str]:
+def read_table(header: str, text: str) -> list[tuple[str, ...]]:
     """
-    Maps the first cell of each row of the Markdown table in `text` whose
-    header row opens on the cell `header` to the row's second cell, reading
-    a cell filled by one code span without its backticks, the table running
-    from the row under its divider to the first blank line.
+    Reads the first two cells of each row of the Markdown table in `text`
+    whose header row opens on the cell `header`, reading a cell filled by
+    one code span without its backticks, the table running from the row
+    under its divider to the first blank line.
     """
     body = text.partition(f"\n| {header} |")[2].partition("\n\n")[0]
-    return dict(
-        [sub(r"^`([^`]*)`$", r"\1", cell) for cell in row]
+    return [
+        tuple(sub(r"^`([^`]*)`$", r"\1", cell) for cell in row)
         for row in findall(r"(?m)^\| (.+?) \| (.+?) \|", body)
-    )
+    ]

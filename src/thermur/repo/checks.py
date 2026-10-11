@@ -222,14 +222,14 @@ class GuideCheck(Check):
     """
     The contributor guide's checks table lists each row of every workflow
     running on a pull request under the name its check run takes, beside the
-    shortest command running the row's task, and lists no other check.
+    command running the row's task, and lists no other check.
     """
 
     @property
     def pairs(self) -> list[Parity]:
         """
-        Pairs the command the guide gives each row's check with the shortest
-        command running the task the row runs.
+        Pairs the command the guide gives each row's check with the command
+        running the task the row runs.
         """
         guide    = self.checkout.guide
         commands = {task.name: task.command for task in self.checkout.tasks}
@@ -238,10 +238,10 @@ class GuideCheck(Check):
                 copied   = guide.checks.get(name),
                 file     = guide.file,
                 label    = f"The command beside `{name}` in `{guide.file}`",
-                origin   = f"the shortest command running `{task}`",
+                origin   = f"the command running `{task}`",
                 original = commands.get(task, f"mise run {task}")
             )
-            for _, name, task in self.checkout.checks
+            for name, task in self.checkout.checks
         ]
 
     def scan(self) -> Iterator[Finding]:
@@ -251,7 +251,7 @@ class GuideCheck(Check):
         otherwise.
         """
         guide = self.checkout.guide
-        run   = {name for _, name, _ in self.checkout.checks}
+        run   = {name for name, _ in self.checkout.checks}
         for name in guide.checks:
             if name not in run:
                 yield Finding(
