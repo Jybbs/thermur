@@ -483,7 +483,7 @@ thermur/
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
-├── src/thermur/repo/               # The checks `mise audit` runs
+├── src/thermur/repo/               # The checks `mise audit` runs and the records `mise rulesets` sends
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── pyproject.toml                  # Package configuration, its dependencies, and each tool's table

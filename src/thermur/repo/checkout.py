@@ -16,12 +16,12 @@ from thermur.repo.schemas import (
     Action,
     Config,
     Document,
+    GithubSettings,
     Issue,
     Job,
     Lock,
     Manifest,
     Ruleset,
-    Settings,
     Step,
     Task,
     Workflow
@@ -64,6 +64,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
+
+    @cached_property
+    def github_settings(self) -> GithubSettings:
+        """
+        Validates `.github/settings.toml`.
+        """
+        return GithubSettings.read(self.root)
 
     @cached_property
     def issues(self) -> list[Issue]:
@@ -155,13 +162,6 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             for path in self.glob(f"{self.config.bin}/*")
             if not path.name.startswith(".")
         ]
-
-    @cached_property
-    def settings(self) -> Settings:
-        """
-        Validates `.github/settings.toml`.
-        """
-        return Settings.read(self.root)
 
     @property
     def steps(self) -> list[tuple[Path, Step]]:

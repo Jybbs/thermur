@@ -1,6 +1,6 @@
 #!/usr/bin/env -S uv run --exact --locked
 # MISE alias       = "rulesets"
-# MISE confirm     = "Apply every ruleset and setting under `.github/` to GitHub?"
+# MISE confirm     = "Apply the rulesets, settings, description, and topics to GitHub?"
 # MISE description = "Apply the rulesets and settings, listing live rulesets left out"
 """
 Applies every ruleset under `.github/rulesets/` and sends every setting
@@ -32,7 +32,7 @@ def main():
     checkout = Checkout()
     try:
         rulesets = checkout.rulesets.values()
-        requests = [*checkout.settings.requests, *checkout.manifest.requests]
+        requests = [*checkout.github_settings.requests, *checkout.manifest.requests]
     except ValidationError as error:
         raise SystemExit(error) from None
 
@@ -43,7 +43,8 @@ def main():
     ):
         raise SystemExit(
             "More than one file under `.github/rulesets/` names each of these "
-            f"rulesets, which would all update one live ruleset: {', '.join(shared)}"
+            "rulesets, which the task matches to a live ruleset by name: "
+            + ", ".join(shared)
         )
 
     live = dict(

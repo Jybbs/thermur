@@ -4,8 +4,8 @@ meaning the key each document field reads, the path a document's error
 carries, what a workflow's jobs, steps, and triggers derive, the annotation
 a `Finding` prints at each level, the findings a `Parity` and an `Issue`
 make, the requirements a task script declares, the holders a `Manifest`
-names, the checks a `Ruleset` requires, the keys `Settings` accepts, and the
-command and body each `Request` sends.
+names, the checks a `Ruleset` requires, the keys `GithubSettings` accepts,
+and the command and body each `Request` sends.
 """
 
 from functools import reduce
@@ -21,6 +21,7 @@ from thermur.repo.schemas import (
     Author,
     Document,
     Finding,
+    GithubSettings,
     Issue,
     Job,
     Level,
@@ -29,7 +30,6 @@ from thermur.repo.schemas import (
     Parity,
     Request,
     Ruleset,
-    Settings,
     Step,
     Task,
     Toggles,
@@ -639,6 +639,39 @@ def test_a_ruleset_reads_the_checks_it_requires(
             "immutable_releases",
             [("toggles", "immutable-releases"), ("toggles", "immutable_releases")],
             id = "toggle"
+        ),
+        param(
+            "sha_pinning_required",
+            "sha_pining_required",
+            [("actions", "sha_pinning_required"), ("actions", "sha_pining_required")],
+            id = "actions"
+        ),
+        param(
+            "secret_scanning ",
+            "secret_scaning ",
+            [
+                ("repository", "security_and_analysis", "secret_scanning"),
+                ("repository", "security_and_analysis", "secret_scaning")
+            ],
+            id = "analysis"
+        ),
+        param(
+            '{ status = "enabled" }\nsecret',
+            '{ state = "enabled" }\nsecret',
+            [
+                ("repository", "security_and_analysis", "secret_scanning", "status"),
+                ("repository", "security_and_analysis", "secret_scanning", "state")
+            ],
+            id = "feature"
+        ),
+        param(
+            "default_workflow_permissions",
+            "default_workflow_permisions",
+            [
+                ("token", "default_workflow_permissions"),
+                ("token", "default_workflow_permisions")
+            ],
+            id = "token"
         )
     ]
 )
@@ -649,16 +682,19 @@ def test_a_misspelled_table_or_key_fails_the_settings(
     pytestconfig : Config
 ):
     """
-    Asserts that a misspelled table, a misspelled key, and a toggle spelled
-    with the underscore its field takes rather than the endpoint's hyphen
-    each fail validation, naming the setting missing beside the one the file
-    carries in its place.
+    Asserts that a misspelled table, a misspelled key in each table or in
+    a feature it nests, and a toggle spelled with the underscore its field
+    takes rather than the endpoint's hyphen each fail validation, naming the
+    setting missing beside the one the file carries in its place.
     """
     text = (pytestconfig.rootpath / ".github/settings.toml").read_text()
 
     assert old in text
     with raises(ValidationError) as error:
-        Settings.model_validate(text.replace(old, new), context={"suffix": ".toml"})
+        GithubSettings.model_validate(
+            text.replace(old, new),
+            context = {"suffix": ".toml"}
+        )
 
     assert [detail["loc"] for detail in error.value.errors()] == locations
 

@@ -2,7 +2,7 @@
 Holds the records the repository audit and `repo:rulesets` read and report:
 
 - The `Document` base and the files it validates, meaning the `Manifest`
-  with its `Author` rows, the `Config`, the `Lock`, and the `Settings` with
+  with its `Author` rows, the `Config`, the `Lock`, and the `GithubSettings` with
   their `Actions`, `Repository`, `Toggles`, and `Token` tables out of the
   TOML, each `Workflow` with its `Job`, `Step`, and `Trigger` rows and
   each composite `Action` out of the YAML under `.github/`, and each
@@ -16,6 +16,7 @@ Holds the records the repository audit and `repo:rulesets` read and report:
 from collections.abc import Iterable
 from enum            import StrEnum, auto
 from http            import HTTPMethod
+from json            import loads as from_json
 from packaging.requirements import Requirement
 from pathlib                import Path, PurePosixPath
 from pydantic               import (
@@ -127,9 +128,9 @@ class Author(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=Tr
 
 class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    A TOML or YAML file of the checkout, validated from its text into the
-    fields the checks read, whose validation error carries the file's path
-    from the root as its title.
+    A TOML, YAML, or JSON file of the checkout, validated from its text into
+    the fields the checks and `repo:rulesets` read, whose validation error
+    carries the file's path from the root as its title.
     """
 
     @property
@@ -145,15 +146,18 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
     def parse(cls, data: object, info: ValidationInfo) -> object:
         """
         Reads text as TOML where the suffix the context names is `.toml` or
-        `.lock` and as YAML otherwise, keeping a YAML timestamp as its text,
-        and passes a mapping already read through unchanged. A `.json` file
-        reads as YAML, since YAML 1.2 is a superset of JSON.
+        `.lock`, as JSON where it is `.json`, and as YAML otherwise, keeping
+        a YAML timestamp as its text, and passes a mapping already read
+        through unchanged.
         """
         if not isinstance(data, str):
             return data
 
         if info.context["suffix"] in (".lock", ".toml"):
             return loads(data)
+
+        if info.context["suffix"] == ".json":
+            return from_json(data)
 
         return from_yaml(data, parse_datetime=False)
 
@@ -1147,7 +1151,7 @@ class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         )
 
 
-class Settings(Document, extra="forbid", title=".github/settings.toml"):
+class GithubSettings(Document, extra="forbid", title=".github/settings.toml"):
     """
     Every repository setting no ruleset carries, as `.github/settings.toml`
     declares it, holding nothing beside its tables.

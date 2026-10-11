@@ -649,6 +649,13 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             "📡 Readout",
             id = "gate"
         ),
+        param(
+            MAIN,
+            '"integration_id": 15368 }]',
+            '"integration_id": 15368 }, { "context": "🐦‍⬛ CI" }]',
+            "🐦‍⬛ CI",
+            id = "second"
+        ),
         param(CI, "  gate:\n", "  brief:\n", "📡 Readout", id="no-gate")
     ]
 )
@@ -660,10 +667,11 @@ def test_a_required_check_no_pull_request_gate_names_is_named(
     path     : str
 ):
     """
-    Asserts that renaming the check the `main` ruleset requires, renaming
-    the gate of the one workflow running on a pull request, or ending that
-    workflow on no gate names the required check on the ruleset, although
-    the gates of the push workflows still carry the name `📡 Readout`.
+    Asserts that renaming the check the `main` ruleset requires, adding a
+    second required check beside it, renaming the gate of the one workflow
+    running on a pull request, or ending that workflow on no gate names the
+    unnamed check on the ruleset, although the gates of the push workflows
+    still carry the name `📡 Readout`.
     """
     edit(checkout, path, new=new, old=old)
 

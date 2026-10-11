@@ -118,6 +118,27 @@ def test_a_failed_call_stops_the_task_before_any_other(
             id = "ruleset"
         ),
         param(
+            ".github/rulesets/main.json",
+            '"parameters"',
+            '"parameter"',
+            "rules.0.parameter\n  Extra inputs are not permitted",
+            id = "rule"
+        ),
+        param(
+            ".github/rulesets/main.json",
+            '"integration_id"',
+            '"integration"',
+            "required_status_checks.0.integration\n  Extra inputs are not permitted",
+            id = "required-check"
+        ),
+        param(
+            ".github/rulesets/tags.json",
+            '"target": "tag"\n',
+            '"target": "tag",\n',
+            "Illegal trailing comma before end of object",
+            id = "trailing-comma"
+        ),
+        param(
             "pyproject.toml",
             "keywords        = [",
             "topics          = [",
@@ -136,10 +157,11 @@ def test_a_file_failing_validation_fails_before_anything_reaches_github(
     path     : str
 ):
     """
-    Asserts that a misspelled settings key, a ruleset key the rulesets API
-    does not take, and a manifest leaving out `[project].keywords` each end
-    the task on the validation error naming it, before the task reads or
-    sends anything.
+    Asserts that a misspelled settings key, a key the rulesets API does
+    not take at any depth the ruleset validates, a ruleset file that is
+    not JSON, and a manifest leaving out `[project].keywords` each end the
+    task on the validation error naming it, before the task reads or sends
+    anything.
     """
     edit(checkout, path, new=new, old=old)
 
@@ -156,9 +178,10 @@ def test_a_failed_read_of_the_live_rulesets_stops_the_task(
     monkeypatch : MonkeyPatch
 ):
     """
-    Asserts that a read of the live rulesets that `gh` fails stops the task
-    before any write, rather than reading as no live ruleset, which would
-    create a second copy of every ruleset.
+    Asserts that a read of the live rulesets that `gh` fails stops the
+    task before any write, rather than reading as no live ruleset, which
+    would send every ruleset through `POST` in place of the update its live
+    ruleset takes.
     """
     monkeypatch.setenv("READ_STATUS", "1")
 
@@ -198,7 +221,7 @@ def test_each_ruleset_and_setting_is_sent_with_its_body(
     snapshot : SnapshotAssertion
 ):
     """
-    Asserts that the task reads every live ruleset across every page,
+    Asserts that the task reads the live rulesets through `--paginate`,
     updates each ruleset in place, and then sends the repository's settings,
     the Actions permissions, the token's defaults, each toggle, and last the
     manifest's description and its keywords as the topics, each call beside
@@ -272,8 +295,8 @@ def test_two_rulesets_sharing_a_name_fail_before_anything_reaches_github(
 ):
     """
     Asserts that two files under `.github/rulesets/` carrying one name end
-    the task naming it, before the task reads or sends anything, since both
-    would update the one live ruleset carrying that name.
+    the task naming it, before the task reads or sends anything, since the
+    task matches each file to a live ruleset by the name it carries.
     """
     rulesets = checkout.root / ".github/rulesets"
     (rulesets / "tags.json").copy(rulesets / "copy.json")
@@ -283,6 +306,7 @@ def test_two_rulesets_sharing_a_name_fail_before_anything_reaches_github(
 
     assert exited.value.code == (
         "More than one file under `.github/rulesets/` names each of these "
-        "rulesets, which would all update one live ruleset: release tag protection"
+        "rulesets, which the task matches to a live ruleset by name: release tag "
+        "protection"
     )
     assert gh.commands == []
