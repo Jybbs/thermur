@@ -1,7 +1,8 @@
 """
 Declares the stand-in Hamilton steps the cache cases run, meaning a JAX
 array beside the NumPy array converted from it, two components holding the
-same parameter, and a table and a tree the cache stores as NetCDF files.
+same parameter, a list and a tuple holding the same items, and a table and a
+tree the cache stores as NetCDF files.
 """
 
 from common.settings import Heading
@@ -63,6 +64,20 @@ def netcdf_tree() -> DataTree:
     return DataTree.from_dict(
         {"/": Dataset(), "/n3": Dataset({"t": ("x", arange(3.0))})}
     )
+
+
+def pair_list() -> list[int]:
+    """
+    Builds a list of two numbers.
+    """
+    return [1, 2]
+
+
+def pair_tuple() -> tuple[int, int]:
+    """
+    Builds a tuple holding the numbers `pair_list` holds.
+    """
+    return (1, 2)
 
 
 def pitch() -> Pitch:

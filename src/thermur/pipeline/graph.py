@@ -9,22 +9,31 @@ fingerprint reading the type and the values of each array, xarray object,
 record, component, and path.
 """
 
-from dataclasses import dataclass
-from decimal     import Decimal
-from equinox     import Module
-from functools   import cached_property
-from hamilton    import registry
-from hamilton.caching.fingerprinting import hash_value
-from hamilton.driver                 import Builder, Driver
-from hamilton.io.data_adapters       import DataLoader, DataSaver
-from hamilton.io.materialization     import to
-from hamilton.plugins.h_experiments  import ExperimentTracker
+from collections.abc import Mapping, Sequence, Set
+from dataclasses     import dataclass
+from decimal         import Decimal
+from equinox         import Module
+from functools       import cached_property
+from hamilton        import registry
+from hamilton.caching.fingerprinting import (
+    UNHASHABLE,
+    hash_bytes,
+    hash_mapping,
+    hash_primitive,
+    hash_sequence,
+    hash_set,
+    hash_value
+)
+from hamilton.driver                import Builder, Driver
+from hamilton.io.data_adapters      import DataLoader, DataSaver
+from hamilton.io.materialization    import to
+from hamilton.plugins.h_experiments import ExperimentTracker
 from importlib import import_module
 from jax       import Array
 from numpy     import asarray, generic, ndarray
 from os        import chdir
 from pathlib   import PurePath
-from pydantic  import BaseModel, Field
+from pydantic  import AnyUrl, BaseModel, Field
 from uuid      import UUID
 from xarray    import DataArray, DataTree, Dataset, open_dataset, open_datatree
 
@@ -269,9 +278,9 @@ class NetcdfReader(NetcdfFile, DataLoader):
         them.
 
         Returns:
-            The dataset beside the `path` the experiment tracker records,
-            in place of the `get_file_metadata` result Hamilton's own
-            loaders return, which calls the deprecated `datetime.utcnow`.
+            The dataset beside its `path` as the loader's metadata, in
+            place of the `get_file_metadata` result Hamilton's own loaders
+            return, which calls the deprecated `datetime.utcnow`.
         """
         return open_dataset(self.path, engine="h5netcdf"), {"path": self.path}
 
@@ -298,7 +307,7 @@ class NetcdfTreeReader(NetcdfFile, DataLoader):
         them.
 
         Returns:
-            The tree beside the `path` the experiment tracker records.
+            The tree beside its `path` as the loader's metadata.
         """
         return open_datatree(self.path, engine="h5netcdf"), {"path": self.path}
 
@@ -329,17 +338,19 @@ class NetcdfWriter(NetcdfFile, DataSaver):
         return {"path": self.path}
 
 
-def fingerprint(payload: object, value: object, *, depth: int) -> str:
+def fingerprint(digest: str, value: object) -> str:
     """
-    Hashes `payload` beside the module and the qualified name of `value`'s
+    Hashes `digest` beside the module and the qualified name of `value`'s
     type, so two values of different types never share a fingerprint.
 
-    Hamilton's file store keeps one stored result per fingerprint, so a
-    value sharing its fingerprint with a value of another type would come
-    back from the cache as that other value.
+    Hamilton's file store keeps one stored result per fingerprint, so
+    a value sharing its fingerprint with a value of another type would
+    come back from the cache as that other value. The hash goes through
+    `hash_primitive`, which dispatches on no type and so reaches none of the
+    registrations below.
     """
     kind = type(value)
-    return hash_value((kind.__module__, kind.__qualname__, payload), depth=depth + 1)
+    return hash_primitive((kind.__module__, kind.__qualname__, digest))
 
 
 @hash_value.register(Array)
@@ -353,12 +364,39 @@ def fingerprint_array(array: Array | generic | ndarray, *, depth: int = 0) -> st
     whatever its shape or dtype, and gives a JAX array and a NumPy integer
     or boolean the one fingerprint it gives an object it cannot read.
     """
-    values = asarray(array)
-    return fingerprint(
-        depth   = depth,
-        payload = (values.shape, values.dtype.str, values.tobytes()),
-        value   = array
-    )
+    values  = asarray(array)
+    payload = (values.shape, values.dtype.str, values.tobytes())
+    return fingerprint(hash_value(payload, depth=depth + 1), array)
+
+
+@hash_value.register(bytes)
+def fingerprint_bytes(data: bytes, *, depth: int = 0) -> str:
+    """
+    Fingerprints bytes by their type and the hash Hamilton takes of the
+    bytes themselves, which Hamilton alone gives `b"1.0"` and the number
+    `1.0` alike.
+    """
+    return fingerprint(hash_bytes(data), data)
+
+
+@hash_value.register(Mapping)
+@hash_value.register(Sequence)
+@hash_value.register(Set)
+def fingerprint_collection(
+    collection : Mapping | Sequence | Set,
+    *,
+    depth      : int = 0
+) -> str:
+    """
+    Fingerprints a mapping, a sequence, or a set by its type and the hash
+    Hamilton takes of its items, which Hamilton alone gives a list and a
+    tuple, or a set and a `frozenset`, holding the same items.
+    """
+    match collection:
+        case Mapping() : digest = hash_mapping(collection, depth=depth)
+        case Set()     : digest = hash_set(collection, depth=depth)
+        case _         : digest = hash_sequence(collection, depth=depth)
+    return fingerprint(digest, collection)
 
 
 @hash_value.register(DataArray)
@@ -371,7 +409,7 @@ def fingerprint_dataset(data: DataArray | Dataset, *, depth: int = 0) -> str:
     Hamilton reads a `Dataset`'s data variable names alone and nothing of
     a `DataArray`.
     """
-    return fingerprint(data.to_dict(data="array"), data, depth=depth)
+    return fingerprint(hash_value(data.to_dict(data="array"), depth=depth + 1), data)
 
 
 @hash_value.register(Module)
@@ -379,9 +417,25 @@ def fingerprint_module(module: Module, *, depth: int = 0) -> str:
     """
     Fingerprints an `equinox.Module` by its type and the value of each of
     its fields, where Hamilton reads the fields alone, which two components
-    declaring the same parameters share.
+    declaring the same parameters share, and gives a component declaring
+    none the one fingerprint it gives an object it cannot read.
     """
-    return fingerprint(vars(module), module, depth=depth)
+    return fingerprint(hash_value(vars(module), depth=depth + 1), module)
+
+
+@hash_value.register(object)
+def fingerprint_object(value: object, *, depth: int = 0) -> str:
+    """
+    Fingerprints any value no other registration reads by its type and
+    the hash Hamilton's own default takes of it, which reads the value's
+    `__dict__` or its text, so two classes holding the same fields
+    fingerprint apart.
+
+    A value Hamilton's default cannot read keeps `UNHASHABLE`, which the
+    cache reads as a result to compute again on every run.
+    """
+    digest = hash_value.__wrapped__(value, depth=depth)
+    return digest if digest == UNHASHABLE else fingerprint(digest, value)
 
 
 @hash_value.register(BaseModel)
@@ -392,26 +446,35 @@ def fingerprint_record(record: BaseModel, *, depth: int = 0) -> str:
     which holds nothing for a record declaring no field and holds each
     `cached_property` once read.
     """
-    return fingerprint(record.model_dump(), record, depth=depth)
+    return fingerprint(hash_value(record.model_dump(), depth=depth + 1), record)
 
 
+@hash_value.register(AnyUrl)
+@hash_value.register(bool)
 @hash_value.register(complex)
 @hash_value.register(Decimal)
+@hash_value.register(float)
+@hash_value.register(int)
 @hash_value.register(PurePath)
+@hash_value.register(str)
 @hash_value.register(UUID)
 def fingerprint_text(
-    value : complex | Decimal | PurePath | UUID,
+    value : AnyUrl | bool | complex | Decimal | float | int | PurePath | str | UUID,
     *,
     depth : int = 0
 ) -> str:
     """
-    Fingerprints a complex number, a `Decimal`, a path, or a `UUID` by its
-    type and the text `str` writes for it, which holds the whole value,
-    where Hamilton gives each the one fingerprint it gives an object it
-    cannot read, since it reads the text of a type only where the type's
-    module is built into the interpreter.
+    Fingerprints a number, a string, a path, a `UUID`, or a URL by its type
+    and the text `str` writes for it, which holds the whole value.
+
+    Hamilton reads the text of a `bool`, an `int`, a `float`, or a `str`
+    without its type, so `1` and `"1"` share a fingerprint there, as do an
+    `IntEnum` member and its value. It gives each other value here the one
+    fingerprint it gives an object it cannot read, since it reads a value's
+    text only where the value's `__module__` names a module built into the
+    interpreter, and a complex number carries no `__module__` at all.
     """
-    return fingerprint(str(value), value, depth=depth)
+    return fingerprint(hash_primitive(value), value)
 
 
 @hash_value.register(DataTree)
@@ -421,4 +484,4 @@ def fingerprint_tree(tree: DataTree, *, depth: int = 0) -> str:
     its paths, where Hamilton reads the names of the tree's variables and
     children alone.
     """
-    return fingerprint(tree.to_dict(), tree, depth=depth)
+    return fingerprint(hash_value(tree.to_dict(), depth=depth + 1), tree)

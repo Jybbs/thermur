@@ -10,7 +10,9 @@ files a run, and what a recorded run keeps.
 from collections.abc import Callable
 from common.cached   import Pitch
 from common.settings import Heading, Tuned
+from dataclasses     import make_dataclass
 from decimal         import Decimal
+from enum            import IntEnum, StrEnum
 from equinox         import Module
 from functools       import partial
 from hamilton.caching.adapter        import CachingEventType
@@ -19,7 +21,7 @@ from jax            import Array, numpy
 from json           import loads
 from numpy          import float32, int32, int64, ones, zeros
 from pathlib        import Path
-from pydantic       import BaseModel
+from pydantic       import BaseModel, HttpUrl, create_model
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
 from unittest.mock  import Mock
 from uuid           import UUID
@@ -139,14 +141,20 @@ def computed(graph: Graph) -> set[str]:
         param(Decimal("1.1"), Decimal("1.2"), id="decimal"),
         param(UUID(int=1), UUID(int=2), id="uuid"),
         param(1 + 2j, 1 + 3j, id="complex"),
-        param(int64(3), int64(4), id="numpy-scalar")
+        param(int64(3), int64(4), id="numpy-scalar"),
+        param(
+            HttpUrl("https://a.example/x"),
+            HttpUrl("https://b.example/y"),
+            id = "url"
+        )
     ]
 )
 def test_values_differing_in_any_part_fingerprint_apart(one: object, other: object):
     """
     Asserts that arrays sharing their bytes but not their shape or dtype,
-    and arrays, datasets, trees, records, paths, and scalars differing in a
-    value, a dimension, an attribute, or a name, each fingerprint apart.
+    and arrays, datasets, trees, records, paths, URLs, and scalars differing
+    in a value, a dimension, an attribute, or a name, each fingerprint
+    apart.
     """
     assert hash_value(one) != hash_value(other)
 
@@ -159,17 +167,34 @@ def test_values_differing_in_any_part_fingerprint_apart(one: object, other: obje
         param(Heading(), Pitch(), id="components"),
         param(Bare(), Settings.model_construct(), id="records"),
         param(
+            Bare(),
+            create_model(Bare.__name__, __module__="common.settings")(),
+            id = "namesakes"
+        ),
+        param(
             Tuned.model_construct(),
             Tuned.model_construct().model_dump(),
             id = "record-dump"
-        )
+        ),
+        param(
+            make_dataclass("Left", ["x"])(1),
+            make_dataclass("Right", ["x"])(1),
+            id = "dataclasses"
+        ),
+        param([1, 2], (1, 2), id="list-tuple"),
+        param(1, "1", id="number-text"),
+        param(True, "True", id="flag-text"),
+        param(1.0, b"1.0", id="number-bytes"),
+        param(IntEnum("Level", {"ONE": 1}).ONE, 1, id="int-enum"),
+        param(StrEnum("Kind", {"A": "a"}).A, "a", id="str-enum"),
+        param({1}, frozenset({1}), id="sets")
     ]
 )
 def test_values_of_different_types_fingerprint_apart(one: object, other: object):
     """
-    Asserts that two values holding the same contents under different
-    types fingerprint apart, so the cache never returns one node's result
-    as another's.
+    Asserts that two values holding the same contents under different types,
+    or under two classes of one name in two modules, fingerprint apart, so
+    the cache never returns one node's result as another's.
     """
     assert hash_value(one) != hash_value(other)
 
@@ -187,7 +212,9 @@ def test_values_of_different_types_fingerprint_apart(one: object, other: object)
         param(lambda: Tuned(radius_m=1.0), id="record"),
         param(lambda: Heading(coupling_per_s=2.0), id="component"),
         param(lambda: Path("a.nc"), id="path"),
-        param(lambda: int64(3), id="numpy-scalar")
+        param(lambda: int64(3), id="numpy-scalar"),
+        param(lambda: [1, (2.0, "3"), {"x": {4}}], id="collection"),
+        param(lambda: HttpUrl("https://a.example/x"), id="url")
     ]
 )
 def test_equal_values_fingerprint_alike(made: Callable[[], object]):
@@ -314,13 +341,17 @@ def test_a_record_fingerprints_by_its_fields_alone(checkout: Checkout):
     """
     Asserts that a record's fingerprint holds through a read storing a
     `cached_property` beside its fields and moves with the path a field
-    holds, and that a record declaring no field still fingerprints.
+    holds, and that a record or a component declaring no field still
+    fingerprints.
     """
     checkout.manifest
 
     assert hash_value(checkout) == hash_value(Checkout(root=checkout.root))
     assert hash_value(checkout) != hash_value(Checkout(root=checkout.root.parent))
-    assert hash_value(Bare()) != UNHASHABLE
+    assert UNHASHABLE not in {
+        hash_value(Bare()),
+        hash_value(type("Still", (Module,), {})())
+    }
 
 
 def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
@@ -344,6 +375,15 @@ def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
     assert folder.parent == clone.root / "data" / "runs" / "thermur"
     with open_dataset(folder / "table.nc", engine="h5netcdf") as saved:
         assert_identical(saved, results["table"])
+
+
+def test_a_value_hamilton_cannot_read_stays_unhashable():
+    """
+    Asserts that a value Hamilton's own default cannot read fingerprints as
+    `UNHASHABLE` rather than under a type, so the cache computes the node
+    returning it again on every run.
+    """
+    assert hash_value(make_dataclass("Slotted", [], slots=True)()) == UNHASHABLE
 
 
 @mark.parametrize(
@@ -397,7 +437,8 @@ def test_an_unrecorded_run_saves_nothing(
     "steps",
     [
         param(("jax_array", "numpy_array"), id="numpy-from-jax"),
-        param(("heading", "pitch"), id="components")
+        param(("heading", "pitch"), id="components"),
+        param(("pair_list", "pair_tuple"), id="list-tuple")
     ]
 )
 def test_a_cached_run_returns_each_node_s_own_type(
