@@ -7,7 +7,6 @@
 [![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
-[![Hydra](https://img.shields.io/badge/Config-Hydra--zen-89b8cd.svg)](https://github.com/mit-ll-responsible-ai/hydra-zen)
 [![WandB](https://img.shields.io/badge/Monitoring-Weights%20%26%20Biases-ffcc00.svg)](https://wandb.ai/Thermur/thermur-imitation/workspace)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -60,7 +59,8 @@ Thermur orchestrates biomimetic flocking through a sophisticated machine learnin
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| **Configuration** | [Hydra-zen](https://github.com/mit-ll-responsible-ai/hydra-zen) + [Pydantic](https://pydantic.dev/) | Composable configs with runtime validation and type safety |
+| **Configuration** | [pydantic-settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | One frozen settings model, read from the `[tool.thermur]` table of `pyproject.toml` beneath a `THERMUR_` variable and a value passed in |
+| **Pipeline** | [Apache Hamilton](https://hamilton.apache.org/) | Every step as a node of one graph, cached under `.cache/hamilton/` and recorded under `data/runs/` with the settings, the commit, the digest of `uv.lock`, and the platform |
 | **Training** | [PyTorch Lightning](https://lightning.ai/) | Distributed training orchestration with automatic mixed precision |
 | **Environment** | [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/) | Offline trajectory generation with WRF-Fire data |
 | **Policy Network** | [PyTorch Geometric](https://pytorch-geometric.readthedocs.io/) | Graph Neural Networks for topological neighbor interactions |
@@ -461,7 +461,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 
 ## 📁 Project Structure
 
-The repository holds the pinned toolchain and its tasks, the package the audit runs from and its test suite, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/raw/` holding the NetCDF files a reader downloads:
+The repository holds the pinned toolchain and its tasks, the package the audit and the pipeline run from and its test suite, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/` holding the NetCDF files a reader downloads under `raw/` and the record of each run under `runs/`:
 
 ```
 thermur/
@@ -485,13 +485,16 @@ thermur/
 │   └── tasks/                      # The gha, lock, py, and repo tasks
 │
 ├── data/
-│   └── raw/                        # NetCDF files from WRF-SFIRE
+│   ├── raw/                        # NetCDF files from WRF-SFIRE
+│   └── runs/                       # The record of each recorded run and the tables it saved
 │
 ├── docs/
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
-├── src/thermur/repo/               # The checks `mise audit` runs and the records `mise rulesets` sends
+├── src/thermur/
+│   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
+│   └── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, and the clone the `repo` tasks and the pipeline read
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads

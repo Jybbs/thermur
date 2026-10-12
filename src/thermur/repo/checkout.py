@@ -1,16 +1,20 @@
 """
-Holds `Checkout`, the clone the `repo` tasks read, which keeps each document
-it validates for every later check that reads it and lists the tasks, the
-programs, the workflows, the composite actions, the issue templates, and the
-rulesets the clone holds, beside the checks each pull request runs.
+Holds `Checkout`, the clone the `repo` tasks read and the pipeline resolves
+every path under, which keeps each document it validates for every later
+check that reads it. It lists the tasks, the programs, the workflows, the
+composite actions, the issue templates, and the rulesets the clone holds
+beside the checks each pull request runs, and reads the commit checked out
+and the digest of `uv.lock`.
 """
 
-from functools  import cached_property
-from json       import loads
-from pathlib    import Path
-from pydantic   import AfterValidator, BaseModel, Field, TypeAdapter
-from subprocess import check_output, run
-from typing     import Annotated
+from functools          import cached_property
+from hashlib            import sha256
+from importlib.metadata import distribution
+from json               import loads
+from pathlib            import Path
+from pydantic           import AfterValidator, BaseModel, Field, TypeAdapter
+from subprocess         import check_output, run
+from typing             import Annotated, Self
 
 from thermur.repo.schemas import (
     Action,
@@ -35,8 +39,9 @@ from thermur.repo.schemas import (
 
 class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    The clone the `repo` tasks read, rooted at `root`, naming each file
-    relative to that root and each task at the path mise resolves.
+    The clone the `repo` tasks read and the pipeline resolves every path
+    under, rooted at `root`, naming each file relative to that root and each
+    task at the path mise resolves.
     """
 
     root: Annotated[Path, AfterValidator(Path.resolve)] = Field(
@@ -75,6 +80,18 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `CITATION.cff`.
         """
         return Citation.read(self.root)
+
+    @property
+    def commit(self) -> str:
+        """
+        Reads the commit checked out at the root, as `git rev-parse HEAD`
+        prints it without its line break.
+        """
+        return check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd  = self.root,
+            text = True
+        ).strip()
 
     @property
     def composites(self) -> dict[str, Path]:
@@ -162,6 +179,14 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `uv.lock`.
         """
         return Lock.read(self.root)
+
+    @property
+    def lock_digest(self) -> str:
+        """
+        Hashes `uv.lock` with SHA-256, which pins the version of every
+        library the package imports.
+        """
+        return sha256((self.root / Lock.model_config["title"]).read_bytes()).hexdigest()
 
     @cached_property
     def manifest(self) -> Manifest:
@@ -255,6 +280,15 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             for path in self.root.glob(pattern)
             if not path.name.startswith(".")
         )
+
+    @classmethod
+    def installed(cls) -> Self:
+        """
+        Roots a checkout at the clone `uv sync` installed the package from,
+        which the `direct_url.json` that PEP 610 defines names, so every
+        path under it resolves the same from any working directory.
+        """
+        return cls(root=Path.from_uri(distribution("thermur").origin.url))
 
     def read(self, path: Path) -> str:
         """

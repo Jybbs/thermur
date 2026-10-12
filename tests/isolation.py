@@ -16,7 +16,7 @@ from socket             import create_connection, socketpair
 from tests.conftest     import pytest_collection_modifyitems
 
 
-@fixture(params=CLEARED, scope="module")
+@fixture(params=[*CLEARED, "THERMUR_RADIUS_M", "thermur_radius_m"], scope="module")
 def name(request: FixtureRequest) -> Iterator[str]:
     """
     Sets the variable `request.param` names and yields that name.
@@ -86,7 +86,8 @@ def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     Asserts that none of these variables reaches a test, covering the ones
     that set whether a console prints color, the files a GitHub Actions
     runner collects a workflow step's outputs and a workflow run's summary
-    page from, the branch and the commit `gha:brief` prefers, and the ones
-    naming where a tool keeps its cache, configuration, data, and state.
+    page from, the branch and the commit `gha:brief` prefers, the ones
+    naming where a tool keeps its cache, configuration, data, and state, and
+    a variable opening on `THERMUR_` in either case, which sets a setting.
     """
     assert name not in environ

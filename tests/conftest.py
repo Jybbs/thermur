@@ -6,11 +6,13 @@ connection only when it carries the `network` mark.
 """
 
 from common.environment import CLEARED
+from os                 import environ
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
-from subprocess         import check_output
+from subprocess         import check_output, run
 
-from thermur.repo.checkout import Checkout
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
 
 
 @fixture
@@ -37,6 +39,30 @@ def checkout(
     return Checkout(root=tmp_path)
 
 
+@fixture
+def clone(checkout: Checkout) -> Checkout:
+    """
+    Commits the copy `checkout` makes into a git repository of its own, so a
+    case reads the commit checked out there.
+    """
+    for command in (
+        ["init", "--quiet"],
+        ["add", "--all"],
+        ["commit", "--message=Copy", "--quiet"]
+    ):
+        run(
+            [
+                "git", "-c", "user.email=thermur@example.com",
+                "-c", "user.name=Thermur",
+                *command
+            ],
+            check = True,
+            cwd   = checkout.root
+        )
+
+    return checkout
+
+
 @fixture(autouse=True)
 def environment(
     monkeypatch      : MonkeyPatch,
@@ -54,7 +80,9 @@ def environment(
     turn on mise's `yes` setting, which answers a task's `confirm` prompt
     without asking. The rest name the folders where a tool keeps its cache,
     configuration, data, and state, which the XDG convention defines. It
-    then points `HOME` at an empty folder the test owns, so a tool that
+    also clears every variable opening on the `env_prefix` of `Settings`,
+    which pydantic-settings matches to the field it names whatever its case.
+    It then points `HOME` at an empty folder the test owns, so a tool that
     falls back to `~` finds none of the developer's files there.
 
     mise reads a configuration file out of every folder above the one
@@ -64,7 +92,11 @@ def environment(
     told to trust. The two `MISE_` variables name that file as one to skip
     and this checkout as one to trust, so a test can run mise over it.
     """
-    for name in CLEARED:
+    prefix = Settings.model_config["env_prefix"].lower()
+    for name in [
+        *CLEARED,
+        *(name for name in environ if name.lower().startswith(prefix))
+    ]:
         monkeypatch.delenv(name, raising=False)
 
     settled = Path.home() / ".config" / "mise" / "config.toml"

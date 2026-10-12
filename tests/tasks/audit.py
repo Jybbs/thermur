@@ -60,7 +60,8 @@ def test_a_broken_checkout_fails_naming_each_finding(
     (root / ".mise/bin/pytest").symlink_to("prose")
     (root / ".mise/tasks/py/test").write_text("#!/bin/sh\nuv run pytest\n")
     (root / "LICENSE").write_text("BSD License\n")
-    (root / "src/thermur/repo").rename(root / "repo")
+    (root / "src/thermur").rename(root / "thermur")
+    (root / "src/thermur").mkdir()
     edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
     edit(checkout, ".github/release.yml", new='["🐛 bug"]', old='["🐞 bug"]')
     edit(

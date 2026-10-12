@@ -1,6 +1,7 @@
 """
-Holds the shell variables each test starts without, which the autouse
-`environment` fixture clears and `tests/isolation.py` checks.
+Holds the shell variables each test starts without besides those opening
+on the `env_prefix` of `Settings`, which the autouse `environment` fixture
+clears and `tests/isolation.py` checks.
 """
 
 CLEARED = (
