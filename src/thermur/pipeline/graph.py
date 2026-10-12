@@ -2,25 +2,31 @@
 Holds `Graph`, which runs the Hamilton steps of every subpackage over
 one `Settings` through a driver whose cache keeps each result under
 `.cache/hamilton/`, beside `Recorder`, which records each run of a recorded
-graph under `data/runs/`, and `NetcdfWriter`, which saves each table the
-run computes. Importing the module registers with Hamilton the saver and a
-fingerprint reading the values of each array, xarray object, and Pydantic
-record.
+graph under `data/runs/`, and the NetCDF adapters, `NetcdfWriter` saving
+each table a run computes and `NetcdfReader` and `NetcdfTreeReader` opening
+one. Importing the module registers the adapters with Hamilton, and a
+fingerprint reading the type and the values of each array, xarray object,
+record, component, and path.
 """
 
 from dataclasses import dataclass
+from decimal     import Decimal
+from equinox     import Module
 from functools   import cached_property
 from hamilton    import registry
 from hamilton.caching.fingerprinting import hash_value
 from hamilton.driver                 import Builder, Driver
-from hamilton.io.data_adapters       import DataSaver
+from hamilton.io.data_adapters       import DataLoader, DataSaver
 from hamilton.io.materialization     import to
 from hamilton.plugins.h_experiments  import ExperimentTracker
 from importlib import import_module
 from jax       import Array
-from numpy     import asarray, ndarray
+from numpy     import asarray, generic, ndarray
+from os        import chdir
+from pathlib   import PurePath
 from pydantic  import BaseModel, Field
-from xarray    import DataArray, DataTree, Dataset
+from uuid      import UUID
+from xarray    import DataArray, DataTree, Dataset, open_dataset, open_datatree
 
 from thermur.pipeline.schemas  import Run, Subpackage
 from thermur.pipeline.settings import Settings
@@ -28,43 +34,32 @@ from thermur.repo.checkout     import Checkout
 
 
 @dataclass(frozen=True)
-class NetcdfWriter(DataSaver):
+class NetcdfFile:
     """
-    The saver `to.netcdf` names, writing a `Dataset` or a `DataTree` into
-    the NetCDF-4 file at `path` through h5netcdf.
+    A NetCDF-4 file at `path`, which Hamilton's savers and loaders reach
+    under the one name `to`, `from_`, and the `format` of `@cache` read.
     """
 
     path: str
     """
-    The file the saver writes, relative to the folder the experiment tracker
-    moves into around each saver.
+    The file, relative to the working directory, which the experiment
+    tracker moves into a run's folder around each saver.
     """
 
-    @classmethod
-    def applicable_types(cls) -> list[type]:
+    def __init_subclass__(cls, **kwargs: object):
         """
-        Lists the types the saver writes.
+        Registers each adapter on the file with Hamilton as its class is
+        defined, under the `name` the adapters share.
         """
-        return [Dataset, DataTree]
+        super().__init_subclass__(**kwargs)
+        registry.register_adapter(cls)
 
     @classmethod
     def name(cls) -> str:
         """
-        Names the saver as `to` reads it.
+        Names the adapter as `to`, `from_`, and `@cache` read it.
         """
         return "netcdf"
-
-    def save_data(self, data: Dataset | DataTree) -> dict[str, str]:
-        """
-        Writes `data` into the file at `path`.
-
-        Returns:
-            The `path` the experiment tracker records, in place of the
-            `get_file_metadata` result Hamilton's own savers return, which
-            calls the deprecated `datetime.utcnow`.
-        """
-        data.to_netcdf(self.path, engine="h5netcdf")
-        return {"path": self.path}
 
 
 class Recorder(ExperimentTracker):
@@ -81,10 +76,40 @@ class Recorder(ExperimentTracker):
     def __init__(self, checkout: Checkout, settings: Settings):
         """
         Keeps the `checkout` whose `data/runs/` holds each record and the
-        `settings` each execution of the graph records.
+        `settings` each execution of the graph records, with no run open.
         """
         self.checkout = checkout
+        self.opened   = False
         self.settings = settings
+
+    def run_after_graph_execution(self, **kwargs: object):
+        """
+        Writes the record of the run `run_before_graph_execution` opened,
+        and nothing for an execution that failed before its run opened.
+
+        Hamilton calls this after every execution, a failed one included,
+        where the tracker alone raises `AttributeError` before its first
+        run and afterward writes the previous run's record again under that
+        run's identifier.
+        """
+        if self.opened:
+            self.opened = False
+            super().run_after_graph_execution(**kwargs)
+
+    def run_after_node_execution(self, *, success: bool, **kwargs: object):
+        """
+        Records each saver's file as the tracker does, and after a failed
+        node moves back into the folder the run started in and records
+        nothing.
+
+        The tracker reads `path` out of a failed saver's result, which is
+        `None`, so it raises `TypeError` in place of the saver's own error
+        and never moves back out of the run's folder.
+        """
+        if success:
+            super().run_after_node_execution(success=success, **kwargs)
+        else:
+            chdir(self.init_directory)
 
     def run_before_graph_execution(self, **kwargs: object):
         """
@@ -93,6 +118,9 @@ class Recorder(ExperimentTracker):
         its folder when built, and stores the `Run` read from the clone at
         that moment as the configuration the tracker writes before recording
         the execution's inputs.
+
+        The `Run` holds the settings in full, so the inputs leave out
+        `settings`, which the tracker would write as the text `str` gives.
         """
         super().__init__(
             base_directory  = str(self.checkout.root / "data" / "runs"),
@@ -101,6 +129,8 @@ class Recorder(ExperimentTracker):
         self.run    = Run.from_checkout(self.checkout, self.settings)
         self.config = self.run.model_dump(mode="json")
         super().run_before_graph_execution(**kwargs)
+        self.inputs = [entry for entry in self.inputs if entry.name != "settings"]
+        self.opened = True
 
 
 class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -153,14 +183,14 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         its cache under `.cache/hamilton/` and the `recorder` where the
         graph records its runs.
 
-        The cache computes every saver again on every run, so a recorded run
-        writes each table it saves into its own folder.
+        The cache runs every saver on every run and stores nothing of it, so
+        a recorded run writes each table it saves into its own folder.
         """
         return (
             Builder()
             .with_modules(*map(import_module, self.modules))
             .with_cache(
-                default_saver_behavior = "recompute",
+                default_saver_behavior = "disable",
                 path = self.checkout.root / ".cache" / "hamilton"
             )
             .with_adapters(*[self.recorder] if self.recorded else [])
@@ -194,38 +224,140 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 
         Returns:
             Each result under the name of the node that computed it.
+
+        Raises:
+            ValueError: Where `steps` names no node, or a node the graph
+                        does not declare, before the cache or the recorder
+                        starts a run.
         """
+        if not steps:
+            raise ValueError("Name at least one step to compute")
+
+        arguments = {
+            "additional_vars" : list(steps),
+            "inputs"          : {
+                "lock_digest" : self.checkout.lock_digest,
+                "settings"    : self.settings
+            }
+        }
         savers = [
             to.netcdf(dependencies=[step], id=f"{step}_saved", path=f"{step}.nc")
             for step in steps
             if self.recorded and step in self.tables
         ]
-        _, results = self.driver.materialize(
-            *savers,
-            additional_vars = list(steps),
-            inputs          = {
-                "lock_digest" : self.checkout.lock_digest,
-                "settings"    : self.settings
-            }
-        )
+        self.driver.validate_materialization(*savers, **arguments)
+        _, results = self.driver.materialize(*savers, **arguments)
 
         return results
 
 
-@hash_value.register(Array)
-@hash_value.register(ndarray)
-def fingerprint_array(array: Array | ndarray, *, depth: int = 0) -> str:
+class NetcdfReader(NetcdfFile, DataLoader):
     """
-    Fingerprints a NumPy or a JAX array by its shape, its dtype, and its
-    values, where Hamilton reads a NumPy array's bytes alone, which every
-    array of zeros spanning as many bytes shares whatever its shape or
-    dtype, and gives every JAX array the one fingerprint it gives an object
-    it cannot read.
+    The loader opening the file at `path` as a `Dataset` through h5netcdf.
+    """
+
+    @classmethod
+    def applicable_types(cls) -> list[type]:
+        """
+        Lists the type the loader opens.
+        """
+        return [Dataset]
+
+    def load_data(self, type_: type) -> tuple[Dataset, dict[str, str]]:
+        """
+        Opens the file at `path`, reading no values until a caller reads
+        them.
+
+        Returns:
+            The dataset beside the `path` the experiment tracker records,
+            in place of the `get_file_metadata` result Hamilton's own
+            loaders return, which calls the deprecated `datetime.utcnow`.
+        """
+        return open_dataset(self.path, engine="h5netcdf"), {"path": self.path}
+
+
+class NetcdfTreeReader(NetcdfFile, DataLoader):
+    """
+    The loader opening the file at `path` as a `DataTree` through h5netcdf.
+
+    Hamilton's cache opens a stored result through the loader it pickled
+    beside it, calling `load_data` with no type, so each loader opens the
+    one type its class lists.
+    """
+
+    @classmethod
+    def applicable_types(cls) -> list[type]:
+        """
+        Lists the type the loader opens.
+        """
+        return [DataTree]
+
+    def load_data(self, type_: type) -> tuple[DataTree, dict[str, str]]:
+        """
+        Opens the file at `path`, reading no values until a caller reads
+        them.
+
+        Returns:
+            The tree beside the `path` the experiment tracker records.
+        """
+        return open_datatree(self.path, engine="h5netcdf"), {"path": self.path}
+
+
+class NetcdfWriter(NetcdfFile, DataSaver):
+    """
+    The saver writing a `Dataset` or a `DataTree` into the file at `path`
+    through h5netcdf.
+    """
+
+    @classmethod
+    def applicable_types(cls) -> list[type]:
+        """
+        Lists the types the saver writes.
+        """
+        return [Dataset, DataTree]
+
+    def save_data(self, data: Dataset | DataTree) -> dict[str, str]:
+        """
+        Writes `data` into the file at `path`.
+
+        Returns:
+            The `path` the experiment tracker records, in place of the
+            `get_file_metadata` result Hamilton's own savers return, which
+            calls the deprecated `datetime.utcnow`.
+        """
+        data.to_netcdf(self.path, engine="h5netcdf")
+        return {"path": self.path}
+
+
+def fingerprint(payload: object, value: object, *, depth: int) -> str:
+    """
+    Hashes `payload` beside the module and the qualified name of `value`'s
+    type, so two values of different types never share a fingerprint.
+
+    Hamilton's file store keeps one stored result per fingerprint, so a
+    value sharing its fingerprint with a value of another type would come
+    back from the cache as that other value.
+    """
+    kind = type(value)
+    return hash_value((kind.__module__, kind.__qualname__, payload), depth=depth + 1)
+
+
+@hash_value.register(Array)
+@hash_value.register(generic)
+@hash_value.register(ndarray)
+def fingerprint_array(array: Array | generic | ndarray, *, depth: int = 0) -> str:
+    """
+    Fingerprints a NumPy or a JAX array, or a NumPy scalar, by its type, its
+    shape, its dtype, and its values, where Hamilton reads a NumPy array's
+    bytes alone, which every array of zeros spanning as many bytes shares
+    whatever its shape or dtype, and gives a JAX array and a NumPy integer
+    or boolean the one fingerprint it gives an object it cannot read.
     """
     values = asarray(array)
-    return hash_value(
-        (values.shape, values.dtype.str, values.tobytes()),
-        depth = depth + 1
+    return fingerprint(
+        depth   = depth,
+        payload = (values.shape, values.dtype.str, values.tobytes()),
+        value   = array
     )
 
 
@@ -233,32 +365,60 @@ def fingerprint_array(array: Array | ndarray, *, depth: int = 0) -> str:
 @hash_value.register(Dataset)
 def fingerprint_dataset(data: DataArray | Dataset, *, depth: int = 0) -> str:
     """
-    Fingerprints a `DataArray` or a `Dataset` by every variable's name,
-    dimensions, attributes, and values, which `to_dict` lays out as a
-    mapping holding each variable's values as an array, where Hamilton reads
-    a `Dataset`'s data variable names alone and nothing of a `DataArray`.
+    Fingerprints a `DataArray` or a `Dataset` by its type and every
+    variable's name, dimensions, attributes, and values, which `to_dict`
+    lays out as a mapping holding each variable's values as an array, where
+    Hamilton reads a `Dataset`'s data variable names alone and nothing of
+    a `DataArray`.
     """
-    return hash_value(data.to_dict(data="array"), depth=depth + 1)
+    return fingerprint(data.to_dict(data="array"), data, depth=depth)
+
+
+@hash_value.register(Module)
+def fingerprint_module(module: Module, *, depth: int = 0) -> str:
+    """
+    Fingerprints an `equinox.Module` by its type and the value of each of
+    its fields, where Hamilton reads the fields alone, which two components
+    declaring the same parameters share.
+    """
+    return fingerprint(vars(module), module, depth=depth)
 
 
 @hash_value.register(BaseModel)
 def fingerprint_record(record: BaseModel, *, depth: int = 0) -> str:
     """
-    Fingerprints a Pydantic record by the value of each field its class
-    declares, where Hamilton reads the record's `__dict__`, which holds
-    nothing for a record declaring no field and holds each `cached_property`
-    once read.
+    Fingerprints a Pydantic record by its type and the value of each field
+    its class declares, where Hamilton reads the record's `__dict__`,
+    which holds nothing for a record declaring no field and holds each
+    `cached_property` once read.
     """
-    return hash_value(record.model_dump(), depth=depth + 1)
+    return fingerprint(record.model_dump(), record, depth=depth)
+
+
+@hash_value.register(complex)
+@hash_value.register(Decimal)
+@hash_value.register(PurePath)
+@hash_value.register(UUID)
+def fingerprint_text(
+    value : complex | Decimal | PurePath | UUID,
+    *,
+    depth : int = 0
+) -> str:
+    """
+    Fingerprints a complex number, a `Decimal`, a path, or a `UUID` by its
+    type and the text `str` writes for it, which holds the whole value,
+    where Hamilton gives each the one fingerprint it gives an object it
+    cannot read, since it reads the text of a type only where the type's
+    module is built into the interpreter.
+    """
+    return fingerprint(str(value), value, depth=depth)
 
 
 @hash_value.register(DataTree)
 def fingerprint_tree(tree: DataTree, *, depth: int = 0) -> str:
     """
-    Fingerprints a `DataTree` by the `Dataset` at each of its paths, where
-    Hamilton reads the names of the tree's variables and children alone.
+    Fingerprints a `DataTree` by its type and the `Dataset` at each of
+    its paths, where Hamilton reads the names of the tree's variables and
+    children alone.
     """
-    return hash_value(tree.to_dict(), depth=depth + 1)
-
-
-registry.register_adapter(NetcdfWriter)
+    return fingerprint(tree.to_dict(), tree, depth=depth)

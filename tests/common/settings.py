@@ -1,9 +1,11 @@
 """
-Holds `Tuned`, the package's settings widened by a stand-in field and the
-stand-in `Heading` component, which the settings and the graph cases read.
+Holds `Tuned`, the package's settings widened by a stand-in field, a
+stand-in path, and the stand-in `Heading` component, which the settings and
+the graph cases read.
 """
 
 from equinox  import Module
+from pathlib  import Path
 from pydantic import Field
 from typing   import Annotated
 
@@ -24,7 +26,8 @@ class Heading(Module):
 
 class Tuned(Settings):
     """
-    The settings with a stand-in component and a stand-in field.
+    The settings with a stand-in component, a stand-in field, and a stand-in
+    path.
     """
 
     heading: Heading = Heading()
@@ -35,4 +38,9 @@ class Tuned(Settings):
     radius_m: Annotated[float, Field(gt=0)] = 5.0
     """
     A stand-in distance in meters.
+    """
+
+    source: Path = Path("data/raw/sample.nc")
+    """
+    A stand-in file a step reads.
     """
