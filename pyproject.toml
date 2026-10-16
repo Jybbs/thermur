@@ -4,7 +4,21 @@ requires      = ["hatchling==1.32.4"]
 
 [project]
 authors         = [{ name = "James Parkington" }]
-dependencies    = ["matplotlib", "numpy", "packaging", "pydantic", "pyyaml", "seaborn", "yaml-rs"]
+dependencies    = [
+    "apache-hamilton",
+    "equinox",
+    "h5netcdf[h5py]",
+    "jax",
+    "matplotlib",
+    "numpy",
+    "packaging",
+    "pydantic",
+    "pydantic-settings",
+    "pyyaml",
+    "seaborn",
+    "xarray",
+    "yaml-rs"
+]
 description     = "Flies a drone flock as a starling murmuration that breaks around a wildfire the way it breaks around a falcon."
 keywords        = [
     "agent-based-modeling",

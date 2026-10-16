@@ -1,18 +1,70 @@
 """
-Pins what `Checkout` lists for the `repo` tasks, meaning the tasks mise
-lists for the clone, the programs on its path, the check run and the task
-of each pull-request row, the steps its workflows and composite actions run,
-its issue templates, and its rulesets.
+Pins what `Checkout` reads from the clone and lists for the `repo` tasks
+and the pipeline:
+
+- The tasks mise lists for the clone and the programs on its path
+- The check run and the task of each pull-request row, the steps its
+  workflows and composite actions run, its issue templates, and its rulesets
+- The commit checked out, the digest of its `uv.lock`, and the clone the
+  package was installed from
 """
 
 from common.edits import append, task
 from os           import X_OK, access, pathsep
 from pathlib      import Path
-from pytest       import MonkeyPatch, TempPathFactory, mark, param
+from pytest       import Config, MonkeyPatch, TempPathFactory, mark, param, raises
 from re           import findall
+from subprocess   import CalledProcessError, check_output
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
+
+
+def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(checkout: Checkout):
+    """
+    Asserts that reading the commit of a folder no git repository holds
+    raises the error git exits with, rather than returning what git prints.
+    """
+    with raises(CalledProcessError):
+        checkout.commit
+
+
+def test_commit_reads_the_commit_checked_out(clone: Checkout):
+    """
+    Asserts that the commit is the hash git logs for the clone's `HEAD`,
+    without the line break git prints after it.
+    """
+    assert clone.commit == check_output(
+        ["git", "log", "-1", "--format=%H"],
+        cwd  = clone.root,
+        text = True
+    ).removesuffix("\n")
+
+
+def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config,
+    tmp_path     : Path
+):
+    """
+    Asserts that the installed checkout sits at the worktree `uv sync`
+    installed the package from, whatever the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    assert Checkout.installed().root == pytestconfig.rootpath.resolve()
+
+
+def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
+    """
+    Asserts that the lock digest is the SHA-256 digest of `uv.lock`, pinned
+    on an empty file against the digest of empty input.
+    """
+    (checkout.root / "uv.lock").write_bytes(b"")
+
+    assert checkout.lock_digest == (
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
 
 
 @mark.parametrize(
