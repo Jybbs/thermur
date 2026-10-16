@@ -9,6 +9,7 @@ from functools  import cached_property
 from json       import loads
 from pathlib    import Path
 from pydantic   import AfterValidator, BaseModel, Field, TypeAdapter
+from re         import sub
 from subprocess import check_output, run
 from typing     import Annotated
 
@@ -24,6 +25,7 @@ from thermur.repo.schemas import (
     Labels,
     Lock,
     Manifest,
+    Package,
     Release,
     Ruleset,
     Step,
@@ -75,6 +77,24 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `CITATION.cff`.
         """
         return Citation.read(self.root)
+
+    @cached_property
+    def commands(self) -> list[tuple[Path, str]]:
+        """
+        Pairs each file a task or a program on the path runs from, relative
+        to the root, with the lines a shell runs out of it as `shell` reads
+        them, where a task declared in TOML gives the lines it runs in place
+        of a file's, read as `unwrap` reads them.
+        """
+        return [
+            (
+                task.path.relative_to(self.root),
+                self.unwrap("\n".join(task.run)) if task.file is None else self.shell(
+                    task.file
+                )
+            )
+            for task in self.tasks
+        ] + [(path, self.shell(self.root / path)) for path in self.scripts]
 
     @property
     def composites(self) -> dict[str, Path]:
@@ -171,6 +191,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         return Manifest.read(self.root)
 
     @cached_property
+    def package(self) -> Package:
+        """
+        Validates `docs/package.json`.
+        """
+        return Package.read(self.root)
+
+    @cached_property
     def release(self) -> Release:
         """
         Validates `.github/release.yml`.
@@ -261,3 +288,25 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Reads the text of the file at `path` under the root.
         """
         return (self.root / path).read_text(encoding="utf-8")
+
+    @staticmethod
+    def shell(path: Path) -> str:
+        """
+        Reads the lines a shell runs out of the file at `path`, which for a
+        Python task is the shebang alone and for any other file its lines as
+        `unwrap` reads them.
+        """
+        text = path.read_text(encoding="utf-8")
+        if path.suffix == ".py":
+            return text.partition("\n")[0]
+
+        return Checkout.unwrap(text)
+
+    @staticmethod
+    def unwrap(text: str) -> str:
+        """
+        Reads every line of `text` a shell runs, blanking each line opening
+        on `#` other than a shebang and joining each backslash continuation
+        to the next line with a space.
+        """
+        return sub(r"(?m)^[ \t]*#(?!!).*$", "", text).replace("\\\n", " ")

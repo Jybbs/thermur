@@ -1,0 +1,26 @@
+{
+    "name"            : "thermur",
+    "private"         : true,
+    "type"            : "module",
+    "devDependencies" : {
+        "@resvg/resvg-js"     : "2.6.2",
+        "@types/culori"       : "4.0.1",
+        "@types/node"         : "26.6.5",
+        "@vitest/coverage-v8" : "5.0.3",
+        "@vue/test-utils"     : "2.5.1",
+        "@vue/tsconfig"       : "0.9.1",
+        "culori"              : "4.0.2",
+        "happy-dom"           : "21.0.1",
+        "katex"               : "0.19.0",
+        "knip"                : "6.41.0",
+        "oxlint"              : "1.87.0",
+        "satori"              : "0.47.1",
+        "smol-toml"           : "1.9.1",
+        "typescript"          : "7.0.2",
+        "vite"                : "8.3.4",
+        "vitepress"           : "2.0.0-alpha.20",
+        "vitest"              : "5.0.3",
+        "vue"                 : "3.5.43"
+    },
+    "overrides"       : { "fflate": "0.7.5" }
+}

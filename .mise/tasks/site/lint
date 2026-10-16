@@ -1,0 +1,10 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "lint"
+#MISE depends     = ["site:install"]
+#MISE description = "Lint the site's TypeScript through Oxlint, as annotations under GitHub Actions"
+#MISE dir         = "{{config_root}}/docs"
+
+format=default
+[[ -z "${GITHUB_ACTIONS:-}" ]] || format=github
+
+node_modules/.bin/oxlint --config .vitepress/.oxlintrc.json --format "$format" "$@" .vitepress

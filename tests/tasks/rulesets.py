@@ -356,9 +356,9 @@ def test_each_ruleset_and_setting_is_sent_with_its_body(
     """
     Asserts that the task reads the live rulesets through `--paginate`,
     updates each ruleset in place, and then sends the repository's settings,
-    the Actions permissions, the token's defaults, each toggle, and last the
-    manifest's description and its keywords as the topics, each call beside
-    the body it sends.
+    the Actions permissions, the token's defaults, each toggle, the
+    manifest's description beside its homepage, and last its keywords as the
+    topics, each call beside the body it sends.
     """
     applied(LIVE)
 

@@ -1,21 +1,21 @@
 # Contributing to Thermur
 
-Every change to *Thermur* starts from an issue, lands on a branch named for that issue, and reaches `main` through a pull request that Jybbs reviews and squash-merges. This guide follows that path from a fresh clone to a merged pull request, then sets out the style the code takes, the checks each pull request runs, and the labels that sort each issue and pull request.
+Every change to *Thermur* starts from an issue, lands on a branch named for that issue, and reaches `main` through a pull request that is reviewed and then squash-merged. This guide follows that path from a fresh clone to a merged pull request, then sets out the style the code takes, the checks each pull request runs, and the labels that sort each issue and pull request.
 
 ## Setting Up the Clone
 
-1. Build the locked environment through the commands under [Quick Start](../README.md#-quick-start) in the README, which install the Python and uv `.mise/config.toml` pins and then the packages `uv.lock` resolves.
+1. Build the locked environment through the commands under [Quick Start](../README.md#-quick-start) in the README, which install every tool `.mise/config.toml` pins and then the packages `uv.lock` resolves.
 2. Run `mise doctor project`, which names any condition the clone still lacks beside the command that supplies it.
 
 ## From an Issue to a Pull Request
 
-1. Open an issue through the [spec or bug template](https://github.com/Jybbs/thermur/issues/new/choose), naming what is wrong and what has to change, which Jybbs labels from the table under Labels below.
+1. Open an issue through the [spec or bug template](https://github.com/Jybbs/thermur/issues/new/choose), naming what is wrong and what has to change, and the issue takes its labels from the table under Labels below.
 2. Branch from `main` as `<issue>/<slug>`, the issue's number followed by at most three words from its title (*`12/seeded-trajectories`*).
-3. Write the change beside the tests that pin it, then run `mise format` and run `mise ci`, which runs every check under [Checks](#checks) below, until it passes. After editing `pyproject.toml` or `.mise/config.toml`, run `mise relock`, so the lockfile it rewrites lands in the same commit.
+3. Write the change beside the tests that pin it, then run `mise format` and run `mise ci`, which runs every check under [Checks](#checks) below, until it passes. After editing `pyproject.toml`, `.mise/config.toml`, or `docs/package.json`, run `mise relock`, so the lockfile it rewrites lands in the same commit.
 4. Commit in the form `type(scope): description`, its type one of `feat`, `fix`, `refactor`, `chore`, `docs`, or `test`, and its scope the part of the package the commit touches (*`cli`, `config`, `controller`, `environment`, `metrics`*) or `docs`, `build`, or `ci`.
 5. Open a pull request titled `[<issue>] <the issue's title>`, filling in the sections its template carries, whose Related Issues line closes the issue on merge.
 
-Jybbs squash-merges each pull request into one commit on `main` titled after the pull request, which is why the title rather than any commit on the branch carries the issue's number.
+Each pull request is squash-merged into one commit on `main` titled after the pull request, which is why the title rather than any commit on the branch carries the issue's number.
 
 ## Code Style
 
@@ -23,18 +23,24 @@ Jybbs squash-merges each pull request into one commit on `main` titled after the
 
 ## Checks
 
-Every pull request runs `🐦‍⬛ CI`, whose rows each run one task, so the command beside each check below runs the same task on a laptop:
+Every pull request runs `🐦‍⬛ CI` except one touching only the site's own code under `docs/.vitepress/`, and one touching what the site reads runs `🐦‍⬛ Site`, whose rows each run one task, so the command beside each check below runs the same task on a laptop:
 
 | **Check** | **Runs Locally** | **Fails When** |
 |---|---|---|
-| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, or the lockfile beside a task script drifts from its manifest, or `.mise/mise.lock` lacks a pinned tool for the running platform |
-| `⛈️ Advisories` | `mise scan` | A package `uv.lock` or a task script's lockfile resolves carries a published advisory, or the advisory service cannot be reached |
+| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, `docs/bun.lock`, or the lockfile beside a task script drifts from its manifest, or `.mise/mise.lock` lacks a pinned tool for the running platform |
+| `⛈️ Advisories` | `mise scan` | A package `uv.lock`, `docs/bun.lock`, or a task script's lockfile resolves carries a published advisory, or the advisory service cannot be reached |
 | `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the line it concerns |
 | `☂️ Coverage` | `mise coverage` | A test fails under coverage, or the suite fails to collect |
 | `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` makes a finding at the error level, such as a file restating a value otherwise than its source, or this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
 | `🗝️ Workflows` | `mise vet` | [zizmor](https://docs.zizmor.sh/) cannot parse a workflow or the composite action, or finds a hazard in one, such as template injection, an unpinned action, an over-broad permission, checkout credentials left on disk, or a cache a privileged job restores |
+| `🪁 Press` | `mise press` | VitePress fails to build a page, or a link between pages leads nowhere |
+| `📻 Links` | `mise links` | A link, an asset, or a heading fragment in the built site, the README, or this guide names nothing it can reach |
+| `🚿 Lint` | `mise lint` | Oxlint reports a finding in the site's TypeScript, each shown as an annotation on the line it concerns |
+| `🚩 Types` | `mise typecheck` | `tsc` reports a type error in the site's TypeScript, or a single-file component appears that `tsc` cannot read |
+| `🪓 Cruft` | `mise cruft` | knip reports an unused file, export, or dependency in the site, or an import cycle |
+| `🦺 Coverage` | `mise run site:coverage` | A site test fails under coverage, or the site's coverage falls below 95% on statements, branches, functions, or lines |
 
-`📡 Readout` waits on every row and fails where any of them fails, so it is the one check a pull request has to pass, and `mise ci` runs every row's task once `mise doctor project` passes.
+Each workflow ends on a `📡 Readout` gate that waits on every row and fails where any of them fails, so it is the one check a pull request has to pass, and `mise ci` runs every row's task once `mise doctor project` passes.
 
 ## Labels
 

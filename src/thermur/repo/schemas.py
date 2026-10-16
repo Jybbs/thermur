@@ -10,8 +10,8 @@ Holds the records the `repo` tasks read and report:
   its `Category` rows, each issue `Template`, and the `Citation` with its
   `Person` rows out of the YAML, each `Ruleset` with its `Rule` and `Actor`
   rows and the `Parameters` of `Status` rows each rule takes out of the JSON
-  under `.github/rulesets/`, and the `Guide` out of the contributor guide's
-  tables
+  under `.github/rulesets/`, the site's `Package` out of `docs/package.json`,
+  and the `Guide` out of the contributor guide's tables
 - The `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and `State` enums
   each closed-set value in `.github/settings.toml` takes, and the
   `ActorType`, `BypassMode`, `Enforcement`, `MergeMethod`, `RuleType`, and
@@ -45,12 +45,14 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re      import findall, fullmatch, search, sub
-from tomllib import loads
-from typing  import Annotated, Self
-from yaml_rs import loads as from_yaml
+from re           import findall, fullmatch, search, sub
+from tomllib      import loads
+from typing       import Annotated, Self
+from urllib.parse import urlsplit
+from yaml_rs      import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
+type Major      = Annotated[str, AfterValidator(read_major)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
 type Scalar     = bool | float | int | str
 
@@ -86,6 +88,14 @@ class ActorType(StrEnum):
     REPOSITORY_ROLE    = "RepositoryRole"
     TEAM               = "Team"
     USER               = "User"
+
+
+def read_major(version: str) -> str:
+    """
+    Reads the major in `version`, the part ahead of its first dot, so
+    `24.11.1` reads as `24`.
+    """
+    return version.partition(".")[0]
 
 
 def read_minor(version: str) -> str:
@@ -251,6 +261,11 @@ class Config(Document, title=".mise/config.toml"):
     bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
     """
     The folder `_.path` puts on the path, relative to the root.
+    """
+
+    node: Major = Field(validation_alias=AliasPath("tools", "node"))
+    """
+    The major of the `node` release mise pins.
     """
 
     python: Minor = Field(validation_alias=AliasPath("tools", "python"))
@@ -419,6 +434,12 @@ class Manifest(Document, title="pyproject.toml"):
     The major and minor `requires-python` sets as the floor.
     """
 
+    homepage: str = Field(validation_alias=AliasPath("project", "urls", "Homepage"))
+    """
+    The address of the docs site `[project.urls]` names, with its scheme and
+    its closing slash.
+    """
+
     keywords: list[str] = Field(validation_alias=AliasPath("project", "keywords"))
     """
     The keywords `[project]` lists, which `repo:rulesets` sends as the
@@ -491,6 +512,15 @@ class Manifest(Document, title="pyproject.toml"):
     """
 
     @property
+    def address(self) -> str:
+        """
+        Writes the homepage the way the repository's homepage field shows
+        it, with its scheme and its closing slash dropped.
+        """
+        homepage = urlsplit(self.homepage)
+        return f"{homepage.netloc}{homepage.path}".removesuffix("/")
+
+    @property
     def holders(self) -> str:
         """
         Joins the authors' names the way a copyright line names its holders.
@@ -500,19 +530,44 @@ class Manifest(Document, title="pyproject.toml"):
     @property
     def requests(self) -> list[Request]:
         """
-        Writes the calls sending the description `[project]` declares
-        as the repository's description and the keywords it lists as the
-        repository's topics, which replace every topic the repository
-        carries.
+        Writes the calls sending the description `[project]` declares as
+        the repository's description and its homepage as the repository's
+        homepage, then the keywords it lists as the repository's topics,
+        which replace every topic the repository carries.
         """
         return [
             Request(
-                body     = {"description": self.description},
+                body     = {"description": self.description, "homepage": self.address},
                 endpoint = "",
                 method   = "PATCH"
             ),
             Request(body={"names": self.keywords}, endpoint="topics", method="PUT")
         ]
+
+
+class Package(Document, title="docs/package.json"):
+    """
+    The pins `docs/package.json` declares that restate another pin or that
+    another pin restates, each an exact version, as Bun installs it.
+    """
+
+    coverage: str = Field(
+        validation_alias = AliasPath("devDependencies", "@vitest/coverage-v8")
+    )
+    """
+    The release of Vitest's coverage provider the site's suite runs under.
+    """
+
+    types: Major = Field(validation_alias=AliasPath("devDependencies", "@types/node"))
+    """
+    The major of the release of Node's types the site's TypeScript checks
+    against.
+    """
+
+    vitest: str = Field(validation_alias=AliasPath("devDependencies", "vitest"))
+    """
+    The release of Vitest the site's suite runs on.
+    """
 
 
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):

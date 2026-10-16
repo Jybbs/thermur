@@ -1,0 +1,72 @@
+name : 🐦‍⬛ Site
+
+concurrency:
+  cancel-in-progress : ${{ github.event_name == 'pull_request' }}
+  group              : ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+
+jobs:
+  check:
+    name    : ${{ matrix.name }}
+    outputs : { site-coverage: "${{ steps.attach.outputs.artifact-url }}" }
+    runs-on : &image ubuntu-26.04
+
+    steps:
+      - name : Provision the tools the site's tasks run
+        uses : $/.github/actions/provision
+        with : { tools: aqua:lycheeverse/lychee bun node }
+
+      - name : Run the row's task
+        env  : { TASK: "${{ matrix.task }}" }
+        run  : mise run "$TASK"
+
+      - name : Attach the coverage report
+        id   : attach
+        if   : ${{ !cancelled() && matrix.report }}
+        uses : actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with : { if-no-files-found: error, name: "${{ matrix.report }}", path: .cache/coverage/site, retention-days: 14 }
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        include:
+          - name : 🪁 Press
+            task : site:press
+          - name : 📻 Links
+            task : site:links
+          - name : 🚿 Lint
+            task : site:lint
+          - name : 🚩 Types
+            task : site:typecheck
+          - name : 🪓 Cruft
+            task : site:cruft
+          - name   : 🦺 Coverage
+            report : site-coverage
+            task   : site:coverage
+
+    timeout-minutes : &timeout 15
+
+  gate:
+    name    : 📡 Readout
+    if      : ${{ always() }}
+    needs   : [check]
+    runs-on : *image
+
+    steps:
+      - name : Provision the tools the gate runs on
+        uses : $/.github/actions/provision
+        with : { tools: python uv }
+
+      - name : Brief the workflow run and exit with its verdict
+        env  : { COMMIT: "${{ github.event.pull_request.head.sha || github.sha }}", NEEDS: "${{ toJSON(needs) }}" }
+        run  : mise run gha:brief
+
+    timeout-minutes : *timeout
+
+on:
+  pull_request:
+    paths : [.github/CONTRIBUTING.md, .github/actions/provision/**, .github/workflows/site.yml, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, README.md, docs/**, pyproject.toml, src/thermur/figures/fonts/**]
+
+  workflow_dispatch:
+
+permissions : { contents: read }

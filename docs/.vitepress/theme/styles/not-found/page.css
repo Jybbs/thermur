@@ -1,0 +1,43 @@
+.not-found {
+  display       : grid;
+  gap           : 0.6rem;
+  justify-items : center;
+  padding       : 0 0 4rem;
+  text-align    : center;
+}
+
+.not-found-stage {
+  height   : 30rem;
+  position : relative;
+  width    : 100%;
+}
+
+.not-found-stage canvas {
+  height     : 100%;
+  inset      : 0;
+  mask-image : linear-gradient(to bottom, transparent, currentcolor 7%, currentcolor 86%, transparent);
+  position   : absolute;
+  width      : 100%;
+}
+
+.not-found-words {
+  display       : grid;
+  gap           : 0.9rem;
+  justify-items : center;
+  padding       : 0 1.5rem;
+}
+
+.not-found-title {
+  font   : 400 2.4rem/1.1 var(--th-font-display);
+  margin : 0.4rem 0 0;
+}
+
+.not-found-lead {
+  font-size   : 1.12rem;
+  line-height : 1.55;
+  max-width   : 34rem;
+}
+
+@media (width < 40rem) {
+  .not-found-stage { height: 24rem; }
+}

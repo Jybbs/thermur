@@ -1,0 +1,161 @@
+{
+  "faces": {
+    "body": {
+      "fallbacks": [
+        "Georgia",
+        "serif"
+      ],
+      "family": "Crimson Pro",
+      "fonts": [
+        {
+          "file": "crimsonpro/CrimsonPro-Regular.ttf",
+          "style": "normal",
+          "weight": 400
+        },
+        {
+          "file": "crimsonpro/CrimsonPro-Italic.ttf",
+          "style": "italic",
+          "weight": 400
+        }
+      ],
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ],
+      "italic": true
+    },
+    "display": {
+      "fallbacks": [
+        "Didot",
+        "Georgia",
+        "serif"
+      ],
+      "family": "Bellefair",
+      "fonts": [
+        {
+          "file": "bellefair/Bellefair-Regular.ttf",
+          "style": "normal",
+          "weight": 400
+        }
+      ],
+      "weights": [
+        400
+      ],
+      "italic": false
+    },
+    "mono": {
+      "fallbacks": [
+        "ui-monospace",
+        "Menlo",
+        "monospace"
+      ],
+      "family": "JetBrains Mono",
+      "fonts": [
+        {
+          "file": "jetbrainsmono/JetBrainsMono-Regular.ttf",
+          "style": "normal",
+          "weight": 400
+        }
+      ],
+      "weights": [
+        400,
+        500
+      ],
+      "italic": false
+    }
+  },
+  "marks": {
+    "mark": {
+      "dark": "mark-dark.svg",
+      "light": "mark-light.svg"
+    },
+    "small": {
+      "dark": "mark-small-dark.svg",
+      "light": "mark-small-light.svg"
+    },
+    "wordmark": {
+      "dark": "wordmark-dark.png",
+      "light": "wordmark-light.png"
+    }
+  },
+  "palette": {
+    "colors": {
+      "autumn-fire": "#c44e4f",
+      "burnt-crimson": "#582124",
+      "cararra": "#f2f1ee",
+      "emberglow": "#ea6759",
+      "eureka": "#e8c840",
+      "fire-lord": "#bb7733",
+      "fire-lord-deep": "#995500",
+      "fire-lord-lift": "#c38243",
+      "flame-red": "#86282e",
+      "kindleflame": "#e9967a",
+      "pompeian-red": "#a82a38",
+      "purpureus": "#9a4eae",
+      "purpureus-lift": "#ae66c2",
+      "topiary-garden": "#6f7c00",
+      "topiary-garden-lift": "#839230",
+      "toronto": "#5069ad",
+      "toronto-lift": "#657ec1",
+      "viridian": "#1e9167",
+      "viridian-lift": "#43a67d",
+      "woodsmoke": "#17171b"
+    },
+    "critical": {
+      "dark": "pompeian-red",
+      "light": "pompeian-red"
+    },
+    "ground": {
+      "dark": "woodsmoke",
+      "light": "cararra"
+    },
+    "heat": [
+      "kindleflame",
+      "emberglow",
+      "autumn-fire",
+      "pompeian-red",
+      "flame-red",
+      "burnt-crimson"
+    ],
+    "ink": {
+      "dark": "cararra",
+      "light": "woodsmoke"
+    },
+    "lead": {
+      "dark": "fire-lord-lift",
+      "light": "fire-lord-deep"
+    },
+    "series": [
+      {
+        "dark": "fire-lord-lift",
+        "light": "fire-lord"
+      },
+      {
+        "dark": "toronto-lift",
+        "light": "toronto"
+      },
+      {
+        "dark": "topiary-garden-lift",
+        "light": "topiary-garden"
+      },
+      {
+        "dark": "purpureus-lift",
+        "light": "purpureus"
+      },
+      {
+        "dark": "viridian-lift",
+        "light": "viridian"
+      }
+    ],
+    "warning": {
+      "dark": "eureka",
+      "light": "eureka"
+    }
+  },
+  "tagline": {
+    "alpha": 0.64,
+    "text": "A starling murmuration that breaks around a wildfire the way it breaks around a falcon."
+  }
+}

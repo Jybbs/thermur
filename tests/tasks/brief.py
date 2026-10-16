@@ -97,6 +97,36 @@ def job(result: str = "success", **outputs: str) -> dict:
             id = "draft-unchanged"
         ),
         param("draft.yml", {"cut": job("failure")}, id="draft-failed"),
+        param(
+            "pages.yml",
+            {"deploy": job(url="https://0a1b2c3d.thermur.pages.dev"), "press": job()},
+            id = "pages"
+        ),
+        param(
+            "pages.yml",
+            {"deploy": job("skipped"), "press": job()},
+            id = "pages-elsewhere"
+        ),
+        param(
+            "pages.yml",
+            {"deploy": job("failure"), "press": job()},
+            id = "pages-failed"
+        ),
+        param(
+            "pages.yml",
+            {"deploy": job("skipped"), "press": job("failure")},
+            id = "pages-unpressed"
+        ),
+        param(
+            "site.yml",
+            {"check": job(**{"site-coverage": "https://example.invalid/2"})},
+            id = "site"
+        ),
+        param(
+            "site.yml",
+            {"check": job("failure", **{"site-coverage": ""})},
+            id = "site-failed"
+        ),
         param("warm.yml", {"kit": job(), "prune": job()}, id="warm"),
         param("warm.yml", {"kit": job(), "prune": job("failure")}, id="warm-failed")
     ]
@@ -109,8 +139,9 @@ def test_each_workflow_renders_its_summary(
 ):
     """
     Asserts that a workflow file with a template of its own renders that
-    template, naming the coverage report the coverage row attached or the
-    path the draft cut took, and that any other renders `base.md.j2`.
+    template, naming the coverage report a coverage row attached and none
+    where the row left its output empty, the path the draft cut took, or the
+    address the deploy published, and that any other renders `base.md.j2`.
     """
     assert readout(file, needs).summary == snapshot
 
@@ -132,6 +163,8 @@ def test_the_heading_keeps_every_word_after_the_glyph(
     [
         param("ci.yml", {"check": job()}, id="ci"),
         param("draft.yml", {"cut": job("failure")}, id="draft"),
+        param("pages.yml", {"deploy": job("skipped"), "press": job()}, id="pages"),
+        param("site.yml", {"check": job()}, id="site"),
         param("warm.yml", {"kit": job()}, id="warm")
     ]
 )
@@ -158,17 +191,18 @@ def test_each_workflow_s_name_opens_on_the_glyph_its_heading_opens_on(
         param(["success", "success"], 0, id="passed"),
         param(["success", "failure"], 1, id="failed"),
         param(["success", "cancelled"], 1, id="cancelled"),
-        param(["success", "skipped"], 1, id="skipped")
+        param(["success", "skipped"], 0, id="skipped")
     ]
 )
-def test_the_verdict_passes_only_where_every_job_succeeded(
+def test_the_verdict_passes_only_where_every_job_succeeded_or_was_skipped(
     readout : Callable[[str, dict], object],
     results : list[str],
     status  : int
 ):
     """
     Asserts that the task exits `0` only where every job the gate waited on
-    succeeded, and `1` where any failed, was cancelled, or was skipped.
+    succeeded or was skipped, as the deploy job is on a run outside `main`,
+    and `1` where any failed or was cancelled.
     """
     needs = {f"job{index}": job(result) for index, result in enumerate(results)}
 

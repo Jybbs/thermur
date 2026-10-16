@@ -63,7 +63,6 @@ def test_each_task_hands_its_program_every_argument(
     for program in ("prose", "pytest"):
         stand_in(program, 'printf "%s\\n" "$@"')
 
-    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     if actions is not None:
         monkeypatch.setenv("GITHUB_ACTIONS", actions)
 

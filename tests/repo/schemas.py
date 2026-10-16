@@ -1097,3 +1097,33 @@ def test_a_deleted_table_fails_the_settings(pytestconfig: Config, table: str):
         GithubSettings.model_validate(parsed)
 
     assert [detail["loc"] for detail in error.value.errors()] == [(table,)]
+
+
+@mark.parametrize(
+    ("homepage", "address"),
+    [
+        param("https://thermur.fyi/", "thermur.fyi", id="apex"),
+        param("https://jybbs.github.io/thermur/", "jybbs.github.io/thermur", id="path"),
+        param("https://thermur.fyi", "thermur.fyi", id="no-slash")
+    ]
+)
+def test_the_homepage_reads_as_github_shows_it(
+    address      : str,
+    homepage     : str,
+    pytestconfig : Config
+):
+    """
+    Asserts that the homepage `repo:rulesets` sends drops the scheme and the
+    closing slash of the address `[project.urls]` names, keeping any path,
+    and travels beside the description.
+    """
+    manifest = (
+        Manifest.read(pytestconfig.rootpath)
+                .model_copy(update={"homepage": homepage})
+    )
+
+    assert manifest.address == address
+    assert manifest.requests[0].body == {
+        "description" : manifest.description,
+        "homepage"    : address
+    }

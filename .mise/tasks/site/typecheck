@@ -1,0 +1,13 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "typecheck"
+#MISE depends     = ["site:install"]
+#MISE description = "Type-check the site's TypeScript through `tsc`, failing on a single-file component, which `tsc` cannot read"
+#MISE dir         = "{{config_root}}/docs"
+
+components=$(find .vitepress -name '*.vue')
+[[ -z "$components" ]] || {
+  echo "tsc reads no single-file component, so each is a .ts module returning h(): $components" >&2
+  exit 1
+}
+
+node_modules/.bin/tsc --project .vitepress/tsconfig.json "$@"

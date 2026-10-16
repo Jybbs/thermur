@@ -1,14 +1,14 @@
 #!/usr/bin/env -S uv run --exact --locked
 # MISE alias       = "rulesets"
-# MISE confirm     = "Apply the rulesets, settings, description, and topics to GitHub?"
+# MISE confirm     = "Apply the rulesets, settings, description, homepage, and topics?"
 # MISE description = "Apply the rulesets and settings, listing live rulesets left out"
 """
 Applies every ruleset under `.github/rulesets/` and sends every setting
-`.github/settings.toml` declares, beside the description and the topics
-`pyproject.toml` declares, to the repository the checkout's remote names,
-as the `repo:rulesets` task, once mise's prompt is answered. It then prints
-each live ruleset no file names, which stays on GitHub until a deletion
-by hand.
+`.github/settings.toml` declares, beside the description, the homepage,
+and the topics `pyproject.toml` declares, to the repository the checkout's
+remote names, as the `repo:rulesets` task, once mise's prompt is answered.
+It then prints each live ruleset no file names, which stays on GitHub until
+a deletion by hand.
 """
 
 from json       import loads as from_json

@@ -1,0 +1,10 @@
+{% extends "base.md.j2" %}
+{% block details %}
+{% if needs.deploy.outputs.url %}
+ Published the site at [{{ needs.deploy.outputs.url }}]({{ needs.deploy.outputs.url }}).
+{%- elif needs.deploy.result == "skipped" and needs.press.result == "success" %}
+ Pressed the site and published nothing, since the run is not on `main`.
+{%- else %}
+ Published nothing.
+{%- endif %}
+{% endblock %}

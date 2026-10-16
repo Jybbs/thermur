@@ -1,7 +1,8 @@
 """
 Holds the edits a case makes to its copy of the checkout before a check
 reads it, meaning text added to the end of a file, one string replaced in a
-file, and a task file written fresh.
+file, and a task file written fresh, beside the writer of an executable file
+each of them and the stand-ins share.
 """
 
 from pathlib import Path
@@ -30,6 +31,20 @@ def edit(checkout: Checkout, path: str, *, new: str, old: str):
     file.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
+def executable(path: Path, text: str) -> Path:
+    """
+    Writes `text` to the file at `path`, creating its folder, and marks
+    it executable.
+
+    Returns:
+        The path written.
+    """
+    path.parent.mkdir(exist_ok=True, parents=True)
+    path.write_text(text, encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
 def task(checkout: Checkout, name: str, text: str) -> Path:
     """
     Writes an executable task file named `name` under `.mise/tasks/` in the
@@ -39,8 +54,5 @@ def task(checkout: Checkout, name: str, text: str) -> Path:
         The task's path relative to the root.
     """
     path = Path(".mise/tasks", name)
-    file = checkout.root / path
-    file.parent.mkdir(exist_ok=True, parents=True)
-    file.write_text(text, encoding="utf-8")
-    file.chmod(0o755)
+    executable(checkout.root / path, text)
     return path

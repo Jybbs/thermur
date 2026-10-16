@@ -1,0 +1,7 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "serve"
+#MISE depends     = ["site:install"]
+#MISE description = "Serve the docs site, reloading a page as it is edited"
+#MISE dir         = "{{config_root}}/docs"
+
+node_modules/.bin/vitepress dev "$@"

@@ -58,9 +58,9 @@ def test_a_broken_checkout_fails_naming_each_finding(
     warm   = ".github/workflows/warm.yml"
     (root / ".mise/bin/pytest").unlink()
     (root / ".mise/bin/pytest").symlink_to("prose")
-    (root / ".mise/tasks/py/test").write_text("#!/bin/sh\nuv run pytest\n")
+    (root / ".mise/tasks/py/test").write_text("#!/bin/sh\nuv run pytest\nbunx knip\n")
     (root / "LICENSE").write_text("BSD License\n")
-    (root / "src/thermur/repo").rename(root / "repo")
+    (root / "src/thermur").rename(root / "thermur")
     edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
     edit(checkout, ".github/release.yml", new='["🐛 bug"]', old='["🐞 bug"]')
     edit(
@@ -71,8 +71,21 @@ def test_a_broken_checkout_fails_naming_each_finding(
     )
     edit(checkout, action, new="default     : &depth '1'", old="default     : '1'")
     edit(checkout, action, new="default     : *depth", old="default     : 'false'")
-    edit(checkout, ".github/workflows/ci.yml", new="", old="    name    : 📡 Readout\n")
+    for workflow in ("ci", "site"):
+        edit(
+            checkout,
+            f".github/workflows/{workflow}.yml",
+            new = "",
+            old = "    name    : 📡 Readout\n"
+        )
     edit(checkout, ".mise/tasks/gha/brief.py", new="==2.23.0", old="==2.24.0")
+    edit(checkout, "docs/package.json", new=': "5.0.2"', old=': "5.0.3"')
+    edit(
+        checkout,
+        "docs/.vitepress/lib/rendered/identity.json",
+        new = '"alpha": 0.5',
+        old = '"alpha": 0.64'
+    )
     edit(
         checkout,
         draft,

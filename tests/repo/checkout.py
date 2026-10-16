@@ -194,3 +194,11 @@ def test_the_root_resolves_through_a_symlink(
     link.symlink_to(checkout.root)
 
     assert Checkout(root=link).root == checkout.root
+
+
+def test_unwrap_blanks_a_comment_and_keeps_the_blank_line_above_it():
+    """
+    Asserts that reading the lines a shell runs blanks an indented comment
+    and keeps the blank line above it, each line keeping its place.
+    """
+    assert Checkout.unwrap("a\n\n  # c\nb\n") == "a\n\n\nb\n"

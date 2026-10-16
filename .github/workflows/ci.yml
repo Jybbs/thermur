@@ -32,13 +32,13 @@ jobs:
         include:
           - name  : 🪵 Lockfiles
             task  : lock:check
-            tools : &package python uv
+            tools : &lockfiles bun python uv
           - name  : ⛈️ Advisories
             task  : lock:scan
-            tools : *package
+            tools : *lockfiles
           - name  : 🪻 Prose
             task  : py:check
-            tools : *package
+            tools : &package python uv
           - name   : ☂️ Coverage
             report : coverage
             task   : py:coverage
@@ -71,6 +71,8 @@ jobs:
 
 on:
   pull_request:
+    paths : ['**', '!docs/.vitepress/**', docs/.vitepress/lib/rendered/**]
+
   workflow_dispatch:
 
 permissions : { contents: read }

@@ -5,6 +5,7 @@ routed through plain text files, each described where it is defined.
 """
 
 from collections.abc  import Callable
+from common.edits     import executable
 from common.stand_ins import StandIn
 from importlib.util   import module_from_spec, spec_from_file_location
 from os               import pathsep
@@ -82,12 +83,11 @@ def stand_in(
         """
         program = StandIn(log=folder / f"{name}.log")
         logged  = quote(str(program.log))
-        (folder / name).write_text(
+        executable(
+            folder / name,
             f"#!/bin/sh\nprintf '%s\\0' {quote(name)} \"$@\" >> {logged}\n"
-            f"echo >> {logged}\n{script}\n",
-            encoding = "utf-8"
+            f"echo >> {logged}\n{script}\n"
         )
-        (folder / name).chmod(0o755)
         return program
 
     return write
