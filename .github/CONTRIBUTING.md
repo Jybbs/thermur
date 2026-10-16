@@ -1,6 +1,6 @@
 # Contributing to Thermur
 
-Every change to *Thermur* starts from an issue, lands on a branch named for that issue, and reaches `main` through a pull request that is reviewed and then squash-merged. This guide follows that path from a fresh clone to a merged pull request, then sets out the style the code takes, the checks each pull request runs, and the labels that sort each issue and pull request.
+Every change to *Thermur* starts from an issue, lands on a branch named for that issue, and reaches `main` through a pull request that is reviewed and then squash-merged. This guide follows that path from a fresh clone to a merged pull request, then sets out the style the code takes, how a page cites a study, the checks each pull request runs, and the labels that sort each issue and pull request.
 
 ## Setting Up the Clone
 
@@ -20,6 +20,16 @@ Each pull request is squash-merged into one commit on `main` titled after the pu
 ## Code Style
 
 [*Prose*](https://prose.fyi) settles the style of the Python under `.mise/tasks`, `src`, and `tests` from the one `[tool.prose]` table in `pyproject.toml`. `mise format` rewrites the source to that style, and `mise check` reports every rewrite the formatter would make beside every lint finding. A lint finding is fixed in the source or held out with `# prose: ignore[<rule>]` on the line it anchors on, which silences that one rule on that one line. A `# prose: skip` trailing the opening line of a construct keeps the line breaks the formatter would reflow there and the construct's place among its siblings, while the lines inside it still take the formatter's other rewrites. The marker silences no lint finding.
+
+## Citing a Study
+
+A page cites published work through a footnote whose label is the study's key in `docs/references.bib`, the first author's surname and the year in lowercase (*`cavagna2010`*), with a letter after the year telling apart two studies one author published that year (*`ballerini2008a`, `ballerini2008b`*). The file holds one entry per study read in full, in the order of its key, each carrying an `annote` on what the study measured, how close it sits to *Thermur*, and how much it can shape the composite, and a `priority` of `prio1`, `prio2`, or `prio3`, the values JabRef writes in its priority field for high, medium, and low.
+
+1. Add the study to `docs/references.bib` as an `@article`, or as a `@misc` naming its `archiveprefix` and `eprint` for a preprint.
+2. Type only the marker in the page (*`[^cavagna2010]`*), then run `mise render`, which writes the definition of every study the page cites at its end, in the order the page first cites each, and removes the definition of one it no longer cites.
+3. Paste what `mise cite <key>` prints beneath the text of an issue, a pull request, or a comment citing the study, since no render reaches that text.
+
+`mise audit` fails where a page's definitions differ from what `mise render` writes, and where a marker under a study's key names no entry in the file.
 
 ## Checks
 

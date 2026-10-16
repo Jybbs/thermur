@@ -20,13 +20,13 @@ from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
 
 
-def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(checkout: Checkout):
+def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(tmp_path: Path):
     """
     Asserts that reading the commit of a folder no git repository holds
     raises the error git exits with, rather than returning what git prints.
     """
     with raises(CalledProcessError):
-        checkout.commit
+        Checkout(root=tmp_path).commit
 
 
 def test_commit_reads_the_commit_checked_out(clone: Checkout):
@@ -93,6 +93,27 @@ def test_a_listing_leaves_out_a_dotfile(
     (checkout.root / folder / ".DS_Store").write_bytes(b"\x00\xff")
 
     assert list(getattr(checkout, member)) == [Path(folder, name) for name in names]
+
+
+def test_pages_lists_each_markdown_file_git_tracks_or_would_track(clone: Checkout):
+    """
+    Asserts that the pages are every Markdown file git tracks, beside one no
+    commit holds yet, in path order, leaving out one `.gitignore` names and
+    one removed from the working tree, which the index still lists.
+    """
+    root = clone.root
+    (root / "docs/pages/notes.md").write_text("# Notes\n")
+    (root / "docs/node_modules").mkdir()
+    (root / "docs/node_modules/README.md").write_text("# A Package\n")
+    (root / "docs/data-procurement.md").unlink()
+
+    tracked = check_output(["git", "ls-files", "*.md"], cwd=root, text=True).split()
+
+    assert list(clone.pages) == sorted(
+        {*map(Path, tracked), Path("docs/pages/notes.md")}
+        - {Path("docs/data-procurement.md")}
+    )
+    assert clone.pages[Path("docs/pages/notes.md")].text == "# Notes\n"
 
 
 def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkout):
@@ -232,6 +253,16 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
         )
         for path in files
     }
+
+
+def test_the_bibliography_reads_each_study_the_file_holds(checkout: Checkout):
+    """
+    Asserts that the bibliography holds one study for each entry
+    `docs/references.bib` opens.
+    """
+    entries = findall(r"(?m)^@\w+\{(\w+),", checkout.read(Path("docs/references.bib")))
+
+    assert list(checkout.bibliography.studies) == entries
 
 
 def test_the_root_resolves_through_a_symlink(

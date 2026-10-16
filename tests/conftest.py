@@ -9,7 +9,7 @@ from common.environment import CLEARED
 from os                 import environ
 from pathlib            import Path
 from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
-from subprocess         import check_output, run
+from subprocess         import run
 
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
@@ -24,8 +24,10 @@ def checkout(
 ) -> Checkout:
     """
     Copies into `tmp_path` every file `tracked` lists, keeping each
-    program's mode, then trusts the copy's mise configuration and returns
-    the `Checkout` rooted there, which a case edits before a check reads it.
+    program's mode, into a git repository holding no commit, so git lists
+    each copied file as one it would track. It then trusts the copy's mise
+    configuration and returns the `Checkout` rooted there, which a case
+    edits before a check reads it.
     """
     for path in tracked:
         (tmp_path / path).parent.mkdir(exist_ok=True, parents=True)
@@ -35,6 +37,7 @@ def checkout(
             preserve_metadata = True
         )
 
+    run(["git", "init", "--quiet"], check=True, cwd=tmp_path)
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
     return Checkout(root=tmp_path)
 
@@ -42,14 +45,10 @@ def checkout(
 @fixture
 def clone(checkout: Checkout) -> Checkout:
     """
-    Commits the copy `checkout` makes into a git repository of its own, so a
-    case reads the commit checked out there.
+    Commits the copy `checkout` makes into the git repository holding it, so
+    a case reads the commit checked out there.
     """
-    for command in (
-        ["init", "--quiet"],
-        ["add", "--all"],
-        ["commit", "--message=Copy", "--quiet"]
-    ):
+    for command in (["add", "--all"], ["commit", "--message=Copy", "--quiet"]):
         run(
             [
                 "git", "-c", "user.email=thermur@example.com",
@@ -110,20 +109,10 @@ def environment(
 @fixture(scope="session")
 def tracked(pytestconfig: Config) -> list[Path]:
     """
-    Lists every file of the worktree git tracks or would track, relative to
-    the root, leaving out one moved away before git learns of it, since the
-    index still lists it.
+    Lists every file of the worktree git tracks or would track, as
+    `Checkout.tracked` lists them.
     """
-    root = pytestconfig.rootpath
-    return [
-        Path(name)
-        for name in check_output(
-            ["git", "ls-files", "--cached", "--exclude-standard", "--others"],
-            cwd  = root,
-            text = True
-        ).splitlines()
-        if (root / name).exists(follow_symlinks=False)
-    ]
+    return Checkout(root=pytestconfig.rootpath).tracked()
 
 
 def pytest_collection_modifyitems(items: list[Item]):

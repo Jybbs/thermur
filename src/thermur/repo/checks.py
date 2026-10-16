@@ -178,6 +178,21 @@ class CommitCheck(Check):
         ]
 
 
+class FootnoteCheck(Check):
+    """
+    Every footnote marker a Markdown page carries under a study's key names
+    a study `docs/references.bib` holds, since the render task writes a
+    definition only for a study the file holds.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each marker under a key the bibliography holds no entry for,
+        at the line of the block it sits in.
+        """
+        yield from Outputs(checkout=self.checkout).unknown
+
+
 class GateCheck(Check):
     """
     Every workflow ends on a job under the key `gate`, which names the check
@@ -703,21 +718,30 @@ class ProvisionCheck(Check):
 
 class RenderCheck(Check):
     """
-    Every file the render task writes into `docs/` reads what the
-    declaration in the package it is written from would write now, so the
-    site, which calls no Python, never reads a stale copy.
+    Every file the render task writes reads what the declaration it is
+    written from would write now, so the site, which calls no Python, never
+    reads a stale copy of the identity, and every Markdown page carries
+    the footnote definition of each study it cites as `docs/references.bib`
+    gives it.
     """
 
     def scan(self) -> Iterator[Finding]:
         """
         Names each written file whose text on disk has drifted from its
-        declaration, a missing file among them.
+        declaration, a missing file among them, and each page whose footnote
+        definitions have drifted from the bibliography.
         """
-        for path in Outputs(root=self.checkout.root).drifted:
+        for path in Outputs(checkout=self.checkout).drifted:
             yield Finding(
                 file    = path,
-                message = f"`{path}` has drifted from the declaration it is written "
-                "from, which `mise render` writes again"
+                message = (
+                    f"The footnote definitions in `{path}` have drifted from "
+                    f"their entries in `{self.checkout.bibliography.file}`, and "
+                    "`mise render` writes them again"
+                    if path in self.checkout.pages
+                    else f"`{path}` has drifted from the declaration it is written "
+                    "from, which `mise render` writes again"
+                )
             )
 
 

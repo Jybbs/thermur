@@ -2,9 +2,10 @@
 Holds `Checkout`, the clone the `repo` tasks read and the pipeline resolves
 every path under, which keeps each document it validates for every later
 check that reads it. It lists the tasks, the programs, the workflows, the
-composite actions, the issue templates, and the rulesets the clone holds
-beside the checks each pull request runs, and reads the commit checked out
-and the digest of `uv.lock`.
+composite actions, the issue templates, the rulesets, every file git tracks,
+and the Markdown pages among them beside the checks each pull request
+runs, and reads the bibliography, the commit checked out, and the digest
+of `uv.lock`.
 """
 
 from functools          import cached_property
@@ -17,6 +18,8 @@ from re                 import sub
 from subprocess         import check_output, run
 from typing             import Annotated, Self
 
+from thermur.docs.pages   import Page
+from thermur.docs.schemas import Bibliography
 from thermur.repo.schemas import (
     Action,
     Citation,
@@ -61,6 +64,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         `.github/actions/`, by its path.
         """
         return self.documents(Action, ".github/actions/*/action.y*ml")
+
+    @cached_property
+    def bibliography(self) -> Bibliography:
+        """
+        Validates `docs/references.bib`.
+        """
+        return Bibliography.read(self.root)
 
     @property
     def checks(self) -> list[tuple[str, str]]:
@@ -223,6 +233,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         return Package.read(self.root)
 
     @cached_property
+    def pages(self) -> dict[Path, Page]:
+        """
+        Reads every Markdown file `tracked` lists, by its path.
+        """
+        return {path: Page(text=self.read(path)) for path in self.tracked("*.md")}
+
+    @cached_property
     def release(self) -> Release:
         """
         Validates `.github/release.yml`.
@@ -335,6 +352,29 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             return text.partition("\n")[0]
 
         return Checkout.unwrap(text)
+
+    def tracked(self, *patterns: str) -> list[Path]:
+        """
+        Lists every file git tracks or would track under the root whose path
+        matches one of `patterns`, or every such file where none is given,
+        relative to the root and in path order, leaving out one removed from
+        the working tree, which the index still lists.
+        """
+        listed = check_output(
+            [
+                "git", "ls-files", "--cached", "--exclude-standard", "--others", "-z",
+                *patterns
+            ],
+            cwd  = self.root,
+            text = True
+        )
+        return sorted(
+            {
+                Path(name)
+                for name in listed.split("\0")
+                if name and (self.root / name).exists(follow_symlinks=False)
+            }
+        )
 
     @staticmethod
     def unwrap(text: str) -> str:

@@ -1,6 +1,7 @@
 ::error file=.github/actions/provision/action.yml::`.github/actions/provision/action.yml` carries the YAML anchor `&depth`, which GitHub's action-manifest parser rejects
 ::error file=.mise/bin/pytest::`.mise/bin/pytest` is a symlink rather than a copy
 ::error file=.github/workflows/draft.yml::The pin on `actions/checkout` in `.github/workflows/draft.yml` reads `0f0f`, where the pin on it in `.github/actions/provision/action.yml` reads `3d3c42e5aac5ba805825da76410c181273ba90b1`
+::error file=docs/pages/index.md::Line 7 of `docs/pages/index.md` cites `smith2020`, which names no entry in `docs/references.bib`
 ::error file=.github/workflows/ci.yml::The `gate` job in `.github/workflows/ci.yml` sets no name
 ::error file=.github/workflows/site.yml::The `gate` job in `.github/workflows/site.yml` sets no name
 ::error file=.github/CONTRIBUTING.md::The command beside `⛈️ Advisories` in `.github/CONTRIBUTING.md` reads `mise run lock:scan`, where the command running `lock:scan` reads `mise scan`
@@ -18,6 +19,7 @@
 ::error file=pyproject.toml::The `requires` of `[build-system]` holds no exact pin on hatchling
 ::error file=.github/workflows/warm.yml::The push filter of `.github/workflows/warm.yml` leaves out `.mise/mise.lock`, which `.github/actions/provision/action.yml` hashes
 ::error file=docs/.vitepress/lib/rendered/identity.json::`docs/.vitepress/lib/rendered/identity.json` has drifted from the declaration it is written from, which `mise render` writes again
+::error file=docs/pages/index.md::The footnote definitions in `docs/pages/index.md` have drifted from their entries in `docs/references.bib`, and `mise render` writes them again
 ::error file=.github/rulesets/main.json::`.github/rulesets/main.json` requires the `📡 Readout` check, which no gate of a workflow running on a pull request names
 ::error file=.mise/tasks/gha/brief.py::The pin on `minijinja` in `.mise/tasks/gha/brief.py` reads `==2.23.0`, where the version `uv.lock` resolves reads `==2.24.0`
 ::error file=.github/workflows/draft.yml::The `cut` job in `.github/workflows/draft.yml` writes to the workflow step summary, which only a `gate` job writes

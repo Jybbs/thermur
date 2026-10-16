@@ -6,14 +6,18 @@ requires      = ["hatchling==1.32.4"]
 authors         = [{ name = "James Parkington" }]
 dependencies    = [
     "apache-hamilton",
+    "bibtexparser",
     "equinox",
     "h5netcdf[h5py]",
     "jax",
+    "markdown-it-py",
     "matplotlib",
+    "mdit-py-plugins",
     "numpy",
     "packaging",
     "pydantic",
     "pydantic-settings",
+    "pylatexenc",
     "pyyaml",
     "seaborn",
     "xarray",
