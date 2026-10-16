@@ -12,6 +12,10 @@ it.for([
   expect(sections.sectionOf(relativePath, REGISTRY)).toEqual(placed)
 })
 
+it('labels each section by its folder’s name, capitalized', () => {
+  expect(REGISTRY.map(section => sections.labelOf(section))).toEqual(['Data', 'Methods'])
+})
+
 it('keeps the registry in alphabetical order, each section opening on an overview', () => {
   const registry: readonly sections.Section[] = sections.SECTIONS
   const names                                 = registry.map(section => section.name)

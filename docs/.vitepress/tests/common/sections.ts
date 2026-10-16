@@ -8,8 +8,8 @@ import { pagesDir } from '../../lib/paths.ts'
  * beside the question its pages answer.
  */
 export const REGISTRY = [
-  { label: 'Data', name: 'data', question: 'Where the plume simulations come from and how to fetch them.' },
-  { label: 'Methods', name: 'methods', question: 'How each drone reads its neighbors and the air around it.' }
+  { name: 'data', question: 'Where the plume simulations come from and how to fetch them.' },
+  { name: 'methods', question: 'How each drone reads its neighbors and the air around it.' }
 ] as const
 
 /**

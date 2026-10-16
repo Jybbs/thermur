@@ -1,6 +1,6 @@
 /**
- * A section of the site placed in the registry, under the label the site names
- * it by and its place in the registry, counting from one.
+ * A section of the site placed in the registry, under its label and its place
+ * in the registry, counting from one.
  */
 export interface Placed {
   label : string
@@ -9,11 +9,10 @@ export interface Placed {
 
 /**
  * A section of the site, meaning the folder under `docs/pages/` it opens on,
- * named `name`, the label the site names it by, and the question its pages
- * answer, which the page met at a missing address sets beside its label.
+ * named `name`, and the question its pages answer, which the page met at a
+ * missing address sets beside its label.
  */
 export interface Section {
-  label    : string
   name     : string
   question : string
 }
@@ -23,6 +22,12 @@ export interface Section {
  * one's place in the list numbering it from one.
  */
 export const SECTIONS = [] as const satisfies readonly Section[]
+
+/**
+ * Labels a section by its folder's name with the first letter capitalized, the
+ * label its cards and the page met at a missing address set.
+ */
+export const labelOf = ({ name }: Section): string => name.charAt(0).toUpperCase() + name.slice(1)
 
 /**
  * Writes a section's place in reading order as two digits.
@@ -41,5 +46,5 @@ export const numeralOf = (place: number): string => String(place).padStart(2, '0
 export function sectionOf(relativePath: string, sections: readonly Section[] = SECTIONS): Placed | undefined {
   const folder = relativePath.split('/', 2)
   const index  = folder.length === 2 ? sections.findIndex(section => section.name === folder[0]) : -1
-  return index === -1 ? undefined : { label: sections[index]!.label, place: index + 1 }
+  return index === -1 ? undefined : { label: labelOf(sections[index]!), place: index + 1 }
 }

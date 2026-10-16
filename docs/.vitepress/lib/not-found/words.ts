@@ -1,5 +1,5 @@
-import { seriesProperty }                    from '../identity.ts'
-import { SECTIONS, type Section, numeralOf } from '../sections.ts'
+import { seriesProperty }                             from '../identity.ts'
+import { SECTIONS, type Section, labelOf, numeralOf } from '../sections.ts'
 
 /**
  * One stop on the way through the site the page met at a missing address lays
@@ -36,7 +36,7 @@ export function trackOf(sections: readonly Section[] = SECTIONS): Stop[] {
   return [WORDS.start, ...sections.map((section, index) => ({
     href    : `/${section.name}/`,
     hue     : `var(${seriesProperty(index + 1)})`,
-    label   : section.label,
+    label   : labelOf(section),
     note    : section.question,
     numeral : numeralOf(index + 1)
   }))]
