@@ -9,11 +9,13 @@ dependencies    = [
     "equinox",
     "h5netcdf[h5py]",
     "jax",
+    "matplotlib",
     "numpy",
     "packaging",
     "pydantic",
     "pydantic-settings",
     "pyyaml",
+    "seaborn",
     "xarray",
     "yaml-rs"
 ]
@@ -36,7 +38,7 @@ requires-python = ">=3.14"
 version         = "0.1.0"
 
 [project.urls]
-Homepage   = "https://jybbs.github.io/thermur/"
+Homepage   = "https://thermur.fyi/"
 Repository = "https://github.com/Jybbs/thermur"
 
 [dependency-groups]

@@ -13,9 +13,11 @@ from packaging.requirements import Requirement
 from packaging.utils        import canonicalize_name
 from pathlib                import Path
 from pydantic               import BaseModel, ValidationError
-from re   import findall, finditer, search, sub
-from yaml import NodeEvent, YAMLError, parse
+from re     import findall, finditer, search
+from typing import ClassVar
+from yaml   import NodeEvent, YAMLError, parse
 
+from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Finding, Parity
 
@@ -414,11 +416,50 @@ class LabelCheck(Check):
         yield from super().scan()
 
 
+class LockfileCheck(Check):
+    """
+    Every package manager a task or a program on the path runs installs
+    from its lockfile, meaning each `uv run` opens its arguments on
+    `--exact --locked`, so it installs exactly what `uv.lock` resolves and
+    stops where the lockfile lags its manifest, each `bun install` carries
+    `--frozen-lockfile` or `--lockfile-only`, so it installs exactly what
+    `docs/bun.lock` resolves or rewrites the lockfile alone, and none runs
+    `bunx`, which can run a copy of a tool from outside `docs/node_modules`.
+    """
+
+    rules: ClassVar[dict[str, str]] = {
+        r"(?m)^(?!.*(?:--frozen-lockfile|--lockfile-only)).*\bbun[ \t]+install\b":
+            "`bun install` with neither `--frozen-lockfile` nor `--lockfile-only`",
+
+        r"\bbunx\b":
+            "`bunx`, which can run a copy of a tool from outside `docs/node_modules`",
+
+        r"\buv[ \t]+run\b(?![ \t]+--exact[ \t]+--locked\b)":
+            "`uv run` without `--exact --locked` opening its arguments"
+    }
+    """
+    Each pattern no file's commands may match, beside what a match runs.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each file whose commands match a pattern of `rules`, once for
+        each pattern they match.
+        """
+        for (path, lines), (pattern, runs) in product(
+            self.checkout.commands,
+            self.rules.items()
+        ):
+            if search(pattern, lines):
+                yield Finding(file=path, message=f"`{path}` runs {runs}")
+
+
 class ParityCheck(Check):
     """
     Every file restating the Python version, the uv release, the license,
-    or the release `CITATION.cff` cites reads the value `pyproject.toml` or
-    `.mise/config.toml` declares.
+    or the release `CITATION.cff` cites reads the value `pyproject.toml`
+    or `.mise/config.toml` declares, and every pin of the site's packages
+    restating another pin reads that pin's version.
 
     The manifest's `requires-python` floor is the Python version the
     README's badge, the formatter's `target-version`, and the minor of
@@ -426,7 +467,9 @@ class ParityCheck(Check):
     `[tool.uv]` requires, and the manifest's license and authors are what
     the README's badge and the title and the copyright line of `LICENSE`
     restate. `CITATION.cff` restates the manifest's version, license,
-    repository, and authors.
+    repository, and authors. Vitest's coverage provider restates the release
+    of Vitest it ships beside, and the major of Node's types restates the
+    major of the `node` mise pins.
     """
 
     @property
@@ -437,6 +480,7 @@ class ParityCheck(Check):
         citation     = self.checkout.citation
         config       = self.checkout.config
         manifest     = self.checkout.manifest
+        package      = self.checkout.package
         license_path = Path("LICENSE")
         readme       = self.checkout.read(manifest.readme)
         notice       = self.checkout.read(license_path)
@@ -516,6 +560,20 @@ class ParityCheck(Check):
                 label    = f"The author list in `{citation.file}`",
                 origin   = f"the author list in `{manifest.file}`",
                 original = manifest.holders
+            ),
+            Parity(
+                copied   = package.coverage,
+                file     = package.file,
+                label    = f"The pin on `@vitest/coverage-v8` in `{package.file}`",
+                origin   = "the pin on `vitest` there",
+                original = package.vitest
+            ),
+            Parity(
+                copied   = package.types,
+                file     = package.file,
+                label    = f"The major of the pin on `@types/node` in `{package.file}`",
+                origin   = f"the major of the `node` pin in `{config.file}`",
+                original = config.node
             )
         ]
 
@@ -643,6 +701,26 @@ class ProvisionCheck(Check):
                         )
 
 
+class RenderCheck(Check):
+    """
+    Every file the render task writes into `docs/` reads what the
+    declaration in the package it is written from would write now, so the
+    site, which calls no Python, never reads a stale copy.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each written file whose text on disk has drifted from its
+        declaration, a missing file among them.
+        """
+        for path in Outputs(root=self.checkout.root).drifted:
+            yield Finding(
+                file    = path,
+                message = f"`{path}` has drifted from the declaration it is written "
+                "from, which `mise render` writes again"
+            )
+
+
 class RulesetCheck(Check):
     """
     Every check a ruleset under `.github/rulesets/` requires is the name of
@@ -669,56 +747,6 @@ class RulesetCheck(Check):
                     file    = path,
                     message = f"`{path}` requires the `{context}` check, which no "
                     "gate of a workflow running on a pull request names"
-                )
-
-
-class RunCheck(Check):
-    """
-    Every `uv run` a task or a program on the path runs opens its arguments
-    on `--exact --locked`, so it installs exactly what `uv.lock` resolves
-    and stops where the lockfile lags its manifest.
-    """
-
-    @property
-    def sources(self) -> list[tuple[Path, str]]:
-        """
-        Pairs each file a task or a program on the path runs from, relative
-        to the root, with the lines a shell runs out of it, where a task
-        declared in TOML gives the lines it runs in place of a file's.
-        """
-        root = self.checkout.root
-        return [
-            (
-                task.path.relative_to(root),
-                "\n".join(task.run) if task.file is None else self.commands(task.file)
-            )
-            for task in self.checkout.tasks
-        ] + [(path, self.commands(root / path)) for path in self.checkout.scripts]
-
-    @staticmethod
-    def commands(path: Path) -> str:
-        """
-        Reads the lines a shell runs out of the file at `path`, which for a
-        Python task is the shebang alone and for any other file every line
-        but a comment.
-        """
-        text = path.read_text(encoding="utf-8")
-        if path.suffix == ".py":
-            return text.partition("\n")[0]
-
-        return sub(r"(?m)^\s*#(?!!).*$", "", text)
-
-    def scan(self) -> Iterator[Finding]:
-        """
-        Names each file running `uv run` without `--exact --locked` opening
-        its arguments, reading a backslash continuation as a space.
-        """
-        for path, lines in self.sources:
-            if search(r"\buv[\s\\]+run\b(?![\s\\]+--exact[\s\\]+--locked\b)", lines):
-                yield Finding(
-                    file    = path,
-                    message = f"`{path}` runs `uv run` without `--exact --locked` "
-                    "opening its arguments"
                 )
 
 

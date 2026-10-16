@@ -1,0 +1,28 @@
+.motion-pause {
+  align-items     : center;
+  border          : 1px solid var(--vp-c-divider);
+  border-radius   : 50%;
+  display         : inline-flex;
+  height          : 2rem;
+  justify-content : center;
+  margin-left     : 0.75rem;
+  width           : 2rem;
+}
+
+.motion-pause:hover { border-color: var(--vp-c-text-3); }
+
+.motion-pause-bars {
+  border-left  : 2px solid currentcolor;
+  border-right : 2px solid currentcolor;
+  height       : 0.625rem;
+  width        : 0.5rem;
+}
+
+.motion-pause-play {
+  border-bottom : 0.3125rem solid transparent;
+  border-left   : 0.5rem solid currentcolor;
+  border-top    : 0.3125rem solid transparent;
+  height        : 0;
+  margin-left   : 0.125rem;
+  width         : 0;
+}

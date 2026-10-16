@@ -4,9 +4,9 @@
 """
 Runs `mise doctor project` and then every task the rows of the pull-request
 workflows under `.github/workflows/` run, as the `repo:ci` task, so a laptop
-runs what each row of `🐦‍⬛ CI` runs. The tasks run under `--force`, because
-the run establishes a verdict, and a task whose `sources` look current would
-otherwise pass without running.
+runs what each row runs on a pull request. The tasks run under `--force`,
+because the run establishes a verdict, and a task whose `sources` look
+current would otherwise pass without running.
 """
 
 from subprocess import run

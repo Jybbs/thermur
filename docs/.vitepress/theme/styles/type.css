@@ -1,0 +1,15 @@
+.vp-doc h1,
+.vp-doc h2,
+.vp-doc h3,
+.vp-doc h4 {
+  font-family : var(--th-font-display);
+  font-weight : 400;
+}
+
+.vp-doc p,
+.vp-doc li {
+  font-size   : 1.125rem;
+  line-height : 1.6;
+}
+
+.VPNavBarTitle .logo { height: 2.25rem; }

@@ -1,0 +1,13 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "cruft"
+#MISE depends     = ["site:install"]
+#MISE description = "Report every unused file, export, and dependency in the site, and every import cycle, through knip"
+#MISE dir         = "{{config_root}}/docs"
+
+reporter=symbols
+[[ -z "${GITHUB_ACTIONS:-}" ]] || reporter=github-actions
+
+status=0
+node_modules/.bin/knip --config .vitepress/knip.ts --reporter "$reporter" "$@" || status=$?
+node_modules/.bin/knip --config .vitepress/knip.ts --cycles --reporter "$reporter" "$@" || status=$?
+exit "$status"

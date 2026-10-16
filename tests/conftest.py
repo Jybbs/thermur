@@ -72,8 +72,9 @@ def environment(
     """
     Clears every shell variable `CLEARED` names, any of which would let
     the machine running the suite change a result. Some set whether a
-    console prints color, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name
-    the files a GitHub Actions runner collects a workflow step's outputs and
+    console prints color, `GITHUB_ACTIONS` sets whether a task prints its
+    GitHub Actions form, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name the
+    files a GitHub Actions runner collects a workflow step's outputs and
     a workflow run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT`
     name the branch and the commit `gha:brief` prefers over the ones a case
     sets. `CI`, which a GitHub Actions runner sets, and `MISE_YES` each

@@ -1,0 +1,179 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Previews > describes the front page as the site, at its own address 1`] = `
+[
+  [
+    "meta",
+    {
+      "content": "What Thermur holds.",
+      "property": "og:description",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "https://example.org/cards/index.png",
+      "property": "og:image",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "The Thermur wordmark and tagline beside a fire seen from above, with a flock flying out of the wordmark to circle it",
+      "property": "og:image:alt",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "630",
+      "property": "og:image:height",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "image/png",
+      "property": "og:image:type",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "1200",
+      "property": "og:image:width",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "en_US",
+      "property": "og:locale",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "Thermur",
+      "property": "og:title",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "website",
+      "property": "og:type",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "https://example.org/",
+      "property": "og:url",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "summary_large_image",
+      "name": "twitter:card",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "https://example.org/cards/index.png",
+      "name": "twitter:image",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "The Thermur wordmark and tagline beside a fire seen from above, with a flock flying out of the wordmark to circle it",
+      "name": "twitter:image:alt",
+    },
+  ],
+  [
+    "link",
+    {
+      "href": "https://example.org/",
+      "rel": "canonical",
+    },
+  ],
+  [
+    "script",
+    {
+      "type": "application/ld+json",
+    },
+    "{"@context":"https://schema.org","@type":"WebSite","name":"Thermur","description":"What Thermur holds.","url":"https://example.org/"}",
+  ],
+]
+`;
+
+exports[`siteHead > names each scheme’s small mark, the faces, the site, and each scheme’s ground 1`] = `
+[
+  [
+    "link",
+    {
+      "href": "/flock/mark-small-dark.svg",
+      "media": "(prefers-color-scheme: dark)",
+      "rel": "icon",
+      "type": "image/svg+xml",
+    },
+  ],
+  [
+    "link",
+    {
+      "href": "/flock/mark-small-light.svg",
+      "media": "(prefers-color-scheme: light)",
+      "rel": "icon",
+      "type": "image/svg+xml",
+    },
+  ],
+  [
+    "link",
+    {
+      "href": "https://fonts.googleapis.com",
+      "rel": "preconnect",
+    },
+  ],
+  [
+    "link",
+    {
+      "crossorigin": "",
+      "href": "https://fonts.gstatic.com",
+      "rel": "preconnect",
+    },
+  ],
+  [
+    "link",
+    {
+      "href": "https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Bellefair&family=JetBrains+Mono:wght@400;500&display=swap",
+      "rel": "stylesheet",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "Thermur",
+      "property": "og:site_name",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "#17171b",
+      "media": "(prefers-color-scheme: dark)",
+      "name": "theme-color",
+    },
+  ],
+  [
+    "meta",
+    {
+      "content": "#f2f1ee",
+      "media": "(prefers-color-scheme: light)",
+      "name": "theme-color",
+    },
+  ],
+]
+`;

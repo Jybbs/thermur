@@ -1,6 +1,6 @@
 {% extends "base.md.j2" %}
 {% block details %}
-{% if needs.check.outputs.coverage %}
- Attached the coverage report as [`coverage`]({{ needs.check.outputs.coverage }}).
-{%- endif %}
+{% for name, url in needs.check.outputs | items if url %}
+ Attached the coverage report as [`{{ name }}`]({{ url }}).
+{%- endfor %}
 {% endblock %}

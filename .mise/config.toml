@@ -12,6 +12,7 @@ run         = '''test .venv/bin/python -ef "$(mise which python)"'''
 
 [env]
 HAMILTON_AUTOLOAD_EXTENSIONS = "0"
+MPLCONFIGDIR                 = "{{config_root}}/.cache/matplotlib"
 PROSE_CACHE_DIR              = "{{config_root}}/.cache/prose"
 PYTHONPYCACHEPREFIX          = "{{config_root}}/.cache/pycache"
 UV_LOCKED                    = "1"
@@ -24,6 +25,9 @@ auto_install = false
 locked = true
 
 [tools]
-python = "3.14.8"
-uv     = "0.12.22"
-zizmor = "1.30.1"
+"aqua:lycheeverse/lychee" = "0.24.2"
+bun                       = "1.4.3"
+node                      = "26.11.1"
+python                    = "3.14.8"
+uv                        = "0.12.22"
+zizmor                    = "1.30.1"

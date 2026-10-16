@@ -14,6 +14,6 @@ gh api --method PUT --silent 'repos/{owner}/{repo}/immutable-releases'
 gh api --method PUT --silent 'repos/{owner}/{repo}/private-vulnerability-reporting'
 gh api --method PUT --silent 'repos/{owner}/{repo}/vulnerability-alerts'
 gh api --input - --method PATCH --silent 'repos/{owner}/{repo}'
-{"description":"Flies a drone flock as a starling murmuration that breaks around a wildfire the way it breaks around a falcon."}
+{"description":"Flies a drone flock as a starling murmuration that breaks around a wildfire the way it breaks around a falcon.","homepage":"thermur.fyi"}
 gh api --input - --method PUT --silent 'repos/{owner}/{repo}/topics'
 {"names":["agent-based-modeling","drones","jax","multi-agent-systems","python","simulation","swarm-intelligence","swarm-robotics","wildfire"]}

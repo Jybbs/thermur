@@ -10,6 +10,7 @@ from pydantic     import TypeAdapter, ValidationError
 from pytest       import MonkeyPatch, mark, param, raises
 from shutil       import copystat
 
+from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import (
     AnchorCheck,
@@ -21,11 +22,12 @@ from thermur.repo.checks   import (
     ImageCheck,
     KitCheck,
     LabelCheck,
+    LockfileCheck,
     ParityCheck,
     PinCheck,
     ProvisionCheck,
+    RenderCheck,
     RulesetCheck,
-    RunCheck,
     ScriptCheck,
     SummaryCheck,
     TaskCheck,
@@ -40,6 +42,7 @@ DRAFT  = ".github/workflows/draft.yml"
 FLOOR  = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
 MAIN   = ".github/rulesets/main.json"
 SHELL  = "#!/usr/bin/env -S bash -euo pipefail\n"
+SITE   = ".github/workflows/site.yml"
 WARM   = ".github/workflows/warm.yml"
 
 
@@ -108,8 +111,8 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
         ),
         param(
             ".mise/config.toml",
-            'python = "3.14.8"',
-            'python = "3.15.0"',
+            'python                    = "3.14.8"',
+            'python                    = "3.15.0"',
             "The minor of the `python` pin in `.mise/config.toml` reads `3.15`, "
             f"where {FLOOR}",
             id = "mise-python"
@@ -142,8 +145,8 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
         param(
             "LICENSE",
             "James Parkington",
-            "Jybbs",
-            "The copyright holder list in `LICENSE` reads `Jybbs`, where the author "
+            "Jane Doe",
+            "The copyright holder list in `LICENSE` reads `Jane Doe`, where the author "
             "list in `pyproject.toml` reads `James Parkington`",
             id = "license-holders"
         ),
@@ -174,10 +177,10 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
         ),
         param(
             "CITATION.cff",
-            "given-names: James",
-            "given-names: Jim",
-            "The author list in `CITATION.cff` reads `Jim Parkington`, where the "
-            "author list in `pyproject.toml` reads `James Parkington`",
+            "family-names: Parkington\n    given-names: James",
+            "family-names: Doe\n    given-names: Jane",
+            "The author list in `CITATION.cff` reads `Jane Doe`, where the author "
+            "list in `pyproject.toml` reads `James Parkington`",
             id = "citation-authors"
         ),
         param(
@@ -195,6 +198,22 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
             "The author list in `CITATION.cff` is missing, where the author list in "
             "`pyproject.toml` reads `James Parkington`",
             id = "citation-authors-missing"
+        ),
+        param(
+            "docs/package.json",
+            '"@vitest/coverage-v8" : "5.0.3"',
+            '"@vitest/coverage-v8" : "5.0.2"',
+            "The pin on `@vitest/coverage-v8` in `docs/package.json` reads `5.0.2`, "
+            "where the pin on `vitest` there reads `5.0.3`",
+            id = "coverage-provider"
+        ),
+        param(
+            "docs/package.json",
+            '"@types/node"         : "26.6.5"',
+            '"@types/node"         : "24.12.0"',
+            "The major of the pin on `@types/node` in `docs/package.json` reads `24`, "
+            "where the major of the `node` pin in `.mise/config.toml` reads `26`",
+            id = "node-types"
         )
     ]
 )
@@ -243,6 +262,7 @@ def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
         param(f"{SHELL}uv run --locked --exact pytest\n", True, id="reordered"),
         param(f"{SHELL}uv run --exact --lockedx pytest\n", True, id="partial-flag"),
         param(f'{SHELL}report=$(uv run pytest "$@")\n', True, id="substitution"),
+        param(f"{SHELL}uv run\n--exact --locked pytest\n", True, id="next-line"),
         param(f"{SHELL}uv run --exact --locked pytest -x\n", False, id="locked"),
         param(
             f"{SHELL}uv run \\\n  --exact \\\n  --locked \\\n  pytest\n",
@@ -279,7 +299,7 @@ def test_a_task_is_named_where_its_uv_run_is_not_locked(
     """
     path = task(checkout, "py/sweep", text)
 
-    assert RunCheck(checkout=checkout).findings == [
+    assert LockfileCheck(checkout=checkout).findings == [
         Finding(
             file    = path,
             message = f"`{path}` runs `uv run` without `--exact --locked` opening its "
@@ -496,8 +516,8 @@ def test_a_build_requirement_naming_a_range_is_named(
         ),
         param(
             ".mise/config.toml",
-            'python = "3.14.8"',
-            'python = "3"',
+            'python                    = "3.14.8"',
+            'python                    = "3"',
             [
                 "`tools.python` in `.mise/config.toml`: Value error, names no major "
                 "and minor version"
@@ -574,7 +594,8 @@ def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(
     "run",
     [
         param('"uv run pytest"', id="line"),
-        param('["uv run pytest", { task = "py:check" }]', id="beside-a-reference")
+        param('["uv run pytest", { task = "py:check" }]', id="beside-a-reference"),
+        param("'''uv \\\nrun pytest'''", id="continued")
     ]
 )
 def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
@@ -585,11 +606,11 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     Asserts that a task `.mise/config.toml` declares in TOML is held to the
     lines it runs and named on that configuration, including a line beside
     a table naming another task, which is held to that line rather than
-    failing validation.
+    failing validation, and a `uv run` a backslash continues across lines.
     """
     append(checkout, ".mise/config.toml", f'\n[tasks."py:sweep"]\nrun = {run}\n')
 
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
+    assert [finding.file for finding in LockfileCheck(checkout=checkout).findings] == [
         Path(".mise/config.toml")
     ]
 
@@ -661,6 +682,21 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
     ]
 
 
+def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a problem `mise tasks validate` reports on a task no file
+    of the checkout declares, such as one a global configuration adds, makes
+    no finding.
+    """
+    outside = Issue(message="m", severity=Level.ERROR, task="global:task")
+    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
+
+    assert TaskCheck(checkout=checkout).findings == []
+
+
 @mark.parametrize(
     ("old", "new", "message"),
     [
@@ -704,21 +740,6 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
-def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
-    checkout    : Checkout,
-    monkeypatch : MonkeyPatch
-):
-    """
-    Asserts that a problem `mise tasks validate` reports on a task no file
-    of the checkout declares, such as one a global configuration adds, makes
-    no finding.
-    """
-    outside = Issue(message="m", severity=Level.ERROR, task="global:task")
-    monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
-
-    assert TaskCheck(checkout=checkout).findings == []
-
-
 def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
     """
     Asserts that a program under `.mise/bin/` is held to `--exact --locked`
@@ -726,7 +747,7 @@ def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checko
     """
     edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
 
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [
+    assert [finding.file for finding in LockfileCheck(checkout=checkout).findings] == [
         Path(".mise/bin/pytest")
     ]
 
@@ -744,7 +765,33 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     )
     path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
 
-    assert [finding.file for finding in RunCheck(checkout=checkout).findings] == [path]
+    assert LockfileCheck(checkout=checkout).findings == [
+        Finding(
+            file    = path,
+            message = f"`{path}` runs `uv run` without `--exact --locked` opening its "
+            "arguments"
+        )
+    ]
+
+
+def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
+    """
+    Asserts that renaming a label in the registry alone names the
+    release-notes categories, the bug and spec templates in that order, and
+    the guide, each still naming the old label, then the new label filed
+    under no category and missing from the guide.
+    """
+    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
+    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
+
+    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
+        Path(".github/release.yml"),
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md"),
+        Path(".github/CONTRIBUTING.md"),
+        Path(".github/release.yml"),
+        Path(".github/CONTRIBUTING.md")
+    ]
 
 
 @mark.parametrize(
@@ -800,23 +847,21 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
+def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
     """
-    Asserts that renaming a label in the registry alone names the
-    release-notes categories, the bug and spec templates in that order, and
-    the guide, each still naming the old label, then the new label filed
-    under no category and missing from the guide.
+    Asserts that a ruleset carrying a key the rulesets API does not take
+    is named on its own file, one finding per field, rather than ending
+    the audit.
     """
-    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
-    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
+    tags = ".github/rulesets/tags.json"
+    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
 
-    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
-        Path(".github/release.yml"),
-        Path(".github/ISSUE_TEMPLATE/bug.md"),
-        Path(".github/ISSUE_TEMPLATE/spec.md"),
-        Path(".github/CONTRIBUTING.md"),
-        Path(".github/release.yml"),
-        Path(".github/CONTRIBUTING.md")
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
+        Finding(
+            file    = Path(tags),
+            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
+        )
     ]
 
 
@@ -987,22 +1032,15 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
+def test_a_second_pull_request_gate_keeps_the_required_check(checkout: Checkout):
     """
-    Asserts that a ruleset carrying a key the rulesets API does not take
-    is named on its own file, one finding per field, rather than ending
-    the audit.
+    Asserts that renaming the gate of one workflow running on a pull request
+    makes no finding while another still ends on `📡 Readout`, since the
+    audit reads the gates of every such workflow as one set.
     """
-    tags = ".github/rulesets/tags.json"
-    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
+    edit(checkout, CI, new="name    : 📡 Report", old="name    : 📡 Readout")
 
-    assert RulesetCheck(checkout=checkout).findings == [
-        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
-        Finding(
-            file    = Path(tags),
-            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
-        )
-    ]
+    assert RulesetCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -1118,20 +1156,18 @@ def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
     ]
 
 
-def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
+def test_a_toml_task_continuing_uv_run_onto_its_flags_passes(checkout: Checkout):
     """
-    Asserts that a `tools` input a step passes an action other than a
-    composite action of the checkout names no subset a Kit job must save.
+    Asserts that a task declared in TOML passes where its `uv run` takes
+    `--exact --locked` on the line a backslash continues it onto.
     """
-    edit(
-        checkout = checkout,
-        new      = "uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
-        "        with : { tools: bun }",
-        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
-        path = DRAFT
+    append(
+        checkout,
+        ".mise/config.toml",
+        "\n[tasks.\"py:sweep\"]\nrun = '''uv run \\\n--exact --locked pytest'''\n"
     )
 
-    assert KitCheck(checkout=checkout).findings == []
+    assert LockfileCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -1390,6 +1426,22 @@ def test_a_moved_manifest_declaration_names_every_copy(
     ]
 
 
+def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
+    """
+    Asserts that a `tools` input a step passes an action other than a
+    composite action of the checkout names no subset a Kit job must save.
+    """
+    edit(
+        checkout = checkout,
+        new      = "uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
+        "        with : { tools: bun }",
+        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
+        path = DRAFT
+    )
+
+    assert KitCheck(checkout=checkout).findings == []
+
+
 def test_a_validation_error_outside_the_documents_is_raised(
     checkout    : Checkout,
     monkeypatch : MonkeyPatch
@@ -1406,22 +1458,7 @@ def test_a_validation_error_outside_the_documents_is_raised(
     )
 
     with raises(ValidationError):
-        RunCheck(checkout=checkout).findings
-
-
-def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
-    """
-    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
-    is reported as one finding on that workflow, whose error names no field.
-    """
-    (checkout.root / CI).write_text("name: one\nname: two\n")
-
-    assert GateCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(CI),
-            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
-        )
-    ]
+        LockfileCheck(checkout=checkout).findings
 
 
 @mark.parametrize(
@@ -1605,6 +1642,136 @@ def test_a_guide_out_of_step_with_the_rows_is_named(
     ]
 
 
+def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
+    """
+    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
+    is reported as one finding on that workflow, whose error names no field.
+    """
+    (checkout.root / CI).write_text("name: one\nname: two\n")
+
+    assert GateCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(CI),
+            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
+        )
+    ]
+
+
+@mark.parametrize(
+    ("paths", "old", "new", "context"),
+    [
+        param(
+            (MAIN,),
+            '"context": "📡 Readout"',
+            '"context": "🐦‍⬛ CI"',
+            "🐦‍⬛ CI",
+            id = "required"
+        ),
+        param(
+            (CI, SITE),
+            "name    : 📡 Readout",
+            "name    : 📡 Report",
+            "📡 Readout",
+            id = "gate"
+        ),
+        param(
+            (MAIN,),
+            '"integration_id": 15368 }]',
+            '"integration_id": 15368 }, { "context": "🐦‍⬛ CI" }]',
+            "🐦‍⬛ CI",
+            id = "second"
+        ),
+        param((CI, SITE), "  gate:\n", "  brief:\n", "📡 Readout", id="no-gate")
+    ]
+)
+def test_a_required_check_no_pull_request_gate_names_is_named(
+    checkout : Checkout,
+    context  : str,
+    new      : str,
+    old      : str,
+    paths    : tuple[str, ...]
+):
+    """
+    Asserts that renaming the check the `main` ruleset requires, adding a
+    second required check beside it, renaming the gate of every workflow
+    running on a pull request, or ending each of them on no gate makes one
+    finding on the ruleset naming the required check no such gate carries,
+    although the gates of the push workflows still carry `📡 Readout`.
+    """
+    for file in paths:
+        edit(checkout, file, new=new, old=old)
+
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(MAIN),
+            message = f"`{MAIN}` requires the `{context}` check, which no gate of a "
+            "workflow running on a pull request names"
+        )
+    ]
+
+
+def test_a_written_file_drifting_from_its_declaration_is_named(checkout: Checkout):
+    """
+    Asserts that a copy of the identity edited by hand, rather than written
+    by the render task from the package's declaration, is named on its path.
+    """
+    path = Outputs().identity
+    edit(checkout, str(path), new='"alpha": 0.5', old='"alpha": 0.64')
+
+    assert RenderCheck(checkout=checkout).findings == [
+        Finding(
+            file    = path,
+            message = f"`{path}` has drifted from the declaration it is written from, "
+            "which `mise render` writes again"
+        )
+    ]
+
+
+@mark.parametrize(
+    ("text", "messages"),
+    [
+        param(f"{SHELL}bun install\n", ["install"], id="bare"),
+        param(f"{SHELL}bunx vitepress build\n", ["bunx"], id="bunx"),
+        param(f"{SHELL}bun install\nbunx knip\n", ["install", "bunx"], id="both"),
+        param(f"{SHELL}bun install --frozen-lockfile\n", [], id="frozen"),
+        param(
+            f"{SHELL}bun install --cwd docs --lockfile-only\n",
+            [],
+            id = "lockfile-only"
+        ),
+        param(
+            f"{SHELL}bun install \\\n  --frozen-lockfile \\\n  --ignore-scripts\n",
+            [],
+            id = "continued"
+        ),
+        param(f"{SHELL}# bunx is never run\nbun audit\n", [], id="comment")
+    ]
+)
+def test_a_task_installing_off_the_lockfile_or_running_bunx_is_named(
+    checkout : Checkout,
+    messages : list[str],
+    text     : str
+):
+    """
+    Asserts that a task running `bun install` with neither
+    `--frozen-lockfile` nor `--lockfile-only` is named, as is one running
+    `bunx`, whereas one carrying the flag on a line a backslash continues
+    the install onto passes, as does one naming `bunx` only in a comment.
+    """
+    path    = task(checkout, "site/fetch", text)
+    written = {
+        "bunx": f"`{path}` runs `bunx`, which can run a copy of a tool from outside "
+        "`docs/node_modules`",
+
+        "install": f"`{path}` runs `bun install` with neither `--frozen-lockfile` nor "
+        "`--lockfile-only`"
+    }
+
+    assert LockfileCheck(checkout=checkout).findings == [
+        Finding(file=path, message=written[message]) for message in messages
+    ]
+
+
 def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
     """
     Asserts that a step pinning an action to a commit other than the one
@@ -1625,58 +1792,6 @@ def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
             message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
             f"the pin on it in `{ACTION}` reads "
             "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
-        )
-    ]
-
-
-@mark.parametrize(
-    ("path", "old", "new", "context"),
-    [
-        param(
-            MAIN,
-            '"context": "📡 Readout"',
-            '"context": "🐦‍⬛ CI"',
-            "🐦‍⬛ CI",
-            id = "required"
-        ),
-        param(
-            CI,
-            "name    : 📡 Readout",
-            "name    : 📡 Report",
-            "📡 Readout",
-            id = "gate"
-        ),
-        param(
-            MAIN,
-            '"integration_id": 15368 }]',
-            '"integration_id": 15368 }, { "context": "🐦‍⬛ CI" }]',
-            "🐦‍⬛ CI",
-            id = "second"
-        ),
-        param(CI, "  gate:\n", "  brief:\n", "📡 Readout", id="no-gate")
-    ]
-)
-def test_a_required_check_no_pull_request_gate_names_is_named(
-    checkout : Checkout,
-    context  : str,
-    new      : str,
-    old      : str,
-    path     : str
-):
-    """
-    Asserts that renaming the check the `main` ruleset requires, adding a
-    second required check beside it, renaming the gate of the one workflow
-    running on a pull request, or ending that workflow on no gate makes one
-    finding on the ruleset naming the required check no such gate carries,
-    although the gates of the push workflows still carry `📡 Readout`.
-    """
-    edit(checkout, path, new=new, old=old)
-
-    assert RulesetCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(MAIN),
-            message = f"`{MAIN}` requires the `{context}` check, which no gate of a "
-            "workflow running on a pull request names"
         )
     ]
 

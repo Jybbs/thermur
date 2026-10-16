@@ -12,3 +12,5 @@ data/
 notes/
 
 .DS_Store
+
+docs/node_modules/

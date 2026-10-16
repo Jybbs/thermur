@@ -425,12 +425,13 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 ### System Requirements
 
 - **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
+- **Node and Bun**: installed by mise at the versions `.mise/config.toml` pins, for the docs site under `docs/`
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
 - **OS**: Linux on x86-64 or arm64, or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records every pinned tool for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
 
 ### Installation
 
-*Thermur* pins Python and [uv](https://docs.astral.sh/uv/) through [mise](https://mise.jdx.dev/), and `uv.lock` records the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists. The commands under Quick Start build that environment, after which one command reports any condition the clone still lacks, beside the command that supplies it:
+*Thermur* pins Python, [uv](https://docs.astral.sh/uv/), Node, and [Bun](https://bun.sh/) through [mise](https://mise.jdx.dev/), and `uv.lock` and `docs/bun.lock` record the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists, the site's packages on the first `site` task it runs. The commands under Quick Start build that environment, after which one command reports any condition the clone still lacks, beside the command that supplies it:
 
 ```bash
 mise doctor project
@@ -446,14 +447,23 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, and the license to one value across the files restating them, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists, and the command beside each, to the rows of each pull-request workflow and the tasks they run, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every check a ruleset requires to the gate a pull-request workflow ends on, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
+| `mise audit` | Holds the Python version, the uv release, the license, and the site's pins on Vitest's coverage provider and on Node's types to one value across the files restating them, the files `mise render` writes to the declarations they are written from, every `bun install` a task runs to the lockfile and no task to `bunx`, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists, and the command beside each, to the rows of each pull-request workflow and the tasks they run, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every check a ruleset requires to the gate a pull-request workflow ends on, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
 | `mise ci` | Runs `mise doctor project`, then every task a row of the pull-request workflows runs, the way the rows run them |
 | `mise labels` | Creates or updates every label `.github/labels.toml` declares on GitHub after a prompt, then lists each live label it omits |
-| `mise rulesets` | Applies the rulesets under `.github/rulesets/` and every setting `.github/settings.toml` declares to GitHub after a prompt, beside the description and the topics `pyproject.toml` declares, and lists each live ruleset no file names |
-| `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, and `.mise/mise.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
+| `mise rulesets` | Applies the rulesets under `.github/rulesets/` and every setting `.github/settings.toml` declares to GitHub after a prompt, beside the description, the homepage, and the topics `pyproject.toml` declares, and lists each live ruleset no file names |
+| `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
 | `mise relock` | Re-resolves every lockfile after its manifest changes |
-| `mise scan` | Holds every package `uv.lock` and the lockfile beside each task script resolve to the published advisories through `uv audit` |
+| `mise scan` | Holds every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories through `uv audit` and `bun audit` |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
+| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/` |
+| `mise press` | Builds the docs site into `docs/.vitepress/dist`, failing on a link between pages that leads nowhere |
+| `mise serve` | Serves the docs site, reloading a page as it is edited |
+| `mise links` | Checks every link, asset, and heading fragment in the built site, the README, and the contributor guide offline through lychee |
+| `mise lint` | Lints the site's TypeScript through Oxlint |
+| `mise typecheck` | Type-checks the site's TypeScript through `tsc` |
+| `mise cruft` | Reports every unused file, export, and dependency in the site, and every import cycle, through knip |
+| `mise run site:test` | Runs the site's Vitest suite, passing any further arguments to it |
+| `mise run site:coverage` | Runs the site's suite under coverage, failing below 95% on statements, branches, functions, or lines |
 
 [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) takes a contributor from a clone to a merged pull request, then sets out the code's style, the checks each pull request runs, and the labels each issue and pull request takes.
 
@@ -461,7 +471,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 
 ## 📁 Project Structure
 
-The repository holds the pinned toolchain and its tasks, the package the audit and the pipeline run from and its test suite, the documentation pages, and the manifest beside its lockfile, with the gitignored `data/` holding the NetCDF files a reader downloads under `raw/` and the record of each run under `runs/`:
+The repository holds the pinned toolchain and its tasks, the package the audit and the pipeline run from and its test suite, the docs site and the documentation pages, and the manifest beside its lockfile, with the gitignored `data/` holding the NetCDF files a reader downloads under `raw/` and the record of each run under `runs/`:
 
 ```
 thermur/
@@ -475,24 +485,31 @@ thermur/
 │   ├── rulesets/                   # The protection on main and on every tag, which mise rulesets applies
 │   ├── scripts/summaries/          # The template each workflow's gate writes its summary from
 │   ├── settings.toml               # Every repository setting no ruleset carries
-│   └── workflows/                  # 🐦‍⬛ CI on every pull request, and 🐦‍⬛ Draft and 🐦‍⬛ Warm on main
+│   └── workflows/                  # 🐦‍⬛ CI and 🐦‍⬛ Site on a pull request, and 🐦‍⬛ Draft, 🐦‍⬛ Pages, and 🐦‍⬛ Warm on main
 │
 ├── .mise/
 │   ├── bin/                        # The script each task runs Prose and pytest through
-│   ├── config.toml                 # Pinned Python, uv, and zizmor, the environment, and the doctor checks
+│   ├── config.toml                 # Pinned Python, uv, Node, Bun, lychee, and zizmor, the environment, and the doctor checks
 │   ├── lib/                        # The shell functions the lock tasks share
 │   ├── mise.lock                   # Locked tool downloads and checksums
-│   └── tasks/                      # The gha, lock, py, and repo tasks
+│   └── tasks/                      # The docs, gha, lock, py, repo, and site tasks
 │
 ├── data/
 │   ├── raw/                        # NetCDF files from WRF-SFIRE
 │   └── runs/                       # The record of each recorded run and the tables it saved
 │
 ├── docs/
+│   ├── .vitepress/                 # The docs site's configuration, theme, and Vitest suite
+│   ├── pages/                      # Every page the docs site at https://thermur.fyi/ builds
+│   ├── public/                     # The logo's files and the headers Cloudflare Pages serves the site with
+│   ├── package.json                # The docs site's packages, each an exact pin, beside bun.lock and bunfig.toml
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
 ├── src/thermur/
+│   ├── docs/                       # The files `mise render` writes into the docs site
+│   ├── figures/                    # The chart theme matplotlib and seaborn draw in, and the faces it ships
+│   ├── identity/                   # The palette, the faces, the marks, and the tagline, declared once
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
 │   └── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, and the clone the `repo` tasks and the pipeline read
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin

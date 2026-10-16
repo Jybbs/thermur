@@ -83,11 +83,12 @@ def test_home_is_an_empty_folder():
 
 def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     """
-    Asserts that none of these variables reaches a test, covering the ones
-    that set whether a console prints color, the files a GitHub Actions
-    runner collects a workflow step's outputs and a workflow run's summary
-    page from, the branch and the commit `gha:brief` prefers, the ones
-    naming where a tool keeps its cache, configuration, data, and state, and
-    a variable opening on `THERMUR_` in either case, which sets a setting.
+    Asserts that none of these variables reaches a test, covering the
+    ones that set whether a console prints color and whether a task prints
+    its GitHub Actions form, the files a GitHub Actions runner collects
+    a workflow step's outputs and a workflow run's summary page from, the
+    branch and the commit `gha:brief` prefers, the ones naming where a tool
+    keeps its cache, configuration, data, and state, and a variable opening
+    on `THERMUR_` in either case, which sets a setting.
     """
     assert name not in environ

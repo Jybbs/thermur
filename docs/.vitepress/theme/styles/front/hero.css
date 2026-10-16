@@ -1,0 +1,39 @@
+.front-page .VPHero .main {
+  align-items     : center;
+  display         : flex;
+  flex-direction  : column;
+  justify-content : center;
+  min-height      : 26rem;
+  text-align      : center;
+  width           : 100%;
+}
+
+.front-page .VPHero .actions { justify-content: center; }
+
+.front-hero-mark img { width: min(38rem, 84vw); }
+
+.front-hero-tagline {
+  color       : var(--vp-c-text-3);
+  font-size   : 1.5rem;
+  font-style  : italic;
+  line-height : 1.45;
+  margin      : 0 auto;
+  max-width   : 36rem;
+  padding-top : 1.1rem;
+  text-wrap   : balance;
+}
+
+.front-page .VPHomeContent { max-width: 43rem; }
+
+.front-page .VPHomeContent h1,
+.front-page .VPHomeContent h1 + p { display: none; }
+
+@media (width < 60rem) {
+  .front-hero-tagline { font-size: 1.25rem; }
+}
+
+@media (width < 40rem) {
+  .front-page .VPHero .main { min-height: 22rem; }
+
+  .front-hero-tagline { font-size: 1.125rem; }
+}

@@ -32,7 +32,6 @@ def test_zizmor_audits_online_under_github_actions_alone(
     text where it is empty or unset.
     """
     stand_in("zizmor", 'echo "$ZIZMOR_OFFLINE"\nprintf "%s\\n" "$@"')
-    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     if actions is not None:
         monkeypatch.setenv("GITHUB_ACTIONS", actions)
 

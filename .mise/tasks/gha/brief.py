@@ -51,9 +51,14 @@ class Readout:
     @property
     def passed(self) -> bool:
         """
-        Tells whether every job the gate waited on succeeded.
+        Tells whether every job the gate waited on succeeded or was skipped,
+        a job being skipped only where its own condition left it out or a
+        job it waits for ended otherwise, which that job's result already
+        reads.
         """
-        return all(job["result"] == "success" for job in self.needs.values())
+        return all(
+            job["result"] in {"skipped", "success"} for job in self.needs.values()
+        )
 
     @property
     def summary(self) -> str:
@@ -102,8 +107,8 @@ class Readout:
         that variable is unset.
 
         Returns:
-            The verdict as an exit status, `0` where every job succeeded and
-            `1` otherwise.
+            The verdict as an exit status, `0` where every job succeeded or
+            was skipped and `1` otherwise.
         """
         path = environ.get("GITHUB_STEP_SUMMARY")
         with open(path, "a", encoding="utf-8") if path else nullcontext() as page:
