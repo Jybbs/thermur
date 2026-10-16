@@ -71,7 +71,9 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "cruft",
             "true",
             [
-                "knip", "--config", ".vitepress/knip.ts",
+                "knip", "--config", ".vitepress/knip.ts", "--reporter",
+                "github-actions", "--marker", "knip",
+                "--config", ".vitepress/knip.ts", "--cycles",
                 "--reporter", "github-actions", "--marker"
             ],
             id = "cruft-actions"
@@ -80,8 +82,9 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "cruft",
             "",
             [
-                "knip", "--config", ".vitepress/knip.ts",
-                "--reporter", "symbols", "--marker"
+                "knip", "--config", ".vitepress/knip.ts", "--reporter", "symbols",
+                "--marker", "knip", "--config", ".vitepress/knip.ts",
+                "--cycles", "--reporter", "symbols", "--marker"
             ],
             id = "cruft-empty"
         ),

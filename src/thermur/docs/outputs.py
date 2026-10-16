@@ -33,7 +33,7 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     @property
     def drifted(self) -> list[Path]:
         """
-        Lists each file whose committed text differs from what the render
+        Lists each file whose text on disk differs from what the render
         would write, a missing file among them.
         """
         return [

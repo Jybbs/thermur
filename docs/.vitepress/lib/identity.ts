@@ -78,6 +78,17 @@ export const MIXES: Readonly<Record<string, Mix>> = {
  * The id the theme imports the identity's stylesheet by.
  */
 const MODULE = 'virtual:identity.css'
+/**
+ * The default theme's custom properties for the label of a button filled in
+ * the lead, at rest, under the pointer, and pressed, which the theme fills in
+ * `--vp-c-brand-3`, `--vp-c-brand-2`, and `--vp-c-brand-1`. Each is set in the
+ * ground, which holds a text's contrast against all three in both schemes.
+ */
+const ON_LEAD = [
+  '--vp-button-brand-active-text',
+  '--vp-button-brand-hover-text',
+  '--vp-button-brand-text'
+] as const
 
 /**
  * Writes the color of a role holding one per scheme, as its hex where the two
@@ -144,10 +155,11 @@ export function identityCss(): string {
       ? `  ${property}: var(--th-${role});`
       : `  ${property}: color-mix(in srgb, var(--th-${role}) ${Math.round(share * 100)}%, `
       + `var(--th-${over}));`)
-  const faces = Object.entries(FACES).map(([property, kind]) =>
+  const labels = ON_LEAD.map(property => `  ${property}: var(--th-ground);`)
+  const faces  = Object.entries(FACES).map(([property, kind]) =>
     `  ${property}: ${fontStack(source.faces[kind])};`)
 
-  return `:root {\n${[...roles, ...series, ...heat, ...mixes, ...faces].join('\n')}\n}\n`
+  return `:root {\n${[...roles, ...series, ...heat, ...mixes, ...labels, ...faces].join('\n')}\n}\n`
 }
 
 /**

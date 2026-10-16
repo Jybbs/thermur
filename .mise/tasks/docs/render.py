@@ -11,7 +11,7 @@ from thermur.docs.outputs import Outputs
 
 def main():
     """
-    Writes each file whose committed text differs from what the render would
+    Writes each file whose text on disk differs from what the render would
     write, then prints each path it wrote.
     """
     for path in Outputs().write():

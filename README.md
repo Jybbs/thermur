@@ -431,7 +431,7 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 ### Installation
 
-*Thermur* pins Python, [uv](https://docs.astral.sh/uv/), Node, and [Bun](https://bun.sh/) through [mise](https://mise.jdx.dev/), and `uv.lock` and `docs/bun.lock` record the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists. The commands under Quick Start build that environment, after which one command reports any condition the clone still lacks, beside the command that supplies it:
+*Thermur* pins Python, [uv](https://docs.astral.sh/uv/), Node, and [Bun](https://bun.sh/) through [mise](https://mise.jdx.dev/), and `uv.lock` and `docs/bun.lock` record the version every dependency resolves to on each platform, so a fresh clone installs those same versions on every platform System Requirements lists, the site's packages on the first `site` task it runs. The commands under Quick Start build that environment, after which one command reports any condition the clone still lacks, beside the command that supplies it:
 
 ```bash
 mise doctor project

@@ -710,7 +710,7 @@ class RenderCheck(Check):
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names each written file whose committed text has drifted from its
+        Names each written file whose text on disk has drifted from its
         declaration, a missing file among them.
         """
         for path in Outputs(root=self.checkout.root).drifted:

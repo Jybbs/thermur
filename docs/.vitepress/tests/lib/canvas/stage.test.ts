@@ -88,6 +88,14 @@ describe('the stage’s fit', () => {
     stage.destroy()
   })
 
+  it('holds its canvas at twice its box on a screen of a higher pixel ratio', () => {
+    vi.stubGlobal('devicePixelRatio', 3)
+    const { stage } = staged()
+    const canvas    = document.querySelector('canvas')!
+    expect([canvas.width, canvas.height]).toEqual([2400, 1600])
+    stage.destroy()
+  })
+
   it('fits nothing to a canvas of no size and paints nothing on a page not yet fitted', () => {
     browser(true).resize(0, 0)
     const drawn = part()

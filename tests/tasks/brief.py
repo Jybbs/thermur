@@ -23,19 +23,20 @@ def readout(
     load_task    : Callable[[str], ModuleType],
     monkeypatch  : MonkeyPatch,
     pytestconfig : Config
-) -> Callable[[str, dict], object]:
+) -> Callable[..., object]:
     """
-    Enters the worktree root, whose `.github/scripts/summaries/` the
-    task reads, and sets the variables a runner sets for a pull request's
-    workflow run.
+    Enters the worktree root, whose `.github/scripts/summaries/` the task
+    reads, and sets the variables a runner sets for a workflow run, on
+    a pull request's merge ref for a workflow a pull request runs and on
+    `main` for any other.
 
     Returns:
-        A builder reading the gate of a run of the workflow file named and
-        the `needs` context given, as the task reads it.
+        A builder reading the gate of a run of the workflow file named, the
+        `needs` context given, and the branch where one is given, as the
+        task reads it.
     """
     monkeypatch.chdir(pytestconfig.rootpath)
     for name, value in {
-        "GITHUB_REF_NAME"   : "55/merge",
         "GITHUB_REPOSITORY" : "Jybbs/thermur",
         "GITHUB_SERVER_URL" : "https://github.com",
         "GITHUB_SHA"        : SHA
@@ -44,20 +45,22 @@ def readout(
 
     module = load_task(".mise/tasks/gha/brief.py")
 
-    def build(file: str, needs: dict) -> object:
+    def build(file: str, needs: dict, branch: str | None = None) -> object:
         """
-        Reads the gate of a run of `.github/workflows/<file>` waiting on the
-        jobs `needs` describes, under the name the workflow declares.
+        Reads the gate of a run of `.github/workflows/<file>` waiting on
+        the jobs `needs` describes, under the name the workflow declares, on
+        `branch` where one is given.
         """
-        path = Path(".github/workflows", file)
-        monkeypatch.setenv(
-            "GITHUB_WORKFLOW",
-            Workflow.read(pytestconfig.rootpath, path).name
+        path     = Path(".github/workflows", file)
+        workflow = Workflow.read(pytestconfig.rootpath, path)
+        ref      = (
+            f"heads/{branch}" if branch
+            else "pull/55/merge" if "pull_request" in workflow.events
+            else "heads/main"
         )
-        monkeypatch.setenv(
-            "GITHUB_WORKFLOW_REF",
-            f"Jybbs/thermur/{path}@refs/pull/55/merge"
-        )
+        monkeypatch.setenv("GITHUB_REF_NAME", ref.partition("/")[2])
+        monkeypatch.setenv("GITHUB_WORKFLOW", workflow.name)
+        monkeypatch.setenv("GITHUB_WORKFLOW_REF", f"Jybbs/thermur/{path}@refs/{ref}")
         monkeypatch.setenv("NEEDS", dumps(needs))
         return module.Readout.running()
 
@@ -72,69 +75,90 @@ def job(result: str = "success", **outputs: str) -> dict:
 
 
 @mark.parametrize(
-    ("file", "needs"),
+    ("file", "needs", "branch"),
     [
-        param("ci.yml", {"check": job(coverage="https://example.invalid/1")}, id="ci"),
-        param("ci.yml", {"check": job("failure")}, id="ci-failed"),
+        param(
+            "ci.yml",
+            {"check": job(coverage="https://example.invalid/1")},
+            None,
+            id = "ci"
+        ),
+        param("ci.yml", {"check": job("failure")}, None, id="ci-failed"),
         param(
             "draft.yml",
             {"cut": job(state="created", url="https://u/d", version="0.2.0")},
+            None,
             id = "draft-created"
         ),
         param(
             "draft.yml",
             {"cut": job(state="kept", url="https://u/d", version="0.2.0")},
+            None,
             id = "draft-kept"
         ),
         param(
             "draft.yml",
             {"cut": job(state="skipped", url="https://u/r", version="0.1.0")},
+            None,
             id = "draft-skipped"
         ),
         param(
             "draft.yml",
             {"cut": job(state="unchanged", url="", version="0.1.0")},
+            None,
             id = "draft-unchanged"
         ),
-        param("draft.yml", {"cut": job("failure")}, id="draft-failed"),
+        param("draft.yml", {"cut": job("failure")}, None, id="draft-failed"),
         param(
             "pages.yml",
             {"deploy": job(url="https://0a1b2c3d.thermur.pages.dev"), "press": job()},
+            None,
             id = "pages"
         ),
         param(
             "pages.yml",
             {"deploy": job("skipped"), "press": job()},
+            "55/pages-preview",
             id = "pages-elsewhere"
         ),
         param(
             "pages.yml",
             {"deploy": job("failure"), "press": job()},
+            None,
             id = "pages-failed"
         ),
         param(
             "pages.yml",
             {"deploy": job("skipped"), "press": job("failure")},
+            None,
             id = "pages-unpressed"
         ),
         param(
             "site.yml",
             {"check": job(**{"site-coverage": "https://example.invalid/2"})},
+            None,
             id = "site"
         ),
         param(
             "site.yml",
             {"check": job("failure", **{"site-coverage": ""})},
+            None,
             id = "site-failed"
         ),
-        param("warm.yml", {"kit": job(), "prune": job()}, id="warm"),
-        param("warm.yml", {"kit": job(), "prune": job("failure")}, id="warm-failed")
+        param("warm.yml", {"kit": job(), "prune": job()}, None, id="warm"),
+        param(
+            "warm.yml",
+            {"kit": job(), "prune": job("failure")},
+            None,
+            id = "warm-failed"
+        )
     ]
 )
 def test_each_workflow_renders_its_summary(
+    branch   : str | None,
     file     : str,
     needs    : dict,
-    readout  : Callable[[str, dict], object],
+    readout  : Callable[..., object],
     snapshot : SnapshotAssertion
 ):
     """
@@ -143,7 +167,7 @@ def test_each_workflow_renders_its_summary(
     where the row left its output empty, the path the draft cut took, or the
     address the deploy published, and that any other renders `base.md.j2`.
     """
-    assert readout(file, needs).summary == snapshot
+    assert readout(file, needs, branch).summary == snapshot
 
 
 def test_the_heading_keeps_every_word_after_the_glyph(
@@ -233,14 +257,14 @@ def test_the_summary_appends_to_the_runner_s_summary_file(
 @mark.parametrize(
     ("variables", "commit", "ref"),
     [
-        param({}, SHA, "55/merge", id="runner"),
+        param({}, SHA, "main", id="runner"),
         param(
             {"COMMIT": "fedcba9876543210", "GITHUB_HEAD_REF": "55/ci-brief-gate"},
             "fedcba9876543210",
             "55/ci-brief-gate",
             id = "pull-request"
         ),
-        param({"COMMIT": "", "GITHUB_HEAD_REF": ""}, SHA, "55/merge", id="empty")
+        param({"COMMIT": "", "GITHUB_HEAD_REF": ""}, SHA, "main", id="empty")
     ]
 )
 def test_the_commit_and_the_branch_prefer_the_pull_request_s_head(

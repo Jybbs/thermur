@@ -76,15 +76,17 @@ describe('Previews', () => {
     expect(meta(tags, 'og:type')).toBe('article')
     expect(tags).toContainEqual(['link', { href: 'https://example.org/methods/alarm', rel: 'canonical' }])
     expect(JSON.parse(String(tags.at(-1)?.[2]))).toMatchObject({
-      '@type'  : 'Article',
-      headline : 'The Alarm',
-      image    : 'https://example.org/cards/methods/alarm.png',
-      isPartOf : { '@type': 'WebSite', name: 'Thermur', url: 'https://example.org/' }
+      '@type'     : 'Article',
+      description : 'What The Alarm holds.',
+      headline    : 'The Alarm',
+      image       : 'https://example.org/cards/methods/alarm.png',
+      isPartOf    : { '@type': 'WebSite', name: 'Thermur', url: 'https://example.org/' }
     })
   })
 
   it('gives the page met at a missing address no address of its own', () => {
     const { tags } = rendered('404.md', '404', true)
+    expect(meta(tags, 'og:type')).toBe('website')
     expect(meta(tags, 'og:url')).toBeUndefined()
     expect(meta(tags, 'og:image')).toBe('https://example.org/cards/index.png')
     expect(new Set(tags.map(([tag]) => tag))).toEqual(new Set(['meta']))

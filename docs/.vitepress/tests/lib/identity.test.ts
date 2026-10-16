@@ -49,6 +49,14 @@ const pairs = checked.flatMap(([name, mix]) => kinded('ground').map(([ground, un
   [name, ground, mix, under] as const))
 
 describe.for(SCHEMES)('under the %s scheme', scheme => {
+  it.for(['--vp-c-brand-1', '--vp-c-brand-2', '--vp-c-brand-3'])(
+    'the ground holds a text’s contrast on a button filled in %s',
+    name => {
+      const ground = identity.colorOf(source.palette.ground[scheme])
+      expect(wcagContrast(ground, painted(identity.MIXES[name]!, scheme))).toBeGreaterThanOrEqual(FLOORS.text)
+    }
+  )
+
   it.for(pairs)('%s holds its contrast against %s', ([, , mix, ground]) => {
     expect(wcagContrast(painted(mix, scheme), painted(ground, scheme))).toBeGreaterThanOrEqual(
       FLOORS[mix.kind as keyof typeof FLOORS]
@@ -96,6 +104,13 @@ describe('fontsHref', () => {
 })
 
 describe('identityCss', () => {
+  it('sets the label of a button filled in the lead in the ground, at rest, hovered, and pressed', () => {
+    const css = identity.identityCss()
+    for (const state of ['active-', 'hover-', '']) {
+      expect(css).toContain(`--vp-button-brand-${state}text: var(--th-ground);`)
+    }
+  })
+
   it('sets a role through light-dark only where its two colors differ', () => {
     const css = identity.identityCss()
     expect(css).toContain('--th-ground: light-dark(#f2f1ee, #17171b);')
