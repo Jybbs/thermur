@@ -80,15 +80,15 @@ export const MIXES: Readonly<Record<string, Mix>> = {
 const MODULE = 'virtual:identity.css'
 /**
  * The default theme's custom properties for the label of a button filled in
- * the lead, at rest, under the pointer, and pressed, which the theme fills in
- * `--vp-c-brand-3`, `--vp-c-brand-2`, and `--vp-c-brand-1`. Each is set in the
- * ground, which holds a text's contrast against all three in both schemes.
+ * the lead, pressed, under the pointer, and at rest, each beside the property
+ * the theme fills that button in. Each label is set in the ground, which holds
+ * a text's contrast against its fill in both schemes.
  */
-const ON_LEAD = [
-  '--vp-button-brand-active-text',
-  '--vp-button-brand-hover-text',
-  '--vp-button-brand-text'
-] as const
+export const ON_LEAD = {
+  '--vp-button-brand-active-text' : '--vp-c-brand-1',
+  '--vp-button-brand-hover-text'  : '--vp-c-brand-2',
+  '--vp-button-brand-text'        : '--vp-c-brand-3'
+} as const
 
 /**
  * Writes the color of a role holding one per scheme, as its hex where the two
@@ -155,7 +155,7 @@ export function identityCss(): string {
       ? `  ${property}: var(--th-${role});`
       : `  ${property}: color-mix(in srgb, var(--th-${role}) ${Math.round(share * 100)}%, `
       + `var(--th-${over}));`)
-  const labels = ON_LEAD.map(property => `  ${property}: var(--th-ground);`)
+  const labels = Object.keys(ON_LEAD).map(property => `  ${property}: var(--th-ground);`)
   const faces  = Object.entries(FACES).map(([property, kind]) =>
     `  ${property}: ${fontStack(source.faces[kind])};`)
 

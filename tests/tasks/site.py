@@ -124,8 +124,9 @@ def test_each_task_runs_its_tool_from_the_site_s_own_packages(
     """
     Asserts that each `site` task runs the copy of its tool under
     `docs/node_modules/.bin` on the arguments it fixes followed by every
-    argument a reader adds, the lint printing annotations and the cruft
-    report taking the GitHub Actions reporter where `GITHUB_ACTIONS` is set.
+    argument a reader adds, the cruft report running knip a second time over
+    import cycles alone. The lint prints annotations and the cruft report
+    takes the GitHub Actions reporter where `GITHUB_ACTIONS` is set.
     """
     if actions is not None:
         monkeypatch.setenv("GITHUB_ACTIONS", actions)

@@ -8,8 +8,8 @@ import type { MarkdownRenderer } from 'vitepress'
  */
 const formula = (tex: string, display: boolean): string =>
   display
-    ? `<div v-pre>${renderToString(tex, { displayMode: true, throwOnError: true })}</div>\n`
-    : `<span v-pre>${renderToString(tex, { throwOnError: true })}</span>`
+    ? `<div v-pre>${renderToString(tex, { displayMode: true })}</div>\n`
+    : `<span v-pre>${renderToString(tex)}</span>`
 
 /**
  * Sets each formula a page writes in the two forms GitHub renders as math with

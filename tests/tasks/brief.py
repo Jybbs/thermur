@@ -55,7 +55,7 @@ def readout(
         workflow = Workflow.read(pytestconfig.rootpath, path)
         ref      = (
             f"heads/{branch}" if branch
-            else "pull/55/merge" if "pull_request" in workflow.events
+            else "pull/55/merge" if workflow.on_pull_request
             else "heads/main"
         )
         monkeypatch.setenv("GITHUB_REF_NAME", ref.partition("/")[2])
@@ -255,20 +255,28 @@ def test_the_summary_appends_to_the_runner_s_summary_file(
 
 
 @mark.parametrize(
-    ("variables", "commit", "ref"),
+    ("file", "variables", "commit", "ref"),
     [
-        param({}, SHA, "main", id="runner"),
+        param("warm.yml", {}, SHA, "main", id="runner"),
         param(
+            "ci.yml",
             {"COMMIT": "fedcba9876543210", "GITHUB_HEAD_REF": "55/ci-brief-gate"},
             "fedcba9876543210",
             "55/ci-brief-gate",
             id = "pull-request"
         ),
-        param({"COMMIT": "", "GITHUB_HEAD_REF": ""}, SHA, "main", id="empty")
+        param(
+            "warm.yml",
+            {"COMMIT": "", "GITHUB_HEAD_REF": ""},
+            SHA,
+            "main",
+            id = "empty"
+        )
     ]
 )
 def test_the_commit_and_the_branch_prefer_the_pull_request_s_head(
     commit      : str,
+    file        : str,
     monkeypatch : MonkeyPatch,
     readout     : Callable[[str, dict], object],
     ref         : str,
@@ -282,6 +290,6 @@ def test_the_commit_and_the_branch_prefer_the_pull_request_s_head(
     for name, value in variables.items():
         monkeypatch.setenv(name, value)
 
-    gate = readout("warm.yml", {})
+    gate = readout(file, {})
 
     assert (gate.commit, gate.ref) == (commit, ref)

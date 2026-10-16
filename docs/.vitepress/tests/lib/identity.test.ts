@@ -49,11 +49,11 @@ const pairs = checked.flatMap(([name, mix]) => kinded('ground').map(([ground, un
   [name, ground, mix, under] as const))
 
 describe.for(SCHEMES)('under the %s scheme', scheme => {
-  it.for(['--vp-c-brand-1', '--vp-c-brand-2', '--vp-c-brand-3'])(
-    'the ground holds a text’s contrast on a button filled in %s',
-    name => {
-      const ground = identity.colorOf(source.palette.ground[scheme])
-      expect(wcagContrast(ground, painted(identity.MIXES[name]!, scheme))).toBeGreaterThanOrEqual(FLOORS.text)
+  it.for(Object.entries(identity.ON_LEAD))(
+    'the ground holds a text’s contrast as %s on a button filled in %s',
+    ([, fill]) => {
+      const label = identity.shadeOf('ground', scheme)
+      expect(wcagContrast(label, painted(identity.MIXES[fill]!, scheme))).toBeGreaterThanOrEqual(FLOORS.text)
     }
   )
 
