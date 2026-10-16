@@ -134,6 +134,36 @@ def test_each_task_runs_its_tool_from_the_site_s_own_packages(
     assert ran(site, pytestconfig, task).stdout.splitlines() == passed
 
 
+@mark.parametrize("failing", ["cycles", "unused"])
+def test_the_cruft_report_runs_both_passes_and_fails_where_either_fails(
+    failing      : str,
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config,
+    site         : Path
+):
+    """
+    Asserts that the cruft report runs knip's pass over import cycles after
+    a first pass that fails as well as after one that passes, and exits
+    nonzero where either pass failed.
+    """
+    executable(
+        site / "node_modules/.bin/knip",
+        '#!/bin/sh\nprintf "%s\\n" "$*"\n'
+        'case "$*" in *--cycles*) test "$FAILING" != cycles ;; '
+        '*) test "$FAILING" != unused ;; esac\n'
+    )
+    monkeypatch.setenv("FAILING", failing)
+    reported = ran(site, pytestconfig, "cruft")
+
+    assert (reported.returncode, reported.stdout.splitlines()) == (
+        1,
+        [
+            "--config .vitepress/knip.ts --reporter symbols --marker",
+            "--config .vitepress/knip.ts --cycles --reporter symbols --marker"
+        ]
+    )
+
+
 def test_the_install_installs_from_the_lockfile_and_prunes(
     pytestconfig : Config,
     site         : Path,
