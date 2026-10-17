@@ -271,11 +271,13 @@ def test_an_article_with_no_issue_leaves_the_parentheses_out(
     assert study.venue == "*Bioinspiration & Biomimetics* 9: 1–10"
 
 
-def test_an_entry_in_jabrefs_shape_reads_the_same(read: Callable[..., Bibliography]):
+def test_capitalized_keys_and_latex_accents_read_the_same(
+    read: Callable[..., Bibliography]
+):
     """
-    Asserts that an entry written with a capitalized type, capitalized field
-    keys, and LaTeX accents, as JabRef writes one, reads into the definition
-    the lowercase form gives.
+    Asserts that an entry written with the capitalized type JabRef writes,
+    capitalized field keys, and LaTeX accents reads into the definition the
+    lowercase form gives.
     """
     text = ARTICLE.format(
         author = "Vir{\\'a}gh, Csaba",

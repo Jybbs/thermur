@@ -18,17 +18,19 @@ from thermur.repo.schemas     import Finding
 def test_a_missing_or_edited_copy_drifts_and_is_written_again(checkout: Checkout):
     """
     Asserts that a missing identity and a page citing a study it does not
-    define both count as drifted, that writing rewrites each, and that a
-    second write finds nothing to write.
+    define both count as drifted, that writing rewrites each while leaving a
+    current page untouched, and that a second write finds nothing to write.
     """
     outputs = Outputs(checkout=checkout)
     page    = Path("docs/pages/index.md")
+    readme  = (checkout.root / "README.md").stat().st_mtime_ns
     (checkout.root / outputs.identity).unlink()
     append(checkout, str(page), "\nTurns travel[^attanasi2014].\n")
 
     assert outputs.drifted == [outputs.identity, page]
     assert outputs.write() == [outputs.identity, page]
     assert outputs.write() == []
+    assert (checkout.root / "README.md").stat().st_mtime_ns == readme
     assert (
         checkout.read(page)
                 .endswith(f"\n\n{checkout.bibliography.cite('attanasi2014')}\n")

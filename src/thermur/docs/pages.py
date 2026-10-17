@@ -66,12 +66,13 @@ class Page(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
 
         The plugin matches every marker whether or not the text defines it,
         and the rule gathering the definitions at the end of the text is
-        switched off, so each definition keeps the lines it spans.
+        left out, so each definition keeps the lines it spans.
         """
         return MarkdownIt("js-default", {"html": True}).use(
             footnote_plugin,
-            always_match_refs = True
-        ).disable("footnote_tail").parse(self.text)
+            always_match_refs = True,
+            move_to_end       = False
+        ).parse(self.text)
 
     def cited(self, bibliography: Bibliography) -> str:
         """

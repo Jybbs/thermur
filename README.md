@@ -504,7 +504,7 @@ thermur/
 │   ├── pages/                      # Every page the docs site at https://thermur.fyi/ builds
 │   ├── public/                     # The logo's files and the headers Cloudflare Pages serves the site with
 │   ├── package.json                # The docs site's packages, each an exact pin, beside bun.lock and bunfig.toml
-│   ├── references.bib              # Every study a page cites, each with its annotation and priority
+│   ├── references.bib              # Every study a page can cite, each with its annotation and priority
 │   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
