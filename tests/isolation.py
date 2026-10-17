@@ -16,7 +16,10 @@ from socket             import create_connection, socketpair
 from tests.conftest     import pytest_collection_modifyitems
 
 
-@fixture(params=[*CLEARED, "THERMUR_RADIUS_M", "thermur_radius_m"], scope="module")
+@fixture(
+    params = [*CLEARED, "THERMUR_RADIUS_M", "thermur_radius_m", "usage_try"],
+    scope  = "module"
+)
 def name(request: FixtureRequest) -> Iterator[str]:
     """
     Sets the variable `request.param` names and yields that name.

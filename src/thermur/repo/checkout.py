@@ -3,18 +3,21 @@ Holds `Checkout`, the clone the `repo` tasks read and the pipeline resolves
 every path under, which keeps each document it validates for every later
 check that reads it. It lists the tasks, the programs, the workflows, the
 composite actions, the issue templates, and the rulesets the clone holds
-beside the checks each pull request runs, and reads the commit checked out
-and the digest of `uv.lock`.
+beside the checks each pull request runs, and the files git tracks there.
+It reads the commit checked out and the digest of `uv.lock`, runs a command
+from the root, and clones itself into a scratch folder.
 """
 
+from collections.abc    import Iterable
 from functools          import cached_property
 from hashlib            import sha256
 from importlib.metadata import distribution
 from json               import loads
+from os                 import environ, pathsep
 from pathlib            import Path
 from pydantic           import AfterValidator, BaseModel, Field, TypeAdapter
 from re                 import sub
-from subprocess         import check_output, run
+from subprocess         import CompletedProcess, run
 from typing             import Annotated, Self
 
 from thermur.repo.schemas import (
@@ -107,11 +110,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Reads the commit checked out at the root, as `git rev-parse HEAD`
         prints it without its line break.
         """
-        return check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd  = self.root,
-            text = True
-        ).strip()
+        return self.run("git", "rev-parse", "HEAD", capture=True).stdout.strip()
 
     @property
     def composites(self) -> dict[str, Path]:
@@ -127,6 +126,29 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
+
+    @property
+    def files(self) -> list[Path]:
+        """
+        Lists every file git tracks or would track under the root, relative
+        to it, leaving out one gone from the disk while the index still
+        lists it.
+        """
+        return [
+            path
+            for path in map(
+                Path,
+                self.run(
+                    "git",
+                    "ls-files",
+                    "--cached",
+                    "--exclude-standard",
+                    "--others",
+                    capture = True
+                ).stdout.splitlines()
+            )
+            if (self.root / path).exists(follow_symlinks=False)
+        ]
 
     @cached_property
     def github_settings(self) -> GithubSettings:
@@ -149,11 +171,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         lists for the checkout, which it prints whatever status it exits
         with.
         """
-        validated = run(
-            ["mise", "tasks", "validate", "--json"],
-            capture_output = True,
-            cwd            = self.root,
-            text           = True
+        validated = self.run(
+            "mise",
+            "tasks",
+            "validate",
+            "--json",
+            capture = True,
+            check   = False
         )
         return TypeAdapter(list[Issue]).validate_python(
             loads(validated.stdout)["issues"]
@@ -186,11 +210,15 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         declares among them.
         """
         return TypeAdapter(list[Task]).validate_json(
-            check_output(
-                ["mise", "tasks", "ls", "--hidden", "--json", "--local"],
-                cwd  = self.root,
-                text = True
-            )
+            self.run(
+                "mise",
+                "tasks",
+                "ls",
+                "--hidden",
+                "--json",
+                "--local",
+                capture = True
+            ).stdout
         )
 
     @cached_property
@@ -289,6 +317,37 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         """
         return self.documents(Workflow, ".github/workflows/*.y*ml")
 
+    def clone(self, folder: Path) -> Self:
+        """
+        Clones the checkout into the empty `folder` through `git clone
+        --shared`, then copies in every file `files` lists and removes
+        each file the clone holds that the checkout does not, so the clone
+        carries the checkout's uncommitted and untracked files.
+
+        Returns:
+            The checkout rooted at the clone.
+        """
+        self.run("git", "clone", "--quiet", "--shared", self.root, folder)
+        clone = type(self)(root=folder)
+        for path in set(clone.files) - set(files := self.files):
+            (clone.root / path).unlink()
+
+        self.copy(files, clone.root)
+        return clone
+
+    def copy(self, files: Iterable[Path], folder: Path):
+        """
+        Copies each of `files`, named relative to the root, to the same path
+        under `folder`, keeping each file's mode and a link as a link.
+        """
+        for path in files:
+            (folder / path).parent.mkdir(exist_ok=True, parents=True)
+            (self.root / path).copy(
+                folder / path,
+                follow_symlinks   = False,
+                preserve_metadata = True
+            )
+
     def documents[D: Document](self, kind: type[D], pattern: str) -> dict[Path, D]:
         """
         Validates each file under the root matching `pattern` as `kind`, by
@@ -322,6 +381,43 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Reads the text of the file at `path` under the root.
         """
         return (self.root / path).read_text(encoding="utf-8")
+
+    def run(
+        self,
+        *command : str | Path,
+        capture  : bool = False,
+        check    : bool = True,
+        folder   : Path = Path()
+    ) -> CompletedProcess[str]:
+        """
+        Runs `command` in `folder` under the root, with mise trusting the
+        root's configuration beside each one the environment already trusts,
+        and without the `VIRTUAL_ENV` a task's `uv run` sets for the clone
+        the task runs from, so uv reaches the root's own `.venv`.
+
+        Args:
+            capture : Whether the output is captured rather than printed.
+            check   : Whether a nonzero exit raises.
+            folder  : The folder to run in, relative to the root.
+
+        Raises:
+            CalledProcessError: Where `check` is set and the command exits
+                                nonzero.
+        """
+        trusted = pathsep.join(
+            filter(None, [environ.get("MISE_TRUSTED_CONFIG_PATHS"), str(self.root)])
+        )
+        return run(
+            command,
+            capture_output = capture,
+            check          = check,
+            cwd            = self.root / folder,
+            env            = {
+                name: value for name, value in environ.items() if name != "VIRTUAL_ENV"
+            }
+            | {"MISE_TRUSTED_CONFIG_PATHS": trusted},
+            text = True
+        )
 
     @staticmethod
     def shell(path: Path) -> str:

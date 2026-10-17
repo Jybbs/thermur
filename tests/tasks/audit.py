@@ -46,11 +46,14 @@ def audited(
 def test_a_broken_checkout_fails_naming_each_finding(
     audited  : Callable[[], tuple[int, list[str]]],
     checkout : Checkout,
+    pins     : dict[str, str],
     snapshot : SnapshotAssertion
 ):
     """
     Asserts that the audit exits `1` over a checkout breaking every check,
-    printing one annotation per finding in the order the checks run.
+    printing one annotation per finding in the order the checks run. Where a
+    finding names two pins, the case sets both, so the printed text names no
+    release a lift moves.
     """
     root   = checkout.root
     action = ".github/actions/provision/action.yml"
@@ -62,7 +65,12 @@ def test_a_broken_checkout_fails_naming_each_finding(
     (root / "LICENSE").write_text("BSD License\n")
     (root / "src/thermur").rename(root / "thermur")
     (root / "src/thermur").mkdir()
-    edit(checkout, "pyproject.toml", new='"hatchling>=1.32"', old='"hatchling==1.32.4"')
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = '"hatchling>=1"',
+        old = f'"hatchling=={pins["hatchling"]}"'
+    )
     edit(checkout, ".github/release.yml", new='["🐛 bug"]', old='["🐞 bug"]')
     edit(
         checkout,
@@ -79,8 +87,36 @@ def test_a_broken_checkout_fails_naming_each_finding(
             new = "",
             old = "    name    : 📡 Readout\n"
         )
-    edit(checkout, ".mise/tasks/gha/brief.py", new="==2.23.0", old="==2.24.0")
-    edit(checkout, "docs/package.json", new=': "5.0.2"', old=': "5.0.3"')
+    edit(
+        checkout,
+        ".mise/tasks/gha/brief.py",
+        new = "==0.0.1",
+        old = f"=={pins['minijinja']}"
+    )
+    edit(
+        checkout,
+        "uv.lock",
+        new = 'name = "minijinja"\nversion = "9.9.9"',
+        old = f'name = "minijinja"\nversion = "{pins["minijinja"]}"'
+    )
+    edit(
+        checkout,
+        "docs/package.json",
+        new = '"@vitest/coverage-v8" : "0.0.1"',
+        old = f'"@vitest/coverage-v8" : "{pins["vitest"]}"'
+    )
+    edit(
+        checkout,
+        "docs/package.json",
+        new = '"vitest"              : "0.0.2"',
+        old = f'"vitest"              : "{pins["vitest"]}"'
+    )
+    edit(
+        checkout,
+        action,
+        new = "actions/checkout@1f1f",
+        old = f"actions/checkout@{pins['checkout']}"
+    )
     edit(
         checkout,
         "docs/.vitepress/lib/rendered/identity.json",

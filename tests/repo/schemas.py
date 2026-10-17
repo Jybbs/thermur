@@ -12,8 +12,12 @@ Pins the records the `repo` tasks read and report:
 - The keys and values `GithubSettings` accepts, the calls `Toggles` writes,
   the checks a `Ruleset` requires and the call it writes, and the command
   and body each `Request` sends
+- The release a requirement pins, whether a `Lag` is major and the row and
+  files it names, what an `Edit` writes, the advisories an `Audit` clears,
+  and the packages a `Tree` finds
 """
 
+from datetime  import UTC, datetime
 from functools import reduce
 from json      import loads as from_json
 from packaging.requirements import Requirement
@@ -23,8 +27,10 @@ from pytest                 import Config, mark, param, raises
 from urllib.parse           import unquote
 
 from thermur.repo.schemas import (
+    Audit,
     Author,
     Document,
+    Edit,
     Finding,
     GithubSettings,
     Guide,
@@ -32,6 +38,7 @@ from thermur.repo.schemas import (
     Job,
     Label,
     Labels,
+    Lag,
     Level,
     Lock,
     Manifest,
@@ -42,8 +49,10 @@ from thermur.repo.schemas import (
     Task,
     Template,
     Toggles,
+    Tree,
     Trigger,
-    Workflow
+    Workflow,
+    read_pin
 )
 
 ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
@@ -487,13 +496,35 @@ def test_a_label_writes_the_command_that_creates_or_updates_it():
     ]
 
 
-def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+def test_a_lag_names_the_files_its_edits_reach_or_the_lock():
     """
-    Asserts that a Markdown file whose text opens on anything but front
-    matter fails to read rather than reading as an empty document.
+    Asserts that a lag names each file its edits reach once, in the order of
+    its edits, and `uv.lock` where it carries no edit.
     """
-    with raises(ValueError, match="opens on no front matter"):
-        Document.load(".md", "name: Bug\n---\n")
+    edits = tuple(
+        Edit(
+            ahead   = "@",
+            current = "a",
+            file    = Path(file),
+            newest  = "b"
+        )
+        for file in ("ci.yml", "pages.yml", "ci.yml")
+    )
+
+    assert (
+        Lag(
+            current = "a",
+            edits   = edits,
+            newest  = "b",
+            pin     = "p"
+        ).files,
+        Lag(
+            current  = "1",
+            newest   = "2",
+            pin      = "p",
+            upgraded = True
+        ).files
+    ) == ([Path("ci.yml"), Path("pages.yml")], [Path("uv.lock")])
 
 
 @mark.parametrize(
@@ -605,30 +636,13 @@ def test_a_malformed_registry_fails_at_the_key_it_breaks(
     assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == errors
 
 
-def test_a_required_check_naming_no_app_sends_no_app():
+def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
     """
-    Asserts that a required check naming no `integration_id` is sent without
-    one rather than as `null`, which the rulesets API reads as no integer,
-    so the body matches the ruleset as written key for key.
+    Asserts that a Markdown file whose text opens on anything but front
+    matter fails to read rather than reading as an empty document.
     """
-    written = {
-        "enforcement"   : "active",
-        "name"          : "a",
-        "target"        : "branch",
-        "bypass_actors" : [],
-        "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
-        "rules"         : [
-            {
-                "type"       : "required_status_checks",
-                "parameters" : {
-                    "strict_required_status_checks_policy" : True,
-                    "required_status_checks"               : [{"context": "c"}]
-                }
-            }
-        ]
-    }
-
-    assert Ruleset.model_validate(written).request(None).body == written
+    with raises(ValueError, match="opens on no front matter"):
+        Document.load(".md", "name: Bug\n---\n")
 
 
 @mark.parametrize(
@@ -705,16 +719,30 @@ def test_a_document_reads_the_value_its_suffix_names(
     assert Document.load(suffix, text) == value
 
 
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+def test_a_required_check_naming_no_app_sends_no_app():
     """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
+    Asserts that a required check naming no `integration_id` is sent without
+    one rather than as `null`, which the rulesets API reads as no integer,
+    so the body matches the ruleset as written key for key.
     """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
+    written = {
+        "enforcement"   : "active",
+        "name"          : "a",
+        "target"        : "branch",
+        "bypass_actors" : [],
+        "conditions"    : {"ref_name": {"exclude": [], "include": ["refs/heads/a"]}},
+        "rules"         : [
+            {
+                "type"       : "required_status_checks",
+                "parameters" : {
+                    "strict_required_status_checks_policy" : True,
+                    "required_status_checks"               : [{"context": "c"}]
+                }
+            }
+        ]
+    }
 
-    assert step.env == {"RETRIES": 3}
+    assert Ruleset.model_validate(written).request(None).body == written
 
 
 @mark.parametrize(
@@ -738,27 +766,16 @@ def test_a_template_reads_its_labels_from_a_list_or_one_string(
     assert Template.model_validate({"labels": labels}).labels == names
 
 
-def test_a_toggle_turns_its_endpoint_on_or_off():
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
     """
-    Asserts that each toggle reads as the endpoint it names, which `PUT`
-    turns on and `DELETE` turns off, in the order the record declares its
-    fields whatever order the table lists them in.
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
     """
-    toggles = Toggles.model_validate(
-        {
-            "automated-security-fixes"        : False,
-            "immutable-releases"              : True,
-            "private-vulnerability-reporting" : True,
-            "vulnerability-alerts"            : False
-        }
-    )
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
 
-    assert [(call.method, call.endpoint) for call in toggles.requests] == [
-        ("DELETE", "automated-security-fixes"),
-        ("PUT", "immutable-releases"),
-        ("PUT", "private-vulnerability-reporting"),
-        ("DELETE", "vulnerability-alerts")
-    ]
+    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -831,6 +848,29 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
+def test_a_toggle_turns_its_endpoint_on_or_off():
+    """
+    Asserts that each toggle reads as the endpoint it names, which `PUT`
+    turns on and `DELETE` turns off, in the order the record declares its
+    fields whatever order the table lists them in.
+    """
+    toggles = Toggles.model_validate(
+        {
+            "automated-security-fixes"        : False,
+            "immutable-releases"              : True,
+            "private-vulnerability-reporting" : True,
+            "vulnerability-alerts"            : False
+        }
+    )
+
+    assert [(call.method, call.endpoint) for call in toggles.requests] == [
+        ("DELETE", "automated-security-fixes"),
+        ("PUT", "immutable-releases"),
+        ("PUT", "private-vulnerability-reporting"),
+        ("DELETE", "vulnerability-alerts")
+    ]
+
+
 def test_a_toml_task_declares_no_requirements(tmp_path: Path):
     """
     Asserts that a task declared in TOML, which holds no file of its own,
@@ -844,40 +884,43 @@ def test_a_toml_task_declares_no_requirements(tmp_path: Path):
     ).dependencies == []
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that a tree keeps each package it resolves under its normalized
+    name, leaving out the script it is rooted at, and that each reads its
+    earliest upload across its source distribution and wheels, or none.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
-
-    assert finding.annotation == "::warning file=a.toml::m"
-
-
-def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
-    """
-    Asserts that a workflow reads the job under the key `gate`, the jobs
-    it waits for, the check run and the task of each row of each job, and
-    whether a step passes a composite action `save: 'true'`.
-    """
-    text = (
-        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
-        "          - task: lock:check\n    steps:\n"
-        "      - uses: $/a\n        with: { save: 'true' }\n"
-        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
-        "        include:\n          - task: py:check\n"
-        "  gate:\n    runs-on: x\n"
+    tree = Tree.model_validate(
+        {
+            "resolution": {
+                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
+                "pydantic-core" : {
+                    "kind"    : "package",
+                    "name"    : "pydantic_core",
+                    "version" : "2.50.1",
+                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
+                    "wheels"  : [
+                        {"upload_time": "2026-10-11T18:33:07.153Z"},
+                        {"upload_time": None}
+                    ]
+                },
+                "script"        : {"kind": "script"}
+            }
+        }
     )
-    read = workflow(text)
 
-    assert (
-        read.gate.image,
-        list(read.gated),
-        read.checks,
-        read.saves("$/a"),
-        read.saves("$/b")
-    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
-    assert workflow(WORKFLOW).gate is None
+    assert sorted(tree.packages) == ["bare", "pydantic-core"]
+    assert tree.package("Pydantic.Core").uploaded == datetime(
+        2026,
+        10,
+        11,
+        18,
+        33,
+        7,
+        153000,
+        tzinfo = UTC
+    )
+    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize(
@@ -1000,16 +1043,14 @@ def test_a_request_sends_its_body_on_standard_input(
     assert (call.command, call.payload) == (command, payload)
 
 
-def test_the_lock_maps_each_package_to_its_version():
+def test_a_warning_prints_as_a_warning_annotation():
     """
-    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
-    name mapped to the version it resolves.
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
     """
-    rows = {
-        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
-    }
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
 
-    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
+    assert finding.annotation == "::warning file=a.toml::m"
 
 
 @mark.parametrize(
@@ -1058,11 +1099,30 @@ def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
     )
 
 
-def workflow(text: str) -> Workflow:
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
     """
-    Validates `text` as a workflow file's YAML.
+    Asserts that a workflow reads the job under the key `gate`, the jobs
+    it waits for, the check run and the task of each row of each job, and
+    whether a step passes a composite action `save: 'true'`.
     """
-    return Workflow.model_validate(text, context={"suffix": ".yml"})
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
+        "        include:\n          - task: py:check\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
+
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.checks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
+    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize(
@@ -1127,3 +1187,175 @@ def test_the_homepage_reads_as_github_shows_it(
         "description" : manifest.description,
         "homepage"    : address
     }
+
+
+@mark.parametrize(
+    ("requirement", "pin"),
+    [
+        param("hatchling==1.32.4", "1.32.4", id="exact"),
+        param("hatchling>=1.32", None, id="floor"),
+        param("hatchling==1.*", None, id="wildcard"),
+        param("hatchling==1.32.4,<2", None, id="range"),
+        param("hatchling", None, id="bare")
+    ]
+)
+def test_a_requirement_pins_a_release_only_through_one_exact_specifier(
+    requirement : str,
+    pin         : str | None
+):
+    """
+    Asserts that a requirement reads as the release it pins only where a
+    single `==` specifier carrying no wildcard names it, and as no pin where
+    it names a range or nothing at all.
+    """
+    assert read_pin(Requirement(requirement)) == pin
+
+
+@mark.parametrize(
+    ("current", "newest", "major"),
+    [
+        param("0.33.1", "0.34.0", True, id="zero-major-minor"),
+        param("2026.7.0", "2026.9.0", False, id="calendar"),
+        param("3.14.8", "3.15.0", False, id="minor"),
+        param("2.24.0", "3.0.1", True, id="major"),
+        param("v5.0.1", "v5.2.0", False, id="tagged"),
+        param("0.0.3", "0.0.4", True, id="zero-zero-patch"),
+        param("2.0.0-alpha.20", "2.0.0", False, id="prerelease"),
+        param("26.11.1", "27", True, id="shorter")
+    ]
+)
+def test_a_lift_is_major_where_it_changes_the_left_most_non_zero_part(
+    current : str,
+    major   : bool,
+    newest  : str
+):
+    """
+    Asserts that a lift counts as major exactly where it changes the
+    left-most non-zero part of the release, read past a leading `v` and a
+    prerelease suffix.
+    """
+    assert Lag(current=current, newest=newest, pin="p").major is major
+
+
+def test_an_edit_naming_a_prefix_of_a_longer_release_fails(tmp_path: Path):
+    """
+    Asserts that an edit whose release only opens a longer one the file
+    names, `1.2.3` against `1.2.34`, rewrites nothing and fails naming the
+    file, so a lift never lands half a release.
+    """
+    (tmp_path / "pyproject.toml").write_text('requires = ["hatchling==1.2.34"]\n')
+
+    with raises(ValueError, match="`pyproject.toml` names no `1.2.3` to lift"):
+        Edit(
+            ahead   = '"hatchling==',
+            current = "1.2.3",
+            file    = Path("pyproject.toml"),
+            newest  = "1.3.0"
+        ).write(tmp_path)
+
+    assert "1.2.34" in (tmp_path / "pyproject.toml").read_text()
+
+
+@mark.parametrize(
+    ("published", "row"),
+    [
+        param(
+            "2026-10-01T12:00:00Z",
+            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes | 14 | GHSA-1, GHSA-2 |",
+            id = "dated"
+        ),
+        param(
+            None,
+            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes |  | GHSA-1, GHSA-2 |",
+            id = "undated"
+        )
+    ]
+)
+def test_a_lag_writes_its_row_counting_whole_days(published: str | None, row: str):
+    """
+    Asserts that a lag's row counts its newest release's age in whole days
+    up to the instant given, leaving the cell empty where no date is known.
+    """
+    lag = Lag(
+        advisories = ("GHSA-1", "GHSA-2"),
+        current    = "0.12.22",
+        newest     = "0.13.1",
+        pin        = "uv",
+        published  = published,
+        upgraded   = True
+    )
+
+    assert lag.row(datetime(2026, 10, 16, 11, tzinfo=UTC)) == row
+
+
+def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Path):
+    """
+    Asserts that an edit rewrites the release only on the line whose opening
+    its pattern matches, `^` matching at each line, and leaves every other
+    line naming the same release as it stood.
+    """
+    (tmp_path / "config.toml").write_text('bun  = "1.4.3"\nnode = "1.4.3"\n')
+
+    Edit(
+        ahead   = r'^bun\s*=\s*"',
+        current = "1.4.3",
+        file    = Path("config.toml"),
+        newest  = "1.4.4"
+    ).write(tmp_path)
+
+    assert (tmp_path / "config.toml").read_text() == 'bun  = "1.4.4"\nnode = "1.4.3"\n'
+
+
+def test_the_lock_maps_each_package_to_its_version():
+    """
+    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
+    name mapped to the version it resolves.
+    """
+    rows = {
+        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
+    }
+
+    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
+
+
+@mark.parametrize(
+    ("name", "current", "newest", "cleared"),
+    [
+        param("urllib3", "2.2.1", "2.6.3", ("GHSA-a",), id="fixed-within"),
+        param("URLLib3", "2.2.1", "2.6.3", ("GHSA-a",), id="spelled-otherwise"),
+        param("urllib3", "2.2.1", "2.2.1.post1", (), id="fix-past-newest"),
+        param("urllib3", "2.2.0", "2.6.3", (), id="other-release"),
+        param("requests", "2.2.1", "2.6.3", (), id="other-package")
+    ]
+)
+def test_an_audit_clears_each_advisory_a_release_up_to_the_newest_fixes(
+    cleared : tuple[str, ...],
+    current : str,
+    name    : str,
+    newest  : str
+):
+    """
+    Asserts that an audit clears an advisory on the package at the release
+    the lift moves from, under any spelling of its name, only where one of
+    its fixes falls above that release and no later than the newest.
+    """
+    audit = Audit.model_validate(
+        {
+            "vulnerabilities": [
+                {
+                    "id"           : "GHSA-a",
+                    "dependency"   : {"name": "urllib3", "version": "2.2.1"},
+                    "fix_versions" : ["1.26.19", "2.2.2"]
+                }
+            ]
+        }
+    )
+
+    assert audit.clears(current, name, newest) == cleared
+
+
+def workflow(text: str) -> Workflow:
+    """
+    Validates `text` as a workflow file's YAML.
+    """
+    return Workflow.model_validate(text, context={"suffix": ".yml"})
