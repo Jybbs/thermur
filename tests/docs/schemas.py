@@ -131,7 +131,8 @@ def test_a_preprint_in_the_arxiv_export_shape_cites_its_identifier(
     study = read(
         text = """@misc{metz2021,
     title         = {Gradients are Not All You Need},
-    author        = {Metz, Luke and Freeman, C. Daniel and Kachman, Tal},
+    author        = {Luke Metz and C. Daniel Freeman and Samuel S. Schoenholz and
+                     Tal Kachman},
     year          = {2021},
     eprint        = {2111.05803},
     archivePrefix = {arXiv},
