@@ -1219,6 +1219,7 @@ def test_a_requirement_pins_a_release_only_through_one_exact_specifier(
         param("3.14.8", "3.15.0", False, id="minor"),
         param("2.24.0", "3.0.1", True, id="major"),
         param("v5.0.1", "v5.2.0", False, id="tagged"),
+        param("v5.0.1", "v6.0.0", True, id="tagged-major"),
         param("0.0.3", "0.0.4", True, id="zero-zero-patch"),
         param("2.0.0-alpha.20", "2.0.0", False, id="prerelease"),
         param("26.11.1", "27", True, id="shorter")
@@ -1323,6 +1324,13 @@ def test_the_lock_maps_each_package_to_its_version():
     [
         param("urllib3", "2.2.1", "2.6.3", ("GHSA-a",), id="fixed-within"),
         param("URLLib3", "2.2.1", "2.6.3", ("GHSA-a",), id="spelled-otherwise"),
+        param(
+            "urllib3",
+            "2.2.1.0",
+            "2.6.3",
+            ("GHSA-a",),
+            id = "release-spelled-otherwise"
+        ),
         param("urllib3", "2.2.1", "2.2.1.post1", (), id="fix-past-newest"),
         param("urllib3", "2.2.0", "2.6.3", (), id="other-release"),
         param("requests", "2.2.1", "2.6.3", (), id="other-package")
@@ -1336,8 +1344,9 @@ def test_an_audit_clears_each_advisory_a_release_up_to_the_newest_fixes(
 ):
     """
     Asserts that an audit clears an advisory on the package at the release
-    the lift moves from, under any spelling of its name, only where one of
-    its fixes falls above that release and no later than the newest.
+    the lift moves from, under any spelling of its name or of that release,
+    only where one of its fixes falls above that release and no later than
+    the newest.
     """
     audit = Audit.model_validate(
         {

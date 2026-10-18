@@ -133,10 +133,11 @@ def pins(pytestconfig: Config) -> dict[str, str]:
     `lock:lift` moves.
 
     Returns:
-        The `actions/checkout` commit, the `minijinja` release `uv.lock`
-        resolves, the `node` major, `python`, and `uv` mise pins, the
-        `@types/node` and `vitest` releases the site pins, and each build
-        requirement and constraint, by its package's name.
+        The `actions/checkout` commit, the minor `requires-python` sets as
+        the floor, the `minijinja` release `uv.lock` resolves, the `node`
+        major, `python`, and `uv` mise pins, the `@types/node` and `vitest`
+        releases the site pins, and each build requirement and constraint,
+        by its package's name.
     """
     worktree = Checkout(root=pytestconfig.rootpath)
     manifest = worktree.manifest
@@ -146,6 +147,7 @@ def pins(pytestconfig: Config) -> dict[str, str]:
         "checkout"  : dict(step.pin for _, step in worktree.steps if step.pin)[
             "actions/checkout"
         ],
+        "floor"     : manifest.floor,
         "minijinja" : worktree.lock.versions["minijinja"],
         "node"      : worktree.config.node,
         "python"    : tools["python"],

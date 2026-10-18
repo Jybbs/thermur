@@ -230,6 +230,7 @@ def test_builds_reads_each_build_pin_against_unpinned_hatchling(
         ("pluggy", pins["pluggy"], "9.9.9", datetime(2026, 10, 15, tzinfo=UTC))
     ]
     assert '# dependencies    = ["hatchling"]' in resolved.read_text()
+    assert f'# requires-python = ">={checkout.manifest.floor}"' in resolved.read_text()
     assert "pluggy==9.9.9" in map(str, Manifest.read(checkout.root).constraints)
 
 
@@ -366,7 +367,7 @@ def test_scripts_reads_each_exact_pin_a_task_script_declares(
     answer(
         "uv",
         answers = {
-            '"audit "*'              : printed(audit),
+            '"audit "*"--script "*'  : printed(audit),
             '"tree "*"--outdated"*'  : printed(outdated),
             '"tree "*"--no-locked"*' : printed(resolved)
         }
@@ -724,8 +725,8 @@ def test_tools_reads_each_tool_mise_reports_newer_and_the_floor(
         "mise",
         answers = {
             '"tasks "*': f'exec {quote(which("mise"))} "$@"',
-            '"outdated --bump --json --local"'         : printed(tools),
-            '"outdated --bump --json aqua:jdx/mise@"*' : printed(floored),
+            '"outdated --bump --json --local"': printed(tools),
+            f'"outdated --bump --json aqua:jdx/mise@{config.floor}"': printed(floored),
             f'"ls-remote --json {lychee}@"*'     : printed([{"version": "9.9.9"}]),
             '"ls-remote --json python@"*'        : printed([{"version": "3.99.0"}]),
             '"ls-remote --json uv@"*'            : printed(uv),
@@ -758,19 +759,25 @@ def test_tools_reads_each_tool_mise_reports_newer_and_the_floor(
 
 
 @mark.parametrize(
-    ("status", "raised"),
-    [param(1, False, id="advisory"), param(2, True, id="unreachable")]
+    ("reported", "status", "raised"),
+    [
+        param(True, 1, False, id="advisory"),
+        param(True, 2, True, id="unreachable"),
+        param(False, 1, True, id="stale")
+    ]
 )
 def test_the_audit_reads_what_uv_reports_on_an_advisory_and_raises_past_it(
     answer   : Callable[..., StandIn],
     checkout : Checkout,
     raised   : bool,
+    reported : bool,
     status   : int
 ):
     """
     Asserts that a manager reads the advisories `uv audit` prints where
     it exits `1` on finding one, and raises where it exits with any other
-    failing status, as it does where OSV cannot be reached.
+    failing status or prints no report, as it does where OSV cannot be
+    reached or the lockfile is stale.
     """
     audit = {
         "vulnerabilities": [
@@ -781,7 +788,12 @@ def test_the_audit_reads_what_uv_reports_on_an_advisory_and_raises_past_it(
             }
         ]
     }
-    answer("uv", answers={'"audit "*': f"{printed(audit)}; exit {status}"})
+    answer(
+        "uv",
+        answers = {
+            '"audit "*': f"{printed(audit) if reported else 'true'}; exit {status}"
+        }
+    )
 
     with raises(CalledProcessError) if raised else nullcontext():
         assert Manager(checkout=checkout).audit().clears("1.0.0", "alpha", "1.1.0") == (

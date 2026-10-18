@@ -1813,7 +1813,7 @@ class Resolution(
     latest: str | None = Field(None, validation_alias="latest_version")
     """
     The newest release on the index, which `uv tree --outdated` reports, or
-    `None` where it is not asked.
+    `None` where it is not asked or the release uv resolves is the newest.
     """
 
     uploads: list[datetime] = []
@@ -1937,7 +1937,7 @@ class Audit(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=Tru
             vulnerability.id
             for vulnerability in self.vulnerabilities
             if canonicalize_name(vulnerability.name) == canonicalize_name(name)
-            and vulnerability.version                == current
+            and Version(vulnerability.version)       == Version(current)
             and any(
                 Version(current) < Version(fix) <= Version(newest)
                 for fix in vulnerability.fixes

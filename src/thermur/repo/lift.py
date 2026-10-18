@@ -69,8 +69,8 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         pin at a time.
 
         Returns:
-            The first such pin whose hold lets the rest of the lift pass
-            `mise ci`, or `None` where no single one does.
+            The first such pin whose hold lets the rest of the lift pass its
+            trial, or `None` where no single one does.
         """
         return next(
             (
@@ -181,9 +181,9 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         uv prints whether it exits `0` or, on finding an advisory, `1`.
 
         Raises:
-            CalledProcessError: Where `uv audit` exits with any other
-                                status, as it does where OSV cannot be
-                                reached.
+            CalledProcessError: Where `uv audit` prints no report, as it
+                                does where OSV cannot be reached or the
+                                lockfile is stale.
         """
         audited = self.checkout.run(
             "uv",
@@ -196,7 +196,7 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             capture = True,
             check   = False
         )
-        if audited.returncode > 1:
+        if audited.returncode > 1 or not audited.stdout:
             audited.check_returncode()
 
         return Audit.model_validate_json(audited.stdout)

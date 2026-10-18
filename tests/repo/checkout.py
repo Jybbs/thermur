@@ -66,19 +66,38 @@ def test_commit_reads_the_commit_checked_out(clone: Checkout):
     ).removesuffix("\n")
 
 
+def test_copy_writes_a_link_as_a_link_over_what_the_folder_holds(
+    checkout         : Checkout,
+    tmp_path_factory : TempPathFactory
+):
+    """
+    Asserts that copying a link into a folder already holding a link at its
+    path leaves the copied link there rather than raising.
+    """
+    (checkout.root / "linked.md").symlink_to("README.md")
+    folder = tmp_path_factory.mktemp("copied")
+    (folder / "linked.md").symlink_to("LICENSE")
+
+    checkout.copy([Path("linked.md")], folder)
+
+    assert (folder / "linked.md").readlink() == Path("README.md")
+
+
 def test_files_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
     """
     Asserts that the files a checkout lists take in an untracked file and
-    leave out one its `.gitignore` covers and a tracked one removed from
-    the disk.
+    one whose name git quotes, and leave out one its `.gitignore` covers and
+    a tracked one removed from the disk.
     """
     append(clone, "notes.md", "An untracked note.\n")
+    append(clone, "café.md", "A note whose name git quotes.\n")
     append(clone, ".env", "IGNORED=1\n")
     (clone.root / "LICENSE").unlink()
 
     files = clone.files
 
     assert Path("notes.md") in files
+    assert Path("café.md") in files
     assert Path(".env") not in files
     assert Path("LICENSE") not in files
 

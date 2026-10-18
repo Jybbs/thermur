@@ -69,7 +69,7 @@ def lifted(
         param(
             {"usage_try": "true", "usage_write": "true"},
             BREAKING,
-            "The lift fails `mise ci`, and holding back `uv` lets the rest pass it",
+            "The lift fails its trial, and holding back `uv` lets the rest pass it",
             True,
             False,
             id = "isolated"
@@ -77,7 +77,7 @@ def lifted(
         param(
             {"usage_try": "true"},
             '[ "$*" = "run ci" ] && exit 1\nexit 0',
-            "The lift fails `mise ci`, and holding back no single major lift lets "
+            "The lift fails its trial, and holding back no single major lift lets "
             "the rest pass it",
             True,
             False,

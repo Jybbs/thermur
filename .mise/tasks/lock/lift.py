@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --exact --locked
 # MISE alias       = "lift"
 # MISE description = "Report each lagging pin, then try or write the lift"
-# USAGE flag "--hold <pin>" var=#true help="Hold back the pin a row names <pin>"
+# USAGE flag "--hold <pin>" var=#true help="Hold back <pin>, given once for each pin"
 # USAGE flag "--try" help="Try the lift in a scratch clone through `mise ci`"
 # USAGE flag "--write" help="Write the lift into the checkout once any trial passes"
 """
@@ -24,9 +24,10 @@ from thermur.repo.schemas  import join_names
 def main():
     """
     Prints the table, then exits with status `2` where a hold names no row
-    of it. Under `--try`, it exits with status `1` where the lift fails
-    `mise ci`, naming the pin a major lift moves whose hold lets the rest
-    pass. Under `--write`, it then writes the lift into the checkout.
+    of it. Under `--try`, it exits with status `1` where the trial fails,
+    meaning a command of the write, `uv sync`, or `mise ci` exits nonzero in
+    the scratch clone, naming the pin a major lift moves whose hold lets the
+    rest pass. Under `--write`, it then writes the lift into the checkout.
     """
     lift = Lift(checkout=Checkout(), holds=tuple(environ.get("usage_hold", "").split()))
     print(lift.table(datetime.now(UTC)), flush=True)
@@ -41,7 +42,7 @@ def main():
     if environ.get("usage_try") == "true" and not lift.passes():
         held = lift.isolate()
         raise SystemExit(
-            "The lift fails `mise ci`, "
+            "The lift fails its trial, "
             + (
                 f"and holding back `{held}` lets the rest pass it"
                 if held

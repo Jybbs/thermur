@@ -144,8 +144,9 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
                     "--cached",
                     "--exclude-standard",
                     "--others",
+                    "-z",
                     capture = True
-                ).stdout.splitlines()
+                ).stdout.split("\0")[:-1]
             )
             if (self.root / path).exists(follow_symlinks=False)
         ]
@@ -338,10 +339,12 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     def copy(self, files: Iterable[Path], folder: Path):
         """
         Copies each of `files`, named relative to the root, to the same path
-        under `folder`, keeping each file's mode and a link as a link.
+        under `folder` in place of whatever that path holds, keeping each
+        file's mode and a link as a link.
         """
         for path in files:
             (folder / path).parent.mkdir(exist_ok=True, parents=True)
+            (folder / path).unlink(missing_ok=True)
             (self.root / path).copy(
                 folder / path,
                 follow_symlinks   = False,

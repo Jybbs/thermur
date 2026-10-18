@@ -164,13 +164,19 @@ def test_a_clean_checkout_passes_printing_nothing(
 
 def test_a_document_failing_validation_prints_each_error_once(
     audited  : Callable[[], tuple[int, list[str]]],
-    checkout : Checkout
+    checkout : Checkout,
+    pins     : dict[str, str]
 ):
     """
     Asserts that a manifest missing a field, which every check reading the
     manifest reports, fails the audit with one annotation for that field.
     """
-    edit(checkout, "pyproject.toml", new="", old='requires-python = ">=3.14"\n')
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = "",
+        old = f'requires-python = ">={pins["floor"]}"\n'
+    )
 
     assert audited() == (
         1,

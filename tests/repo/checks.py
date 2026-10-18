@@ -41,7 +41,7 @@ ACTION = ".github/actions/provision/action.yml"
 BRIEF  = ".mise/tasks/gha/brief.py"
 CI     = ".github/workflows/ci.yml"
 DRAFT  = ".github/workflows/draft.yml"
-FLOOR  = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
+FLOOR  = "the floor of `requires-python` in `pyproject.toml` reads `{floor}`"
 MAIN   = ".github/rulesets/main.json"
 SHELL  = "#!/usr/bin/env -S bash -euo pipefail\n"
 SITE   = ".github/workflows/site.yml"
@@ -92,21 +92,21 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
     [
         param(
             "README.md",
-            "python-3.14+",
+            "python-{floor}+",
             "python-3.13+",
             f"The Python badge in `README.md` reads `3.13`, where {FLOOR}",
             id = "python-badge"
         ),
         param(
             "README.md",
-            "badge/python-3.14+",
+            "badge/python-{floor}+",
             "badge/py-3.14+",
             f"The Python badge in `README.md` is missing, where {FLOOR}",
             id = "python-badge-missing"
         ),
         param(
             "pyproject.toml",
-            'target-version = "3.14"',
+            'target-version = "{floor}"',
             'target-version = "3.13"',
             f"The `target-version` in `[tool.prose]` reads `3.13`, where {FLOOR}",
             id = "target-version"
@@ -490,7 +490,7 @@ def test_a_build_requirement_naming_a_range_is_named(
     [
         param(
             "pyproject.toml",
-            'requires-python = ">=3.14"\n',
+            'requires-python = ">={floor}"\n',
             "",
             ["`project.requires-python` in `pyproject.toml`: Field required"],
             id = "missing-field"
@@ -498,7 +498,7 @@ def test_a_build_requirement_naming_a_range_is_named(
         param(
             "pyproject.toml",
             'license         = "MIT"\nname            = "thermur"\n'
-            'readme          = "README.md"\nrequires-python = ">=3.14"\n',
+            'readme          = "README.md"\nrequires-python = ">={floor}"\n',
             'name            = "thermur"\n',
             [
                 "`project.requires-python` in `pyproject.toml`: Field required",
@@ -1405,8 +1405,8 @@ def test_a_file_disagreeing_with_the_label_registry_is_named(
     ("old", "new", "files"),
     [
         param(
-            '">=3.14"',
-            '">=3.15"',
+            '">={floor}"',
+            '">=3.99"',
             ["README.md", "pyproject.toml", ".mise/config.toml"],
             id = "python-floor"
         ),
@@ -1422,14 +1422,15 @@ def test_a_moved_manifest_declaration_names_every_copy(
     checkout : Checkout,
     old      : str,
     new      : str,
-    files    : list[str]
+    files    : list[str],
+    pins     : dict[str, str]
 ):
     """
     Asserts that raising `requires-python` names the README's badge, the
     formatter's `target-version`, and the minor mise pins, and that moving
     `[project].version` names `CITATION.cff`, each against the new value.
     """
-    edit(checkout, "pyproject.toml", new=new, old=old)
+    edit(checkout, "pyproject.toml", new=new, old=old.format_map(pins))
 
     assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
         Path(file) for file in files
