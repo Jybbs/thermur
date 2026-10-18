@@ -181,9 +181,9 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         uv prints whether it exits `0` or, on finding an advisory, `1`.
 
         Raises:
-            CalledProcessError: Where `uv audit` prints no report, as it
-                                does where OSV cannot be reached or the
-                                lockfile is stale.
+            CalledProcessError: Where `uv audit` exits above `1`, or exits
+                                `1` printing no report, as it does where OSV
+                                cannot be reached or the lockfile is stale.
         """
         audited = self.checkout.run(
             "uv",
