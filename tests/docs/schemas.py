@@ -119,18 +119,24 @@ def test_a_block_the_parser_cannot_read_is_named_by_its_line(
         read(text=f"{entry}\n{entry}")
 
 
-def test_a_preprint_names_its_archive_and_identifier(read: Callable[..., Bibliography]):
+def test_a_preprint_in_the_arxiv_export_shape_cites_its_identifier(
+    read: Callable[..., Bibliography]
+):
     """
-    Asserts that a `@misc` entry naming an archive reads as a preprint
-    there, its identifier in place of a journal's volume and pages.
+    Asserts that a `@misc` entry carrying the fields arXiv's BibTeX export
+    writes, in its casing, reads as a preprint whose definition gives the
+    identifier and category an arXiv abstract page cites it by, in place of
+    a journal's volume and pages.
     """
     study = read(
         text = """@misc{metz2021,
-    author        = {Metz, Luke and Freeman, C. Daniel and Kachman, Tal},
     title         = {Gradients are Not All You Need},
+    author        = {Metz, Luke and Freeman, C. Daniel and Kachman, Tal},
     year          = {2021},
-    archiveprefix = {arXiv},
     eprint        = {2111.05803},
+    archivePrefix = {arXiv},
+    primaryClass  = {cs.LG},
+    url           = {https://arxiv.org/abs/2111.05803},
     doi           = {10.48550/arXiv.2111.05803},
     priority      = {prio3},
     annote        = {What the report argues.}
@@ -141,7 +147,7 @@ def test_a_preprint_names_its_archive_and_identifier(read: Callable[..., Bibliog
     assert isinstance(study, Preprint)
     assert study.definition == (
         '[^metz2021]: Metz et al. 2021. "Gradients are Not All You Need." '
-        "arXiv preprint 2111.05803. <https://doi.org/10.48550/arXiv.2111.05803>"
+        "arXiv:2111.05803 [cs.LG]. <https://doi.org/10.48550/arXiv.2111.05803>"
     )
 
 

@@ -192,19 +192,19 @@ class Article(Study):
 
 class Preprint(Study):
     """
-    A study an archive posted ahead of any review, as a `@misc` entry naming
-    the archive and its identifier there, the shape arXiv's own export
-    writes.
+    A study an archive posted with no peer-reviewed version, as the `@misc`
+    entry arXiv's BibTeX export writes, naming the archive, the study's
+    identifier there, and its primary category.
     """
 
     archiveprefix: str
     """
-    The archive that posted the study, such as arXiv or bioRxiv.
+    The archive that posted the study, such as arXiv.
     """
 
     eprint: str
     """
-    The study's identifier in that archive.
+    The study's identifier in that archive, without a version.
     """
 
     kind: Literal["misc"]
@@ -212,13 +212,19 @@ class Preprint(Study):
     The entry's type.
     """
 
+    primaryclass: str
+    """
+    The archive's category the study is filed under first, such as `cs.LG`.
+    """
+
     @property
     def venue(self) -> str:
         """
-        Names the archive, marks the study as a preprint, and gives its
-        identifier there.
+        Names the study by its identifier and category in the
+        form an arXiv abstract page gives under `Cite as`, such as
+        `arXiv:2111.05803 [cs.LG]`.
         """
-        return f"{self.archiveprefix} preprint {self.eprint}"
+        return f"{self.archiveprefix}:{self.eprint} [{self.primaryclass}]"
 
 
 class Bibliography(Document, extra="forbid", title="docs/references.bib"):
