@@ -3,10 +3,13 @@
 # MISE description = "Run each row's task once `mise doctor project` passes"
 """
 Runs `mise doctor project` and then every task the rows of the pull-request
-workflows under `.github/workflows/` run, as the `repo:ci` task, so a laptop
-runs what each row runs on a pull request. The tasks run under `--force`,
-because the run establishes a verdict, and a task whose `sources` look
-current would otherwise pass without running.
+workflows under `.github/workflows/` run, as the `repo:ci` task, so a
+laptop runs what each row runs on a pull request. The tasks run under
+`--force`, because the run establishes a verdict, and a task whose
+`sources` look current would otherwise pass without running. They run under
+`--continue-on-error` as well, so mise waits for every task to finish and
+report before it exits, rather than stopping the rest at the first failure
+while a program one of them started keeps running.
 """
 
 from subprocess import run
@@ -24,7 +27,9 @@ def main():
         raise SystemExit(doctor)
 
     tasks = " ::: ".join(Checkout().rows).split()
-    raise SystemExit(run(["mise", "run", "--force", *tasks]).returncode)
+    raise SystemExit(
+        run(["mise", "run", "--continue-on-error", "--force", *tasks]).returncode
+    )
 
 
 if __name__ == "__main__":

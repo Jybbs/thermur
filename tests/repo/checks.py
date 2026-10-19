@@ -2,6 +2,8 @@
 Pins what each check `repo:audit` runs reports over a copy of the checkout,
 nothing for the copy as it stands and one finding for each way a case breaks
 it, the label registry's agreement with each file naming a label among them.
+A case naming a pin reads its release through the `pins` fixture, so a lift
+leaves every case as it stands.
 """
 
 from common.edits import append, edit, task
@@ -39,7 +41,7 @@ ACTION = ".github/actions/provision/action.yml"
 BRIEF  = ".mise/tasks/gha/brief.py"
 CI     = ".github/workflows/ci.yml"
 DRAFT  = ".github/workflows/draft.yml"
-FLOOR  = "the floor of `requires-python` in `pyproject.toml` reads `3.14`"
+FLOOR  = "the floor of `requires-python` in `pyproject.toml` reads `{floor}`"
 MAIN   = ".github/rulesets/main.json"
 SHELL  = "#!/usr/bin/env -S bash -euo pipefail\n"
 SITE   = ".github/workflows/site.yml"
@@ -90,40 +92,40 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
     [
         param(
             "README.md",
-            "python-3.14+",
+            "python-{floor}+",
             "python-3.13+",
             f"The Python badge in `README.md` reads `3.13`, where {FLOOR}",
             id = "python-badge"
         ),
         param(
             "README.md",
-            "badge/python-3.14+",
+            "badge/python-{floor}+",
             "badge/py-3.14+",
             f"The Python badge in `README.md` is missing, where {FLOOR}",
             id = "python-badge-missing"
         ),
         param(
             "pyproject.toml",
-            'target-version = "3.14"',
+            'target-version = "{floor}"',
             'target-version = "3.13"',
             f"The `target-version` in `[tool.prose]` reads `3.13`, where {FLOOR}",
             id = "target-version"
         ),
         param(
             ".mise/config.toml",
-            'python                    = "3.14.8"',
-            'python                    = "3.15.0"',
-            "The minor of the `python` pin in `.mise/config.toml` reads `3.15`, "
+            'python                    = "{python}"',
+            'python                    = "3.99.0"',
+            "The minor of the `python` pin in `.mise/config.toml` reads `3.99`, "
             f"where {FLOOR}",
             id = "mise-python"
         ),
         param(
             "pyproject.toml",
-            '"==0.12.22"',
-            '"==0.12.21"',
-            "The `required-version` in `[tool.uv]` reads `==0.12.21`, where the "
+            '"=={uv}"',
+            '"==0.0.1"',
+            "The `required-version` in `[tool.uv]` reads `==0.0.1`, where the "
             "`uv` pin in `.mise/config.toml` as a `==` requirement reads "
-            "`==0.12.22`",
+            "`=={uv}`",
             id = "required-version"
         ),
         param(
@@ -201,18 +203,18 @@ def test_a_citation_naming_each_author_passes(checkout: Checkout):
         ),
         param(
             "docs/package.json",
-            '"@vitest/coverage-v8" : "5.0.3"',
-            '"@vitest/coverage-v8" : "5.0.2"',
-            "The pin on `@vitest/coverage-v8` in `docs/package.json` reads `5.0.2`, "
-            "where the pin on `vitest` there reads `5.0.3`",
+            '"@vitest/coverage-v8" : "{vitest}"',
+            '"@vitest/coverage-v8" : "0.0.1"',
+            "The pin on `@vitest/coverage-v8` in `docs/package.json` reads `0.0.1`, "
+            "where the pin on `vitest` there reads `{vitest}`",
             id = "coverage-provider"
         ),
         param(
             "docs/package.json",
-            '"@types/node"         : "26.6.5"',
-            '"@types/node"         : "24.12.0"',
-            "The major of the pin on `@types/node` in `docs/package.json` reads `24`, "
-            "where the major of the `node` pin in `.mise/config.toml` reads `26`",
+            '"@types/node"         : "{types}"',
+            '"@types/node"         : "1.0.0"',
+            "The major of the pin on `@types/node` in `docs/package.json` reads `1`, "
+            "where the major of the `node` pin in `.mise/config.toml` reads `{node}`",
             id = "node-types"
         )
     ]
@@ -222,17 +224,18 @@ def test_a_restated_declaration_that_drifts_is_named(
     path     : str,
     old      : str,
     new      : str,
-    message  : str
+    message  : str,
+    pins     : dict[str, str]
 ):
     """
     Asserts that each file restating the Python version, the uv release, the
     license, or what `CITATION.cff` cites is named once its copy drifts from
     the declaration it restates, or once the file stops carrying it.
     """
-    edit(checkout, path, new=new, old=old)
+    edit(checkout, path, new=new, old=old.format_map(pins))
 
     assert ParityCheck(checkout=checkout).findings == [
-        Finding(file=Path(path), message=message)
+        Finding(file=Path(path), message=message.format_map(pins))
     ]
 
 
@@ -420,44 +423,44 @@ def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
     ("old", "new", "message"),
     [
         param(
-            '"hatchling==1.32.4"',
-            '"hatchling>=1.32.4"',
+            '"hatchling=={hatchling}"',
+            '"hatchling>={hatchling}"',
             "The `requires` of `[build-system]` holds no exact pin on hatchling",
             id = "hatchling-range"
         ),
         param(
-            '"hatchling==1.32.4"',
-            '"hatchling==1.32.*"',
+            '"hatchling=={hatchling}"',
+            '"hatchling==1.*"',
             "The `requires` of `[build-system]` holds no exact pin on hatchling",
             id = "hatchling-wildcard"
         ),
         param(
-            '"hatchling==1.32.4"',
+            '"hatchling=={hatchling}"',
             '"setuptools==80.9.0"',
             "The `requires` of `[build-system]` holds no exact pin on hatchling",
             id = "hatchling-absent"
         ),
         param(
-            '"pluggy==1.6.0"',
-            '"pluggy>=1.6,<2"',
-            "The build constraint `pluggy<2,>=1.6` in `[tool.uv]` is not an exact pin",
+            '"pluggy=={pluggy}"',
+            '"pluggy>=1,<99"',
+            "The build constraint `pluggy<99,>=1` in `[tool.uv]` is not an exact pin",
             id = "constraint-range"
         ),
         param(
-            '"hatchling==1.32.4"',
+            '"hatchling=={hatchling}"',
             '"hatchling"',
             "The `requires` of `[build-system]` holds no exact pin on hatchling",
             id = "hatchling-unpinned"
         ),
         param(
-            '"pluggy==1.6.0"',
+            '"pluggy=={pluggy}"',
             '"pluggy"',
             "The build constraint `pluggy` in `[tool.uv]` is not an exact pin",
             id = "constraint-unpinned"
         ),
         param(
-            '"hatchling==1.32.4"',
-            '"hatchling==1.32.4,<2"',
+            '"hatchling=={hatchling}"',
+            '"hatchling=={hatchling},<99"',
             "The `requires` of `[build-system]` holds no exact pin on hatchling",
             id = "hatchling-second-specifier"
         )
@@ -467,14 +470,15 @@ def test_a_build_requirement_naming_a_range_is_named(
     checkout : Checkout,
     old      : str,
     new      : str,
-    message  : str
+    message  : str,
+    pins     : dict[str, str]
 ):
     """
     Asserts that a hatchling requirement naming a range, a wildcard, or no
     hatchling at all, and a build constraint naming a range, are each named,
     since uv resolves both outside `uv.lock`.
     """
-    edit(checkout, "pyproject.toml", new=new, old=old)
+    edit(checkout, "pyproject.toml", new=new.format_map(pins), old=old.format_map(pins))
 
     assert PinCheck(checkout=checkout).findings == [
         Finding(file=Path("pyproject.toml"), message=message)
@@ -486,7 +490,7 @@ def test_a_build_requirement_naming_a_range_is_named(
     [
         param(
             "pyproject.toml",
-            'requires-python = ">=3.14"\n',
+            'requires-python = ">={floor}"\n',
             "",
             ["`project.requires-python` in `pyproject.toml`: Field required"],
             id = "missing-field"
@@ -494,7 +498,7 @@ def test_a_build_requirement_naming_a_range_is_named(
         param(
             "pyproject.toml",
             'license         = "MIT"\nname            = "thermur"\n'
-            'readme          = "README.md"\nrequires-python = ">=3.14"\n',
+            'readme          = "README.md"\nrequires-python = ">={floor}"\n',
             'name            = "thermur"\n',
             [
                 "`project.requires-python` in `pyproject.toml`: Field required",
@@ -505,18 +509,18 @@ def test_a_build_requirement_naming_a_range_is_named(
         ),
         param(
             "pyproject.toml",
-            '"hatchling==1.32.4"',
-            '"hatchling=1.32.4"',
+            '"hatchling=={hatchling}"',
+            '"hatchling={hatchling}"',
             [
                 "`build-system.requires.0` in `pyproject.toml`: Value error, Expected "
                 "semicolon (after name with no version specifier) or end\n    "
-                "hatchling=1.32.4\n             ^"
+                "hatchling={hatchling}\n             ^"
             ],
             id = "malformed-requirement"
         ),
         param(
             ".mise/config.toml",
-            'python                    = "3.14.8"',
+            'python                    = "{python}"',
             'python                    = "3"',
             [
                 "`tools.python` in `.mise/config.toml`: Value error, names no major "
@@ -538,17 +542,19 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
     path     : str,
     old      : str,
     new      : str,
-    messages : list[str]
+    messages : list[str],
+    pins     : dict[str, str]
 ):
     """
     Asserts that a document missing fields the checks read, or holding one
     that fails to parse, makes one finding on that document per field rather
     than ending the audit, whichever field the check itself reads.
     """
-    edit(checkout, path, new=new, old=old)
+    edit(checkout, path, new=new.format_map(pins), old=old.format_map(pins))
 
     assert ParityCheck(checkout=checkout).findings == [
-        Finding(file=Path(path), message=message) for message in messages
+        Finding(file=Path(path), message=message.format_map(pins))
+        for message in messages
     ]
 
 
@@ -615,7 +621,10 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     ]
 
 
-def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
+def test_a_hatchling_pin_in_another_spelling_passes(
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
     """
     Asserts that an exact pin naming hatchling in another spelling its
     normalized name allows passes, since a package's name compares case
@@ -624,8 +633,8 @@ def test_a_hatchling_pin_in_another_spelling_passes(checkout: Checkout):
     edit(
         checkout,
         "pyproject.toml",
-        new = '"Hatchling==1.32.4"',
-        old = '"hatchling==1.32.4"'
+        new = f'"Hatchling=={pins["hatchling"]}"',
+        old = f'"hatchling=={pins["hatchling"]}"'
     )
 
     assert PinCheck(checkout=checkout).findings == []
@@ -910,15 +919,15 @@ def test_a_hashed_file_no_push_warms_is_named(
     ("new", "message"),
     [
         param(
-            "minijinja==2.23.0",
-            f"The pin on `minijinja` in `{BRIEF}` reads `==2.23.0`, where the version "
-            "`uv.lock` resolves reads `==2.24.0`",
+            "minijinja==0.0.1",
+            f"The pin on `minijinja` in `{BRIEF}` reads `==0.0.1`, where the version "
+            "`uv.lock` resolves reads `=={minijinja}`",
             id = "drifted"
         ),
         param(
             "minijinja",
             f"The pin on `minijinja` in `{BRIEF}` is missing, where the version "
-            "`uv.lock` resolves reads `==2.24.0`",
+            "`uv.lock` resolves reads `=={minijinja}`",
             id = "unpinned"
         ),
         param("rich==14.0.0", None, id="unlocked")
@@ -927,17 +936,18 @@ def test_a_hashed_file_no_push_warms_is_named(
 def test_a_script_pinning_another_version_than_the_lock_is_named(
     checkout : Checkout,
     message  : str | None,
-    new      : str
+    new      : str,
+    pins     : dict[str, str]
 ):
     """
     Asserts that a task script pinning another version of a package
     `uv.lock` resolves, or pinning none, is named, and that one requiring a
     package `uv.lock` does not resolve passes.
     """
-    edit(checkout, BRIEF, new=new, old="minijinja==2.24.0")
+    edit(checkout, BRIEF, new=new, old=f"minijinja=={pins['minijinja']}")
 
     assert [finding.message for finding in ScriptCheck(checkout=checkout).findings] == (
-        [message] if message else []
+        [message.format_map(pins)] if message else []
     )
 
 
@@ -1395,8 +1405,8 @@ def test_a_file_disagreeing_with_the_label_registry_is_named(
     ("old", "new", "files"),
     [
         param(
-            '">=3.14"',
-            '">=3.15"',
+            '">={floor}"',
+            '">=3.99"',
             ["README.md", "pyproject.toml", ".mise/config.toml"],
             id = "python-floor"
         ),
@@ -1412,28 +1422,32 @@ def test_a_moved_manifest_declaration_names_every_copy(
     checkout : Checkout,
     old      : str,
     new      : str,
-    files    : list[str]
+    files    : list[str],
+    pins     : dict[str, str]
 ):
     """
     Asserts that raising `requires-python` names the README's badge, the
     formatter's `target-version`, and the minor mise pins, and that moving
     `[project].version` names `CITATION.cff`, each against the new value.
     """
-    edit(checkout, "pyproject.toml", new=new, old=old)
+    edit(checkout, "pyproject.toml", new=new, old=old.format_map(pins))
 
     assert [finding.file for finding in ParityCheck(checkout=checkout).findings] == [
         Path(file) for file in files
     ]
 
 
-def test_a_tools_input_to_another_action_installs_no_subset(checkout: Checkout):
+def test_a_tools_input_to_another_action_installs_no_subset(
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
     """
     Asserts that a `tools` input a step passes an action other than a
     composite action of the checkout names no subset a Kit job must save.
     """
     edit(
         checkout = checkout,
-        new      = "uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1\n"
+        new      = f"uses : actions/checkout@{pins['checkout']}\n"
         "        with : { tools: bun }",
         old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
         path = DRAFT
@@ -1772,7 +1786,10 @@ def test_a_task_installing_off_the_lockfile_or_running_bunx_is_named(
     ]
 
 
-def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
+def test_an_action_pinned_to_a_second_commit_is_named(
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
     """
     Asserts that a step pinning an action to a commit other than the one
     the first step pinning it names is named against that first step, in
@@ -1790,8 +1807,7 @@ def test_an_action_pinned_to_a_second_commit_is_named(checkout: Checkout):
         Finding(
             file    = Path(DRAFT),
             message = f"The pin on `actions/checkout` in `{DRAFT}` reads `0f0f`, where "
-            f"the pin on it in `{ACTION}` reads "
-            "`3d3c42e5aac5ba805825da76410c181273ba90b1`"
+            f"the pin on it in `{ACTION}` reads `{pins['checkout']}`"
         )
     ]
 

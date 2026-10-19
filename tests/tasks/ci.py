@@ -1,7 +1,8 @@
 """
-Pins the commands `repo:ci` runs, meaning `mise doctor project` first and
-then one `mise run --force` of every task the pull-request rows run, and the
-status it exits with when the doctor or a row fails.
+Pins the commands `repo:ci` runs, meaning `mise doctor project` first
+and then one `mise run --continue-on-error --force` of every task the
+pull-request rows run, and the status it exits with when the doctor or a
+row fails.
 """
 
 from collections.abc  import Callable
@@ -33,7 +34,8 @@ def test_the_rows_run_once_the_doctor_passes(
     """
     Asserts that the task runs `mise doctor project`, stops with its status
     where it fails, and otherwise runs every row's task in one `mise run`
-    under `--force`, exiting with that run's status.
+    under `--continue-on-error` and `--force`, exiting with that run's
+    status.
     """
     monkeypatch.chdir(checkout.root)
     mise = stand_in("mise", f'[ "$1" = doctor ] && exit {doctor}\nexit {rows}')
@@ -44,5 +46,5 @@ def test_the_rows_run_once_the_doctor_passes(
     assert exited.value.code == status
     assert mise.commands == [
         "mise doctor project",
-        *[f"mise run --force {' ::: '.join(checkout.rows)}"] * ran
+        *[f"mise run --continue-on-error --force {' ::: '.join(checkout.rows)}"] * ran
     ]

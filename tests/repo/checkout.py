@@ -7,6 +7,8 @@ and the pipeline:
   workflows and composite actions run, its issue templates, and its rulesets
 - The commit checked out, the digest of its `uv.lock`, and the clone the
   package was installed from
+- The files git tracks there, the commands it runs from its root, and the
+  scratch clone it makes of itself
 """
 
 from common.edits import append, task
@@ -18,6 +20,29 @@ from subprocess   import CalledProcessError, check_output
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
+
+
+def test_a_clone_carries_the_checkouts_changes_and_its_programs_modes(
+    clone            : Checkout,
+    tmp_path_factory : TempPathFactory
+):
+    """
+    Asserts that a clone of a checkout holds the commit checked out there
+    beside the checkout's uncommitted edit, its untracked file, and its
+    removal of a tracked file, while every program under `.mise/bin/` stays
+    executable.
+    """
+    append(clone, "README.md", "\nAn uncommitted line.\n")
+    append(clone, "notes.md", "An untracked note.\n")
+    (clone.root / "LICENSE").unlink()
+
+    copied = clone.clone(tmp_path_factory.mktemp("scratch") / "clone")
+
+    assert copied.commit == clone.commit
+    assert copied.read(Path("README.md")) == clone.read(Path("README.md"))
+    assert copied.read(Path("notes.md")) == "An untracked note.\n"
+    assert not (copied.root / "LICENSE").exists()
+    assert all(access(copied.root / path, X_OK) for path in copied.scripts)
 
 
 def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(checkout: Checkout):
@@ -41,30 +66,40 @@ def test_commit_reads_the_commit_checked_out(clone: Checkout):
     ).removesuffix("\n")
 
 
-def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
-    monkeypatch  : MonkeyPatch,
-    pytestconfig : Config,
-    tmp_path     : Path
+def test_copy_writes_a_link_as_a_link_over_what_the_folder_holds(
+    checkout         : Checkout,
+    tmp_path_factory : TempPathFactory
 ):
     """
-    Asserts that the installed checkout sits at the worktree `uv sync`
-    installed the package from, whatever the working directory.
+    Asserts that copying a link into a folder already holding a link at its
+    path leaves the copied link there rather than raising.
     """
-    monkeypatch.chdir(tmp_path)
+    (checkout.root / "linked.md").symlink_to("README.md")
+    folder = tmp_path_factory.mktemp("copied")
+    (folder / "linked.md").symlink_to("LICENSE")
 
-    assert Checkout.installed().root == pytestconfig.rootpath.resolve()
+    checkout.copy([Path("linked.md")], folder)
+
+    assert (folder / "linked.md").readlink() == Path("README.md")
 
 
-def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
+def test_files_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
     """
-    Asserts that the lock digest is the SHA-256 digest of `uv.lock`, pinned
-    on an empty file against the digest of empty input.
+    Asserts that the files a checkout lists take in an untracked file and
+    one whose name git quotes, and leave out one its `.gitignore` covers and
+    a tracked one removed from the disk.
     """
-    (checkout.root / "uv.lock").write_bytes(b"")
+    append(clone, "notes.md", "An untracked note.\n")
+    append(clone, "café.md", "A note whose name git quotes.\n")
+    append(clone, ".env", "IGNORED=1\n")
+    (clone.root / "LICENSE").unlink()
 
-    assert checkout.lock_digest == (
-        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-    )
+    files = clone.files
+
+    assert Path("notes.md") in files
+    assert Path("café.md") in files
+    assert Path(".env") not in files
+    assert Path("LICENSE") not in files
 
 
 @mark.parametrize(
@@ -93,6 +128,32 @@ def test_a_listing_leaves_out_a_dotfile(
     (checkout.root / folder / ".DS_Store").write_bytes(b"\x00\xff")
 
     assert list(getattr(checkout, member)) == [Path(folder, name) for name in names]
+
+
+def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config,
+    tmp_path     : Path
+):
+    """
+    Asserts that the installed checkout sits at the worktree `uv sync`
+    installed the package from, whatever the working directory.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    assert Checkout.installed().root == pytestconfig.rootpath.resolve()
+
+
+def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
+    """
+    Asserts that the lock digest is the SHA-256 digest of `uv.lock`, pinned
+    on an empty file against the digest of empty input.
+    """
+    (checkout.root / "uv.lock").write_bytes(b"")
+
+    assert checkout.lock_digest == (
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
 
 
 def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkout):
@@ -133,6 +194,39 @@ def test_rulesets_reads_each_ruleset_by_its_path(checkout: Checkout):
         (Path(".github/rulesets/main.json"), "main branch protection"),
         (Path(".github/rulesets/tags.json"), "release tag protection")
     ]
+
+
+def test_run_leaves_out_the_environment_a_task_runs_in(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a command the checkout runs sees no `VIRTUAL_ENV`, so the
+    `.venv` a task's `uv run` names for the clone it runs from never stands
+    in for the root's own.
+    """
+    monkeypatch.setenv("VIRTUAL_ENV", "/elsewhere/.venv")
+
+    assert checkout.run(
+        "sh",
+        "-c",
+        'printf %s "${VIRTUAL_ENV-unset}"',
+        capture = True
+    ).stdout == "unset"
+
+
+def test_run_runs_in_its_folder_and_raises_only_where_checked(checkout: Checkout):
+    """
+    Asserts that a command the checkout runs starts in the folder named
+    under the root, and that one exiting nonzero raises unless the call
+    leaves its status unchecked.
+    """
+    assert checkout.run("pwd", capture=True, folder=Path("docs")).stdout.strip() == (
+        str(checkout.root / "docs")
+    )
+    assert checkout.run("false", check=False).returncode == 1
+    with raises(CalledProcessError):
+        checkout.run("false")
 
 
 def test_steps_lists_the_actions_ahead_of_the_workflows(checkout: Checkout):
@@ -232,6 +326,37 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
         )
         for path in files
     }
+
+
+@mark.parametrize(
+    ("trusted", "reads"),
+    [
+        param("/elsewhere", "/elsewhere{sep}{root}", id="beside"),
+        param(None, "{root}", id="alone")
+    ]
+)
+def test_run_trusts_the_root_beside_each_configuration_already_trusted(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch,
+    reads       : str,
+    trusted     : str | None
+):
+    """
+    Asserts that a command the checkout runs sees mise trusting the root's
+    configuration after each one the environment already trusts.
+    """
+    monkeypatch.delenv("MISE_TRUSTED_CONFIG_PATHS")
+    if trusted:
+        monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", trusted)
+
+    printed = checkout.run(
+        "sh",
+        "-c",
+        'printf %s "$MISE_TRUSTED_CONFIG_PATHS"',
+        capture = True
+    )
+
+    assert printed.stdout == reads.format(root=checkout.root, sep=pathsep)
 
 
 def test_the_root_resolves_through_a_symlink(
