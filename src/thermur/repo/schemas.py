@@ -20,16 +20,23 @@ Holds the records the `repo` tasks read and report:
 - Each `Task` mise lists and each `Issue` mise reports on one
 - Each `Finding` a check makes at its `Level`, and each `Parity` a check
   compares
+- Each `Lag` `lock:lift` reports with the `Edit` rows that lift it, the
+  `Audit` of `Vulnerability` rows `uv audit` reports, and the `Tree` of
+  `Resolution` rows `uv tree` resolves
 """
 
 from collections     import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from datetime        import datetime
 from enum            import StrEnum, auto
 from http            import HTTPMethod
 from itertools       import cycle
 from json            import loads as from_json
 from operator        import attrgetter
 from packaging.requirements import Requirement
+from packaging.specifiers   import Specifier
+from packaging.utils        import canonicalize_name
+from packaging.version      import Version
 from pathlib                import Path, PurePosixPath
 from pydantic               import (
     AfterValidator,
@@ -45,7 +52,7 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re           import findall, fullmatch, search, sub
+from re           import MULTILINE, escape, findall, fullmatch, match, search, sub, subn
 from tomllib      import loads
 from typing       import Annotated, Self
 from urllib.parse import urlsplit
@@ -254,13 +261,18 @@ class BypassMode(StrEnum):
 
 class Config(Document, title=".mise/config.toml"):
     """
-    The tools `.mise/config.toml` pins and the folder its `[env]` puts on
-    the path.
+    The tools `.mise/config.toml` pins, the floor it sets on mise itself,
+    and the folder its `[env]` puts on the path.
     """
 
     bin: Path = Field(validation_alias=AliasPath("env", "_", "path"))
     """
     The folder `_.path` puts on the path, relative to the root.
+    """
+
+    floor: str = Field(validation_alias=AliasPath("min_version"))
+    """
+    The oldest release of mise that `min_version` lets read the file.
     """
 
     node: Major = Field(validation_alias=AliasPath("tools", "node"))
@@ -654,21 +666,28 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     @property
     def dependencies(self) -> list[Requirement]:
         """
-        Reads the requirements the `script` block of the task file's inline
-        metadata declares under PEP 723, or none where the task holds no
-        file or the file no such block.
+        Reads the requirements the task file's inline metadata declares, or
+        none where it declares none.
+        """
+        return [Requirement(entry) for entry in self.metadata.get("dependencies", [])]
+
+    @property
+    def metadata(self) -> dict:
+        """
+        Reads the `script` block of the task file's inline metadata under
+        PEP 723, or nothing where the task holds no file or the file no
+        such block.
         """
         text  = self.file.read_text(encoding="utf-8") if self.file else ""
         block = search(r"(?m)^# /// script$\s(?P<body>(^#(| .*)$\s)+)^# ///$", text)
         if not block:
-            return []
+            return {}
 
-        metadata = loads(
+        return loads(
             "".join(
                 line[2:] or "\n" for line in block["body"].splitlines(keepends=True)
             )
         )
-        return [Requirement(entry) for entry in metadata.get("dependencies", [])]
 
     @property
     def path(self) -> Path:
@@ -1725,6 +1744,119 @@ class Toggles(
         ]
 
 
+class Edit(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One place a file declares a pin, found as the release it names behind
+    text a pattern matches, which `lock:lift` rewrites to the newest
+    release.
+    """
+
+    ahead: str
+    """
+    The pattern the text ahead of the release matches.
+    """
+
+    current: str
+    """
+    The release the file names.
+    """
+
+    file: Path
+    """
+    The file declaring the pin, relative to the root.
+    """
+
+    newest: str
+    """
+    The release the lift writes in place of `current`.
+    """
+
+    def write(self, root: Path):
+        """
+        Writes `newest` in place of each `current` the file under `root`
+        names behind text `ahead` matches, where no further digit of a
+        release follows it. `^` and `$` in `ahead` match at each line.
+
+        Raises:
+            ValueError: Where the file names `current` nowhere behind such
+                        text.
+        """
+        path        = root / self.file
+        text, count = subn(
+            rf"({self.ahead}){escape(self.current)}(?!\.?\d)",
+            lambda found: found[1] + self.newest,
+            path.read_text(encoding="utf-8"),
+            flags = MULTILINE
+        )
+        if not count:
+            raise ValueError(f"`{self.file}` names no `{self.current}` to lift")
+
+        path.write_text(text, encoding="utf-8")
+
+
+class Resolution(
+    BaseModel,
+    extra="ignore",
+    frozen=True,
+    use_attribute_docstrings=True
+):
+    """
+    One package `uv tree --format json` lists, at the release uv resolves
+    it to.
+    """
+
+    version: str
+    """
+    The release uv resolves.
+    """
+
+    latest: str | None = Field(None, validation_alias="latest_version")
+    """
+    The newest release on the index, which `uv tree --outdated` reports, or
+    `None` where it is not asked or the release uv resolves is the newest.
+    """
+
+    uploads: list[datetime] = []
+    """
+    When each file of the release was uploaded.
+    """
+
+    @property
+    def uploaded(self) -> datetime | None:
+        """
+        Reads when the release's first file was uploaded, or `None` where uv
+        lists no upload time.
+        """
+        return min(self.uploads, default=None)
+
+    @model_validator(mode="before")
+    @classmethod
+    def gather(cls, package: dict) -> dict:
+        """
+        Gathers the upload time uv lists for the source distribution and for
+        each wheel of the release under `uploads`.
+        """
+        return package | {
+            "uploads": [
+                file["upload_time"]
+                for file in [*package.get("wheels", []), package.get("sdist") or {}]
+                if file.get("upload_time")
+            ]
+        }
+
+
+def read_resolutions(resolution: dict[str, dict]) -> dict[str, dict]:
+    """
+    Keeps each package `uv tree --format json` lists under `resolution`, by
+    its normalized name, leaving out the script the tree is rooted at.
+    """
+    return {
+        canonicalize_name(entry["name"]): entry
+        for entry in resolution.values()
+        if entry["kind"] == "package"
+    }
+
+
 class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The defaults of the token each workflow run receives, which `[token]`
@@ -1752,3 +1884,229 @@ class Token(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             endpoint = "actions/permissions/workflow",
             method   = "PUT"
         )
+
+
+class Vulnerability(
+    BaseModel,
+    extra="ignore",
+    frozen=True,
+    use_attribute_docstrings=True
+):
+    """
+    One advisory `uv audit --output-format json` reports on a package a
+    lockfile resolves.
+    """
+
+    id: str
+    """
+    The advisory's identifier.
+    """
+
+    fixes: tuple[str, ...] = Field((), validation_alias="fix_versions")
+    """
+    Each release that fixes the advisory, one for each affected line.
+    """
+
+    name: str = Field(validation_alias=AliasPath("dependency", "name"))
+    """
+    The package the advisory concerns.
+    """
+
+    version: str = Field(validation_alias=AliasPath("dependency", "version"))
+    """
+    The release of the package the lockfile resolves.
+    """
+
+
+class Audit(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    The advisories `uv audit --output-format json` reports on one lockfile.
+    """
+
+    vulnerabilities: tuple[Vulnerability, ...] = ()
+    """
+    Each advisory, in the order uv reports them.
+    """
+
+    def clears(self, current: str, name: str, newest: str) -> tuple[str, ...]:
+        """
+        Keeps each advisory on the package `name` at `current` that a
+        release above `current` and no later than `newest` fixes.
+        """
+        return tuple(
+            vulnerability.id
+            for vulnerability in self.vulnerabilities
+            if canonicalize_name(vulnerability.name) == canonicalize_name(name)
+            and Version(vulnerability.version)       == Version(current)
+            and any(
+                Version(current) < Version(fix) <= Version(newest)
+                for fix in vulnerability.fixes
+            )
+        )
+
+
+class Lag(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    One pin lagging its newest release, as one row of the table `lock:lift`
+    prints.
+    """
+
+    current: str
+    """
+    The release the checkout pins.
+    """
+
+    newest: str
+    """
+    The newest release the pin's manager reports.
+    """
+
+    pin: str
+    """
+    The name the manager gives the pin, which `--hold` names.
+    """
+
+    advisories: tuple[str, ...] = ()
+    """
+    The identifier of each advisory the lift clears.
+    """
+
+    edits: tuple[Edit, ...] = ()
+    """
+    Each place a file declares the pin, where the lift writes the newest
+    release.
+    """
+
+    published: datetime | None = None
+    """
+    When the newest release was published, or `None` where its manager
+    reports no date.
+    """
+
+    upgraded: bool = False
+    """
+    Whether the pin is a package `uv.lock` resolves, which the lift moves
+    through `uv lock --upgrade-package`.
+    """
+
+    @property
+    def files(self) -> list[Path]:
+        """
+        Lists each file declaring the pin, in the order of its edits, then
+        `uv.lock` for a package it resolves.
+        """
+        return [
+            *dict.fromkeys(edit.file for edit in self.edits),
+            *[Path(Lock.model_config["title"])] * self.upgraded
+        ]
+
+    @property
+    def major(self) -> bool:
+        """
+        Tells whether the lift changes the left-most non-zero part of the
+        release, so `0.33.1` to `0.34.0` does and `2026.7.0` to `2026.9.0`
+        does not.
+        """
+        current = read_release(self.current)
+        place   = next(
+            (index for index, part in enumerate(current) if part),
+            len(current)
+        )
+        return read_release(self.newest)[: place + 1] != current[: place + 1]
+
+    @classmethod
+    def declared(
+        cls,
+        places     : Mapping[Path, str],
+        *,
+        current    : str,
+        newest     : str,
+        pin        : str,
+        advisories : tuple[str, ...]       = (),
+        published  : datetime | str | None = None
+    ) -> Self:
+        """
+        Builds the lag of a pin each file `places` names declares behind
+        text the pattern beside it matches, each edit writing `newest` in
+        place of `current`.
+        """
+        return cls(
+            advisories = advisories,
+            current    = current,
+            edits      = tuple(
+                Edit(
+                    ahead   = ahead,
+                    current = current,
+                    file    = file,
+                    newest  = newest
+                )
+                for file, ahead in places.items()
+            ),
+            newest    = newest,
+            pin       = pin,
+            published = published
+        )
+
+    def row(self, now: datetime) -> str:
+        """
+        Writes the pin as a row of the table, its newest release's age
+        counted in whole days up to `now`.
+        """
+        age = (now - self.published).days if self.published else ""
+        return (
+            f"| `{self.pin}` | {', '.join(f'`{file}`' for file in self.files)} | "
+            f"{self.current} | {self.newest} | {'yes' if self.major else 'no'} | "
+            f"{age} | {', '.join(self.advisories)} |"
+        )
+
+    def write(self, root: Path):
+        """
+        Writes the newest release wherever each of the pin's edits finds it
+        in the files under `root`.
+
+        Raises:
+            ValueError: Where a file names no release an edit lifts.
+        """
+        for edit in self.edits:
+            edit.write(root)
+
+
+def read_pin(requirement: Requirement) -> str | None:
+    """
+    Reads the one release `requirement` pins through a single `==` specifier
+    carrying no `.*` wildcard, or `None` where it names a range.
+    """
+    match list(requirement.specifier):
+        case [Specifier(operator="==", version=version)] if not version.endswith(".*"):
+            return version
+
+    return None
+
+
+def read_release(version: str) -> tuple[int, ...]:
+    """
+    Reads the dotted integers `version` opens on past a leading `v`,
+    which a semantic, a PEP 440, and a calendar version each open on, so
+    `v2.0.0-alpha.20` reads as `(2, 0, 0)`.
+    """
+    return tuple(map(int, findall(r"\d+", match(r"v?[\d.]*", version)[0])))
+
+
+class Tree(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
+    """
+    The packages `uv tree --format json` resolves for a script.
+    """
+
+    packages: Annotated[dict[str, Resolution], BeforeValidator(read_resolutions)] = (
+        Field(validation_alias="resolution")
+    )
+    """
+    Each package, by its normalized name.
+    """
+
+    def package(self, name: str) -> Resolution | None:
+        """
+        Finds the package `name` names under any spelling its normalized
+        name allows, or `None` where the tree holds no such package.
+        """
+        return self.packages.get(canonicalize_name(name))

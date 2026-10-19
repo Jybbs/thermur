@@ -5,21 +5,20 @@ each found through `Check.__subclasses__()` rather than through a list kept
 beside them.
 """
 
-from collections            import Counter
-from collections.abc        import Iterator
-from filecmp                import cmp
-from itertools              import product
-from packaging.requirements import Requirement
-from packaging.utils        import canonicalize_name
-from pathlib                import Path
-from pydantic               import BaseModel, ValidationError
-from re     import findall, finditer, search
-from typing import ClassVar
-from yaml   import NodeEvent, YAMLError, parse
+from collections     import Counter
+from collections.abc import Iterator
+from filecmp         import cmp
+from itertools       import product
+from packaging.utils import canonicalize_name
+from pathlib         import Path
+from pydantic        import BaseModel, ValidationError
+from re              import findall, finditer, search
+from typing          import ClassVar
+from yaml            import NodeEvent, YAMLError, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Parity
+from thermur.repo.schemas  import Finding, Parity, read_pin
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -608,17 +607,6 @@ class PinCheck(Check):
     dependencies outside `uv.lock`.
     """
 
-    @staticmethod
-    def exact(requirement: Requirement) -> bool:
-        """
-        Tells whether `requirement` names one version, meaning a single `==`
-        specifier carrying no `.*` wildcard.
-        """
-        return [
-            (specifier.operator, specifier.version.endswith(".*"))
-            for specifier in requirement.specifier
-        ] == [("==", False)]
-
     def scan(self) -> Iterator[Finding]:
         """
         Names a `[build-system]` holding no exact pin on hatchling, under
@@ -628,7 +616,7 @@ class PinCheck(Check):
         manifest = self.checkout.manifest
         if not any(
             canonicalize_name(requirement.name) == "hatchling"
-            and self.exact(requirement)
+            and read_pin(requirement)
             for requirement in manifest.requires
         ):
             yield Finding(
@@ -638,7 +626,7 @@ class PinCheck(Check):
             )
 
         for constraint in manifest.constraints:
-            if not self.exact(constraint):
+            if not read_pin(constraint):
                 yield Finding(
                     file    = manifest.file,
                     message = f"The build constraint `{constraint}` in `[tool.uv]` "

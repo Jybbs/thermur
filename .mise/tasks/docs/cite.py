@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --exact --locked
 # MISE alias       = "cite"
 # MISE description = "Print the footnote definition of each study a key names"
-# [USAGE] arg "<key>..." help="The key of each study to cite, such as cavagna2010"
+# USAGE arg "<key>..." help="The key of each study to cite, such as cavagna2010"
 """
 Prints the footnote definition of each study whose key in
 `docs/references.bib` it is given, as the `docs:cite` task, for pasting

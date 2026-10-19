@@ -10,7 +10,7 @@ where `mise lock` skips a platform, as it does offline.
 from collections.abc  import Callable
 from common.stand_ins import StandIn
 from pathlib          import Path
-from pytest           import Config, FixtureRequest, MonkeyPatch, fixture, mark, param
+from pytest           import Config, MonkeyPatch, fixture, mark, param
 from subprocess       import CompletedProcess, run
 from tomllib          import loads
 
@@ -146,15 +146,6 @@ def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
     )
 
 
-@fixture
-def mise(request: FixtureRequest, stand_in: Callable[[str, str], StandIn]):
-    """
-    Writes a stand-in `mise` running the `sh` lines a case passes through
-    `request.param`.
-    """
-    stand_in("mise", request.param)
-
-
 @mark.parametrize(
     ("mise", "reported"),
     [
@@ -175,7 +166,7 @@ def mise(request: FixtureRequest, stand_in: Callable[[str, str], StandIn]):
 )
 def test_the_check_fails_printing_what_mise_reports(
     copy     : Path,
-    mise     : None,
+    mise     : StandIn,
     reported : str
 ):
     """

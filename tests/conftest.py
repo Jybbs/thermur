@@ -5,14 +5,28 @@ machine running it, and the collection hook lets a test open a network
 connection only when it carries the `network` mark.
 """
 
+from collections.abc    import Callable
+from common.edits       import executable
 from common.environment import CLEARED
-from os                 import environ
+from common.stand_ins   import StandIn
+from json               import loads
+from os                 import environ, pathsep
 from pathlib            import Path
-from pytest             import Config, Item, MonkeyPatch, TempPathFactory, fixture, mark
-from subprocess         import run
+from pytest             import (
+    Config,
+    FixtureRequest,
+    Item,
+    MonkeyPatch,
+    TempPathFactory,
+    fixture,
+    mark
+)
+from shlex   import quote
+from tomllib import loads as from_toml
 
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
+from thermur.repo.schemas      import read_pin
 
 
 @fixture
@@ -29,17 +43,11 @@ def checkout(
     configuration and returns the `Checkout` rooted there, which a case
     edits before a check reads it.
     """
-    for path in tracked:
-        (tmp_path / path).parent.mkdir(exist_ok=True, parents=True)
-        (pytestconfig.rootpath / path).copy(
-            tmp_path / path,
-            follow_symlinks   = False,
-            preserve_metadata = True
-        )
-
-    run(["git", "init", "--quiet"], check=True, cwd=tmp_path)
+    copy = Checkout(root=tmp_path)
+    Checkout(root=pytestconfig.rootpath).copy(tracked, copy.root)
+    copy.run("git", "init", "--quiet")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
-    return Checkout(root=tmp_path)
+    return copy
 
 
 @fixture
@@ -49,14 +57,13 @@ def clone(checkout: Checkout) -> Checkout:
     a case reads the commit checked out there.
     """
     for command in (["add", "--all"], ["commit", "--message=Copy", "--quiet"]):
-        run(
-            [
-                "git", "-c", "user.email=thermur@example.com",
-                "-c", "user.name=Thermur",
-                *command
-            ],
-            check = True,
-            cwd   = checkout.root
+        checkout.run(
+            "git",
+            "-c",
+            "user.email=thermur@example.com",
+            "-c",
+            "user.name=Thermur",
+            *command
         )
 
     return checkout
@@ -81,9 +88,11 @@ def environment(
     without asking. The rest name the folders where a tool keeps its cache,
     configuration, data, and state, which the XDG convention defines. It
     also clears every variable opening on the `env_prefix` of `Settings`,
-    which pydantic-settings matches to the field it names whatever its case.
-    It then points `HOME` at an empty folder the test owns, so a tool that
-    falls back to `~` finds none of the developer's files there.
+    which pydantic-settings matches to the field it names whatever its case,
+    and every one opening on `usage_`, through which mise hands a task each
+    flag its usage spec declares and which every program the task starts
+    inherits. It then points `HOME` at an empty folder the test owns, so a
+    tool that falls back to `~` finds none of the developer's files there.
 
     mise reads a configuration file out of every folder above the one
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
@@ -92,10 +101,10 @@ def environment(
     told to trust. The two `MISE_` variables name that file as one to skip
     and this checkout as one to trust, so a test can run mise over it.
     """
-    prefix = Settings.model_config["env_prefix"].lower()
+    prefixes = (Settings.model_config["env_prefix"].lower(), "usage_")
     for name in [
         *CLEARED,
-        *(name for name in environ if name.lower().startswith(prefix))
+        *(name for name in environ if name.lower().startswith(prefixes))
     ]:
         monkeypatch.delenv(name, raising=False)
 
@@ -104,6 +113,86 @@ def environment(
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
     monkeypatch.setenv("MISE_IGNORED_CONFIG_PATHS", str(settled))
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(pytestconfig.rootpath))
+
+
+@fixture
+def mise(request: FixtureRequest, stand_in: Callable[[str, str], StandIn]) -> StandIn:
+    """
+    Puts a stand-in `mise` on the path running the `sh` lines a case passes
+    through `request.param`, or exiting `0` where it passes none.
+    """
+    return stand_in("mise", getattr(request, "param", "exit 0"))
+
+
+@fixture(scope="session")
+def pins(pytestconfig: Config) -> dict[str, str]:
+    """
+    Reads the release each pin a case edits holds in the worktree, which
+    the copy `checkout` makes holds as well, by the name a case formats into
+    the text it edits and the message it expects, so no case names a release
+    `lock:lift` moves.
+
+    Returns:
+        The `actions/checkout` commit, the minor `requires-python` sets as
+        the floor, the `minijinja` release `uv.lock` resolves, the `node`
+        major, `python`, and `uv` mise pins, the `@types/node` and `vitest`
+        releases the site pins, and each build requirement and constraint,
+        by its package's name.
+    """
+    worktree = Checkout(root=pytestconfig.rootpath)
+    manifest = worktree.manifest
+    site     = loads(worktree.read(Path("docs/package.json")))["devDependencies"]
+    tools    = from_toml(worktree.read(Path(".mise/config.toml")))["tools"]
+    return {
+        "checkout"  : dict(step.pin for _, step in worktree.steps if step.pin)[
+            "actions/checkout"
+        ],
+        "floor"     : manifest.floor,
+        "minijinja" : worktree.lock.versions["minijinja"],
+        "node"      : worktree.config.node,
+        "python"    : tools["python"],
+        "types"     : site["@types/node"],
+        "uv"        : tools["uv"],
+        "vitest"    : site["vitest"],
+        **{
+            requirement.name: read_pin(requirement)
+            for requirement in [*manifest.requires, *manifest.constraints]
+        }
+    }
+
+
+@fixture
+def stand_in(
+    monkeypatch      : MonkeyPatch,
+    tmp_path_factory : TempPathFactory
+) -> Callable[[str, str], StandIn]:
+    """
+    Puts an empty folder ahead of every other on the path, so a program a
+    case writes there answers in place of the real one.
+
+    Returns:
+        A writer taking the program's name and the `sh` lines it runs, and
+        returning the `StandIn` whose log holds each command it receives.
+    """
+    folder = tmp_path_factory.mktemp("bin")
+    monkeypatch.setenv("PATH", str(folder), prepend=pathsep)
+
+    def write(name: str, script: str) -> StandIn:
+        """
+        Writes an executable `sh` script named `name` into the folder, which
+        logs each command it receives beside it before running the lines
+        `script` holds.
+        """
+        program = StandIn(log=folder / f"{name}.log")
+        logged  = quote(str(program.log))
+        executable(
+            folder / name,
+            f"#!/bin/sh\nprintf '%s\\0' {quote(name)} \"$@\" >> {logged}\n"
+            f"echo >> {logged}\n{script}\n"
+        )
+        return program
+
+    return write
 
 
 @fixture(scope="session")
