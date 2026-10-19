@@ -38,25 +38,25 @@ def checkout(
 ) -> Checkout:
     """
     Copies into `tmp_path` every file `tracked` lists, keeping each
-    program's mode, then trusts the copy's mise configuration and returns
-    the `Checkout` rooted there, which a case edits before a check reads it.
+    program's mode, into a git repository holding no commit, so git lists
+    each copied file as one it would track. It then trusts the copy's mise
+    configuration and returns the `Checkout` rooted there, which a case
+    edits before a check reads it.
     """
-    Checkout(root=pytestconfig.rootpath).copy(tracked, tmp_path)
+    copy = Checkout(root=tmp_path)
+    Checkout(root=pytestconfig.rootpath).copy(tracked, copy.root)
+    copy.run("git", "init", "--quiet")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
-    return Checkout(root=tmp_path)
+    return copy
 
 
 @fixture
 def clone(checkout: Checkout) -> Checkout:
     """
-    Commits the copy `checkout` makes into a git repository of its own, so a
-    case reads the commit checked out there.
+    Commits the copy `checkout` makes into the git repository holding it, so
+    a case reads the commit checked out there.
     """
-    for command in (
-        ["init", "--quiet"],
-        ["add", "--all"],
-        ["commit", "--message=Copy", "--quiet"]
-    ):
+    for command in (["add", "--all"], ["commit", "--message=Copy", "--quiet"]):
         checkout.run(
             "git",
             "-c",
@@ -198,11 +198,10 @@ def stand_in(
 @fixture(scope="session")
 def tracked(pytestconfig: Config) -> list[Path]:
     """
-    Lists every file of the worktree git tracks or would track, relative to
-    the root, leaving out one moved away before git learns of it, since the
-    index still lists it.
+    Lists every file of the worktree git tracks or would track, as
+    `Checkout.tracked` lists them.
     """
-    return Checkout(root=pytestconfig.rootpath).files
+    return Checkout(root=pytestconfig.rootpath).tracked()
 
 
 def pytest_collection_modifyitems(items: list[Item]):

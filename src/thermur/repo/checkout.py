@@ -2,10 +2,11 @@
 Holds `Checkout`, the clone the `repo` tasks read and the pipeline resolves
 every path under, which keeps each document it validates for every later
 check that reads it. It lists the tasks, the programs, the workflows, the
-composite actions, the issue templates, and the rulesets the clone holds
-beside the checks each pull request runs, and the files git tracks there.
-It reads the commit checked out and the digest of `uv.lock`, runs a command
-from the root, and clones itself into a scratch folder.
+composite actions, the issue templates, the rulesets, every file git tracks,
+and the Markdown pages among them beside the checks each pull request
+runs. It reads the bibliography, the commit checked out, and the digest of
+`uv.lock`, runs a command from the root, and clones itself into a scratch
+folder.
 """
 
 from collections.abc    import Iterable
@@ -20,6 +21,8 @@ from re                 import sub
 from subprocess         import CompletedProcess, run
 from typing             import Annotated, Self
 
+from thermur.docs.pages   import Page
+from thermur.docs.schemas import Bibliography
 from thermur.repo.schemas import (
     Action,
     Citation,
@@ -64,6 +67,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         `.github/actions/`, by its path.
         """
         return self.documents(Action, ".github/actions/*/action.y*ml")
+
+    @cached_property
+    def bibliography(self) -> Bibliography:
+        """
+        Validates `docs/references.bib`.
+        """
+        return Bibliography.read(self.root)
 
     @property
     def checks(self) -> list[tuple[str, str]]:
@@ -126,30 +136,6 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
-
-    @property
-    def files(self) -> list[Path]:
-        """
-        Lists every file git tracks or would track under the root, relative
-        to it, leaving out one gone from the disk while the index still
-        lists it.
-        """
-        return [
-            path
-            for path in map(
-                Path,
-                self.run(
-                    "git",
-                    "ls-files",
-                    "--cached",
-                    "--exclude-standard",
-                    "--others",
-                    "-z",
-                    capture = True
-                ).stdout.split("\0")[:-1]
-            )
-            if (self.root / path).exists(follow_symlinks=False)
-        ]
 
     @cached_property
     def github_settings(self) -> GithubSettings:
@@ -252,6 +238,13 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         return Package.read(self.root)
 
     @cached_property
+    def pages(self) -> dict[Path, Page]:
+        """
+        Reads every Markdown file `tracked` lists, by its path.
+        """
+        return {path: Page(text=self.read(path)) for path in self.tracked("*.md")}
+
+    @cached_property
     def release(self) -> Release:
         """
         Validates `.github/release.yml`.
@@ -321,7 +314,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     def clone(self, folder: Path) -> Self:
         """
         Clones the checkout into the empty `folder` through `git clone
-        --shared`, then copies in every file `files` lists and removes
+        --shared`, then copies in every file `tracked` lists and removes
         each file the clone holds that the checkout does not, so the clone
         carries the checkout's uncommitted and untracked files.
 
@@ -330,7 +323,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         """
         self.run("git", "clone", "--quiet", "--shared", self.root, folder)
         clone = type(self)(root=folder)
-        for path in set(clone.files) - set(files := self.files):
+        for path in set(clone.tracked()) - set(files := self.tracked()):
             (clone.root / path).unlink()
 
         self.copy(files, clone.root)
@@ -434,6 +427,31 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             return text.partition("\n")[0]
 
         return Checkout.unwrap(text)
+
+    def tracked(self, *patterns: str) -> list[Path]:
+        """
+        Lists every file git tracks or would track under the root whose path
+        matches one of `patterns`, or every such file where none is given,
+        relative to the root and in path order, leaving out one removed from
+        the working tree, which the index still lists.
+        """
+        listed = self.run(
+            "git",
+            "ls-files",
+            "--cached",
+            "--exclude-standard",
+            "--others",
+            "-z",
+            *patterns,
+            capture = True
+        ).stdout
+        return sorted(
+            {
+                Path(name)
+                for name in listed.split("\0")
+                if name and (self.root / name).exists(follow_symlinks=False)
+            }
+        )
 
     @staticmethod
     def unwrap(text: str) -> str:

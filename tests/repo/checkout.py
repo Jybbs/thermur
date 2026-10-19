@@ -7,8 +7,9 @@ and the pipeline:
   workflows and composite actions run, its issue templates, and its rulesets
 - The commit checked out, the digest of its `uv.lock`, and the clone the
   package was installed from
-- The files git tracks there, the commands it runs from its root, and the
-  scratch clone it makes of itself
+- The files git tracks there and the Markdown pages among them, the
+  bibliography, the commands it runs from its root, and the scratch clone
+  it makes of itself
 """
 
 from common.edits import append, task
@@ -45,13 +46,13 @@ def test_a_clone_carries_the_checkouts_changes_and_its_programs_modes(
     assert all(access(copied.root / path, X_OK) for path in copied.scripts)
 
 
-def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(checkout: Checkout):
+def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(tmp_path: Path):
     """
     Asserts that reading the commit of a folder no git repository holds
     raises the error git exits with, rather than returning what git prints.
     """
     with raises(CalledProcessError):
-        checkout.commit
+        Checkout(root=tmp_path).commit
 
 
 def test_commit_reads_the_commit_checked_out(clone: Checkout):
@@ -83,23 +84,18 @@ def test_copy_writes_a_link_as_a_link_over_what_the_folder_holds(
     assert (folder / "linked.md").readlink() == Path("README.md")
 
 
-def test_files_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
+def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config,
+    tmp_path     : Path
+):
     """
-    Asserts that the files a checkout lists take in an untracked file and
-    one whose name git quotes, and leave out one its `.gitignore` covers and
-    a tracked one removed from the disk.
+    Asserts that the installed checkout sits at the worktree `uv sync`
+    installed the package from, whatever the working directory.
     """
-    append(clone, "notes.md", "An untracked note.\n")
-    append(clone, "café.md", "A note whose name git quotes.\n")
-    append(clone, ".env", "IGNORED=1\n")
-    (clone.root / "LICENSE").unlink()
+    monkeypatch.chdir(tmp_path)
 
-    files = clone.files
-
-    assert Path("notes.md") in files
-    assert Path("café.md") in files
-    assert Path(".env") not in files
-    assert Path("LICENSE") not in files
+    assert Checkout.installed().root == pytestconfig.rootpath.resolve()
 
 
 @mark.parametrize(
@@ -130,20 +126,6 @@ def test_a_listing_leaves_out_a_dotfile(
     assert list(getattr(checkout, member)) == [Path(folder, name) for name in names]
 
 
-def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
-    monkeypatch  : MonkeyPatch,
-    pytestconfig : Config,
-    tmp_path     : Path
-):
-    """
-    Asserts that the installed checkout sits at the worktree `uv sync`
-    installed the package from, whatever the working directory.
-    """
-    monkeypatch.chdir(tmp_path)
-
-    assert Checkout.installed().root == pytestconfig.rootpath.resolve()
-
-
 def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
     """
     Asserts that the lock digest is the SHA-256 digest of `uv.lock`, pinned
@@ -154,6 +136,27 @@ def test_lock_digest_is_the_sha256_digest_of_uv_lock(checkout: Checkout):
     assert checkout.lock_digest == (
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     )
+
+
+def test_pages_lists_each_markdown_file_git_tracks_or_would_track(clone: Checkout):
+    """
+    Asserts that the pages are every Markdown file git tracks, beside one no
+    commit holds yet, in path order, leaving out one `.gitignore` names and
+    one removed from the working tree, which the index still lists.
+    """
+    root = clone.root
+    (root / "docs/pages/notes.md").write_text("# Notes\n")
+    (root / "docs/node_modules").mkdir()
+    (root / "docs/node_modules/README.md").write_text("# A Package\n")
+    (root / "docs/data-procurement.md").unlink()
+
+    tracked = check_output(["git", "ls-files", "*.md"], cwd=root, text=True).split()
+
+    assert list(clone.pages) == sorted(
+        {*map(Path, tracked), Path("docs/pages/notes.md")}
+        - {Path("docs/data-procurement.md")}
+    )
+    assert clone.pages[Path("docs/pages/notes.md")].text == "# Notes\n"
 
 
 def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkout):
@@ -328,6 +331,16 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
     }
 
 
+def test_the_bibliography_reads_each_study_the_file_holds(checkout: Checkout):
+    """
+    Asserts that the bibliography holds one study for each entry
+    `docs/references.bib` opens.
+    """
+    entries = findall(r"(?m)^@\w+\{(\w+),", checkout.read(Path("docs/references.bib")))
+
+    assert list(checkout.bibliography.studies) == entries
+
+
 @mark.parametrize(
     ("trusted", "reads"),
     [
@@ -371,6 +384,26 @@ def test_the_root_resolves_through_a_symlink(
     link.symlink_to(checkout.root)
 
     assert Checkout(root=link).root == checkout.root
+
+
+def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
+    """
+    Asserts that the files a checkout tracks take in an untracked file
+    and one whose name git quotes, in path order, and leave out one its
+    `.gitignore` covers and a tracked one removed from the disk.
+    """
+    append(clone, "notes.md", "An untracked note.\n")
+    append(clone, "café.md", "A note whose name git quotes.\n")
+    append(clone, ".env", "IGNORED=1\n")
+    (clone.root / "LICENSE").unlink()
+
+    files = clone.tracked()
+
+    assert files == sorted(files)
+    assert Path("notes.md") in files
+    assert Path("café.md") in files
+    assert Path(".env") not in files
+    assert Path("LICENSE") not in files
 
 
 def test_unwrap_blanks_a_comment_and_keeps_the_blank_line_above_it():

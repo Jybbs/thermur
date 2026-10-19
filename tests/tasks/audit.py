@@ -5,7 +5,7 @@ manifest fails to validate, and over one whose only findings are warnings.
 """
 
 from collections.abc  import Callable
-from common.edits     import edit, task
+from common.edits     import append, edit, task
 from pytest           import CaptureFixture, MonkeyPatch, fixture, raises
 from syrupy.assertion import SnapshotAssertion
 from types            import ModuleType
@@ -144,6 +144,11 @@ def test_a_broken_checkout_fails_naming_each_finding(
         old = "          - name  : 🎒 Kit · Workflows\n            tools : zizmor\n"
     )
     edit(checkout, warm, new="]", old=", .mise/mise.lock]")
+    append(
+        checkout,
+        "docs/pages/index.md",
+        "\nA study[^smith2020] beside[^cavagna2010].\n"
+    )
     task(checkout, "py/sweep", '#!/bin/sh\n#MISE alias = "audit"\ntrue\n')
 
     status, printed = audited()
