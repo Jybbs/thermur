@@ -27,6 +27,7 @@ from pytest                 import Config, mark, param, raises
 from urllib.parse           import unquote
 
 from thermur.repo.schemas import (
+    Action,
     Audit,
     Author,
     Document,
@@ -1139,6 +1140,30 @@ def test_a_workflow_reads_whether_it_runs_on_a_pull_request(events: str, pulls: 
     is among its events, whatever else it runs on.
     """
     assert workflow(f"name: w\njobs: {{}}\non:\n{events}").on_pull_request is pulls
+
+
+@mark.parametrize(
+    ("kind", "path"),
+    [
+        param(Action, Path(".github/actions/provision/action.yml"), id="action"),
+        param(Guide, None, id="guide"),
+        param(Lock, None, id="lock"),
+        param(Workflow, Path(".github/workflows/ci.yml"), id="workflow")
+    ]
+)
+def test_a_document_holding_mappings_hashes_alike_across_reads(
+    kind         : type[Document],
+    path         : Path | None,
+    pytestconfig : Config
+):
+    """
+    Asserts that each document holding its mappings in a `frozendict`, the
+    jobs, the matrix rows, and the steps inside it included, hashes, and
+    that two reads of one file hash alike.
+    """
+    root = pytestconfig.rootpath
+
+    assert hash(kind.read(root, path)) == hash(kind.read(root, path))
 
 
 @mark.parametrize("table", list(GithubSettings.model_fields))

@@ -4,9 +4,10 @@ one `Settings` through a driver whose cache keeps each result under
 `.cache/hamilton/`, beside `Recorder`, which records each run of a recorded
 graph under `data/runs/`, and the NetCDF adapters, `NetcdfWriter` saving
 each table a run computes and `NetcdfReader` and `NetcdfTreeReader` opening
-one. Importing the module registers the adapters with Hamilton, and a
+one. The module registers the adapters with Hamilton as it runs, and a
 fingerprint reading the type and the values of each array, xarray object,
-record, component, and path.
+record, component, and path. It runs once a line first reads a name it
+defines.
 """
 
 from collections.abc import Mapping, Sequence, Set
@@ -62,6 +63,16 @@ class NetcdfFile:
         """
         super().__init_subclass__(**kwargs)
         registry.register_adapter(cls)
+
+    @property
+    def options(self) -> dict[str, object]:
+        """
+        Names netCDF4 as the engine each adapter opens and writes the
+        file through, keeping each complex variable complex, which netCDF4
+        otherwise reads back as the compound type of its real and imaginary
+        parts.
+        """
+        return {"auto_complex": True, "engine": "netcdf4"}
 
     @classmethod
     def name(cls) -> str:
@@ -262,7 +273,7 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 
 class NetcdfReader(NetcdfFile, DataLoader):
     """
-    The loader opening the file at `path` as a `Dataset` through h5netcdf.
+    The loader opening the file at `path` as a `Dataset` through netCDF4.
     """
 
     @classmethod
@@ -282,12 +293,12 @@ class NetcdfReader(NetcdfFile, DataLoader):
             place of the `get_file_metadata` result Hamilton's own loaders
             return, which calls the deprecated `datetime.utcnow`.
         """
-        return open_dataset(self.path, engine="h5netcdf"), {"path": self.path}
+        return open_dataset(self.path, **self.options), {"path": self.path}
 
 
 class NetcdfTreeReader(NetcdfFile, DataLoader):
     """
-    The loader opening the file at `path` as a `DataTree` through h5netcdf.
+    The loader opening the file at `path` as a `DataTree` through netCDF4.
 
     Hamilton's cache opens a stored result through the loader it pickled
     beside it, calling `load_data` with no type, so each loader opens the
@@ -309,13 +320,13 @@ class NetcdfTreeReader(NetcdfFile, DataLoader):
         Returns:
             The tree beside its `path` as the loader's metadata.
         """
-        return open_datatree(self.path, engine="h5netcdf"), {"path": self.path}
+        return open_datatree(self.path, **self.options), {"path": self.path}
 
 
 class NetcdfWriter(NetcdfFile, DataSaver):
     """
     The saver writing a `Dataset` or a `DataTree` into the file at `path`
-    through h5netcdf.
+    through netCDF4.
     """
 
     @classmethod
@@ -334,7 +345,7 @@ class NetcdfWriter(NetcdfFile, DataSaver):
             `get_file_metadata` result Hamilton's own savers return, which
             calls the deprecated `datetime.utcnow`.
         """
-        data.to_netcdf(self.path, engine="h5netcdf")
+        data.to_netcdf(self.path, **self.options)
         return {"path": self.path}
 
 

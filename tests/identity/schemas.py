@@ -4,16 +4,41 @@ colors read by name, the name a role reads being one the palette declares,
 and the faces, the marks, and the tagline as `identity.toml` declares them.
 """
 
-from pydantic import ValidationError
-from pytest   import mark, param, raises
+from importlib.resources import files
+from pydantic            import ValidationError
+from pytest              import mark, param, raises
 
 from thermur.identity.schemas import Identity, Palette
+
+
+def test_every_file_a_face_names_ships_beside_the_declaration():
+    """
+    Asserts that every file a face names sits under the `fonts/` folder the
+    package ships beside `identity.toml`, which the site's preview cards
+    read each face from.
+    """
+    fonts = files("thermur.identity") / "fonts"
+
+    assert [
+        font.file
+        for _, face in Identity.shipped().faces
+        for font in face.fonts
+        if not (fonts / str(font.file)).is_file()
+    ] == []
+
+
+def test_the_shipped_identity_hashes_alike_across_reads():
+    """
+    Asserts that the shipped identity hashes, its palette holding the colors
+    in a `frozendict`, and that two reads of the declaration hash alike.
+    """
+    assert hash(Identity.shipped()) == hash(Identity.shipped())
 
 
 def test_the_shipped_identity_names_a_file_for_every_face():
     """
     Asserts that every face names at least one file the package ships it as,
-    since a chart and a card set their words from those files alone.
+    since a preview card sets its words from those files alone.
     """
     assert all(face.fonts for _, face in Identity.shipped().faces)
 
@@ -42,7 +67,7 @@ def test_the_shipped_identity_reads_each_role_s_colors():
     palette = Identity.shipped().palette
 
     assert [
-        palette.hex(name)
+        palette.colors[name]
         for pair in (palette.ground, palette.ink, palette.lead)
         for name in (pair.light, pair.dark)
     ] == ["#f2f1ee", "#17171b", "#17171b", "#f2f1ee", "#995500", "#c38243"]

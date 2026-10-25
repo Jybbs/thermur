@@ -67,7 +67,7 @@ jobs:
 on:
   push:
     branches : [main]
-    paths    : [.github/actions/provision/**, .github/workflows/pages.yml, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, docs/**, pyproject.toml, src/thermur/figures/fonts/**]
+    paths    : [.github/actions/provision/**, .github/workflows/pages.yml, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, docs/**, pyproject.toml, src/thermur/identity/fonts/**]
 
   workflow_dispatch:
 

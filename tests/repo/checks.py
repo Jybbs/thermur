@@ -666,16 +666,19 @@ def test_a_hatchling_pin_in_another_spelling_passes(
     assert PinCheck(checkout=checkout).findings == []
 
 
-def test_a_job_on_a_second_runner_image_is_named(checkout: Checkout):
+def test_a_job_on_a_second_runner_image_is_named(
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
     """
     Asserts that each job running on an image other than the first job's is
     named against that first job, in path order.
     """
-    edit(checkout, WARM, new="&image ubuntu-24.04", old="&image ubuntu-26.04")
+    edit(checkout, WARM, new="&image ubuntu-24.04", old=f"&image {pins['image']}")
 
     assert [finding.message for finding in ImageCheck(checkout=checkout).findings] == [
         f"The runner image of the `{key}` job in `{WARM}` reads `ubuntu-24.04`, where "
-        f"the one the `check` job in `{CI}` runs on reads `ubuntu-26.04`"
+        f"the one the `check` job in `{CI}` runs on reads `{pins['image']}`"
         for key in checkout.workflows[Path(WARM)].jobs
     ]
 

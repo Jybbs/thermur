@@ -4,7 +4,7 @@
 
 ### *Teaching Drone Flocks to See Fire Like Starlings See Hawks*
 
-[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.15+](https://img.shields.io/badge/python-3.15+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg)](https://pytorch.org/)
 [![Lightning](https://img.shields.io/badge/Lightning-2.0+-792ee5.svg)](https://lightning.ai/)
 [![WandB](https://img.shields.io/badge/Monitoring-Weights%20%26%20Biases-ffcc00.svg)](https://wandb.ai/Thermur/thermur-imitation/workspace)
@@ -424,10 +424,10 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 ### System Requirements
 
-- **Python**: 3.14, installed by mise at the version `.mise/config.toml` pins
+- **Python**: 3.15, installed by mise at the version `.mise/config.toml` pins
 - **Node and Bun**: installed by mise at the versions `.mise/config.toml` pins, for the docs site under `docs/`
 - **Storage**: 1.5GB for sample data, 6TB for full dataset
-- **OS**: Linux on x86-64 or arm64, or macOS on Apple silicon or Intel, each a platform `.mise/mise.lock` records every pinned tool for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash
+- **OS**: Linux on x86-64 or arm64, or macOS 15 or later on Apple silicon, each a platform `.mise/mise.lock` records every pinned tool for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash. No other macOS installs the wheels `uv.lock` resolves, because [netCDF4](https://pypi.org/project/netCDF4/1.7.5/#files)'s macOS wheels need macOS 15 and [JAX](https://docs.jax.dev/en/latest/installation.html) publishes macOS wheels for Apple silicon alone
 
 ### Installation
 
@@ -454,7 +454,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise lockfile` | Verifies `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, and that the lock holds every pinned tool for the running platform |
 | `mise relock` | Re-resolves every lockfile after its manifest changes |
 | `mise scan` | Holds every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories through `uv audit` and `bun audit` |
-| `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, and the actions the workflows pin, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands |
+| `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, the actions the workflows pin, the runner image every job runs on, and the wrangler release `🐦‍⬛ Pages` deploys through, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 | `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the footnote definition of every study it cites out of `docs/references.bib` |
 | `mise cite` | Prints the footnote definition of each study whose key it is given, out of `docs/references.bib`, for pasting into an issue, a pull request, or a comment |
@@ -511,10 +511,10 @@ thermur/
 │
 ├── src/thermur/
 │   ├── docs/                       # The bibliography's records and the files `mise render` writes into the docs site and each page
-│   ├── figures/                    # The chart theme matplotlib and seaborn draw in, and the faces it ships
-│   ├── identity/                   # The palette, the faces, the marks, and the tagline, declared once
+│   ├── identity/                   # The palette, the faces and the font files they ship as, the marks, and the tagline, declared once
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
-│   └── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, the lift `mise lift` reports, and the clone the `repo` tasks and the pipeline read
+│   ├── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, the lift `mise lift` reports, and the clone the `repo` tasks and the pipeline read
+│   └── startup/                    # The entry point `site` calls in every interpreter the environment starts, loading each import lazily
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads

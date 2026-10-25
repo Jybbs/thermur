@@ -233,7 +233,7 @@ class Bibliography(Document, extra="forbid", title="docs/references.bib"):
     it by.
     """
 
-    studies: dict[str, Annotated[Article | Preprint, Field(discriminator="kind")]]
+    studies: frozendict[str, Annotated[Article | Preprint, Field(discriminator="kind")]]
     """
     Each study, by its key.
     """

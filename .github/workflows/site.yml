@@ -65,7 +65,7 @@ jobs:
 
 on:
   pull_request:
-    paths : [.github/CONTRIBUTING.md, .github/actions/provision/**, .github/workflows/site.yml, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, README.md, docs/**, pyproject.toml, src/thermur/figures/fonts/**]
+    paths : [.github/CONTRIBUTING.md, .github/actions/provision/**, .github/workflows/site.yml, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, README.md, docs/**, pyproject.toml, src/thermur/identity/fonts/**]
 
   workflow_dispatch:
 

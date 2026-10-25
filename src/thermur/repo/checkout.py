@@ -83,10 +83,9 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         order the workflows and their rows declare them.
         """
         return [
-            check
+            *workflow.checks
             for workflow in self.workflows.values()
             if workflow.on_pull_request
-            for check in workflow.checks
         ]
 
     @cached_property
