@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "lockfile"
-#MISE description = "Verify `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, and that the lock holds every pinned tool for this platform"
+#MISE description = "Verify `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, and that the lock holds every pinned tool for this platform and every platform it records"
 
 source "$MISE_PROJECT_ROOT/.mise/lib/lockfiles.sh"
 
@@ -13,11 +13,12 @@ each_lockfile uv lock --check
 snapshot=$(mktemp)
 cp -p .mise/mise.lock "$snapshot"
 trap restore EXIT
-report=$(mise lock 2>&1) && [[ "$report" == *"(0 skipped)"* ]] || {
+report=$(mise lock 2>&1) && [[ ! "$report" =~ \([1-9][0-9]*\ skipped\) ]] || {
   echo "$report" >&2
   exit 1
 }
 diff -u "$snapshot" .mise/mise.lock >&2
+python -c 'import sys, tomllib; tools = {name: {key.removeprefix("platforms.") for entry in entries for key in entry if key.startswith("platforms.")} for name, entries in tomllib.load(sys.stdin.buffer)["tools"].items()}; every = set().union(*tools.values()); sys.exit("\n".join(f"{name} has no {platform} entry in .mise/mise.lock" for name, platforms in tools.items() for platform in sorted(every - platforms)) or None)' < .mise/mise.lock
 report=$(MISE_LOCKED_SCOPES=project mise install --dry-run --force --locked 2>&1) || {
   echo "$report" >&2
   exit 1

@@ -4,7 +4,7 @@ gh api --input - --method PUT --silent 'repos/{owner}/{repo}/rulesets/24390266'
 gh api --input - --method PUT --silent 'repos/{owner}/{repo}/rulesets/24390267'
 {"bypass_actors":[],"conditions":{"ref_name":{"exclude":[],"include":["refs/tags/*"]}},"enforcement":"active","name":"release tag protection","rules":[{"type":"update"},{"type":"deletion"}],"target":"tag"}
 gh api --input - --method PATCH --silent 'repos/{owner}/{repo}'
-{"allow_auto_merge":false,"allow_merge_commit":false,"allow_rebase_merge":false,"allow_squash_merge":true,"allow_update_branch":true,"delete_branch_on_merge":true,"has_discussions":false,"has_issues":true,"has_projects":false,"has_wiki":false,"security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}},"squash_merge_commit_message":"PR_BODY","squash_merge_commit_title":"PR_TITLE"}
+{"allow_auto_merge":false,"allow_merge_commit":false,"allow_rebase_merge":false,"allow_squash_merge":true,"allow_update_branch":true,"delete_branch_on_merge":true,"has_discussions":false,"has_issues":true,"has_projects":false,"has_wiki":false,"pull_request_creation_policy":"all","security_and_analysis":{"secret_scanning":{"status":"enabled"},"secret_scanning_push_protection":{"status":"enabled"}},"squash_merge_commit_message":"PR_BODY","squash_merge_commit_title":"PR_TITLE"}
 gh api --input - --method PUT --silent 'repos/{owner}/{repo}/actions/permissions'
 {"allowed_actions":"all","enabled":true,"sha_pinning_required":true}
 gh api --input - --method PUT --silent 'repos/{owner}/{repo}/actions/permissions/workflow'

@@ -146,6 +146,16 @@ def test_a_failed_call_stops_the_task_before_any_other(
         ),
         param(
             ".github/settings.toml",
+            'pull_request_creation_policy = "all"',
+            'pull_request_creation_policy = "everyone"',
+            (
+                "repository.pull_request_creation_policy\n  "
+                "Input should be 'all' or 'collaborators_only'"
+            ),
+            id = "creation-policy"
+        ),
+        param(
+            ".github/settings.toml",
             '"PR_TITLE"',
             '"PR_TILTE"',
             (
@@ -365,9 +375,8 @@ def test_each_ruleset_and_setting_is_sent_with_its_body(
     sent = iter(bodies.read_text().splitlines())
 
     assert "\n".join(
-        line
+        *[command, *([next(sent)] if "--input -" in command else [])]
         for command in gh.commands
-        for line in [command, *([next(sent)] if "--input -" in command else [])]
     ) == snapshot
 
 

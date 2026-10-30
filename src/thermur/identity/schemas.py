@@ -17,8 +17,8 @@ type Hex = Annotated[str, Field(pattern=r"^#[0-9a-f]{6}$")]
 
 class Font(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    One file a face ships as, under the folder `thermur.figures` keeps the
-    faces in.
+    One file a face ships as, under the `fonts/` folder beside the
+    declaration, which the site's preview cards set their words from.
     """
 
     file: Path
@@ -131,7 +131,7 @@ class Palette(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     role naming its color by the key `colors` files it under.
     """
 
-    colors: dict[str, Hex]
+    colors: frozendict[str, Hex]
     """
     Each color's hex, by its name in lowercase with hyphens between its
     words.
@@ -178,17 +178,8 @@ class Palette(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         """
         Collects every color name a role reads.
         """
-        pairs = [role for _, role in self if isinstance(role, Pair)] + list(self.series)
-        return {
-            *self.heat,
-            *(name for pair in pairs for name in (pair.dark, pair.light))
-        }
-
-    def hex(self, name: str) -> str:
-        """
-        Reads the hex of the color filed under `name`.
-        """
-        return self.colors[name]
+        pairs = [*(role for _, role in self if isinstance(role, Pair)), *self.series]
+        return {*(pair.dark, pair.light) for pair in pairs}.union(self.heat)
 
     @model_validator(mode="after")
     def reject_unknown(self) -> Self:
@@ -232,7 +223,7 @@ class Faces(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 class Identity(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The palette, the faces, the marks, and the tagline the site's theme and
-    the chart theme both read.
+    its preview cards read.
     """
 
     faces: Faces

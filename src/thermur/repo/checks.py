@@ -603,8 +603,9 @@ class ParityCheck(Check):
 class PinCheck(Check):
     """
     The hatchling build requirement and every build constraint `[tool.uv]`
-    declares each name one version, since uv resolves hatchling and its own
-    dependencies outside `uv.lock`.
+    declares each name one version, since uv resolves the build requirements
+    of hatchling and of each package it builds from source outside
+    `uv.lock`.
     """
 
     def scan(self) -> Iterator[Finding]:

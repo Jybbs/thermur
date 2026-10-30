@@ -22,9 +22,7 @@ def main():
     """
     checkout = Checkout()
     findings = dict.fromkeys(
-        finding
-        for check in Check.__subclasses__()
-        for finding in check(checkout=checkout).findings
+        *check(checkout=checkout).findings for check in Check.__subclasses__()
     )
     for finding in findings:
         print(finding.annotation)

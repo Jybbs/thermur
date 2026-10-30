@@ -1,19 +1,24 @@
 """
 Pins the path `lock:check` takes for each answer `uv`, `mise`, and `bun`
-give it, each case running a copy of the task beside a lockfile of its own,
-the lockfile beside each task script declaring its own dependencies that
-every `lock` task checks, audits, or writes, and the summary line the pinned
-mise prints for a lock it writes in full, which `lock:check` reads to fail
-where `mise lock` skips a platform, as it does offline.
+give it, each case running a copy of the task beside a lockfile of its
+own, the lockfile beside each task script declaring its own dependencies
+that every `lock` task checks, audits, or writes, and what the real mise
+answers for the committed lockfile online and for one missing a platform
+entry offline, where `lock:check` fails on a `mise lock` exiting nonzero or
+counting a skipped platform and on a lockfile in which a tool holds no entry
+for a platform another tool carries.
 """
 
 from collections.abc  import Callable
 from common.stand_ins import StandIn
 from pathlib          import Path
 from pytest           import Config, MonkeyPatch, fixture, mark, param
+from re               import escape, sub
 from subprocess       import CompletedProcess, run
-from tomllib          import loads
 
+CHECKED = "mise lock    ✓ 72 targets checked"
+FAILED  = "mise ERROR error sending request"
+LYCHEE  = '[tools."aqua:lycheeverse/lychee"."platforms.linux-x64"]'
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
 SUMMARY = "✓ Updated 14 platform entries ({skipped} skipped)"
 
@@ -61,18 +66,30 @@ def copy(
     return tmp_path
 
 
-def test_a_current_lock_passes(copy: Path, stand_in: Callable[[str, str], StandIn]):
+@mark.parametrize(
+    "summary",
+    [
+        param(SUMMARY.format(skipped=0), id="no-skipped-platform"),
+        param(CHECKED, id="the-targets-checked")
+    ]
+)
+def test_a_current_lock_passes(
+    copy     : Path,
+    stand_in : Callable[[str, str], StandIn],
+    summary  : str
+):
     """
     Asserts that the task exits `0` where `uv.lock` is current, `mise lock`
-    writes every platform and changes nothing, and the dry run installs
-    every tool the project pins under the project's lock scope alone, while
-    the task prints nothing and leaves `.mise/mise.lock` the file it found.
+    writes every platform and changes nothing, reporting no skipped platform
+    or only the targets it checked, and the dry run installs every tool the
+    project pins under the project's lock scope alone, while the task prints
+    nothing and leaves `.mise/mise.lock` the file it found.
     """
     lock = copy / ".mise/mise.lock"
     held = (lock.read_bytes(), lock.stat().st_ino)
     stand_in(
         "mise",
-        f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}"\n'
+        f'[ "$1" = lock ] && echo "{summary}"\n'
         'echo "$MISE_LOCKED_SCOPES $*" >> install\n'
         'echo "mise uv@0.12.22 would install"'
     )
@@ -155,6 +172,16 @@ def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
             id = "skipped-platform"
         ),
         param(
+            f'echo "{SUMMARY.format(skipped=10)}"',
+            SUMMARY.format(skipped=10),
+            id = "ten-skipped-platforms"
+        ),
+        param(
+            f'[ "$1" = lock ] && echo "{FAILED}" >&2 && exit 1\nexit 0',
+            FAILED,
+            id = "failed-lock"
+        ),
+        param(
             f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}" && exit 0\n'
             f'echo "{MISSING}" >&2\n'
             "exit 1",
@@ -170,59 +197,85 @@ def test_the_check_fails_printing_what_mise_reports(
     reported : str
 ):
     """
-    Asserts that a `mise lock` skipping a platform, which exits `0`, and
-    a dry run finding no lockfile entry for a pinned tool on the running
-    platform each fail the task, which prints what mise reported.
+    Asserts that a `mise lock` counting a skipped platform, which exits `0`,
+    a `mise lock` exiting nonzero, and a dry run finding no lockfile entry
+    for a pinned tool on the running platform each fail the task, which
+    prints what mise reported.
     """
     result = executed(copy)
 
     assert (result.returncode, result.stderr.strip()) == (1, reported)
 
 
-def test_an_offline_lock_fails_the_check(copy: Path, monkeypatch: MonkeyPatch):
+def test_a_tool_missing_a_platform_another_carries_fails_naming_both(
+    copy     : Path,
+    stand_in : Callable[[str, str], StandIn]
+):
     """
-    Asserts that the real `mise lock`, reaching no release host through a
-    proxy that refuses every connection, skips a platform and so fails the
-    task, while exiting `0` itself.
+    Asserts that a lockfile in which one tool holds no entry for a platform
+    another tool's entries carry fails the task, which names the tool
+    and the platform, even where `mise lock` exits `0`, counts no skipped
+    platform, and leaves the file as it found it.
+    """
+    lock = copy / ".mise/mise.lock"
+    lock.write_text(sub(rf"{escape(LYCHEE)}\n(?:.+\n)+\n?", "", lock.read_text()))
+    stand_in("mise", f'echo "{CHECKED}"')
+
+    result = executed(copy)
+
+    assert (result.returncode, result.stderr.strip()) == (
+        1, "aqua:lycheeverse/lychee has no linux-x64 entry in .mise/mise.lock"
+    )
+
+
+@mark.parametrize(
+    "table",
+    [
+        param(LYCHEE, id="lychee"),
+        param('[tools.zizmor."platforms.windows-x64-baseline"]', id="zizmor")
+    ]
+)
+def test_an_offline_lock_fails_the_check(
+    copy        : Path,
+    monkeypatch : MonkeyPatch,
+    table       : str
+):
+    """
+    Asserts that the real `mise lock`, reaching no release host through
+    a proxy that refuses every connection, fails the task on a lockfile
+    missing one platform entry, which it cannot fetch, and that the task
+    leaves the lockfile as it found it.
 
     `MISE_HTTP_RETRIES` set to `0` makes each refused request fail at once
     rather than after mise's retries.
     """
+    lock    = copy / ".mise/mise.lock"
+    trimmed = sub(rf"{escape(table)}\n(?:.+\n)+\n?", "", lock.read_text())
+    lock.write_text(trimmed)
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("MISE_HTTP_RETRIES", "0")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(copy))
 
-    result = executed(copy)
-
-    assert result.returncode == 1
-    assert "skipped)" in result.stderr
-    assert "(0 skipped)" not in result.stderr
+    assert (executed(copy).returncode, lock.read_text()) == (1, trimmed)
 
 
 @mark.network
-def test_mise_lock_writes_every_platform_online(
+def test_the_committed_lock_passes_the_check_online(
     copy        : Path,
     monkeypatch : MonkeyPatch
 ):
     """
-    Asserts that the pinned mise, locking every platform `.mise/mise.lock`
-    holds, prints the summary line `lock:check` reads, naming each platform
-    entry and no skipped one.
+    Asserts that the real `mise`, locking every platform `.mise/mise.lock`
+    holds and running the dry run, passes the task on the committed
+    lockfile, printing nothing. The release `min_version` names fetches each
+    platform entry over the network to lock it.
     """
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(copy))
-    entries = sum(
-        key.startswith("platforms.")
-        for versions in loads((copy / ".mise/mise.lock").read_text())["tools"].values()
-        for entry in versions
-        for key in entry
-    )
 
-    locked = run(["mise", "lock"], capture_output=True, cwd=copy, text=True)
+    result = executed(copy)
 
-    assert f"✓ Updated {entries} platform entries (0 skipped)" in (
-        locked.stdout + locked.stderr
-    ).splitlines()
+    assert (result.returncode, result.stderr) == (0, "")
 
 
 @mark.parametrize(

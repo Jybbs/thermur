@@ -5,9 +5,9 @@
 ::error file=.github/workflows/ci.yml::The `gate` job in `.github/workflows/ci.yml` sets no name
 ::error file=.github/workflows/site.yml::The `gate` job in `.github/workflows/site.yml` sets no name
 ::error file=.github/CONTRIBUTING.md::The command beside `⛈️ Advisories` in `.github/CONTRIBUTING.md` reads `mise run lock:scan`, where the command running `lock:scan` reads `mise scan`
-::error file=.github/workflows/warm.yml::The runner image of the `kit` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
-::error file=.github/workflows/warm.yml::The runner image of the `prune` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
-::error file=.github/workflows/warm.yml::The runner image of the `gate` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-26.04`
+::error file=.github/workflows/warm.yml::The runner image of the `kit` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-22.04`
+::error file=.github/workflows/warm.yml::The runner image of the `prune` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-22.04`
+::error file=.github/workflows/warm.yml::The runner image of the `gate` job in `.github/workflows/warm.yml` reads `ubuntu-24.04`, where the one the `check` job in `.github/workflows/ci.yml` runs on reads `ubuntu-22.04`
 ::error file=.github/workflows/ci.yml::`.github/workflows/ci.yml` installs the `zizmor` subset, whose archive no job saves
 ::error file=.github/release.yml::`.github/release.yml` names `🐛 bug`, a label `.github/labels.toml` does not declare
 ::error file=.github/release.yml::`.github/release.yml` files `🐞 bug` under no release-notes categories rather than one

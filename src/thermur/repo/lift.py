@@ -1,8 +1,9 @@
 """
 Holds `Lift`, the pins lagging their newest releases that `lock:lift`
-reports, tries in a scratch clone, and writes, and `Manager`, the
-class each package manager extends. Each manager reads its lagging pins
-through the report command it ships, and the lift finds each through
+reports, tries in a scratch clone, and writes, and `Manager`, the class each
+source of pins extends, meaning each package manager, GitHub for the actions
+and the runner image, and Bun for wrangler. Each manager reads its lagging
+pins through the command its source ships, and the lift finds each through
 `Manager.__subclasses__()` rather than through a list kept beside them.
 """
 
@@ -11,13 +12,22 @@ from datetime        import datetime
 from json            import dumps, loads
 from pathlib         import Path
 from pydantic        import BaseModel, Field
-from re              import escape, findall
+from re              import escape, findall, fullmatch
 from subprocess      import CalledProcessError
 from tempfile        import TemporaryDirectory
 from typing          import ClassVar
 
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Audit, Edit, Lag, Task, Tree, read_minor, read_pin
+from thermur.repo.schemas  import (
+    Audit,
+    Edit,
+    Lag,
+    Task,
+    Tree,
+    read_minor,
+    read_pin,
+    read_release
+)
 
 
 def read_lags(fields: dict) -> list[Lag]:
@@ -27,9 +37,8 @@ def read_lags(fields: dict) -> list[Lag]:
     declared.
     """
     return [
-        lag
+        *manager(checkout=fields["checkout"]).lags
         for manager in Manager.__subclasses__()
-        for lag in manager(checkout=fields["checkout"]).lags
     ]
 
 
@@ -145,10 +154,7 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         checkout.run("mise", "lock")
         checkout.run("mise", "install")
         if upgraded := [
-            argument
-            for lag in lifted
-            if lag.upgraded
-            for argument in ("--upgrade-package", lag.pin)
+            *("--upgrade-package", lag.pin) for lag in lifted if lag.upgraded
         ]:
             checkout.run("mise", "x", "--", "uv", "lock", "--no-locked", *upgraded)
 
@@ -157,7 +163,7 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
 
 class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
-    One package manager, whose report names each pin the checkout declares
+    One source of pins, whose report names each pin the checkout declares
     through it that lags its newest release.
     """
 
@@ -200,6 +206,23 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             audited.check_returncode()
 
         return Audit.model_validate_json(audited.stdout)
+
+    def published(self, name: str, version: str) -> str | None:
+        """
+        Reads when the release `version` of the npm package `name` was
+        published, as `bun info` reports it from the site's folder, or
+        `None` where it reports no date.
+        """
+        return loads(
+            self.read(
+                "bun",
+                "info",
+                name,
+                "time",
+                "--json",
+                folder = self.checkout.package.folder
+            )
+        ).get(version)
 
     def read(self, *command: str | Path, folder: Path = Path()) -> str:
         """
@@ -352,9 +375,9 @@ class Actions(Manager):
 class Builds(Manager):
     """
     uv, reporting the build requirement and each build constraint
-    `pyproject.toml` pins exactly, against the releases uv resolves for
-    the build requirement left unpinned, so each constraint lifts only to a
-    release the newest build backend admits.
+    `pyproject.toml` pins exactly, against the releases uv resolves for all
+    of them left unpinned together, so a constraint on a dependency of the
+    build backend lifts only to a release the newest backend admits.
     """
 
     @property
@@ -364,9 +387,8 @@ class Builds(Manager):
         to a release past its pin.
         """
         manifest = self.checkout.manifest
-        tree     = self.resolve(
-            *(requirement.name for requirement in manifest.requires)
-        )
+        pinned   = [*manifest.requires, *manifest.constraints]
+        tree     = self.resolve(*(requirement.name for requirement in pinned))
         return [
             Lag.declared(
                 {manifest.file: rf'"{escape(requirement.name)}=='},
@@ -375,11 +397,89 @@ class Builds(Manager):
                 pin       = requirement.name,
                 published = resolved.uploaded
             )
-            for requirement in [*manifest.requires, *manifest.constraints]
+            for requirement in pinned
             if (current := read_pin(requirement))
             and (resolved := tree.package(requirement.name))
             and resolved.version != current
         ]
+
+
+class Images(Manager):
+    """
+    GitHub, reporting the runner image the jobs run on against the newest
+    version of its family the README of `actions/runner-images` gives a
+    `runs-on` label outside a preview. An image is named by its family
+    and read as its version, so `ubuntu-26.04` is the release `26.04` of
+    `ubuntu`.
+    """
+
+    label: ClassVar[str] = r"([a-z]+)-(\d[\d.]*)"
+    """
+    The pattern a runner image's label takes, its family and its version.
+    """
+
+    @property
+    def images(self) -> dict[tuple[str, str], list[Path]]:
+        """
+        Maps the family and the version of each image a job runs on to every
+        workflow naming it, in path order, leaving out a label holding more
+        than a family and a version, such as one ending on `-arm`.
+        """
+        jobs = self.checkout.jobs
+        return {
+            named.groups(): [
+                *dict.fromkeys(path for path, _, job in jobs if job.image == image)
+            ]
+            for image in dict.fromkeys(job.image for _, _, job in jobs)
+            if (named := fullmatch(self.label, image))
+        }
+
+    @property
+    def lags(self) -> list[Lag]:
+        """
+        Lists each image whose family the README gives a newer version,
+        lifted in every workflow naming it.
+        """
+        newest = self.newest
+        return [
+            Lag.declared(
+                dict.fromkeys(
+                    files,
+                    rf"\bruns-on\s*:\s*(?:&[\w-]+\s+)?{escape(family)}-"
+                ),
+                current = version,
+                newest  = lifted,
+                pin     = family
+            )
+            for (family, version), files in self.images.items()
+            if read_release(lifted := newest.get(family, version))
+            > read_release(version)
+        ]
+
+    @property
+    def newest(self) -> dict[str, str]:
+        """
+        Reads the newest version of each image family the table in the
+        README of `actions/runner-images` gives a `runs-on` label, through
+        `gh api`, leaving out each row a `preview` badge marks.
+        """
+        readme = self.read(
+            "gh",
+            "api",
+            "--header",
+            "Accept: application/vnd.github.raw+json",
+            "repos/actions/runner-images/readme"
+        )
+        return dict(
+            sorted(
+                (
+                    *findall(f"`{self.label}`", row)
+                    for row in readme.splitlines()
+                    if "preview" not in row
+                ),
+                key = lambda label: read_release(label[1])
+            )
+        )
 
 
 class Locked(Manager):
@@ -431,12 +531,7 @@ class Scripts(Manager):
         """
         Lists the lagging pins of each task script declaring dependencies.
         """
-        return [
-            lag
-            for task in self.checkout.tasks
-            if task.dependencies
-            for lag in self.pins(task)
-        ]
+        return [*self.pins(task) for task in self.checkout.tasks if task.dependencies]
 
     def pins(self, task: Task) -> list[Lag]:
         """
@@ -478,7 +573,6 @@ class Site(Manager):
         advisories the lift clears on it.
         """
         package = self.checkout.package
-        folder  = package.file.parent
         return self.cleared(
             [
             Lag.declared(
@@ -486,13 +580,11 @@ class Site(Manager):
                 current   = current,
                 newest    = newest,
                 pin       = name,
-                published = loads(
-                    self.read("bun", "info", name, "time", "--json", folder=folder)
-                ).get(newest)
+                published = self.published(name, newest)
             )
             for name, current, newest in findall(
                 r"(?m)^\| (\S+)(?: \(\w+\))? +\| (\d\S*) +\| \S+ +\| (\S+) +\|$",
-                self.read("bun", "outdated", folder=folder)
+                self.read("bun", "outdated", folder=package.folder)
             )
             ]
         )
@@ -509,7 +601,7 @@ class Site(Manager):
             "--json",
             capture = True,
             check   = False,
-            folder  = self.checkout.package.file.parent
+            folder  = self.checkout.package.folder
         )
         return {
             name: {advisory["url"].rpartition("/")[2] for advisory in advisories}
@@ -523,20 +615,25 @@ class Site(Manager):
         carries, auditing a copy of `docs/` only where an advisory names one
         of them.
         """
-        package = self.checkout.package.file
-        folder  = package.parent
+        package = self.checkout.package
         before  = self.advisories(self.checkout)
         if not before.keys() & {lag.pin for lag in lags}:
             return lags
 
         with TemporaryDirectory(prefix="thermur-") as scratch:
             copy = Checkout(root=scratch)
-            self.checkout.copy([package, folder / "bun.lock"], copy.root)
+            self.checkout.copy([package.file, package.folder / "bun.lock"], copy.root)
 
             for lag in lags:
                 lag.write(copy.root)
 
-            copy.run("bun", "install", "--lockfile-only", capture=True, folder=folder)
+            copy.run(
+                "bun",
+                "install",
+                "--lockfile-only",
+                capture = True,
+                folder  = package.folder
+            )
             after = self.advisories(copy)
 
         return [
@@ -678,3 +775,47 @@ class Tools(Manager):
                 self.read("mise", "ls-remote", "--json", f"{tool}@{version}")
             )
         }.get(version)
+
+
+class Wrangler(Manager):
+    """
+    Bun, reporting the release of wrangler each step installs through the
+    `wranglerVersion` input of `cloudflare/wrangler-action`, against the
+    release the `latest` tag of the `wrangler` package names.
+    """
+
+    @property
+    def lags(self) -> list[Lag]:
+        """
+        Lists each release of wrangler a step names short of the newest,
+        lifted in every file naming it.
+        """
+        pinned = [
+            (path, str(version))
+            for path, step in self.checkout.steps
+            if (version := step.inputs.get("wranglerVersion")) is not None
+        ]
+        if not pinned:
+            return []
+
+        newest = self.read(
+            "bun",
+            "info",
+            "wrangler",
+            "version",
+            folder = self.checkout.package.folder
+        ).strip()
+        return [
+            Lag.declared(
+                dict.fromkeys(
+                    (path for path, named in pinned if named == current),
+                    r"^\s*wranglerVersion\s*:\s*[\"']?"
+                ),
+                current   = current,
+                newest    = newest,
+                pin       = "wrangler",
+                published = self.published("wrangler", newest)
+            )
+            for current in dict.fromkeys(named for _, named in pinned)
+            if current != newest
+        ]

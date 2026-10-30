@@ -2,7 +2,7 @@
 # MISE description = "Write the workflow run's summary and exit with the gate's verdict"
 # /// script
 # dependencies    = ["minijinja==2.24.0"]
-# requires-python = ">=3.14"
+# requires-python = ">=3.15"
 # ///
 """
 Writes the summary of a workflow run and exits with the verdict of every job
@@ -31,7 +31,7 @@ class Readout:
 
     commit     : str
     file       : Path
-    needs      : dict[str, dict]
+    needs      : frozendict[str, frozendict]
     ref        : str
     repository : str
     server     : str
@@ -87,14 +87,15 @@ class Readout:
     def running(cls) -> Self:
         """
         Reads the gate of the running workflow run from `NEEDS`, the `needs`
-        context as JSON, and from the variables the runner sets, taking the
-        commit from `COMMIT` where the workflow sets it to the head of a
-        pull request's branch and from `GITHUB_SHA` otherwise.
+        context as JSON whose every object it reads as a `frozendict`, and
+        from the variables the runner sets, taking the commit from `COMMIT`
+        where the workflow sets it to the head of a pull request's branch
+        and from `GITHUB_SHA` otherwise.
         """
         return cls(
             commit     = environ.get("COMMIT") or environ["GITHUB_SHA"],
             file       = Path(environ["GITHUB_WORKFLOW_REF"].partition("@")[0]),
-            needs      = loads(environ["NEEDS"]),
+            needs      = loads(environ["NEEDS"], object_hook=frozendict),
             ref        = environ.get("GITHUB_HEAD_REF") or environ["GITHUB_REF_NAME"],
             repository = environ["GITHUB_REPOSITORY"],
             server     = environ["GITHUB_SERVER_URL"],

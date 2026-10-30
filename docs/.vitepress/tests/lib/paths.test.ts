@@ -10,7 +10,7 @@ test('every folder joins onto the root of the repository holding the module', ({
   const { metaUrl, root } = repository
   expect(paths.repoRoot(metaUrl)).toBe(root)
   expect(paths.cacheDir(metaUrl, 'vitest')).toBe(path.join(root, '.cache', 'vitest'))
-  expect(paths.fontsDir(metaUrl)).toBe(path.join(root, 'src', 'thermur', 'figures', 'fonts'))
+  expect(paths.fontsDir(metaUrl)).toBe(path.join(root, 'src', 'thermur', 'identity', 'fonts'))
   expect(paths.pagesDir(metaUrl)).toBe(path.join(root, 'docs', 'pages'))
   expect(paths.publicDir(metaUrl)).toBe(path.join(root, 'docs', 'public'))
 })

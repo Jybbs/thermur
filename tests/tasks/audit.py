@@ -136,7 +136,15 @@ def test_a_broken_checkout_fails_naming_each_finding(
         "      - name : Cut",
         path = draft
     )
-    edit(checkout, warm, new="&image ubuntu-24.04", old="&image ubuntu-26.04")
+    for path in checkout.workflows:
+        edit(
+            checkout,
+            str(path),
+            new = "&image ubuntu-22.04",
+            old = f"&image {pins['image']}"
+        )
+
+    edit(checkout, warm, new="&image ubuntu-24.04", old="&image ubuntu-22.04")
     edit(
         checkout,
         warm,

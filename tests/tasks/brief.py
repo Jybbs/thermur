@@ -170,16 +170,17 @@ def test_each_workflow_renders_its_summary(
     assert readout(file, needs, branch).summary == snapshot
 
 
-def test_the_heading_keeps_every_word_after_the_glyph(
+def test_the_gate_read_from_the_runner_hashes_alike_across_reads(
     readout: Callable[[str, dict], object]
 ):
     """
-    Asserts that the summary's heading names the workflow by every word its
-    name carries after its glyph, so a name of two words keeps both.
+    Asserts that the gate the task reads hashes, every object of its `needs`
+    context read as a `frozendict`, each job's outputs included, and that
+    two reads of one context hash alike.
     """
-    gate = replace(readout("warm.yml", {"kit": job()}), workflow="🐦‍⬛ Pages Deploy")
+    needs = {"check": job(coverage="https://github.com/Jybbs/thermur/actions")}
 
-    assert gate.summary.partition("\n")[0] == "## 🐦‍⬛ Thermur Pages Deploy"
+    assert hash(readout("ci.yml", needs)) == hash(readout("ci.yml", needs))
 
 
 @mark.parametrize(
@@ -231,6 +232,18 @@ def test_the_verdict_passes_only_where_every_job_succeeded_or_was_skipped(
     needs = {f"job{index}": job(result) for index, result in enumerate(results)}
 
     assert readout("warm.yml", needs).write() == status
+
+
+def test_the_heading_keeps_every_word_after_the_glyph(
+    readout: Callable[[str, dict], object]
+):
+    """
+    Asserts that the summary's heading names the workflow by every word its
+    name carries after its glyph, so a name of two words keeps both.
+    """
+    gate = replace(readout("warm.yml", {"kit": job()}), workflow="🐦‍⬛ Pages Deploy")
+
+    assert gate.summary.partition("\n")[0] == "## 🐦‍⬛ Thermur Pages Deploy"
 
 
 def test_the_summary_appends_to_the_runner_s_summary_file(

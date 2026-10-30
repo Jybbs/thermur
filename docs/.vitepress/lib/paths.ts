@@ -15,7 +15,7 @@ export function cacheDir(metaUrl: string, name: string): string {
  * the preview cards set their words from.
  */
 export function fontsDir(metaUrl: string): string {
-  return path.join(repoRoot(metaUrl), 'src', 'thermur', 'figures', 'fonts')
+  return path.join(repoRoot(metaUrl), 'src', 'thermur', 'identity', 'fonts')
 }
 
 export function pagesDir(metaUrl: string): string {

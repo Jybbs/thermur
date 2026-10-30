@@ -17,6 +17,7 @@ from equinox         import Module
 from functools       import partial
 from hamilton.caching.adapter        import CachingEventType
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
+from importlib      import import_module
 from jax            import Array, numpy
 from json           import loads
 from numpy          import float32, int32, int64, ones, zeros
@@ -63,6 +64,19 @@ def graphed(clone: Checkout) -> Callable[..., Graph]:
         checkout = clone,
         modules  = ("thermur.pipeline.steps", "common.steps")
     )
+
+
+@fixture
+def fingerprinted() -> Callable[[object], str]:
+    """
+    Runs `thermur.pipeline.graph`, whose fingerprints register with Hamilton
+    as the module runs, which a lazy import of the module leaves undone.
+
+    Returns:
+        Hamilton's `hash_value`, fingerprinting each value as the cache does.
+    """
+    import_module("thermur.pipeline.graph")
+    return hash_value
 
 
 def computed(graph: Graph) -> set[str]:
@@ -149,14 +163,18 @@ def computed(graph: Graph) -> set[str]:
         )
     ]
 )
-def test_values_differing_in_any_part_fingerprint_apart(one: object, other: object):
+def test_values_differing_in_any_part_fingerprint_apart(
+    fingerprinted : Callable[[object], str],
+    one           : object,
+    other         : object
+):
     """
     Asserts that arrays sharing their bytes but not their shape or dtype,
     and arrays, datasets, trees, records, paths, URLs, and scalars differing
     in a value, a dimension, an attribute, or a name, each fingerprint
     apart.
     """
-    assert hash_value(one) != hash_value(other)
+    assert fingerprinted(one) != fingerprinted(other)
 
 
 @mark.parametrize(
@@ -190,13 +208,17 @@ def test_values_differing_in_any_part_fingerprint_apart(one: object, other: obje
         param({1}, frozenset({1}), id="sets")
     ]
 )
-def test_values_of_different_types_fingerprint_apart(one: object, other: object):
+def test_values_of_different_types_fingerprint_apart(
+    fingerprinted : Callable[[object], str],
+    one           : object,
+    other         : object
+):
     """
     Asserts that two values holding the same contents under different types,
     or under two classes of one name in two modules, fingerprint apart, so
     the cache never returns one node's result as another's.
     """
-    assert hash_value(one) != hash_value(other)
+    assert fingerprinted(one) != fingerprinted(other)
 
 
 @mark.parametrize(
@@ -217,12 +239,15 @@ def test_values_of_different_types_fingerprint_apart(one: object, other: object)
         param(lambda: HttpUrl("https://a.example/x"), id="url")
     ]
 )
-def test_equal_values_fingerprint_alike(made: Callable[[], object]):
+def test_equal_values_fingerprint_alike(
+    fingerprinted : Callable[[object], str],
+    made          : Callable[[], object]
+):
     """
     Asserts that two values built alike fingerprint alike, so a rerun reads
     a result back.
     """
-    assert hash_value(made()) == hash_value(made())
+    assert fingerprinted(made()) == fingerprinted(made())
 
 
 def test_a_call_naming_no_step_is_refused(graphed: Callable[..., Graph]):
@@ -242,11 +267,23 @@ def test_a_call_naming_no_step_is_refused(graphed: Callable[..., Graph]):
             id = "dataset"
         ),
         param(
+            Dataset({"t": ("x", ones(3)), "z": ("x", ones(3) * (1 - 2j))}),
+            NetcdfReader,
+            id = "complex-dataset"
+        ),
+        param(
             DataTree.from_dict(
                 {"/": Dataset(), "/child": Dataset({"t": ("x", ones(3))})}
             ),
             NetcdfTreeReader,
             id = "tree"
+        ),
+        param(
+            DataTree.from_dict(
+                {"/": Dataset(), "/child": Dataset({"z": ("x", ones(3) * (1 - 2j))})}
+            ),
+            NetcdfTreeReader,
+            id = "complex-tree"
         )
     ]
 )
@@ -256,9 +293,9 @@ def test_the_saver_writes_a_file_its_loader_reads_back_whole(
     tmp_path : Path
 ):
     """
-    Asserts that the saver writes a dataset or a tree into a NetCDF file
-    that the loader for its type opens back identical, each returning the
-    path it reached.
+    Asserts that the saver writes a dataset or a tree, a complex variable
+    included, into a NetCDF file that the loader for its type opens back
+    identical, each returning the path it reached.
     """
     path = str(tmp_path / "saved.nc")
 
@@ -337,7 +374,10 @@ def test_a_new_path_setting_computes_its_reader_again(graphed: Callable[..., Gra
     assert computed(graph) == {"pipeline_digest", "table"}
 
 
-def test_a_record_fingerprints_by_its_fields_alone(checkout: Checkout):
+def test_a_record_fingerprints_by_its_fields_alone(
+    checkout      : Checkout,
+    fingerprinted : Callable[[object], str]
+):
     """
     Asserts that a record's fingerprint holds through a read storing a
     `cached_property` beside its fields and moves with the path a field
@@ -346,11 +386,11 @@ def test_a_record_fingerprints_by_its_fields_alone(checkout: Checkout):
     """
     checkout.manifest
 
-    assert hash_value(checkout) == hash_value(Checkout(root=checkout.root))
-    assert hash_value(checkout) != hash_value(Checkout(root=checkout.root.parent))
+    assert fingerprinted(checkout) == fingerprinted(Checkout(root=checkout.root))
+    assert fingerprinted(checkout) != fingerprinted(Checkout(root=checkout.root.parent))
     assert UNHASHABLE not in {
-        hash_value(Bare()),
-        hash_value(type("Still", (Module,), {})())
+        fingerprinted(Bare()),
+        fingerprinted(type("Still", (Module,), {})())
     }
 
 
@@ -373,17 +413,19 @@ def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
         str(folder / "table.nc")
     ]
     assert folder.parent == clone.root / "data" / "runs" / "thermur"
-    with open_dataset(folder / "table.nc", engine="h5netcdf") as saved:
+    with open_dataset(folder / "table.nc", engine="netcdf4") as saved:
         assert_identical(saved, results["table"])
 
 
-def test_a_value_hamilton_cannot_read_stays_unhashable():
+def test_a_value_hamilton_cannot_read_stays_unhashable(
+    fingerprinted: Callable[[object], str]
+):
     """
     Asserts that a value Hamilton's own default cannot read fingerprints as
     `UNHASHABLE` rather than under a type, so the cache computes the node
     returning it again on every run.
     """
-    assert hash_value(make_dataclass("Slotted", [], slots=True)()) == UNHASHABLE
+    assert fingerprinted(make_dataclass("Slotted", [], slots=True)()) == UNHASHABLE
 
 
 @mark.parametrize(

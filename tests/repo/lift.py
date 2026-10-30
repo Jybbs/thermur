@@ -3,9 +3,10 @@ Pins what `lock:lift` reads from each package manager, each answering
 through a stand-in program over a copy of the checkout, and what the lift
 then prints, writes, and tries:
 
-- The pins `Tools`, `Locked`, `Scripts`, `Builds`, `Site`, and `Actions`
-  report lagging, each beside its newest release's date and the advisories
-  the lift clears, and the edits each writes into the copy
+- The pins `Tools`, `Locked`, `Scripts`, `Builds`, `Site`, `Actions`,
+  `Images`, and `Wrangler` report lagging, each beside its newest release's
+  date and the advisories the lift clears, and the edits each writes into
+  the copy
 - The table the lift prints, the holds naming no row, and the pins it
   lifts short of its holds
 - The commands the write runs, and the trial's verdict in a scratch clone
@@ -27,16 +28,18 @@ from subprocess       import CalledProcessError
 from tomllib          import loads as from_toml
 
 from thermur.repo.checkout import Checkout
-from thermur.repo.checks   import ParityCheck
+from thermur.repo.checks   import ImageCheck, ParityCheck
 from thermur.repo.lift     import (
     Actions,
     Builds,
+    Images,
     Lift,
     Locked,
     Manager,
     Scripts,
     Site,
-    Tools
+    Tools,
+    Wrangler
 )
 from thermur.repo.schemas  import Config, Lag, Manifest
 
@@ -44,6 +47,7 @@ ADVISED = {"satori": [{"url": "https://github.com/advisories/GHSA-s"}]}
 BRIEF   = ".mise/tasks/gha/brief.py"
 CONFIG  = Path(".mise/config.toml")
 NOW     = datetime(2026, 10, 16, tzinfo=UTC)
+PAGES   = Path(".github/workflows/pages.yml")
 
 
 @fixture
@@ -192,18 +196,20 @@ def test_an_action_under_a_subpath_reads_the_releases_of_its_repository(
     )
 
 
-def test_builds_reads_each_build_pin_against_unpinned_hatchling(
+def test_builds_reads_each_build_pin_against_every_build_pin_unpinned(
     answer      : Callable[..., StandIn],
     checkout    : Checkout,
     monkeypatch : MonkeyPatch,
     pins        : dict[str, str]
 ):
     """
-    Asserts that `Builds` resolves the build requirement unpinned and
-    reports each build pin the resolution moves past, leaving out one it
-    resolves at its pin and one it does not resolve, and that writing its
-    edit lifts the constraint in `pyproject.toml`.
+    Asserts that `Builds` resolves the build requirement and every build
+    constraint unpinned together and reports each build pin the resolution
+    moves past, a constraint no dependency of hatchling names among them,
+    leaving out one it resolves at its pin and one it does not resolve, and
+    that writing its edits lifts each constraint in `pyproject.toml`.
     """
+    manifest = checkout.manifest
     resolved = checkout.root.parent / "resolved.py"
     tree     = {
         "resolution": {
@@ -212,7 +218,12 @@ def test_builds_reads_each_build_pin_against_unpinned_hatchling(
                 uploaded = "2026-09-20T00:00:00Z",
                 version  = pins["hatchling"]
             ),
-            "p" : package("pluggy", uploaded="2026-10-15T00:00:00Z", version="9.9.9")
+            "p" : package("pluggy", uploaded="2026-10-15T00:00:00Z", version="9.9.9"),
+            "s" : package(
+                name     = "setuptools",
+                uploaded = "2026-10-16T00:00:00Z",
+                version  = "99.0.0"
+            )
         }
     }
     monkeypatch.setenv("RESOLVED", str(resolved))
@@ -227,11 +238,117 @@ def test_builds_reads_each_build_pin_against_unpinned_hatchling(
     lags = written(Builds(checkout=checkout).lags, checkout.root)
 
     assert [(lag.pin, lag.current, lag.newest, lag.published) for lag in lags] == [
-        ("pluggy", pins["pluggy"], "9.9.9", datetime(2026, 10, 15, tzinfo=UTC))
+        ("pluggy", pins["pluggy"], "9.9.9", datetime(2026, 10, 15, tzinfo=UTC)),
+        ("setuptools", pins["setuptools"], "99.0.0", datetime(2026, 10, 16, tzinfo=UTC))
     ]
-    assert '# dependencies    = ["hatchling"]' in resolved.read_text()
-    assert f'# requires-python = ">={checkout.manifest.floor}"' in resolved.read_text()
-    assert "pluggy==9.9.9" in map(str, Manifest.read(checkout.root).constraints)
+    assert (
+        "# dependencies    = "
+        + dumps([pin.name for pin in [*manifest.requires, *manifest.constraints]])
+    ) in resolved.read_text()
+    assert f'# requires-python = ">={manifest.floor}"' in resolved.read_text()
+    assert {"pluggy==9.9.9", "setuptools==99.0.0"} <= {
+        *map(str, Manifest.read(checkout.root).constraints)
+    }
+
+
+@mark.parametrize(
+    ("rows", "lifted"),
+    [
+        param(
+            (
+                "| Ubuntu {next} | x64 | `ubuntu-{next}` | [x] |",
+                "| Ubuntu {version} | x64 | `{image}` | [x] |"
+            ),
+            True,
+            id = "released"
+        ),
+        param(
+            (
+                "| Ubuntu {next} ![badge](https://img.shields.io/badge/preview-0969DA) "
+                "| x64 | `ubuntu-{next}` | [x] |",
+                "| Ubuntu {version} | x64 | `{image}` | [x] |"
+            ),
+            False,
+            id = "previewed"
+        ),
+        param(("| Ubuntu 20.04 | x64 | `ubuntu-20.04` | [x] |",), False, id="older")
+    ]
+)
+def test_images_reads_the_newest_version_of_the_image_s_family(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout,
+    lifted   : bool,
+    pins     : dict[str, str],
+    rows     : tuple[str, ...]
+):
+    """
+    Asserts that `Images` reports the runner image the jobs run on where
+    the README of `actions/runner-images` gives its family a newer version,
+    as a major lift written into every workflow that leaves the jobs on one
+    image, and reports nothing where the newer label sits in a preview row
+    or the README lists only an older one. A stand-in `gh` answers only the
+    raw read of that README, and a label carrying a suffix, an alias, and
+    another family never count.
+    """
+    family, _, version = pins["image"].partition("-")
+    lifting            = f"{int(version.partition('.')[0]) + 2}.04"
+    readme             = "\n".join(
+        [
+            "| Image | Architecture | YAML Label | Included Software |",
+            "| --- | --- | --- | --- |",
+            *(row.format(
+                image   = pins["image"],
+                next    = lifting,
+                version = version
+            ) for row in rows),
+            "| Ubuntu 99.04 Arm64 | arm64 | `ubuntu-99.04-arm` | [x] |",
+            "| Ubuntu 22.04 | x64 | `ubuntu-latest` or `ubuntu-22.04` | [x] |",
+            "| Windows Server 2099 | x64 | `windows-2099` | [x] |"
+        ]
+    )
+    answer(
+        "gh",
+        answers = {
+            '"api --header Accept: application/vnd.github.raw+json '
+            'repos/actions/runner-images/readme"': printed(readme)
+        }
+    )
+
+    assert [
+        (lag.pin, lag.current, lag.newest, lag.major, lag.files)
+        for lag in written(Images(checkout=checkout).lags, checkout.root)
+    ] == ([(family, version, lifting, True, [*checkout.workflows])] if lifted else [])
+    reread = Checkout(root=checkout.root)
+
+    assert {job.image for _, _, job in reread.jobs} == {
+        f"{family}-{lifting}" if lifted else pins["image"]
+    }
+    assert ImageCheck(checkout=reread).findings == []
+
+
+def test_images_reports_no_row_for_a_label_holding_more_than_a_family_and_a_version(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
+    """
+    Asserts that `Images` reports no row where every job runs on a label
+    carrying a suffix past its version, such as one ending on `-arm`, even
+    where the README gives that label's family a newer version.
+    """
+    for path in checkout.glob(".github/workflows/*.y*ml"):
+        edit(
+            checkout,
+            str(path),
+            new = f"&image {pins['image']}-arm",
+            old = f"&image {pins['image']}"
+        )
+    answer(
+        "gh",
+        answers = {'"api "*': printed("| Ubuntu 99.04 | x64 | `ubuntu-99.04` | [x] |")}
+    )
+
+    assert Images(checkout=Checkout(root=checkout.root)).lags == []
 
 
 def test_locked_reads_each_package_the_upgrade_moves(
@@ -310,7 +427,7 @@ def test_the_lift_gathers_each_managers_lags_in_the_order_they_are_declared(
         )
 
     assert [lag.pin for lag in Lift(checkout=checkout).lags] == [
-        "Actions", "Builds", "Locked", "Scripts", "Site", "Tools"
+        "Actions", "Builds", "Images", "Locked", "Scripts", "Site", "Tools", "Wrangler"
     ]
 
 
@@ -825,6 +942,106 @@ def test_an_action_whose_repository_publishes_no_release_makes_no_row(
 
     with raises(CalledProcessError) if raised else nullcontext():
         assert Actions(checkout=checkout).lags == []
+
+
+def test_wrangler_lifts_a_quoted_release_inside_its_quotes(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that writing the edit of a release `wranglerVersion` names in
+    quotes lifts the release inside them.
+    """
+    pinned = next(
+        str(step.inputs["wranglerVersion"])
+        for _, step in Checkout(root=checkout.root).steps
+        if "wranglerVersion" in step.inputs
+    )
+    edit(
+        checkout,
+        str(PAGES),
+        new = f'wranglerVersion : "{pinned}"',
+        old = f"wranglerVersion : {pinned}"
+    )
+    answer(
+        "bun",
+        answers = {
+            '"info wrangler version"'     : printed("99.0.0"),
+            '"info wrangler time --json"' : printed({})
+        }
+    )
+
+    written(Wrangler(checkout=Checkout(root=checkout.root)).lags, checkout.root)
+
+    assert 'wranglerVersion : "99.0.0"' in checkout.read(PAGES)
+
+
+@mark.parametrize("lifted", [param(True, id="behind"), param(False, id="newest")])
+def test_wrangler_reads_the_release_each_step_installs(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout,
+    lifted   : bool
+):
+    """
+    Asserts that `Wrangler` reports the release a step installs wrangler at
+    through `wranglerVersion` where the `latest` tag of the package names
+    a newer one, beside the date `bun info` gives that release, and that
+    writing its edit lifts the input, whereas a step at the newest release
+    makes no row.
+    """
+    pinned = next(
+        str(step.inputs["wranglerVersion"])
+        for _, step in checkout.steps
+        if "wranglerVersion" in step.inputs
+    )
+    newest = "99.0.0" if lifted else pinned
+    answer(
+        "bun",
+        answers = {
+            '"info wrangler version"'     : printed(newest),
+            '"info wrangler time --json"' : printed(
+                value = {newest: "2026-10-22T14:43:55.825Z"}
+            )
+        }
+    )
+
+    assert [
+        (lag.pin, lag.current, lag.newest, lag.files, lag.published)
+        for lag in written(Wrangler(checkout=checkout).lags, checkout.root)
+    ] == (
+        [
+            (
+                "wrangler", pinned, "99.0.0",
+                [PAGES],
+                datetime(2026, 10, 22, 14, 43, 55, 825000, tzinfo=UTC)
+            )
+        ]
+        if lifted
+        else []
+    )
+    assert ("wranglerVersion : 99.0.0" in checkout.read(PAGES)) is lifted
+
+
+def test_wrangler_reads_nothing_where_no_step_installs_it(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Wrangler` reports no row where no step names
+    `wranglerVersion`, asking nothing of a stand-in `bun` that fails every
+    call.
+    """
+    (checkout.root / PAGES).write_text(
+        "".join(
+            line
+            for line in checkout.read(PAGES).splitlines(keepends=True)
+            if "wranglerVersion" not in line
+        ),
+        encoding = "utf-8"
+    )
+    answer("bun", answers={"*": "exit 1"})
+
+    assert Wrangler(checkout=checkout).lags == []
 
 
 def written(lags: list[Lag], root: Path) -> list[Lag]:

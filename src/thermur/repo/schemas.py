@@ -12,8 +12,8 @@ Holds the records the `repo` tasks read and report:
   rows and the `Parameters` of `Status` rows each rule takes out of the JSON
   under `.github/rulesets/`, the site's `Package` out of `docs/package.json`,
   and the `Guide` out of the contributor guide's tables
-- The `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and `State` enums
-  each closed-set value in `.github/settings.toml` takes, and the
+- The `Creators`, `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and
+  `State` enums each closed-set value in `.github/settings.toml` takes, and the
   `ActorType`, `BypassMode`, `Enforcement`, `MergeMethod`, `RuleType`, and
   `Target` enums each closed-set value of a ruleset takes
 - Each `Request` `repo:rulesets` sends GitHub
@@ -59,6 +59,7 @@ from urllib.parse import urlsplit
 from yaml_rs      import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
+type FrozenJson = frozendict[str, FrozenJson] | list[FrozenJson] | Scalar | None
 type Major      = Annotated[str, AfterValidator(read_major)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
 type Scalar     = bool | float | int | str
@@ -332,12 +333,12 @@ class Step(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     an action or runs shell lines.
     """
 
-    env: dict[str, Scalar] = {}
+    env: frozendict[str, Scalar] = frozendict()
     """
     The variables the step sets for what it runs, by name.
     """
 
-    inputs: dict[str, Scalar] = Field({}, validation_alias="with")
+    inputs: frozendict[str, Scalar] = Field(frozendict(), validation_alias="with")
     """
     The inputs the step passes the action it names, by input.
     """
@@ -408,7 +409,7 @@ class Lock(Document, title="uv.lock"):
     The version `uv.lock` resolves for each package.
     """
 
-    versions: Annotated[dict[str, str], BeforeValidator(read_versions)] = Field(
+    versions: Annotated[frozendict[str, str], BeforeValidator(read_versions)] = Field(
         validation_alias = AliasPath("package")
     )
     """
@@ -432,7 +433,8 @@ class Manifest(Document, title="pyproject.toml"):
         validation_alias = AliasPath("tool", "uv", "build-constraint-dependencies")
     )
     """
-    The build constraints `[tool.uv]` holds hatchling's own dependencies to.
+    The build constraints `[tool.uv]` declares, each pinning one build
+    requirement of hatchling or of a package uv builds from source.
     """
 
     description: str = Field(validation_alias=AliasPath("project", "description"))
@@ -503,8 +505,8 @@ class Manifest(Document, title="pyproject.toml"):
     The requirements `[build-system]` builds the wheel with.
     """
 
-    scripts: dict[str, str] = Field(
-        {},
+    scripts: frozendict[str, str] = Field(
+        frozendict(),
         validation_alias = AliasPath("project", "scripts")
     )
     """
@@ -581,6 +583,14 @@ class Package(Document, title="docs/package.json"):
     The release of Vitest the site's suite runs on.
     """
 
+    @property
+    def folder(self) -> Path:
+        """
+        Names the folder holding `docs/package.json`, relative to the root,
+        where every Bun command reading the site's packages runs.
+        """
+        return self.file.parent
+
 
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
@@ -610,7 +620,7 @@ class Action(Document):
     manifest declares and the steps it runs.
     """
 
-    inputs: dict[str, dict[str, Scalar]] = {}
+    inputs: frozendict[str, frozendict[str, Scalar]] = frozendict()
     """
     The inputs the manifest declares, by input, each with its default and its
     description.
@@ -739,7 +749,7 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
     The jobs this one waits for, by key.
     """
 
-    rows: tuple[dict[str, str], ...] = Field(
+    rows: tuple[frozendict[str, str], ...] = Field(
         (),
         validation_alias = AliasPath("strategy", "matrix", "include")
     )
@@ -802,7 +812,7 @@ class Workflow(Document):
     the jobs it runs.
     """
 
-    jobs: dict[str, Job]
+    jobs: frozendict[str, Job]
     """
     The jobs the workflow runs, by key.
     """
@@ -812,7 +822,7 @@ class Workflow(Document):
     The name the workflow's runs carry.
     """
 
-    events: dict[str, Trigger | None] = Field(validation_alias="on")
+    events: frozendict[str, Trigger | None] = Field(validation_alias="on")
     """
     The events the workflow runs on, each narrowed by its filters where it
     carries any.
@@ -824,7 +834,7 @@ class Workflow(Document):
         Pairs the name each row of each job gives its check run with the
         task the row runs.
         """
-        return [check for job in self.jobs.values() for check in job.checks]
+        return [*job.checks for job in self.jobs.values()]
 
     @property
     def gate(self) -> Job | None:
@@ -879,13 +889,13 @@ class Guide(Document, extra="forbid", title=".github/CONTRIBUTING.md"):
     carries no table under its header.
     """
 
-    checks: Annotated[dict[str, str], BeforeValidator(read_pairs)]
+    checks: Annotated[frozendict[str, str], BeforeValidator(read_pairs)]
     """
     The command the checks table gives each check for a laptop, by the
     name of the check.
     """
 
-    labels: Annotated[dict[str, str], BeforeValidator(read_pairs)]
+    labels: Annotated[frozendict[str, str], BeforeValidator(read_pairs)]
     """
     The description the labels table gives each label, by the label's
     name.
@@ -1376,6 +1386,16 @@ class Parameters(BaseModel, extra="allow", frozen=True, use_attribute_docstrings
     """
 
 
+class Creators(StrEnum):
+    """
+    Who can open a pull request on a repository, as
+    `pull_request_creation_policy` names them.
+    """
+
+    ALL                = auto()
+    COLLABORATORS_ONLY = auto()
+
+
 class Policy(StrEnum):
     """
     The actions a workflow may run, as `allowed_actions` names them.
@@ -1443,6 +1463,11 @@ class Repository(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
     Whether the repository shows the wiki.
     """
 
+    pull_request_creation_policy: Creators
+    """
+    Who can open a pull request on the repository.
+    """
+
     security_and_analysis: Analysis
     """
     The security and analysis features the repository runs.
@@ -1484,7 +1509,7 @@ class Request(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     The HTTP method the call takes.
     """
 
-    body: dict[str, JsonValue] | None = None
+    body: frozendict[str, FrozenJson] | None = None
     """
     The JSON body the call sends, or `None` where it sends none.
     """
@@ -1573,7 +1598,7 @@ class Ruleset(Document, extra="forbid"):
     The actors who may bypass the ruleset.
     """
 
-    conditions: dict[str, JsonValue]
+    conditions: frozendict[str, FrozenJson]
     """
     The refs the ruleset applies to, by the patterns they match.
     """
@@ -2097,9 +2122,9 @@ class Tree(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
     The packages `uv tree --format json` resolves for a script.
     """
 
-    packages: Annotated[dict[str, Resolution], BeforeValidator(read_resolutions)] = (
-        Field(validation_alias="resolution")
-    )
+    packages: Annotated[frozendict[str, Resolution], BeforeValidator(
+        read_resolutions
+    )] = Field(validation_alias="resolution")
     """
     Each package, by its normalized name.
     """
