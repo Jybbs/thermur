@@ -59,6 +59,7 @@ from urllib.parse import urlsplit
 from yaml_rs      import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
+type FrozenJson = frozendict[str, FrozenJson] | list[FrozenJson] | Scalar | None
 type Major      = Annotated[str, AfterValidator(read_major)]
 type Minor      = Annotated[str, AfterValidator(read_minor)]
 type Scalar     = bool | float | int | str
@@ -1508,7 +1509,7 @@ class Request(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     The HTTP method the call takes.
     """
 
-    body: frozendict[str, JsonValue] | None = None
+    body: frozendict[str, FrozenJson] | None = None
     """
     The JSON body the call sends, or `None` where it sends none.
     """
@@ -1597,7 +1598,7 @@ class Ruleset(Document, extra="forbid"):
     The actors who may bypass the ruleset.
     """
 
-    conditions: frozendict[str, JsonValue]
+    conditions: frozendict[str, FrozenJson]
     """
     The refs the ruleset applies to, by the patterns they match.
     """

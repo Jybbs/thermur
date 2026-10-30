@@ -468,6 +468,26 @@ def test_a_step_reads_its_inputs_as_github_hands_them_to_the_action(
     assert (step.saves, step.inputs["since"]) == (saves, "2026-10-01")
 
 
+def test_a_json_object_at_any_depth_reads_as_a_frozendict(pytestconfig: Config):
+    """
+    Asserts that a request's body and a ruleset's conditions read every
+    JSON object they hold as a `frozendict`, a nested one included, so the
+    request sending the repository's own settings hashes, and that the body
+    encodes the JSON the repository's table dumps to.
+    """
+    root       = pytestconfig.rootpath
+    repository = GithubSettings.read(root).repository
+    request    = repository.request
+    ruleset    = Ruleset.read(root, Path(".github/rulesets/main.json"))
+
+    assert (
+        type(request.body["security_and_analysis"]),
+        type(ruleset.conditions["ref_name"])
+    ) == (frozendict, frozendict)
+    assert hash(request) == hash(repository.request)
+    assert from_json(request.payload) == repository.model_dump(mode="json")
+
+
 def test_a_label_description_runs_to_100_characters():
     """
     Asserts that a description of 100 characters, the most GitHub's label
@@ -495,37 +515,6 @@ def test_a_label_writes_the_command_that_creates_or_updates_it():
         "gh", "label", "create", "--color", "8c055e",
         "--description", "Wrong output", "--force", "🐞 bug"
     ]
-
-
-def test_a_lag_names_the_files_its_edits_reach_or_the_lock():
-    """
-    Asserts that a lag names each file its edits reach once, in the order of
-    its edits, and `uv.lock` where it carries no edit.
-    """
-    edits = tuple(
-        Edit(
-            ahead   = "@",
-            current = "a",
-            file    = Path(file),
-            newest  = "b"
-        )
-        for file in ("ci.yml", "pages.yml", "ci.yml")
-    )
-
-    assert (
-        Lag(
-            current = "a",
-            edits   = edits,
-            newest  = "b",
-            pin     = "p"
-        ).files,
-        Lag(
-            current  = "1",
-            newest   = "2",
-            pin      = "p",
-            upgraded = True
-        ).files
-    ) == ([Path("ci.yml"), Path("pages.yml")], [Path("uv.lock")])
 
 
 @mark.parametrize(
@@ -637,13 +626,35 @@ def test_a_malformed_registry_fails_at_the_key_it_breaks(
     assert [(detail["loc"], detail["msg"]) for detail in error.value.errors()] == errors
 
 
-def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+def test_a_lag_names_the_files_its_edits_reach_or_the_lock():
     """
-    Asserts that a Markdown file whose text opens on anything but front
-    matter fails to read rather than reading as an empty document.
+    Asserts that a lag names each file its edits reach once, in the order of
+    its edits, and `uv.lock` where it carries no edit.
     """
-    with raises(ValueError, match="opens on no front matter"):
-        Document.load(".md", "name: Bug\n---\n")
+    edits = tuple(
+        Edit(
+            ahead   = "@",
+            current = "a",
+            file    = Path(file),
+            newest  = "b"
+        )
+        for file in ("ci.yml", "pages.yml", "ci.yml")
+    )
+
+    assert (
+        Lag(
+            current = "a",
+            edits   = edits,
+            newest  = "b",
+            pin     = "p"
+        ).files,
+        Lag(
+            current  = "1",
+            newest   = "2",
+            pin      = "p",
+            upgraded = True
+        ).files
+    ) == ([Path("ci.yml"), Path("pages.yml")], [Path("uv.lock")])
 
 
 @mark.parametrize(
@@ -720,6 +731,36 @@ def test_a_document_reads_the_value_its_suffix_names(
     assert Document.load(suffix, text) == value
 
 
+def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
+    """
+    Asserts that a Markdown file whose text opens on anything but front
+    matter fails to read rather than reading as an empty document.
+    """
+    with raises(ValueError, match="opens on no front matter"):
+        Document.load(".md", "name: Bug\n---\n")
+
+
+@mark.parametrize(
+    ("labels", "names"),
+    [
+        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
+        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
+        param("🐞 bug", ["🐞 bug"], id="one"),
+        param("", [], id="empty")
+    ]
+)
+def test_a_template_reads_its_labels_from_a_list_or_one_string(
+    labels : str | list[str],
+    names  : list[str]
+):
+    """
+    Asserts that a template's labels read from a list as written, and from
+    one string as each name its commas separate with the spaces around it
+    removed, so an empty string names none.
+    """
+    assert Template.model_validate({"labels": labels}).labels == names
+
+
 def test_a_required_check_naming_no_app_sends_no_app():
     """
     Asserts that a required check naming no `integration_id` is sent without
@@ -744,39 +785,6 @@ def test_a_required_check_naming_no_app_sends_no_app():
     }
 
     assert Ruleset.model_validate(written).request(None).body == written
-
-
-@mark.parametrize(
-    ("labels", "names"),
-    [
-        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
-        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
-        param("🐞 bug", ["🐞 bug"], id="one"),
-        param("", [], id="empty")
-    ]
-)
-def test_a_template_reads_its_labels_from_a_list_or_one_string(
-    labels : str | list[str],
-    names  : list[str]
-):
-    """
-    Asserts that a template's labels read from a list as written, and from
-    one string as each name its commas separate with the spaces around it
-    removed, so an empty string names none.
-    """
-    assert Template.model_validate({"labels": labels}).labels == names
-
-
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
-    """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
-    """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
-
-    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -849,6 +857,18 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+    """
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
+    """
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
+
+    assert step.env == {"RETRIES": 3}
+
+
 def test_a_toggle_turns_its_endpoint_on_or_off():
     """
     Asserts that each toggle reads as the endpoint it names, which `PUT`
@@ -883,45 +903,6 @@ def test_a_toml_task_declares_no_requirements(tmp_path: Path):
         run    = (),
         source = tmp_path
     ).dependencies == []
-
-
-def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
-    """
-    Asserts that a tree keeps each package it resolves under its normalized
-    name, leaving out the script it is rooted at, and that each reads its
-    earliest upload across its source distribution and wheels, or none.
-    """
-    tree = Tree.model_validate(
-        {
-            "resolution": {
-                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
-                "pydantic-core" : {
-                    "kind"    : "package",
-                    "name"    : "pydantic_core",
-                    "version" : "2.50.1",
-                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
-                    "wheels"  : [
-                        {"upload_time": "2026-10-11T18:33:07.153Z"},
-                        {"upload_time": None}
-                    ]
-                },
-                "script"        : {"kind": "script"}
-            }
-        }
-    )
-
-    assert sorted(tree.packages) == ["bare", "pydantic-core"]
-    assert tree.package("Pydantic.Core").uploaded == datetime(
-        2026,
-        10,
-        11,
-        18,
-        33,
-        7,
-        153000,
-        tzinfo = UTC
-    )
-    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize(
@@ -1044,14 +1025,43 @@ def test_a_request_sends_its_body_on_standard_input(
     assert (call.command, call.payload) == (command, payload)
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that a tree keeps each package it resolves under its normalized
+    name, leaving out the script it is rooted at, and that each reads its
+    earliest upload across its source distribution and wheels, or none.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+    tree = Tree.model_validate(
+        {
+            "resolution": {
+                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
+                "pydantic-core" : {
+                    "kind"    : "package",
+                    "name"    : "pydantic_core",
+                    "version" : "2.50.1",
+                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
+                    "wheels"  : [
+                        {"upload_time": "2026-10-11T18:33:07.153Z"},
+                        {"upload_time": None}
+                    ]
+                },
+                "script"        : {"kind": "script"}
+            }
+        }
+    )
 
-    assert finding.annotation == "::warning file=a.toml::m"
+    assert sorted(tree.packages) == ["bare", "pydantic-core"]
+    assert tree.package("Pydantic.Core").uploaded == datetime(
+        2026,
+        10,
+        11,
+        18,
+        33,
+        7,
+        153000,
+        tzinfo = UTC
+    )
+    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize(
@@ -1100,30 +1110,14 @@ def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
     )
 
 
-def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
+def test_a_warning_prints_as_a_warning_annotation():
     """
-    Asserts that a workflow reads the job under the key `gate`, the jobs
-    it waits for, the check run and the task of each row of each job, and
-    whether a step passes a composite action `save: 'true'`.
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
     """
-    text = (
-        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
-        "          - task: lock:check\n    steps:\n"
-        "      - uses: $/a\n        with: { save: 'true' }\n"
-        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
-        "        include:\n          - task: py:check\n"
-        "  gate:\n    runs-on: x\n"
-    )
-    read = workflow(text)
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
 
-    assert (
-        read.gate.image,
-        list(read.gated),
-        read.checks,
-        read.saves("$/a"),
-        read.saves("$/b")
-    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
-    assert workflow(WORKFLOW).gate is None
+    assert finding.annotation == "::warning file=a.toml::m"
 
 
 @mark.parametrize(
@@ -1164,6 +1158,32 @@ def test_a_document_holding_mappings_hashes_alike_across_reads(
     root = pytestconfig.rootpath
 
     assert hash(kind.read(root, path)) == hash(kind.read(root, path))
+
+
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
+    """
+    Asserts that a workflow reads the job under the key `gate`, the jobs
+    it waits for, the check run and the task of each row of each job, and
+    whether a step passes a composite action `save: 'true'`.
+    """
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
+        "        include:\n          - task: py:check\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
+
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.checks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
+    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize("table", list(GithubSettings.model_fields))

@@ -1,15 +1,16 @@
 """
 Holds `start`, the entry point the package installs in `site-packages` as
-`thermur.start`, which `site` calls once every path a `.pth` file names
-is on `sys.path`, and `lazily`, the filter `start` sets. Every interpreter
-the environment starts then loads each module it imports where a line first
-reads the name bound to it, short of each import a package `EAGER` names
-makes.
+`thermur.start`, which `site` calls once every path a `.pth` file names is
+on `sys.path`, and `lazily`, the filter `start` sets. Every interpreter the
+environment starts then loads the module each top-level import names where
+a line first reads the name it binds, short of an import inside a `try`, a
+`from … import *`, and each import a package `EAGER` names makes, which load
+as they run.
 """
 
 from sys import set_lazy_imports, set_lazy_imports_filter
 
-EAGER = frozenset({"_pytest", "numpy", "pandas"})
+EAGER = frozenset({"_pytest", "pandas"})
 """
 The packages whose own imports load as they run, since each fails once they
 load lazily, each listed below beside its defect, its upstream issue where one
@@ -19,16 +20,11 @@ passes, with its issue read for whether a fix has shipped:
 
 - `_pytest`, whose assertion rewriter matches each module's path through
   `fnmatch` and so enters itself again through the lazy import of `fnmatch`,
-  raising `ImportCycleError` (pytest-dev/pytest#14632, with a fix in
-  pytest-dev/pytest#14844), reproduced by `mise test -- --collect-only`
-- `numpy`, which binds `exceptions` on macOS through a lazy
-  `from . import exceptions` inside an `if` in its `__init__`, whose
-  resolution enters the module `__getattr__` importing that submodule again
-  without end, reproduced by
-  `mise x -- uv run --locked python -c "import numpy; numpy.exceptions"`
+  raising `ImportCycleError` (pytest-dev/pytest#14632, with a fix proposed
+  in pytest-dev/pytest#14844), reproduced by `mise test -- --collect-only`
 - `pandas`, which imports the modules setting its C API capsules and its
   options only for that effect, so its compiled modules read them unset
-  (pandas-dev/pandas#71173, with a fix in pandas-dev/pandas#71178),
+  (pandas-dev/pandas#71173, with a fix proposed in pandas-dev/pandas#71178),
   reproduced by `mise x -- uv run --locked python -c "import pandas; pandas.Index"`
 """
 
@@ -50,8 +46,9 @@ def lazily(importer: str | None, name: str, fromlist: tuple[str, ...] | None) ->
 
 def start():
     """
-    Sets `lazily` as the filter, then makes every import at the top of a
-    module lazy wherever the filter lets it be.
+    Sets `lazily` as the filter, then makes each import at the top of
+    a module lazy, short of one inside a `try` or a `from … import *`,
+    wherever the filter lets it be.
     """
     set_lazy_imports_filter(lazily)
     set_lazy_imports("all")

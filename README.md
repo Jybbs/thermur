@@ -514,7 +514,7 @@ thermur/
 │   ├── identity/                   # The palette, the faces and the font files they ship as, the marks, and the tagline, declared once
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
 │   ├── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, the lift `mise lift` reports, and the clone the `repo` tasks and the pipeline read
-│   └── startup/                    # The entry point `site` calls in every interpreter the environment starts, loading each import lazily
+│   └── startup/                    # The entry point `site` calls in every interpreter the environment starts, loading each top-level import lazily
 ├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads
