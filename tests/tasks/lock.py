@@ -5,17 +5,20 @@ own, the lockfile beside each task script declaring its own dependencies
 that every `lock` task checks, audits, or writes, and what the real mise
 answers for the committed lockfile online and for one missing a platform
 entry offline, where `lock:check` fails on a `mise lock` exiting nonzero or
-counting a skipped platform.
+counting a skipped platform and on a lockfile in which a tool holds no entry
+for a platform another tool carries.
 """
 
 from collections.abc  import Callable
 from common.stand_ins import StandIn
 from pathlib          import Path
 from pytest           import Config, MonkeyPatch, fixture, mark, param
+from re               import escape, sub
 from subprocess       import CompletedProcess, run
 
 CHECKED = "mise lock    ✓ 72 targets checked"
 FAILED  = "mise ERROR error sending request"
+LYCHEE  = '[tools."aqua:lycheeverse/lychee"."platforms.linux-x64"]'
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
 SUMMARY = "✓ Updated 14 platform entries ({skipped} skipped)"
 
@@ -204,18 +207,50 @@ def test_the_check_fails_printing_what_mise_reports(
     assert (result.returncode, result.stderr.strip()) == (1, reported)
 
 
-def test_an_offline_lock_fails_the_check(copy: Path, monkeypatch: MonkeyPatch):
+def test_a_tool_missing_a_platform_another_carries_fails_naming_both(
+    copy     : Path,
+    stand_in : Callable[[str, str], StandIn]
+):
+    """
+    Asserts that a lockfile in which one tool holds no entry for a platform
+    another tool's entries carry fails the task, which names the tool
+    and the platform, even where `mise lock` exits `0`, counts no skipped
+    platform, and leaves the file as it found it.
+    """
+    lock = copy / ".mise/mise.lock"
+    lock.write_text(sub(rf"{escape(LYCHEE)}\n(?:.+\n)+\n?", "", lock.read_text()))
+    stand_in("mise", f'echo "{CHECKED}"')
+
+    result = executed(copy)
+
+    assert (result.returncode, result.stderr.strip()) == (
+        1, "aqua:lycheeverse/lychee has no linux-x64 entry in .mise/mise.lock"
+    )
+
+
+@mark.parametrize(
+    "table",
+    [
+        param(LYCHEE, id="lychee"),
+        param('[tools.zizmor."platforms.windows-x64-baseline"]', id="zizmor")
+    ]
+)
+def test_an_offline_lock_fails_the_check(
+    copy        : Path,
+    monkeypatch : MonkeyPatch,
+    table       : str
+):
     """
     Asserts that the real `mise lock`, reaching no release host through
     a proxy that refuses every connection, fails the task on a lockfile
-    missing its last platform entry, which it cannot fetch, and that the
-    task leaves the lockfile as it found it.
+    missing one platform entry, which it cannot fetch, and that the task
+    leaves the lockfile as it found it.
 
     `MISE_HTTP_RETRIES` set to `0` makes each refused request fail at once
     rather than after mise's retries.
     """
     lock    = copy / ".mise/mise.lock"
-    trimmed = lock.read_text().rpartition("\n\n[")[0] + "\n"
+    trimmed = sub(rf"{escape(table)}\n(?:.+\n)+\n?", "", lock.read_text())
     lock.write_text(trimmed)
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
