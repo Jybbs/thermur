@@ -232,8 +232,9 @@ def test_the_committed_lock_passes_the_check_online(
 ):
     """
     Asserts that the real `mise`, locking every platform `.mise/mise.lock`
-    holds over the network and running the dry run, passes the task on the
-    committed lockfile, printing nothing.
+    holds and running the dry run, passes the task on the committed
+    lockfile, printing nothing. The release `min_version` names fetches each
+    platform entry over the network to lock it.
     """
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(copy))
 

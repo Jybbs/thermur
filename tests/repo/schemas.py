@@ -470,10 +470,10 @@ def test_a_step_reads_its_inputs_as_github_hands_them_to_the_action(
 
 def test_a_json_object_at_any_depth_reads_as_a_frozendict(pytestconfig: Config):
     """
-    Asserts that a request's body and a ruleset's conditions read every
-    JSON object they hold as a `frozendict`, a nested one included, so the
-    request sending the repository's own settings hashes, and that the body
-    encodes the JSON the repository's table dumps to.
+    Asserts that a request's body and a ruleset's conditions read every JSON
+    object they hold as a `frozendict`, one nested in another or in an array
+    included, so the request sending the repository's own settings hashes,
+    and that the body encodes the JSON the repository's table dumps to.
     """
     root       = pytestconfig.rootpath
     repository = GithubSettings.read(root).repository
@@ -482,8 +482,9 @@ def test_a_json_object_at_any_depth_reads_as_a_frozendict(pytestconfig: Config):
 
     assert (
         type(request.body["security_and_analysis"]),
-        type(ruleset.conditions["ref_name"])
-    ) == (frozendict, frozendict)
+        type(ruleset.conditions["ref_name"]),
+        type(ruleset.request(None).body["rules"][0])
+    ) == (frozendict, frozendict, frozendict)
     assert hash(request) == hash(repository.request)
     assert from_json(request.payload) == repository.model_dump(mode="json")
 
