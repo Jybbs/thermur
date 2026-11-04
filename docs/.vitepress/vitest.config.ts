@@ -3,6 +3,13 @@ import { defineConfig } from 'vitest/config'
 import { identityModule } from './lib/identity.ts'
 import { cacheDir }       from './lib/paths.ts'
 
+/**
+ * The milliseconds a case runs before it fails. Each case spends its time on
+ * the CPU, so the slowest takes half a second on an idle machine and more than
+ * 30 seconds at a load average in the hundreds.
+ */
+const TEST_TIMEOUT = 60_000
+
 export default defineConfig({
   cacheDir : cacheDir(import.meta.url, 'vitest'),
   plugins  : [identityModule()],
@@ -15,6 +22,7 @@ export default defineConfig({
     restoreMocks        : true,
     sequence            : { shuffle: true },
     setupFiles          : ['.vitepress/tests/common/matchers.ts'],
+    testTimeout         : TEST_TIMEOUT,
     unstubGlobals       : true,
 
     coverage: {
