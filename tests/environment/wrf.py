@@ -3,30 +3,33 @@ Pins the conversions `WrfOutput` takes of a WRF-SFIRE output, read here off
 the dataset a parametric threat builds:
 
 - The air temperature, the height above the ground, and the destaggered
-  winds on the model's levels
+  winds on the model's levels, and the range each is checked against
 - The regridding onto fixed heights, the excess over the ambient profile,
   and the distance to the front
 - The air they lay out, the crop each constructor applies, and the
   functions applied along one dimension or one snapshot
 """
 
-from numpy          import arange, array, inf, isfinite, sqrt, zeros
+from contextlib     import AbstractContextManager, nullcontext
+from numpy          import arange, array, inf, isfinite, nan, sqrt, zeros
 from numpy.testing  import assert_allclose
 from pathlib        import Path
 from pytest         import MonkeyPatch, fixture, mark, param, raises
-from xarray         import DataArray, Dataset
+from xarray         import DataArray, Dataset, full_like, zeros_like
 from xarray.testing import assert_identical
 
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
+    DRY_AIR_J_KG_K,
     GRAVITY_M_S2,
     Grid,
     HEAT_CAPACITY_J_KG_K,
     ParametricThreat,
+    REFERENCE_PA,
     Span
 )
-from thermur.environment.wrf   import WrfOutput, destaggered, distances, spans
+from thermur.environment.wrf   import WrfOutput, checked, destaggered, distances, spans
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 
@@ -76,6 +79,30 @@ def exner(heights: DataArray) -> DataArray:
     return 1 - GRAVITY_M_S2 * heights / (HEAT_CAPACITY_J_KG_K * BASE_K)
 
 
+def scaled(threat: ParametricThreat, *, scale: float) -> Dataset:
+    """
+    Scales the base-state geopotential of one column of the threat's
+    dataset, leaving every other column on its own levels.
+    """
+    data         = threat.dataset
+    corner       = {"south_north": 0, "west_east": 0}
+    base         = data.PHB.copy()
+    base[corner] = base[corner] * scale
+    return data.assign(PHB=base)
+
+
+def test_a_crop_drops_every_other_coordinate(crop: Crop, threat: ParametricThreat):
+    """
+    Asserts that a crop keeps none of the coordinates an output holds beyond
+    the ones it places, such as the `XLAT` a WRF-SFIRE output carries.
+    """
+    data = threat.dataset
+
+    placed = WrfOutput.from_dataset(data.assign_coords(XLAT=data.GRNHFX), crop=crop)
+
+    assert "XLAT" not in placed.dataset.coords
+
+
 @mark.parametrize(
     ("crop", "empty"),
     [
@@ -101,6 +128,38 @@ def test_a_crop_keeping_no_point_along_a_dimension_is_refused(
     """
     with raises(ValueError, match=f"The crop keeps no point along {empty}"):
         WrfOutput.from_threat(threat, crop=crop)
+
+
+def test_a_crop_keeps_the_band_above_raised_ground(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that a crop over ground 1,000 m above sea level keeps the levels
+    it keeps over ground at sea level, since the band is a height above
+    the ground.
+    """
+    data   = threat.dataset
+    raised = WrfOutput.from_dataset(
+        data.assign(PHB=data.PHB + GRAVITY_M_S2 * 1000.0),
+        crop = crop
+    )
+
+    assert raised.dataset.sizes["bottom_top"] == 7
+    assert raised.aloft.sizes["height"] == 5
+
+
+def test_a_crop_keeps_the_levels_its_shortest_column_needs(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that a crop reads its levels from the column reaching the top of
+    the band last, so one column half as deep still covers the band.
+    """
+    output = WrfOutput.from_dataset(scaled(threat, scale=0.5), crop=crop)
+
+    assert output.aloft.sizes["height"] == 5
 
 
 def test_an_output_lacking_a_variable_is_refused_naming_it(
@@ -259,13 +318,54 @@ def test_the_air_aloft_is_each_column_interpolated_onto_the_fixed_heights(
     )
 
 
+@mark.parametrize(
+    "scale",
+    [
+        param(3.0, id="starting-above-the-floor"),
+        param(0.25, id="ending-below-the-top")
+    ]
+)
+def test_the_air_aloft_refuses_a_band_one_column_misses(
+    crop   : Crop,
+    scale  : float,
+    threat : ParametricThreat
+):
+    """
+    Asserts that the air aloft is refused where one column alone starts
+    above the band or ends below it, every other column covering the band.
+    """
+    with raises(ValueError, match="short of the band"):
+        WrfOutput.from_dataset(scaled(threat, scale=scale), crop=crop).aloft
+
+
+def test_the_air_aloft_takes_a_band_beginning_on_the_level_it_reads():
+    """
+    Asserts that a band beginning at the lowest level's center is regridded,
+    though that center lands a fraction of a micrometer above it in single
+    precision on levels 7.2 m deep.
+    """
+    threat = ParametricThreat(
+        edge_m = 10.0,
+        grid   = Grid(
+            columns   = 4,
+            level_m   = 7.2,
+            levels    = 4,
+            rows      = 2,
+            snapshots = 2
+        )
+    )
+    crop = Crop(floor_m=3.6, levels=2, spacing_m=7.2)
+
+    assert WrfOutput.from_threat(threat, crop=crop).aloft.sizes["height"] == 2
+
+
 def test_the_air_aloft_takes_a_band_ending_on_the_levels_it_reads(
     threat: ParametricThreat
 ):
     """
-    Asserts that a band beginning at the lowest level's center and ending at
-    the highest's is regridded, though those centers land a few micrometers
-    off in single precision.
+    Asserts that a band beginning at the lowest level's center and ending
+    at the highest's is regridded, though those centers land tens of
+    micrometers off in single precision.
     """
     crop = Crop(floor_m=10.0, levels=12, spacing_m=20.0)
 
@@ -384,6 +484,39 @@ def test_a_crop_keeps_the_window_the_neighborhood_and_the_band(
     assert "XTIME" not in dataset
 
 
+def test_the_conversions_read_each_perturbation_and_the_ground(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that the air temperature reads the perturbation pressure beside
+    the base state, and that the height reads the perturbation geopotential
+    beside the base state, measured from the ground's own.
+    """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(
+        data.assign(
+            P   = data.P + 500.0,
+            PH  = data.PHB * 0.5,
+            PHB = data.PHB + GRAVITY_M_S2 * 100.0
+        ),
+        crop = crop
+    )
+    levels   = data.isel(bottom_top=slice(output.dataset.sizes["bottom_top"]))
+    exponent = DRY_AIR_J_KG_K / HEAT_CAPACITY_J_KG_K
+
+    assert_allclose(
+        output.temperature.values,
+        ((levels.T + BASE_K) * ((levels.PB + 500.0) / REFERENCE_PA) ** exponent).values,
+        rtol = 1e-5
+    )
+    assert_allclose(
+        output.heights.isel(Time=0, south_north=0, west_east=0).values,
+        1.5 * threat.grid.heights.isel(bottom_top=levels.bottom_top).values,
+        rtol = 1e-4
+    )
+
+
 def test_the_default_settings_lay_out_the_default_threat():
     """
     Asserts that the fixed heights the default crop lays out sit inside the
@@ -394,6 +527,122 @@ def test_the_default_settings_lay_out_the_default_threat():
 
     assert air.channels.shape == (7, 9, 25, 50, 100)
     assert isfinite(air.channels).all()
+
+
+@mark.parametrize(
+    ("values", "held"),
+    [
+        param([0.0, 10.0], nullcontext(), id="reaching-each-bound"),
+        param(
+            [-0.5, 10.0],
+            raises(
+                ValueError,
+                match = "`air` runs from -0.5 to 10 K, outside the range from 0 to 10 K"
+            ),
+            id = "under-the-floor"
+        ),
+        param(
+            [0.0, 10.5],
+            raises(
+                ValueError,
+                match = "`air` runs from 0 to 10.5 K, outside the range from 0 to 10 K"
+            ),
+            id = "past-the-ceiling"
+        ),
+        param(
+            [5.0, nan],
+            raises(ValueError, match="`air` runs from nan to nan K"),
+            id = "missing-a-value"
+        )
+    ]
+)
+def test_a_field_checked_against_its_bounds_is_refused_past_either(
+    held   : AbstractContextManager[object],
+    values : list[float]
+):
+    """
+    Asserts that a field reaching each of its bounds comes back as it went
+    in, and one past either bound or missing a value is refused, the refusal
+    naming the field, the values it holds, and its range.
+    """
+    field = DataArray(values, name="air")
+
+    with held:
+        assert checked(field, bounds=(0.0, 10.0), unit="K") is field
+
+
+@mark.parametrize(
+    "value",
+    [
+        param(-300.0, id="at-absolute-zero"),
+        param(2000.0, id="past-a-crown-fire"),
+        param(nan, id="missing")
+    ]
+)
+def test_an_air_temperature_outside_its_range_is_refused(
+    crop   : Crop,
+    threat : ParametricThreat,
+    value  : float
+):
+    """
+    Asserts that an air temperature below the lowest recorded at the Earth's
+    surface, past the peak measured in a crown fire, or missing is refused
+    against the range `Ranges` declares.
+    """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(data.assign(T=full_like(data.T, value)), crop=crop)
+
+    with raises(
+        ValueError,
+        match = "`temperature` .* outside the range from 183.95 to 1603.15 K"
+    ):
+        output.temperature
+
+
+@mark.parametrize(
+    "scale",
+    [param(-2.0, id="below-the-ground"), param(100.0, id="past-the-deepest-simulation")]
+)
+def test_a_height_outside_its_range_is_refused(
+    crop   : Crop,
+    scale  : float,
+    threat : ParametricThreat
+):
+    """
+    Asserts that a height below the ground or past the top of the deepest
+    simulation is refused against the range `Ranges` declares.
+    """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(data.assign(PH=data.PHB * scale), crop=crop)
+
+    with raises(ValueError, match="`height` .* outside the range from 0 to 5000 m"):
+        output.heights
+
+
+@mark.parametrize("offset", [param(-200.0, id="westward"), param(200.0, id="eastward")])
+@mark.parametrize("variable", ["U", "V", "W"])
+def test_a_wind_outside_its_range_is_refused_naming_its_axis(
+    crop     : Crop,
+    offset   : float,
+    threat   : ParametricThreat,
+    variable : str
+):
+    """
+    Asserts that a wind past the world-record gust, either way along any
+    axis, is refused against the range `Ranges` declares, the refusal naming
+    the component.
+    """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(
+        data.assign({variable: data[variable] + offset}),
+        crop = crop
+    )
+
+    with raises(
+        ValueError,
+        match = f"`{variable.lower()}` .* outside the range from -113.3 to 113.3 m/s"
+    ):
+        output.wind
 
 
 def test_the_distances_measure_each_cell_to_the_nearest_burning_one():
@@ -456,6 +705,29 @@ def test_the_front_and_the_ambient_read_the_columns_the_crop_keeps(
         0.0,
         atol = 1e-3
     )
+
+
+def test_the_front_and_the_points_read_each_axis_s_own_spacing(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that an output whose rows lie 80 m apart and whose columns lie
+    40 m apart places its points and measures the front along each axis by
+    that axis's spacing.
+    """
+    data    = threat.dataset
+    burning = zeros_like(data.GRNHFX)
+    burning[{"south_north": 0, "west_east": 0}] = 1.0
+
+    output = WrfOutput.from_dataset(
+        data.assign(GRNHFX=burning).assign_attrs(DY=80.0),
+        crop = crop
+    )
+
+    assert output.dataset.south_north.values.tolist() == [40.0, 120.0, 200.0]
+    assert_allclose(output.front.isel(Time=0, south_north=1, west_east=0), 80.0)
+    assert_allclose(output.front.isel(Time=0, south_north=0, west_east=1), 40.0)
 
 
 def test_the_front_is_each_column_s_distance_to_the_nearest_burning_one(

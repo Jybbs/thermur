@@ -4,13 +4,12 @@ registers each command by its import path, so `thermur --version` and the
 help of a group import no module a command reads until that command runs.
 """
 
-from cyclopts           import App, Parameter
+from cyclopts           import App
 from importlib.metadata import metadata
 
 app = App(
-    default_parameter = Parameter(negative=()),
-    help              = metadata("thermur")["Summary"],
-    name              = "thermur"
+    help = metadata("thermur")["Summary"],
+    name = "thermur"
 )
 app.command(
     App(

@@ -1,8 +1,8 @@
 """
-Holds `WrfOutput`, the WRF-SFIRE output a run reads, beside `destaggered`,
-`distances`, and `spans`, the functions it applies along one dimension or
-one snapshot. The `wrf_output` step builds the record and the `air` step
-reads it.
+Holds `WrfOutput`, the WRF-SFIRE output a run reads, beside `checked`,
+`destaggered`, `distances`, and `spans`, the functions it applies to a
+field, along one dimension, or to one snapshot. The `wrf_output` step builds
+the record and the `air` step reads it.
 """
 
 from functools     import cached_property
@@ -22,6 +22,8 @@ from thermur.environment.schemas import (
     HEAT_CAPACITY_J_KG_K,
     ParametricThreat,
     REFERENCE_PA,
+    Range,
+    Ranges,
     Span
 )
 from thermur.pipeline.settings import Settings
@@ -31,9 +33,15 @@ from thermur.repo.checkout     import Checkout
 class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     One WRF-SFIRE output under WRF's own names, holding only the variables
-    the record reads, cropped to `crop` before any field loads, with its
-    mass and staggered points placed in meters from the domain's southwest
-    corner and its snapshots in seconds since the simulation started.
+    the record reads, cropped to `crop` before any other field loads,
+    reading only the times and the base-state geopotential, with its mass
+    and staggered points placed in meters from the domain's southwest corner
+    and its snapshots in seconds since the simulation started.
+    """
+
+    ranges: ClassVar[Ranges] = Ranges()
+    """
+    The values each converted field may take.
     """
 
     variables: ClassVar[tuple[str, ...]] = (
@@ -75,7 +83,8 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         through `np.interp`.
 
         Each column's extent is compared to the millimeter, since a height
-        in single precision lands a few micrometers off the level it names.
+        in single precision lands tens of micrometers off the level it
+        names.
 
         Raises:
             ValueError: Where a column's levels begin above the lowest fixed
@@ -151,12 +160,21 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
 
         The ground is the lowest staggered level, where WRF holds the
         geopotential of the terrain, so the height needs no `HGT`.
+
+        Raises:
+            ValueError: Where a height falls outside `ranges.height_m`.
         """
         geopotential = self.dataset.PH + self.dataset.PHB
-        return (
-            destaggered(geopotential, dimension="bottom_top_stag")
-            - geopotential.isel(bottom_top_stag=0)
-        ) / GRAVITY_M_S2
+        return checked(
+            field = (
+                (
+                    destaggered(geopotential, dimension="bottom_top_stag")
+                    - geopotential.isel(bottom_top_stag=0)
+                ) / GRAVITY_M_S2
+            ).rename("height"),
+            bounds = self.ranges.height_m,
+            unit   = "m"
+        )
 
     @property
     def smoke(self) -> DataArray:
@@ -172,10 +190,20 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         Converts the perturbation potential temperature `T` into the air
         temperature at each mass point on the model's levels, in kelvin, as
         wrf-python's `tk` does from the pressure `P` plus `PB`.
+
+        Raises:
+            ValueError: Where a temperature falls outside
+                        `ranges.temperature_k`.
         """
         data = self.dataset
-        return (data.T + BASE_K) * ((data.P + data.PB) / REFERENCE_PA) ** (
-            DRY_AIR_J_KG_K / HEAT_CAPACITY_J_KG_K
+        return checked(
+            field = (
+                (data.T + BASE_K) * ((data.P + data.PB) / REFERENCE_PA) ** (
+                    DRY_AIR_J_KG_K / HEAT_CAPACITY_J_KG_K
+                )
+            ).rename("temperature"),
+            bounds = self.ranges.temperature_k,
+            unit   = "K"
         )
 
     @cached_property
@@ -184,6 +212,9 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         Destaggers each wind component onto the mass points on the model's
         levels, as wrf-python's `ua`, `va`, and `wa` do, under the names
         `u`, `v`, and `w`.
+
+        Raises:
+            ValueError: Where a component falls outside `ranges.wind_m_s`.
         """
         return Dataset(
             {
@@ -192,7 +223,7 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
                 "w" : destaggered(self.dataset.W, dimension="bottom_top_stag")
             },
             coords = self.temperature.coords
-        )
+        ).map(checked, bounds=self.ranges.wind_m_s, unit="m/s")
 
     @classmethod
     def from_dataset(cls, dataset: Dataset, *, crop: Crop) -> Self:
@@ -204,9 +235,10 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         value but the times `XTIME` holds and the base-state geopotential of
         the first snapshot loads.
 
-        The levels kept are read from that geopotential's lowest height at
-        each level, keeping one level more than the first to reach the top
-        of the band, since the perturbation geopotential can lower a level.
+        The levels kept are read from the lowest height above the ground
+        that geopotential gives each level, keeping one level more than
+        the first to reach the top of the band, since the perturbation
+        geopotential can lower a level.
 
         Raises:
             ValueError: Where the window holds no snapshot, or the
@@ -233,8 +265,9 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         if empty := [name for name, size in framed.sizes.items() if not size]:
             raise ValueError(f"The crop keeps no point along {empty}")
 
+        base   = framed.PHB.isel(Time=0)
         lowest = destaggered(
-            field = (framed.PHB.isel(Time=0) / GRAVITY_M_S2).min(
+            field = ((base - base.isel(bottom_top_stag=0)) / GRAVITY_M_S2).min(
                 ["south_north", "west_east"]
             ),
             dimension = "bottom_top_stag"
@@ -251,8 +284,10 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
     @classmethod
     def from_path(cls, path: Path, *, crop: Crop) -> Self:
         """
-        Opens the WRF-SFIRE output at `path` through netCDF4, reading no
-        value until a caller reads it, and crops it as `from_dataset` does.
+        Opens the WRF-SFIRE output at `path` through netCDF4 and crops it
+        as `from_dataset` does, which reads the times and the base-state
+        geopotential, leaving every other value unread until a caller reads
+        it.
         """
         return cls.from_dataset(open_dataset(path, engine="netcdf4"), crop=crop)
 
@@ -277,6 +312,33 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         `from_dataset` crops a simulation.
         """
         return cls.from_dataset(threat.dataset, crop=crop)
+
+
+def checked(field: DataArray, *, bounds: Range, unit: str) -> DataArray:
+    """
+    Checks every value of `field` against `bounds`, reading a missing value
+    as one outside them.
+
+    Args:
+        field  : The converted field, named as a failure reports it.
+        bounds : The lowest and the highest value it may take.
+        unit   : The unit of its values, as a failure reports it.
+
+    Returns:
+        `field`, unchanged.
+
+    Raises:
+        ValueError: Where a value falls outside `bounds` or is missing.
+    """
+    floor, ceiling  = bounds
+    lowest, highest = float(field.min(skipna=False)), float(field.max(skipna=False))
+    if not floor <= lowest <= highest <= ceiling:
+        raise ValueError(
+            f"`{field.name}` runs from {lowest:g} to {highest:g} {unit}, outside "
+            f"the range from {floor:g} to {ceiling:g} {unit}"
+        )
+
+    return field
 
 
 def destaggered(field: DataArray, *, dimension: str) -> DataArray:

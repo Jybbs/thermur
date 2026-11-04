@@ -27,7 +27,8 @@ def settings() -> Settings:
     return Settings(
         crop   = Crop(floor_m=20.0, levels=5, spacing_m=20.0),
         threat = ParametricThreat(
-            grid = Grid(
+            edge_m = 10.0,
+            grid   = Grid(
                 columns   = 8,
                 levels    = 10,
                 rows      = 2,

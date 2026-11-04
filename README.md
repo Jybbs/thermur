@@ -212,7 +212,7 @@ These emergent behaviors are verified through the comprehensive metrics suite de
 
 ### WRF-SFIRE Dataset
 
-The air the flock flies through comes from the large-eddy simulations of the [WRF-SFIRE LES Synthetic Wildfire Plume Dataset](https://doi.org/10.20383/102.0314), of which `mise fetch` downloads one output as a sample into `data/samples/`, at the revision and digest the package pins. **[Data](https://thermur.fyi/data/)** (`docs/pages/data/index.md`) sets out what the sample holds, how the graph reads an output, the parametric threat it flies through where no output is named, and how to reach the full dataset.
+The air the flock flies through comes from the large-eddy simulations of the [WRF-SFIRE LES Synthetic Wildfire Plume Dataset](https://doi.org/10.20383/102.0314), of which `mise fetch` downloads a slice of one output as a sample into `data/samples/`, at the revision and digest the package pins. **[Data](https://thermur.fyi/data/)** (`docs/pages/data/index.md`) sets out what the sample holds, how the graph reads an output, the parametric threat it flies through where no output is named, and how to reach the full dataset.
 
 ### Training Workflow
 

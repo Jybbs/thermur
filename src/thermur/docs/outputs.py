@@ -18,6 +18,7 @@ from thermur.environment.schemas import (
     GRAVITY_M_S2,
     HEAT_CAPACITY_J_KG_K,
     ParametricThreat,
+    Ranges,
     Sample
 )
 from thermur.identity.schemas import Identity
@@ -92,11 +93,13 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         """
         Renders the body of each region the render task writes into a page,
         by the page's path and then by the region's name, meaning the fields
-        `Sample`, `Crop`, and `ParametricThreat` declare on the Data page.
+        `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
+        Data page.
         """
         return {
             Path("docs/pages/data/index.md"): {
                 "crop"   : tabled(Crop),
+                "ranges" : tabled(Ranges),
                 "sample" : tabled(Sample),
                 "threat" : tabled(ParametricThreat)
             }

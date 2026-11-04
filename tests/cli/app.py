@@ -1,7 +1,7 @@
 """
 Pins the `thermur` command line, meaning the version it reports, the help
 it prints for itself, for each group, and for each command, and that neither
-the version nor a command's help imports JAX or xarray.
+the version, a command's help, nor the fetch imports JAX or xarray.
 """
 
 from collections.abc    import Callable
@@ -57,6 +57,31 @@ def test_neither_the_version_nor_a_command_s_help_imports_jax_or_xarray():
                     ["fetch", "sample", "--help"]
                 )
             ),
+            "print(sorted({'jax', 'xarray'} & set(sys.modules)))"
+        ]
+    )
+
+    started = run(
+        [executable, "-c", script],
+        capture_output = True,
+        check          = True,
+        text           = True
+    )
+
+    assert started.stdout.splitlines()[-1] == "[]"
+
+
+def test_running_the_fetch_imports_neither_jax_nor_xarray():
+    """
+    Asserts that a fresh interpreter running the fetch imports neither JAX
+    nor xarray, with the download itself stood in for.
+    """
+    script = "; ".join(
+        [
+            "import sys", "from thermur.cli import app",
+            "from thermur.environment import schemas",
+            "schemas.Sample.fetch = lambda self, root: root / self.member",
+            "app(['fetch', 'sample'], result_action='return_value')",
             "print(sorted({'jax', 'xarray'} & set(sys.modules)))"
         ]
     )

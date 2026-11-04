@@ -47,6 +47,21 @@ function drawn(reduced = false, seen = true): Drawn {
  */
 const words = (stand: Browser): unknown[] => stand.context.fillText!.mock.calls.map(([word]) => word)
 
+/**
+ * Glides the run to `seconds` under a press, then clears the stand-in context
+ * of everything but what one more frame draws.
+ */
+function standing(seconds: number): Browser {
+  const { playback, stand } = drawn()
+  playback.press()
+  playback.seek(seconds)
+  stand.frames.run(300, 16)
+  stand.context.fillRect!.mockClear()
+  stand.context.stroke!.mockClear()
+  stand.frames.run(1, 16)
+  return stand
+}
+
 describe('the heat ramp a plot draws in', () => {
   const tones = new Tones()
 
@@ -106,6 +121,18 @@ describe('a plot in motion', () => {
     const before = stand.context.stroke!.mock.calls.length
     stand.frames.run(1, 16)
     expect(stand.context.stroke!.mock.calls.length - before).toBeGreaterThan(9)
+  })
+})
+
+describe('a plot held by a press', () => {
+  it('strokes a trace only for each snapshot the front has passed', () => {
+    const early = standing(40).context.stroke!.mock.calls.length
+    const late  = standing(100).context.stroke!.mock.calls.length
+    expect(late - early).toBe(4)
+  })
+
+  it('lights only the cells whose centers the front has reached', () => {
+    expect(standing(60).context.fillRect!.mock.calls).toHaveLength(1)
   })
 })
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it }           from 'vitest'
+import { type VueWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it }                          from 'vitest'
 
 import ThreatFront                         from '../../theme/threat.ts'
 import { type Browser, RELEASED, browser } from '../common/browser.ts'
@@ -121,5 +121,25 @@ describe('the rail', () => {
     expect(chips(widget)[0]).toBe('Time30 s')
     stand.frames.run(20, 50)
     expect(chips(widget)[0]).not.toBe('Time30 s')
+  })
+})
+
+describe('the rail over a drawing already drawn', () => {
+  it('repaints a drawing standing still on a move once its face has loaded', async () => {
+    const { widget } = mounted(true)
+    await flushPromises()
+    await widget.get('input').setValue(90)
+    expect(chips(widget)[0]).toBe('Time90 s')
+  })
+
+  it('holds the run after a press that moved nothing', async () => {
+    const { stand, widget } = mounted()
+    stand.frames.run(10, 50)
+    const rail = widget.get('input')
+    await rail.trigger('pointerdown')
+    await rail.trigger('pointerup')
+    const held = chips(widget)[0]
+    stand.frames.run(70, 50)
+    expect(chips(widget)[0]).toBe(held)
   })
 })

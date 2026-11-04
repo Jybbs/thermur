@@ -1,6 +1,6 @@
 """
 Holds the records the fire data is read through, meaning `Crop`, `Grid`,
-`ParametricThreat`, and `Sample`, beside the constants WRF and the
+`ParametricThreat`, `Ranges`, and `Sample`, beside the constants WRF and the
 wrf-python diagnostics share.
 """
 
@@ -24,7 +24,8 @@ from xarray             import DataArray, Dataset
 # pressure, and the pressure potential temperature is referred to.
 type Count           = Annotated[int, Field(ge=1)]
 type Positive        = Annotated[float, Field(gt=0)]
-type Span            = tuple[float, float] | None
+type Range           = tuple[float, float]
+type Span            = Range | None
 BASE_K               = 300.0
 DRY_AIR_J_KG_K       = 287.0
 GRAVITY_M_S2         = 9.81
@@ -35,8 +36,9 @@ REFERENCE_PA         = 100000.0
 class Crop(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The window, the neighborhood, and the band a WRF-SFIRE output is
-    cropped to before any field loads, and the fixed heights its fields are
-    regridded onto.
+    cropped to before any other field loads, reading only its times and its
+    base-state geopotential, and the fixed heights its fields are regridded
+    onto.
     """
 
     floor_m: Positive = 20.0
@@ -202,6 +204,33 @@ class Grid(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         )
 
 
+class Ranges(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The values each field `WrfOutput` converts may take, which a misread
+    variable or a fill value falls outside.
+    """
+
+    height_m: Range = (0.0, 5000.0)
+    """
+    The height above the ground a mass point may take, in meters, from the
+    ground to the top of the plume dataset's deepest simulations.
+    """
+
+    temperature_k: Range = (183.95, 1603.15)
+    """
+    The air temperature a mass point may take, in kelvin, from the -89.2 °C
+    recorded at Vostok station, the lowest at the Earth's surface, to the
+    1,330 °C peak air temperatures exceeded inside a boreal crown fire.
+    """
+
+    wind_m_s: Range = (-113.3, 113.3)
+    """
+    The wind along each axis a mass point may take, in meters per second,
+    either way up to the 113.3 m/s gust recorded on Barrow Island, the
+    world record.
+    """
+
+
 class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The WRF-SFIRE sample the `thermur fetch sample` command downloads, an
@@ -342,8 +371,8 @@ class ParametricThreat(
 
     The air holds the potential temperature WRF's base state takes at every
     height, warmed behind the front by `anomaly_k`, which a hyperbolic
-    tangent `edge_m` wide carries to zero ahead of it, and the smoke tracer
-    follows the same profile from one behind the front to zero ahead.
+    tangent of scale `edge_m` carries to zero ahead of it, and the smoke
+    tracer follows the same profile from one behind the front to zero ahead.
     """
 
     anomaly_k: Positive = 20.0
@@ -354,8 +383,9 @@ class ParametricThreat(
 
     edge_m: Positive = 40.0
     """
-    The width over which the anomaly falls from behind the front to ahead of
-    it, in meters, one grid spacing by default.
+    The scale of the hyperbolic tangent carrying the anomaly to zero ahead of
+    the front, in meters, one grid spacing by default, so 76% of the anomaly
+    falls within this distance on either side of the front.
     """
 
     grid: Grid = Grid()
@@ -408,18 +438,20 @@ class ParametricThreat(
     @model_validator(mode="after")
     def held(self) -> Self:
         """
-        Holds the front inside the western half of the domain until the
-        last snapshot, so the hot air covers less than half of every height
-        and the median `WrfOutput.ambient` takes still reads the air ahead
-        of it.
+        Holds the front and five times `edge_m` ahead of it inside the
+        western half of the domain through the last snapshot, so the
+        hot air covers less than half of every height and the median
+        `WrfOutput.ambient` takes still reads the air ahead of it, the
+        anomaly having fallen under 0.005% of itself that far ahead.
 
         Raises:
-            ValueError: Where the front passes the domain's midline before
-                        the last snapshot.
+            ValueError: Where the front's edge passes the domain's midline
+                        by the last snapshot.
         """
-        if (reach := self.speed_m_s * self.grid.span_s) > self.grid.length_m / 2:
+        reach = self.speed_m_s * self.grid.span_s + 5 * self.edge_m
+        if reach > self.grid.length_m / 2:
             raise ValueError(
-                f"The front reaches {reach:g} m by the last snapshot, past the "
+                f"The front's edge reaches {reach:g} m by the last snapshot, past the "
                 f"midline of a domain {self.grid.length_m:g} m long"
             )
 

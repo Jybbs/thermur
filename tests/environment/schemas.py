@@ -17,7 +17,9 @@ from numpy.testing      import assert_allclose
 from pathlib            import Path
 from pydantic           import ValidationError
 from pytest             import MonkeyPatch, mark, param, raises
-from tarfile            import FilterError, TarFile, TarInfo
+from tarfile            import CHRTYPE, FilterError, SYMTYPE, TarFile, TarInfo
+from tempfile           import TemporaryFile
+from unittest.mock      import Mock
 from urllib.error       import HTTPError, URLError
 from urllib.request     import HTTPRedirectHandler, Request, build_opener
 
@@ -47,11 +49,11 @@ class Unfollowed(HTTPRedirectHandler):
         """
 
 
-def served(folder: Path, members: dict[str, bytes]) -> Sample:
+def served(folder: Path, members: dict[str, bytes], *entries: TarInfo) -> Sample:
     """
-    Packs `members` into a gzipped tar archive, each under its name, and
-    writes it where the sample's address points once `folder` stands in for
-    the Hub.
+    Packs `members` into a gzipped tar archive, each under its name, beside
+    `entries`, each holding no data of its own, and writes it where the
+    sample's address points once `folder` stands in for the Hub.
 
     Returns:
         The sample pinning the archive's digest, with `folder` as its Hub.
@@ -62,6 +64,9 @@ def served(folder: Path, members: dict[str, bytes]) -> Sample:
             info      = TarInfo(name)
             info.size = len(data)
             bundle.addfile(info, BytesIO(data))
+
+        for entry in entries:
+            bundle.addfile(entry)
 
     sample = Sample(digest=sha256(buffer.getvalue()).hexdigest(), hub=folder.as_uri())
     (path := Path.from_uri(sample.address)).parent.mkdir(parents=True)
@@ -79,6 +84,23 @@ def test_a_crop_lays_its_heights_out_evenly_from_its_floor():
     assert heights.dims == ("height",)
     assert heights.values.tolist() == [10.0, 15.0, 20.0]
     assert heights.height.values.tolist() == [10.0, 15.0, 20.0]
+
+
+def test_a_fetch_downloads_into_a_temporary_file_under_its_folder(
+    monkeypatch : MonkeyPatch,
+    tmp_path    : Path
+):
+    """
+    Asserts that a fetch writes its download into a temporary file under the
+    folder it extracts into.
+    """
+    sample = served(tmp_path / "hub", {"samples/wrf_sample.nc": b"CDF"})
+    spy    = Mock(wraps=TemporaryFile)
+    monkeypatch.setattr("thermur.environment.schemas.TemporaryFile", spy)
+
+    sample.fetch(tmp_path / "clone")
+
+    spy.assert_called_once_with(dir=tmp_path / "clone/data")
 
 
 def test_a_fetch_extracts_an_archive_matching_its_digest(tmp_path: Path):
@@ -110,6 +132,31 @@ def test_a_fetch_extracts_nothing_from_an_archive_with_another_digest(tmp_path: 
 
     with raises(ValueError, match=f"hashes to `{sample.digest}`"):
         sample.model_copy(update={"digest": "0" * 64}).fetch(tmp_path / "clone")
+
+    assert list((tmp_path / "clone/data").iterdir()) == []
+
+
+@mark.parametrize(
+    ("kind", "target"),
+    [
+        param(SYMTYPE, "/etc/hosts", id="a-link-leading-out"),
+        param(CHRTYPE, "", id="a-device")
+    ]
+)
+def test_a_fetch_refuses_a_link_leading_out_and_a_device(
+    kind     : bytes,
+    target   : str,
+    tmp_path : Path
+):
+    """
+    Asserts that a fetch refuses an archive holding a link leading out of
+    the folder it extracts into or a device, extracting neither.
+    """
+    entry = TarInfo("samples/member")
+    entry.linkname, entry.type = target, kind
+
+    with raises(FilterError):
+        served(tmp_path / "hub", {}, entry).fetch(tmp_path / "clone")
 
     assert list((tmp_path / "clone/data").iterdir()) == []
 
@@ -261,9 +308,9 @@ def test_a_sample_addresses_its_archive_at_its_revision():
 @mark.parametrize(
     ("speed_m_s", "held"),
     [
-        param(10.0, nullcontext(), id="reaching-the-midline"),
+        param(8.0, nullcontext(), id="reaching-the-midline"),
         param(
-            10.01,
+            8.01,
             raises(ValidationError, match="reaches 1001 m .* domain 2000 m long"),
             id = "passing-the-midline"
         )
@@ -274,9 +321,10 @@ def test_a_threat_holds_its_front_inside_the_western_half(
     held      : AbstractContextManager[object]
 ):
     """
-    Asserts that a threat whose front reaches the midline of its domain by
-    the last snapshot validates, and one whose front passes it is refused,
-    on a domain 2,000 m long that the front crosses for 100 s.
+    Asserts that a threat whose front and five times its `edge_m` ahead
+    of it reach the midline of its domain by the last snapshot validates,
+    and one passing it is refused, on a domain 2,000 m long that the front
+    crosses for 100 s behind an edge of 40 m.
     """
     with held:
         ParametricThreat(
@@ -370,6 +418,17 @@ def test_a_still_threat_burns_nothing():
     of every snapshot unburned.
     """
     assert ParametricThreat(speed_m_s=0.0).dataset.GRNHFX.max() == 0
+
+
+def test_a_threat_burns_a_cell_the_moment_its_front_reaches_the_center():
+    """
+    Asserts that a threat's ground heat flux shows a cell burning at the
+    snapshot its front reaches the cell's center, and the next cell not yet.
+    """
+    threat  = ParametricThreat(speed_m_s=11.5, grid=Grid(interval_s=10.0, snapshots=13))
+    burning = threat.dataset.GRNHFX.isel(Time=-1, south_north=0).values
+
+    assert (burning[34], burning[35]) == (1.0, 0.0)
 
 
 def test_a_threat_lays_its_front_out_under_wrf_s_names():

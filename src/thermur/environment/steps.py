@@ -21,8 +21,9 @@ def air(environment_digest: str, wrf_output: WrfOutput) -> Air:
 @cache(behavior="recompute")
 def wrf_output(settings: Settings) -> WrfOutput:
     """
-    Opens the output the settings name, cropped before any field loads, or
-    wraps the dataset the threat builds, again on every run, since the cache
-    reads the path of a file rather than what the file holds.
+    Opens the output the settings name, cropped before any other field
+    loads, reading only the times and the base-state geopotential, or wraps
+    the dataset the threat builds, again on every run, since the cache reads
+    the path of a file rather than what the file holds.
     """
     return WrfOutput.from_settings(settings)

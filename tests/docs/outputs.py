@@ -24,7 +24,8 @@ from thermur.environment.schemas import (
     GRAVITY_M_S2,
     HEAT_CAPACITY_J_KG_K,
     ParametricThreat,
-    Sample,
+    Ranges,
+    Sample
 )
 from thermur.identity.schemas import Identity
 from thermur.repo.checkout    import Checkout
@@ -112,7 +113,7 @@ def test_a_missing_page_refuses_each_of_its_regions(checkout: Checkout):
     assert [finding.message for finding in Outputs(checkout=checkout).refused] == [
         f"`{DATA}` does not carry the opening and then the closing marker of its "
         f"`{name}` region once each, so `mise render` leaves the region as it stands"
-        for name in ("crop", "sample", "threat")
+        for name in ("crop", "ranges", "sample", "threat")
     ]
 
 
@@ -226,15 +227,17 @@ def test_each_marker_naming_no_entry_is_listed_on_its_page(checkout: Checkout):
 
 def test_each_region_of_the_data_page_is_written_from_its_record(checkout: Checkout):
     """
-    Asserts that the Data page carries the fields `Sample`, `Crop`, and
-    `ParametricThreat` declare, each between its pair of markers as the
-    render writes it, so the copy the repository holds has not drifted.
+    Asserts that the Data page carries the fields `Sample`, `Crop`,
+    `Ranges`, and `ParametricThreat` declare, each between its pair of
+    markers as the render writes it, so the copy the repository holds has
+    not drifted.
     """
     outputs = Outputs(checkout=checkout)
 
     assert outputs.regions == {
         DATA: {
             "crop"   : tabled(Crop),
+            "ranges" : tabled(Ranges),
             "sample" : tabled(Sample),
             "threat" : tabled(ParametricThreat)
         }

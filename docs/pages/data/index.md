@@ -1,6 +1,6 @@
 # Data
 
-The air *Thermur*'s flock flies through comes from the [WRF-SFIRE LES Synthetic Wildfire Plume Dataset](https://doi.org/10.20383/102.0314), the large-eddy simulations of wildfire plumes from which Moisseeva and Stull derive the height a smoke plume rises to[^moisseeva2021]. They ran each simulation in WRF-SFIRE, which couples a fire spreading over the ground to the Weather Research and Forecasting model (WRF). A clone fetches one output of one simulation as a sample, and wherever no simulation is named, the flock flies through a parametric threat instead, a front of hot air laid out the way a simulation lays out its fields.
+The air *Thermur*'s flock flies through comes from the [WRF-SFIRE LES Synthetic Wildfire Plume Dataset](https://doi.org/10.20383/102.0314), the large-eddy simulations of wildfire plumes from which Moisseeva and Stull derive the height a smoke plume rises to[^moisseeva2021]. They ran each simulation in WRF-SFIRE, which couples a fire spreading over the ground to the Weather Research and Forecasting model (WRF). A clone fetches a slice of one simulation's output as a sample, and wherever no simulation is named, the flock flies through a parametric threat instead, a front of hot air laid out the way a simulation lays out its fields.
 
 ## The Simulations
 
@@ -8,7 +8,7 @@ The dataset holds 147 simulations, each over a domain 20 km long and 10 km wide 
 
 ## The Sample
 
-The sample is one output of one simulation, holding four snapshots 15 s apart, from 3,615 s to 3,660 s after the simulation starts, over the whole domain on its 500 by 250 grid and its 50 levels. The ground heat flux and the smoke tracer are zero across the domain in the first two snapshots.
+The sample is `wrfout_W5F7R4`, the output of one simulation, cut to four snapshots 15 s apart, from 3,615 s to 3,660 s after the simulation starts, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the 50 levels of mass points between its 51 staggered levels. The ground heat flux and the smoke tracer are zero across the domain in the first two snapshots.
 
 `mise fetch` runs `thermur fetch sample`, which downloads the archive the table names at the pinned revision of its Hugging Face dataset, checks it against the digest, extracts it under `data/`, and prints the path of the output inside it. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
 
@@ -38,7 +38,7 @@ simulation = "data/samples/wrf_sample.nc"
 
 ## Reading an Output
 
-The graph opens an output without reading it and crops it to the window, the columns, and the heights the table below sets before any field loads, then converts each field the way the [wrf-python diagnostics](https://wrf-python.readthedocs.io/en/latest/diagnostics.html) define it:
+The graph opens an output without reading it and crops it to the window, the columns, and the heights the table below sets before any field but the times and the base-state geopotential loads, then converts each field the way the [wrf-python diagnostics](https://wrf-python.readthedocs.io/en/latest/diagnostics.html) define it:
 
 - The air temperature, from the perturbation potential temperature `T` and the pressure `P` plus `PB`
 - The height above the ground, from the geopotential `PH` plus `PHB`, along which each column is interpolated onto evenly spaced heights
@@ -67,9 +67,21 @@ The table is written from the record the crop is set in, each field set under `[
 
 <!-- /crop -->
 
+Each conversion refuses a field outside its range below, which a misread variable or a fill value falls past, and names the field beside the values it holds. The air temperature runs from the lowest recorded at the Earth's surface[^turner2009] to the peak measured inside a crown fire[^butler2004], the winds reach the world-record gust[^courtney2012] either way, and the heights run from the ground to the top of the dataset's deepest simulations. The table is written from the record declaring the ranges, and `mise render` rewrites it.
+
+<!-- ranges -->
+
+| **Field** | **Default** | **Holds** |
+|---|---|---|
+| `height_m` | `[0.0, 5000.0]` | The height above the ground a mass point may take, in meters, from the ground to the top of the plume dataset's deepest simulations |
+| `temperature_k` | `[183.95, 1603.15]` | The air temperature a mass point may take, in kelvin, from the -89.2 °C recorded at Vostok station, the lowest at the Earth's surface, to the 1,330 °C peak air temperatures exceeded inside a boreal crown fire |
+| `wind_m_s` | `[-113.3, 113.3]` | The wind along each axis a mass point may take, in meters per second, either way up to the 113.3 m/s gust recorded on Barrow Island, the world record |
+
+<!-- /ranges -->
+
 ## The Parametric Threat
 
-The parametric threat is a front of hot air entering the domain at its western edge as the first snapshot is written and advancing east at a steady speed, laid out under the names and on the grid a simulation writes, so it passes through every conversion above. Ahead of the front, the air holds the potential temperature of a still atmosphere cooling with height at the dry adiabatic lapse rate, and behind it, the air is warmer by the anomaly, which falls to nothing across the width of the front's edge. The smoke tracer follows the same profile, and each cell the front has reached shows burning. The front stays in the western half of the domain through the last snapshot, so the median at each height stays the air ahead of it.
+The parametric threat is a front of hot air entering the domain at its western edge as the first snapshot is written and advancing east at a steady speed, laid out under the names and on the grid a simulation writes, so it passes through every conversion above. Ahead of the front, the air holds the potential temperature of a still atmosphere cooling with height at the dry adiabatic lapse rate, and behind it, the air is warmer by the anomaly, which falls toward nothing along a hyperbolic tangent whose scale `edge_m` sets. The smoke tracer follows the same profile, and each cell the front has reached shows burning. The front and five times `edge_m` ahead of it stay in the western half of the domain through the last snapshot, so the median at each height stays the air ahead of it.
 
 The graph reads the threat wherever `simulation` names no output, so a fresh clone and the suite run every conversion without the network. The table is written from the record the threat is set in, each field set under `[tool.thermur.threat]`, and `mise render` rewrites it.
 
@@ -80,7 +92,7 @@ The drawing below runs the threat's own formula at ten times its pace, so the ho
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
 | `anomaly_k` | `20.0` | above 0 | The potential temperature behind the front in excess of the air ahead of it, in kelvin |
-| `edge_m` | `40.0` | above 0 | The width over which the anomaly falls from behind the front to ahead of it, in meters, one grid spacing by default |
+| `edge_m` | `40.0` | above 0 | The scale of the hyperbolic tangent carrying the anomaly to zero ahead of the front, in meters, one grid spacing by default, so 76% of the anomaly falls within this distance on either side of the front |
 | `grid.columns` | `100` | at least 1 | The number of mass points from west to east |
 | `grid.interval_s` | `15.0` | above 0 | The time between neighboring snapshots, in seconds, the interval each output of the plume dataset is written at |
 | `grid.level_m` | `20.0` | above 0 | The depth of each model level, in meters |
@@ -93,3 +105,9 @@ The drawing below runs the threat's own formula at ten times its pace, so the ho
 <!-- /threat -->
 
 [^moisseeva2021]: Moisseeva and Stull 2021. "Wildfire smoke-plume rise: a simple energy balance parameterization." *Atmospheric Chemistry and Physics* 21(3): 1407–1425. <https://doi.org/10.5194/acp-21-1407-2021>
+
+[^turner2009]: Turner et al. 2009. "Record low surface air temperature at Vostok station, Antarctica." *Journal of Geophysical Research: Atmospheres* 114(D24): 2009JD012104. <https://doi.org/10.1029/2009JD012104>
+
+[^butler2004]: Butler et al. 2004. "Measurements of radiant emissive power and temperatures in crown fires." *Canadian Journal of Forest Research* 34(8): 1577–1587. <https://doi.org/10.1139/x04-060>
+
+[^courtney2012]: Courtney et al. 2012. "Documentation and verification of the world extreme wind gust record: 113.3 m/s on Barrow Island, Australia, during passage of tropical cyclone Olivia." *Australian Meteorological and Oceanographic Journal* 62(1): 1–9. <https://doi.org/10.22499/2.6201.001>

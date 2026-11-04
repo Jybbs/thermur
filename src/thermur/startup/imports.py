@@ -26,9 +26,9 @@ passes, with its issue read for whether a fix has shipped:
   options only for that effect, so its compiled modules read them unset
   (pandas-dev/pandas#71173, with a fix proposed in pandas-dev/pandas#71178),
   reproduced by `mise x -- uv run --locked python -c "import pandas; pandas.Index"`
-- `xarray`, whose `xarray.backends` imports each engine's module only for
-  the effect of entering the engine in the registry `open_dataset` reads, so
-  a first `open_dataset` finds no engine and caches the empty registry,
+- `xarray`, each of whose engines enters the registry `open_dataset` reads
+  only as a side effect of importing its module, so a first `open_dataset`
+  finds no engine and caches the empty registry,
   reproduced by
   `mise x -- uv run python -c "import xarray; assert xarray.backends.list_engines()"`
 """
