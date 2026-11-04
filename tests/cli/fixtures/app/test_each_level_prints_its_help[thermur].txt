@@ -1,0 +1,10 @@
+Usage: thermur COMMAND
+
+Flies a drone flock as a starling murmuration that breaks around a wildfire the 
+way it breaks around a falcon.
+
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ fetch        Fetches the data a run reads into the clone's data/ folder.     │
+│ --help (-h)  Display this message and exit.                                  │
+│ --version    Display application version.                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯

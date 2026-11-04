@@ -50,6 +50,23 @@ def test_an_interpreter_starts_under_the_mode_the_entry_point_sets(
     assert started.stdout == printed
 
 
+def test_a_fresh_interpreter_finds_the_engine_opening_an_output():
+    """
+    Asserts that xarray's registry holds the `netcdf4` engine in a fresh
+    interpreter of the environment, since an engine enters the registry only
+    as xarray's own import of its module runs, which `EAGER` holds to.
+    """
+    started = run(
+        [executable, "-c", "import xarray; print(*xarray.backends.list_engines())"],
+        capture_output = True,
+        check          = True,
+        env            = {},
+        text           = True
+    )
+
+    assert "netcdf4" in started.stdout.split()
+
+
 def test_start_sets_the_filter_and_the_mode_where_it_runs():
     """
     Asserts that `start`, run once its module loads again in this
@@ -69,7 +86,7 @@ def test_start_sets_the_filter_and_the_mode_where_it_runs():
         *(param(f"{package}.module", False, id=package) for package in sorted(EAGER)),
         param("thermur.pipeline.graph", True, id="the-package"),
         param("json.decoder", True, id="the-standard-library"),
-        param("xarray.core.dataset", True, id="another-library"),
+        param("scipy.ndimage", True, id="another-library"),
         param("pandasx", True, id="a-name-an-entry-prefixes"),
         param("__main__", True, id="the-main-module"),
         param(None, True, id="outside-a-module")

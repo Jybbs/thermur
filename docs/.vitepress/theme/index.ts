@@ -2,13 +2,16 @@ import type { Theme } from 'vitepress'
 import DefaultTheme   from 'vitepress/theme-without-fonts'
 import { h }          from 'vue'
 
+import CropKept     from './crop.ts'
 import FrontHero    from './front/hero.ts'
 import FrontSky     from './front/sky.ts'
 import NotFoundPage from './not-found/page.ts'
 import MotionPause  from './pause.ts'
+import ThreatFront  from './threat.ts'
 
 import 'katex/dist/katex.min.css'
 import 'virtual:identity.css'
+import './styles/motion.css'
 import './styles/type.css'
 import './styles/tables.css'
 import './styles/front/sky.css'
@@ -16,6 +19,9 @@ import './styles/front/hero.css'
 import './styles/not-found/page.css'
 import './styles/not-found/track.css'
 import './styles/pause.css'
+import './styles/crop.css'
+import './styles/threat.css'
+import './styles/values.css'
 
 /**
  * The default layout's slots the theme fills: the front page's background
@@ -32,5 +38,10 @@ const SLOTS = {
 
 export default {
   Layout  : () => h(DefaultTheme.Layout, null, SLOTS),
-  extends : DefaultTheme
+  extends : DefaultTheme,
+
+  enhanceApp: ({ app }) => {
+    app.component('CropKept', CropKept)
+    app.component('ThreatFront', ThreatFront)
+  }
 } satisfies Theme

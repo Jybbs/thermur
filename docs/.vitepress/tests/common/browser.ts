@@ -14,7 +14,7 @@ export interface Browser {
   motion  : { listeners: Set<() => void>, matches: boolean }
   mutate  : () => void
   pen     : CanvasRenderingContext2D
-  reflow  : () => void
+  reflow  : (target?: Element) => void
   resize  : (width: number, height: number) => void
   see     : (seen: boolean) => void
   wrote   : (key: string) => unknown[]
@@ -250,7 +250,7 @@ export function browser(reduced = false): Browser {
     frames : queued,
     motion : motion,
     mutate : () => notify('MutationObserver', []),
-    reflow : () => notify('ResizeObserver', [], document.body),
+    reflow : (target = document.body) => notify('ResizeObserver', [], target),
     see    : seen => notify('IntersectionObserver', [{ isIntersecting: seen }]),
     held   : () => ({
       canvases  : document.querySelectorAll('canvas').length,

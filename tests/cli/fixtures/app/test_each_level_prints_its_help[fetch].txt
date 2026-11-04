@@ -1,0 +1,7 @@
+Usage: thermur fetch COMMAND
+
+Fetches the data a run reads into the clone's data/ folder.
+
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ sample                                                                       │
+╰──────────────────────────────────────────────────────────────────────────────╯

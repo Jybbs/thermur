@@ -1,8 +1,9 @@
 """
 Defines the fixtures every test folder shares, each described where it is
-defined. The autouse `environment` fixture isolates every test from the
-machine running it, and the collection hook lets a test open a network
-connection only when it carries the `network` mark.
+defined, beside the plain-file extension every snapshot is written through.
+The autouse `environment` fixture isolates every test from the machine
+running it, and the collection hook lets a test open a network connection
+only when it carries the `network` mark.
 """
 
 from collections.abc    import Callable
@@ -21,12 +22,26 @@ from pytest             import (
     fixture,
     mark
 )
-from shlex   import quote
+from shlex            import quote
+from syrupy.assertion import SnapshotAssertion
+from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from tomllib import loads as from_toml
 
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 from thermur.repo.schemas      import read_pin
+
+
+class PlainFile(SingleFileSnapshotExtension):
+    """
+    Writes each snapshot as a plain text file at
+    `fixtures/<module>/<test>.txt` beside the tests that read it,
+    the `fixtures` folder named by the `--snapshot-dirname` option in
+    `[tool.pytest]`.
+    """
+
+    _write_mode    = WriteMode.TEXT
+    file_extension = "txt"
 
 
 @fixture
@@ -215,3 +230,11 @@ def pytest_collection_modifyitems(items: list[Item]):
     for item in items:
         if item.get_closest_marker("network"):
             item.add_marker(mark.enable_socket)
+
+
+@fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """
+    Routes every snapshot through the plain-file extension.
+    """
+    return snapshot.use_extension(PlainFile)

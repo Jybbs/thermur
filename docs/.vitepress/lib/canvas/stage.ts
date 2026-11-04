@@ -1,15 +1,6 @@
-import type { Scheme }         from '../identity.ts'
-import type { Geometry, Part } from './part.ts'
-import { paused }              from './pause.ts'
-
-/**
- * Where a stage's canvas sits, `pinned` behind the whole page and reading the
- * pointer across the page in its coordinates, or else in the page's flow and
- * reading the pointer over the canvas in its own.
- */
-interface Mount {
-  pinned : boolean
-}
+import type { Scheme }                from '../identity.ts'
+import type { Geometry, Mount, Part } from './part.ts'
+import { paused }                     from './pause.ts'
 
 /**
  * The observers a stage holds: one watching its canvas come on and off the
@@ -294,5 +285,13 @@ export class Stage {
    */
   refit(): void {
     this.#onResize()
+  }
+
+  /**
+   * Paints every part once, as once a reader moves a control a part reads while
+   * the drawing stands still.
+   */
+  repaint(): void {
+    this.#paint()
   }
 }

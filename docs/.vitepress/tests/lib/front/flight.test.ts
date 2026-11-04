@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import { FIRE }             from '../../../lib/front/drawing.ts'
 import { plan, smoothPath } from '../../../lib/front/flight.ts'
-import { FIRE, geometry }   from '../../common/front.ts'
+import { geometry }         from '../../common/front.ts'
 
 const page = geometry()
 

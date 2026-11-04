@@ -10,7 +10,7 @@ as they run.
 
 from sys import set_lazy_imports, set_lazy_imports_filter
 
-EAGER = frozenset({"_pytest", "pandas"})
+EAGER = frozenset({"_pytest", "pandas", "xarray"})
 """
 The packages whose own imports load as they run, since each fails once they
 load lazily, each listed below beside its defect, its upstream issue where one
@@ -26,6 +26,11 @@ passes, with its issue read for whether a fix has shipped:
   options only for that effect, so its compiled modules read them unset
   (pandas-dev/pandas#71173, with a fix proposed in pandas-dev/pandas#71178),
   reproduced by `mise x -- uv run --locked python -c "import pandas; pandas.Index"`
+- `xarray`, each of whose engines enters the registry `open_dataset` reads
+  only as a side effect of importing its module, so a first `open_dataset`
+  finds no engine and caches the empty registry,
+  reproduced by
+  `mise x -- uv run python -c "import xarray; assert xarray.backends.list_engines()"`
 """
 
 

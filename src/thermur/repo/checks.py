@@ -709,29 +709,46 @@ class RenderCheck(Check):
     """
     Every file the render task writes reads what the declaration it is
     written from would write now, so the site, which calls no Python, never
-    reads a stale copy of the identity, and every Markdown page carries
+    reads a stale copy of the identity, every region a page carries reads
+    the declaration it is written from, and every Markdown page carries
     the footnote definition of each study it cites as `docs/references.bib`
     gives it.
     """
 
     def scan(self) -> Iterator[Finding]:
         """
-        Names each written file whose text on disk has drifted from its
-        declaration, a missing file among them, and each page whose footnote
-        definitions have drifted from the bibliography.
+        Names each region `Outputs.refused` names, then each written file
+        whose text on disk has drifted from its declaration, a missing file
+        among them, naming on a drifted page each region that drifted and,
+        where they drifted too, its footnote definitions.
         """
-        for path in Outputs(checkout=self.checkout).drifted:
-            yield Finding(
-                file    = path,
-                message = (
-                    f"The footnote definitions in `{path}` have drifted from "
-                    f"their entries in `{self.checkout.bibliography.file}`, and "
-                    "`mise render` writes them again"
-                    if path in self.checkout.pages
-                    else f"`{path}` has drifted from the declaration it is written "
-                    "from, which `mise render` writes again"
+        outputs      = Outputs(checkout=self.checkout)
+        bibliography = self.checkout.bibliography
+        yield from outputs.refused
+        for path in outputs.drifted:
+            if (page := self.checkout.pages.get(path)) is None:
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` has drifted from the declaration it is "
+                    "written from, which `mise render` writes again"
                 )
+                continue
+
+            yield from (
+                Finding(
+                    file    = path,
+                    message = f"The `{name}` region of `{path}` has drifted from the "
+                    "declaration it is written from, which `mise render` writes again"
+                )
+                for name in page.drifted(outputs.regions.get(path, {}))
             )
+            if page.cited(bibliography) != page.text:
+                yield Finding(
+                    file    = path,
+                    message = f"The footnote definitions in `{path}` have drifted "
+                    f"from their entries in `{bibliography.file}`, and "
+                    "`mise render` writes them again"
+                )
 
 
 class RulesetCheck(Check):

@@ -14,6 +14,11 @@ interface Rise {
 }
 
 /**
+ * The shape of the plume the site's flocks part around.
+ */
+export const RISE = { core: 22, gain: 1.7, lean: 0.42, reach: 300, spread: 0.24 } as const
+
+/**
  * A fire on the ground at `x` and `y` and the plume of hot air it sends up,
  * leaning with the wind, widening as it rises, and swaying with `t`, its
  * strength the fire's.

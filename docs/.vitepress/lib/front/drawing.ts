@@ -7,14 +7,14 @@ import { Lines }            from './lines.ts'
 import { type Murmur, Sky } from './sky.ts'
 
 /**
- * The fire's strength the front page draws, on a made-up scale from out at 0 to
- * a blaze at 1.
+ * The fire's strength the site's flocks fly through, on a made-up scale from
+ * out at 0 to a blaze at 1.
  */
-const FIRE = 0.62
+export const FIRE = 0.62
 /**
- * The flock the front page draws.
+ * The flock the site draws.
  */
-const MURMUR: Murmur = { count: 340, settle: 8 }
+export const MURMUR: Murmur = { count: 340, settle: 8 }
 
 /**
  * Draws the front page's background into `host`: the banded sky over the hero

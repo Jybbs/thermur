@@ -1,0 +1,61 @@
+.crop-kept { margin: 1.25rem 0 1.125rem; }
+
+.crop-canvas { height: 8rem; }
+
+.crop-canvas canvas {
+  display : block;
+  height  : 100%;
+  width   : 100%;
+}
+
+.vp-doc .crop-sentence {
+  color  : var(--vp-c-text-1);
+  font   : 400 1.28rem / 1.75 var(--vp-font-family-base);
+  margin : 0.875rem 0 0.75rem;
+}
+
+.crop-sentence select {
+  appearance    : none;
+  background    :
+    linear-gradient(45deg, transparent 50%, var(--th-lead) 50%) right 0.42em center / 0.3em 0.3em no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--th-lead) 50%) right 0.12em center / 0.3em 0.3em no-repeat;
+  border        : 0;
+  border-bottom : 1.5px solid var(--th-lead);
+  border-radius : 0;
+  color         : var(--th-lead);
+  cursor        : pointer;
+  field-sizing  : content;
+  font          : inherit;
+  margin        : 0;
+  max-width     : 100%;
+  padding       : 0 1em 0 0;
+}
+
+.crop-sentence select:focus-visible {
+  outline        : 2px solid var(--th-lead);
+  outline-offset : 2px;
+}
+
+.crop-sentence option {
+  background : var(--vp-c-bg);
+  color      : var(--vp-c-text-1);
+  font-size  : 1rem;
+}
+
+.crop-lines {
+  background    : var(--vp-code-block-bg);
+  border-radius : 0.5rem;
+  color         : var(--vp-c-text-1);
+  font          : 400 0.82rem / 1.375rem var(--vp-font-family-mono);
+  margin        : 0 0 1.125rem;
+  min-height    : 7.25rem;
+  padding       : 0.875rem 1.125rem;
+  white-space   : pre-wrap;
+}
+
+.crop-lines[data-empty] {
+  color       : var(--vp-c-text-2);
+  font-family : var(--vp-font-family-base);
+  font-size   : 0.95rem;
+  line-height : 1.7;
+}

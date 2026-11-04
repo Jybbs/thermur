@@ -2,3 +2,12 @@
   display : table;
   width   : 100%;
 }
+
+.vp-doc td code { overflow-wrap: anywhere; }
+
+.vp-doc td:first-child code { overflow-wrap: normal; }
+
+@media (width < 40rem) {
+  .vp-doc th,
+  .vp-doc td { padding-inline: 0.5rem; }
+}

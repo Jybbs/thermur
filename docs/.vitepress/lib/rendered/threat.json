@@ -1,0 +1,17 @@
+{
+  "base_k": 300.0,
+  "gravity_m_s2": 9.81,
+  "heat_capacity_j_kg_k": 1004.5,
+  "anomaly_k": 20.0,
+  "edge_m": 40.0,
+  "grid": {
+    "columns": 100,
+    "interval_s": 15.0,
+    "level_m": 20.0,
+    "levels": 30,
+    "rows": 50,
+    "snapshots": 9,
+    "spacing_m": 40.0
+  },
+  "speed_m_s": 1.0
+}

@@ -25,3 +25,4 @@
 ::error file=.github/workflows/draft.yml::The `cut` job in `.github/workflows/draft.yml` writes to the workflow step summary, which only a `gate` job writes
 ::error file=.mise/tasks/py/sweep::`mise tasks validate` reports `Alias 'audit' is used by multiple tasks` on `py:sweep` (`Tasks: py:sweep, repo:audit.py`)
 ::error file=pyproject.toml::The wheel `packages` entry `src/thermur` holds no module
+::error file=pyproject.toml::The `thermur` script targets `thermur.cli`, which the wheel does not carry

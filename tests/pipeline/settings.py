@@ -2,11 +2,12 @@
 Pins where the settings read each value from, meaning the order of a value
 passed in, a `THERMUR_` variable, and the `[tool.thermur]` table of the
 installed clone, and what the model refuses, over a stand-in field and a
-stand-in component.
+stand-in component, beside the fire data's settings each source sets.
 """
 
 from common.edits    import append, edit
 from common.settings import Heading, Tuned
+from pathlib         import Path
 from pydantic        import ValidationError
 from pytest          import MonkeyPatch, TempPathFactory, fixture, mark, param, raises
 
@@ -102,6 +103,16 @@ def test_a_variable_sets_a_component_as_json(
     assert Tuned().heading == Heading(coupling_per_s=4.0)
 
 
+def test_a_variable_sets_the_simulation(installed: Checkout, monkeypatch: MonkeyPatch):
+    """
+    Asserts that `THERMUR_SIMULATION` names the simulation over the table,
+    which names none.
+    """
+    monkeypatch.setenv("THERMUR_SIMULATION", "data/samples/wrf_sample.nc")
+
+    assert Tuned().simulation == Path("data/samples/wrf_sample.nc")
+
+
 def test_the_settings_are_frozen(installed: Checkout):
     """
     Asserts that a field cannot be set once the settings are built, so one
@@ -136,6 +147,27 @@ def test_the_table_sets_a_field_and_a_component(installed: Checkout):
 
     assert (settings.radius_m, settings.heading) == (7.0, Heading(coupling_per_s=2.5))
     assert type(settings.heading) is Heading
+
+
+def test_the_table_sets_the_simulation_the_crop_and_the_threat(installed: Checkout):
+    """
+    Asserts that the table names the simulation as a path relative to the
+    clone and sets the crop's fields and the threat's grid in tables of
+    their own, as the Data page sets them out.
+    """
+    edit(
+        installed,
+        "pyproject.toml",
+        new = 'simulation = "data/samples/wrf_sample.nc"\nradius_m',
+        old = "radius_m"
+    )
+    append(installed, "pyproject.toml", "\n[tool.thermur.crop]\nfloor_m = 40.0\n")
+    append(installed, "pyproject.toml", "\n[tool.thermur.threat.grid]\ncolumns = 60\n")
+
+    settings = Tuned()
+
+    assert settings.simulation == Path("data/samples/wrf_sample.nc")
+    assert (settings.crop.floor_m, settings.threat.grid.columns) == (40.0, 60)
 
 
 def test_without_a_table_each_field_keeps_its_default(installed: Checkout):

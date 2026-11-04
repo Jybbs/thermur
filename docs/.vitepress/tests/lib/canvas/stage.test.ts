@@ -217,6 +217,18 @@ describe('a stage set in the page’s flow', () => {
   })
 })
 
+describe('a repaint', () => {
+  it('paints every part once, without fitting or stepping any', () => {
+    const { drawn, stage } = staged(FLOWING)
+    vi.clearAllMocks()
+    stage.repaint()
+    expect(drawn.paint).toHaveBeenCalledOnce()
+    expect(drawn.fit).not.toHaveBeenCalled()
+    expect(drawn.step).not.toHaveBeenCalled()
+    stage.destroy()
+  })
+})
+
 describe('the stage’s teardown', () => {
   it.for([['pinned behind the page', PINNED], ['set in the page’s flow', FLOWING]] as const)(
     'leaves no listener, observer, frame, or canvas behind once a stage %s is destroyed',

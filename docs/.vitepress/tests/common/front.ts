@@ -3,6 +3,7 @@ import { vi } from 'vitest'
 import { Marks }                      from '../../lib/canvas/marks.ts'
 import type { Geometry }              from '../../lib/canvas/part.ts'
 import { Tones }                      from '../../lib/canvas/tones.ts'
+import { FIRE }                       from '../../lib/front/drawing.ts'
 import { type Heat, repel }           from '../../lib/front/heat.ts'
 import { Sky }                        from '../../lib/front/sky.ts'
 import { type Browser, box, browser } from './browser.ts'
@@ -18,10 +19,6 @@ interface Unfitted {
   tones : Tones
 }
 
-/**
- * The fire's strength a drawing's suite draws at.
- */
-export const FIRE = 0.62
 /**
  * A flock small enough and settled briefly enough for a case to fly many times
  * over.

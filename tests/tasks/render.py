@@ -1,11 +1,12 @@
 """
-Pins what `docs:render` prints and exits with, meaning the path of each file
-it rewrote, nothing where every file is current, and each marker naming no
-entry in `docs/references.bib`, which fails the task.
+Pins what `docs:render` prints and exits with, meaning the path of each
+file it rewrote, nothing where every file is current, and each region
+whose page lacks its pair of markers and each marker naming no entry in
+`docs/references.bib`, either of which fails the task.
 """
 
 from collections.abc import Callable
-from common.edits    import append
+from common.edits    import append, edit
 from pathlib         import Path
 from pytest          import CaptureFixture, MonkeyPatch, raises
 from types           import ModuleType
@@ -42,6 +43,32 @@ def test_a_marker_naming_no_entry_fails_the_render(
     assert (
         checkout.read(page)
                 .endswith(f"{checkout.bibliography.cite('cavagna2010')}\n")
+    )
+
+
+def test_a_region_missing_its_pair_of_markers_fails_the_render(
+    capsys      : CaptureFixture[str],
+    checkout    : Checkout,
+    load_task   : Callable[[str], ModuleType],
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that the render writes no file where a page's region lacks its
+    opening marker and every other file is current, printing no path, then
+    prints the region to standard error and exits `1`.
+    """
+    monkeypatch.chdir(checkout.root)
+    page = "docs/pages/data/index.md"
+    edit(checkout, page, new="", old="<!-- threat -->")
+
+    with raises(SystemExit) as exited:
+        load_task(".mise/tasks/docs/render.py").main()
+
+    assert exited.value.code
+    assert capsys.readouterr() == (
+        "",
+        f"`{page}` does not carry the opening and then the closing marker of its "
+        "`threat` region once each, so `mise render` leaves the region as it stands\n"
     )
 
 

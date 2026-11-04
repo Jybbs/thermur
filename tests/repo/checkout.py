@@ -107,7 +107,7 @@ def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
             ["bug.md", "spec.md"],
             id = "templates"
         ),
-        param(".mise/bin", "scripts", ["prose", "pytest"], id="scripts")
+        param(".mise/bin", "scripts", ["prose", "pytest", "thermur"], id="scripts")
     ]
 )
 def test_a_listing_leaves_out_a_dotfile(
@@ -148,13 +148,13 @@ def test_pages_lists_each_markdown_file_git_tracks_or_would_track(clone: Checkou
     (root / "docs/pages/notes.md").write_text("# Notes\n")
     (root / "docs/node_modules").mkdir()
     (root / "docs/node_modules/README.md").write_text("# A Package\n")
-    (root / "docs/data-procurement.md").unlink()
+    (root / ".github/ISSUE_TEMPLATE/bug.md").unlink()
 
     tracked = check_output(["git", "ls-files", "*.md"], cwd=root, text=True).split()
 
     assert list(clone.pages) == sorted(
         {*map(Path, tracked), Path("docs/pages/notes.md")}
-        - {Path("docs/data-procurement.md")}
+        - {Path(".github/ISSUE_TEMPLATE/bug.md")}
     )
     assert clone.pages[Path("docs/pages/notes.md")].text == "# Notes\n"
 
