@@ -438,21 +438,23 @@ class ParametricThreat(
     @model_validator(mode="after")
     def held(self) -> Self:
         """
-        Holds the front and five times `edge_m` ahead of it inside the
-        western half of the domain through the last snapshot, so the
-        hot air covers less than half of every height and the median
-        `WrfOutput.ambient` takes still reads the air ahead of it, the
-        anomaly having fallen under 0.005% of itself that far ahead.
+        Holds the front and five times `edge_m` ahead of it at or west of
+        the center of the first column a median over the columns reads,
+        through the last snapshot, so the median `WrfOutput.ambient` takes
+        still reads the air ahead of the front, the anomaly having fallen
+        under 0.005% of itself that far ahead.
 
         Raises:
-            ValueError: Where the front's edge passes the domain's midline
+            ValueError: Where the front's edge passes that column's center
                         by the last snapshot.
         """
-        reach = self.speed_m_s * self.grid.span_s + 5 * self.edge_m
-        if reach > self.grid.length_m / 2:
+        middle = float(self.grid.centers[(self.grid.columns - 1) // 2])
+        reach  = self.speed_m_s * self.grid.span_s + 5 * self.edge_m
+        if reach > middle:
             raise ValueError(
-                f"The front's edge reaches {reach:g} m by the last snapshot, past the "
-                f"midline of a domain {self.grid.length_m:g} m long"
+                f"The front's edge reaches {reach:g} m by the last snapshot, past "
+                f"the column at {middle:g} m a median reads on a domain "
+                f"{self.grid.length_m:g} m long"
             )
 
         return self

@@ -1,11 +1,12 @@
 """
 Holds `WrfOutput`, the WRF-SFIRE output a run reads, beside `checked`,
-`destaggered`, `distances`, and `spans`, the functions it applies to a
-field, along one dimension, or to one snapshot. The `wrf_output` step builds
-the record and the `air` step reads it.
+`destaggered`, `distances`, `extremes`, `spans`, and `unfilled`, the
+functions it applies to a field, along one dimension, or to one snapshot.
+The `wrf_output` step builds the record and the `air` step reads it.
 """
 
 from functools     import cached_property
+from netCDF4       import default_fillvals
 from numpy         import arange, full, inf, interp, ndarray
 from pathlib       import Path
 from pydantic      import BaseModel, InstanceOf
@@ -89,7 +90,8 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         Raises:
             ValueError: Where a column's levels begin above the lowest fixed
                         height or end below the highest, which `np.interp`
-                        would read as the value at the column's edge.
+                        would read as the value at the column's edge, or
+                        where `tr17_1` holds a missing or fill value.
         """
         heights, band = self.heights, self.crop.heights
         lowest        = round(float(heights.isel(bottom_top=0).max()), 3)
@@ -102,7 +104,7 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
             )
 
         fields = self.wind.assign(
-            smoke       = self.dataset.tr17_1,
+            smoke       = unfilled(self.dataset.tr17_1),
             temperature = self.temperature
         )
         return apply_ufunc(
@@ -139,10 +141,13 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         Measures each mass point's horizontal distance to the nearest one
         the crop keeps whose ground heat flux `GRNHFX` shows burning, in
         meters, one snapshot at a time.
+
+        Raises:
+            ValueError: Where `GRNHFX` holds a missing or fill value.
         """
         return apply_ufunc(
             distances,
-            self.dataset.GRNHFX > 0,
+            unfilled(self.dataset.GRNHFX) > 0,
             input_core_dims = [["south_north", "west_east"]],
             kwargs          = {
                 "sampling": (self.dataset.attrs["DY"], self.dataset.attrs["DX"])
@@ -221,8 +226,7 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
                 "u" : destaggered(self.dataset.U, dimension="west_east_stag"),
                 "v" : destaggered(self.dataset.V, dimension="south_north_stag"),
                 "w" : destaggered(self.dataset.W, dimension="bottom_top_stag")
-            },
-            coords = self.temperature.coords
+            }
         ).map(checked, bounds=self.ranges.wind_m_s, unit="m/s")
 
     @classmethod
@@ -331,7 +335,7 @@ def checked(field: DataArray, *, bounds: Range, unit: str) -> DataArray:
         ValueError: Where a value falls outside `bounds` or is missing.
     """
     floor, ceiling  = bounds
-    lowest, highest = float(field.min(skipna=False)), float(field.max(skipna=False))
+    lowest, highest = extremes(field)
     if not floor <= lowest <= highest <= ceiling:
         raise ValueError(
             f"`{field.name}` runs from {lowest:g} to {highest:g} {unit}, outside "
@@ -378,6 +382,14 @@ def distances(burning: ndarray, sampling: tuple[float, float]) -> ndarray:
     return full(burning.shape, inf)
 
 
+def extremes(field: DataArray) -> Range:
+    """
+    Reads the lowest and the highest value of `field`, each one NaN where a
+    value is missing.
+    """
+    return float(field.min(skipna=False)), float(field.max(skipna=False))
+
+
 def spans(coordinate: DataArray, *, bounds: Span) -> dict[str, slice]:
     """
     Finds the mass points along the dimension `coordinate` places whose
@@ -393,3 +405,29 @@ def spans(coordinate: DataArray, *, bounds: Span) -> dict[str, slice]:
         coordinate.name           : slice(start, stop),
         f"{coordinate.name}_stag" : slice(start, stop + 1)
     }
+
+
+def unfilled(field: DataArray) -> DataArray:
+    """
+    Checks that `field`, which holds no range of its own, holds no missing
+    value and nothing at netCDF's default fill value for single precision.
+
+    A value past the fill value reads as one, as netCDF's attribute
+    conventions read a positive fill value as the valid maximum, and the
+    same magnitude is refused below zero.
+
+    Returns:
+        `field`, unchanged.
+
+    Raises:
+        ValueError: Where a value is missing or reaches the fill value.
+    """
+    fill            = default_fillvals["f4"]
+    lowest, highest = extremes(field)
+    if not -fill < lowest <= highest < fill:
+        raise ValueError(
+            f"`{field.name}` runs from {lowest:g} to {highest:g}, holding a missing "
+            f"value or reaching the netCDF fill value of {fill:g}"
+        )
+
+    return field

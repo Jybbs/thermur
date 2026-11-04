@@ -306,30 +306,40 @@ def test_a_sample_addresses_its_archive_at_its_revision():
 
 
 @mark.parametrize(
-    ("speed_m_s", "held"),
+    ("columns", "speed_m_s", "held"),
     [
-        param(8.0, nullcontext(), id="reaching-the-midline"),
+        param(50, 7.8, nullcontext(), id="reaching-the-column-of-an-even-count"),
         param(
-            8.01,
-            raises(ValidationError, match="reaches 1001 m .* domain 2000 m long"),
-            id = "passing-the-midline"
+            50,
+            7.81,
+            raises(ValidationError, match="reaches 981 m .* domain 2000 m long"),
+            id = "passing-the-column-of-an-even-count"
+        ),
+        param(51, 8.2, nullcontext(), id="reaching-the-column-of-an-odd-count"),
+        param(
+            51,
+            8.21,
+            raises(ValidationError, match="reaches 1021 m .* domain 2040 m long"),
+            id = "passing-the-column-of-an-odd-count"
         )
     ]
 )
-def test_a_threat_holds_its_front_inside_the_western_half(
+def test_a_threat_holds_its_front_short_of_the_column_a_median_reads(
+    columns   : int,
     speed_m_s : float,
     held      : AbstractContextManager[object]
 ):
     """
     Asserts that a threat whose front and five times its `edge_m` ahead
-    of it reach the midline of its domain by the last snapshot validates,
-    and one passing it is refused, on a domain 2,000 m long that the front
-    crosses for 100 s behind an edge of 40 m.
+    of it reach the center of the first column a median reads by the last
+    snapshot validates, and one passing it is refused, on a domain the front
+    crosses for 100 s behind an edge of 40 m, that column being the western
+    of the two middle columns of an even count.
     """
     with held:
         ParametricThreat(
             grid = Grid(
-                columns    = 50,
+                columns    = columns,
                 interval_s = 10.0,
                 snapshots  = 11,
                 spacing_m  = 40.0

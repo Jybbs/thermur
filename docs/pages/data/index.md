@@ -67,7 +67,7 @@ The table is written from the record the crop is set in, each field set under `[
 
 <!-- /crop -->
 
-Each conversion refuses a field outside its range below, which a misread variable or a fill value falls past, and names the field beside the values it holds. The air temperature runs from the lowest recorded at the Earth's surface[^turner2009] to the peak measured inside a crown fire[^butler2004], the winds reach the world-record gust[^courtney2012] either way, and the heights run from the ground to the top of the dataset's deepest simulations. The table is written from the record declaring the ranges, and `mise render` rewrites it.
+Each conversion refuses a field outside its range below, which a misread variable or a fill value falls past, and names the field beside the values it holds. The air temperature runs from the lowest recorded at the Earth's surface[^turner2009] to the 1,330 °C that peak air temperatures exceeded inside a crown fire[^butler2004], the winds reach the world-record gust[^courtney2012] either way, and the heights run from the ground to the top of the dataset's deepest simulations. The smoke tracer and the ground heat flux take no range, so each refuses only a missing value or a value reaching the netCDF fill value, naming the variable beside the values it holds. The table is written from the record declaring the ranges, and `mise render` rewrites it.
 
 <!-- ranges -->
 
@@ -81,7 +81,7 @@ Each conversion refuses a field outside its range below, which a misread variabl
 
 ## The Parametric Threat
 
-The parametric threat is a front of hot air entering the domain at its western edge as the first snapshot is written and advancing east at a steady speed, laid out under the names and on the grid a simulation writes, so it passes through every conversion above. Ahead of the front, the air holds the potential temperature of a still atmosphere cooling with height at the dry adiabatic lapse rate, and behind it, the air is warmer by the anomaly, which falls toward nothing along a hyperbolic tangent whose scale `edge_m` sets. The smoke tracer follows the same profile, and each cell the front has reached shows burning. The front and five times `edge_m` ahead of it stay in the western half of the domain through the last snapshot, so the median at each height stays the air ahead of it.
+The parametric threat is a front of hot air entering the domain at its western edge as the first snapshot is written and advancing east at a steady speed, laid out under the names and on the grid a simulation writes, so it passes through every conversion above. Ahead of the front, the air holds the potential temperature of a still atmosphere cooling with height at the dry adiabatic lapse rate, and behind it, the air is warmer by the anomaly, which falls toward nothing along a hyperbolic tangent whose scale `edge_m` sets. The smoke tracer follows the same profile, and each cell the front has reached shows burning. The front and five times `edge_m` ahead of it stay at or west of the center of the first column the median at each height reads, through the last snapshot, so that median stays the air ahead of the front.
 
 The graph reads the threat wherever `simulation` names no output, so a fresh clone and the suite run every conversion without the network. The table is written from the record the threat is set in, each field set under `[tool.thermur.threat]`, and `mise render` rewrites it.
 

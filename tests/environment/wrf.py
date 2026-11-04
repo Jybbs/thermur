@@ -4,6 +4,8 @@ the dataset a parametric threat builds:
 
 - The air temperature, the height above the ground, and the destaggered
   winds on the model's levels, and the range each is checked against
+- The refusal of a missing or fill value in the ground heat flux and the
+  smoke tracer, which hold no range
 - The regridding onto fixed heights, the excess over the ambient profile,
   and the distance to the front
 - The air they lay out, the crop each constructor applies, and the
@@ -11,7 +13,7 @@ the dataset a parametric threat builds:
 """
 
 from contextlib     import AbstractContextManager, nullcontext
-from numpy          import arange, array, inf, isfinite, nan, sqrt, zeros
+from numpy          import arange, array, inf, isfinite, isnan, nan, sqrt, zeros
 from numpy.testing  import assert_allclose
 from pathlib        import Path
 from pytest         import MonkeyPatch, fixture, mark, param, raises
@@ -29,9 +31,20 @@ from thermur.environment.schemas import (
     REFERENCE_PA,
     Span
 )
-from thermur.environment.wrf   import WrfOutput, checked, destaggered, distances, spans
+from thermur.environment.wrf   import (
+    WrfOutput,
+    checked,
+    destaggered,
+    distances,
+    extremes,
+    spans,
+    unfilled
+)
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
+
+# The fill value netCDF writes by default in single precision, `NC_FILL_FLOAT`.
+FILL_VALUE = 9.969209968386869e36
 
 
 @fixture
@@ -48,7 +61,7 @@ def threat() -> ParametricThreat:
     """
     Builds a threat on a grid of 20 columns, 3 rows, and 12 levels 20 m
     deep, over 3 snapshots 15 s apart, whose front advances 10 m each second
-    behind an edge 10 m wide.
+    behind an edge of scale 10 m.
     """
     return ParametricThreat(
         edge_m = 10.0,
@@ -338,6 +351,35 @@ def test_the_air_aloft_refuses_a_band_one_column_misses(
         WrfOutput.from_dataset(scaled(threat, scale=scale), crop=crop).aloft
 
 
+@mark.parametrize(
+    "level_m",
+    [
+        param(20.004, id="starting-two-millimeters-above-the-floor"),
+        param(19.9998, id="ending-two-millimeters-below-the-top")
+    ]
+)
+def test_the_air_aloft_refuses_a_band_missed_by_two_millimeters(level_m: float):
+    """
+    Asserts that the air aloft compares a column's extent to the band to
+    the millimeter, refusing levels whose lowest center sits 2 mm above the
+    floor or whose highest center sits 2 mm below the top.
+    """
+    threat = ParametricThreat(
+        edge_m = 10.0,
+        grid   = Grid(
+            columns   = 20,
+            level_m   = level_m,
+            levels    = 12,
+            rows      = 3,
+            snapshots = 3
+        )
+    )
+    crop = Crop(floor_m=10.0, levels=12, spacing_m=20.0)
+
+    with raises(ValueError, match="short of the band"):
+        WrfOutput.from_threat(threat, crop=crop).aloft
+
+
 def test_the_air_aloft_takes_a_band_beginning_on_the_level_it_reads():
     """
     Asserts that a band beginning at the lowest level's center is regridded,
@@ -347,7 +389,7 @@ def test_the_air_aloft_takes_a_band_beginning_on_the_level_it_reads():
     threat = ParametricThreat(
         edge_m = 10.0,
         grid   = Grid(
-            columns   = 4,
+            columns   = 6,
             level_m   = 7.2,
             levels    = 4,
             rows      = 2,
@@ -586,8 +628,8 @@ def test_an_air_temperature_outside_its_range_is_refused(
 ):
     """
     Asserts that an air temperature below the lowest recorded at the Earth's
-    surface, past the peak measured in a crown fire, or missing is refused
-    against the range `Ranges` declares.
+    surface, past the figure a crown fire's peak exceeded, or missing is
+    refused against the range `Ranges` declares.
     """
     data   = threat.dataset
     output = WrfOutput.from_dataset(data.assign(T=full_like(data.T, value)), crop=crop)
@@ -619,6 +661,108 @@ def test_a_height_outside_its_range_is_refused(
         output.heights
 
 
+def test_the_distances_measure_each_cell_to_the_nearest_burning_one():
+    """
+    Asserts that each cell's distance is measured to the nearest burning
+    cell along the spacing of the rows and the columns, and that every
+    distance is infinite where no cell burns.
+    """
+    burning       = zeros((2, 2), dtype=bool)
+    burning[0, 0] = True
+
+    assert_allclose(
+        distances(burning, sampling=(2.0, 3.0)),
+        array([[0.0, 3.0], [2.0, sqrt(13.0)]])
+    )
+    assert (distances(zeros((2, 2), dtype=bool), sampling=(2.0, 3.0)) == inf).all()
+
+
+@mark.parametrize(
+    "values",
+    [
+        param([0.0, 1.0], id="a-tracer-at-rest"),
+        param([-8.9e-8, 11905.0], id="undershooting-zero-as-the-sample-does"),
+        param([-1e36, 1e36], id="short-of-the-fill-value-either-way")
+    ]
+)
+def test_a_field_with_no_range_takes_any_value_short_of_the_fill_value(
+    values: list[float]
+):
+    """
+    Asserts that a field holding no range comes back as it went in whatever
+    it holds short of the netCDF fill value, so no physical bound applies
+    to it.
+    """
+    field = DataArray(array(values, dtype="float32"), name="tr17_1")
+
+    assert unfilled(field) is field
+
+
+@mark.parametrize(
+    ("values", "reading"),
+    [
+        param([5.0, nan], "nan to nan", id="missing-a-value"),
+        param([nan, nan], "nan to nan", id="missing-every-value"),
+        param([5.0, FILL_VALUE], r"5 to 9\.96921e\+36", id="at-the-fill-value"),
+        param([-FILL_VALUE, 5.0], r"-9\.96921e\+36 to 5", id="at-its-negative"),
+        param([5.0, inf], "5 to inf", id="infinite"),
+        param([-inf, 5.0], "-inf to 5", id="negatively-infinite")
+    ]
+)
+def test_a_field_with_no_range_is_refused_naming_the_values_it_holds(
+    reading : str,
+    values  : list[float]
+):
+    """
+    Asserts that a field holding a missing value, or a value at or past the
+    fill value netCDF writes by default in single precision, is refused,
+    naming the field and the values it holds.
+    """
+    with raises(
+        ValueError,
+        match = (
+            f"`tr17_1` runs from {reading}, holding a missing value or reaching "
+            r"the netCDF fill value of 9\.96921e\+36"
+        )
+    ):
+        unfilled(DataArray(array(values, dtype="float32"), name="tr17_1"))
+
+
+@mark.parametrize(
+    "value",
+    [param(nan, id="missing"), param(FILL_VALUE, id="at-the-fill-value")]
+)
+@mark.parametrize(
+    ("variable", "reader"),
+    [
+        param("GRNHFX", "air", id="the-air-from-the-ground-heat-flux"),
+        param("GRNHFX", "front", id="the-front-from-the-ground-heat-flux"),
+        param("tr17_1", "air", id="the-air-from-the-smoke-tracer"),
+        param("tr17_1", "smoke", id="the-smoke-from-its-tracer")
+    ]
+)
+def test_a_bad_value_in_a_field_with_no_range_is_refused_where_it_is_read(
+    crop     : Crop,
+    reader   : str,
+    threat   : ParametricThreat,
+    value    : float,
+    variable : str
+):
+    """
+    Asserts that one cell of the ground heat flux or the smoke tracer
+    holding a missing or fill value is refused wherever the record reads
+    that field, naming the variable, rather than reading as no fire or
+    reaching the air.
+    """
+    data = threat.dataset
+    bad  = data[variable].copy()
+    bad[{"Time": -1, "south_north": 0, "west_east": 0}] = value
+    output = WrfOutput.from_dataset(data.assign({variable: bad}), crop=crop)
+
+    with raises(ValueError, match=f"`{variable}` runs from "):
+        getattr(output, reader)
+
+
 @mark.parametrize("offset", [param(-200.0, id="westward"), param(200.0, id="eastward")])
 @mark.parametrize("variable", ["U", "V", "W"])
 def test_a_wind_outside_its_range_is_refused_naming_its_axis(
@@ -645,22 +789,6 @@ def test_a_wind_outside_its_range_is_refused_naming_its_axis(
         output.wind
 
 
-def test_the_distances_measure_each_cell_to_the_nearest_burning_one():
-    """
-    Asserts that each cell's distance is measured to the nearest burning
-    cell along the spacing of the rows and the columns, and that every
-    distance is infinite where no cell burns.
-    """
-    burning       = zeros((2, 2), dtype=bool)
-    burning[0, 0] = True
-
-    assert_allclose(
-        distances(burning, sampling=(2.0, 3.0)),
-        array([[0.0, 3.0], [2.0, sqrt(13.0)]])
-    )
-    assert (distances(zeros((2, 2), dtype=bool), sampling=(2.0, 3.0)) == inf).all()
-
-
 def test_the_excess_is_the_heat_behind_the_front_over_the_air_ahead(
     crop   : Crop,
     output : WrfOutput,
@@ -685,6 +813,15 @@ def test_the_excess_is_the_heat_behind_the_front_over_the_air_ahead(
         (threat.anomaly_k * exner(crop.heights)).values,
         rtol = 1e-3
     )
+
+
+def test_the_extremes_read_a_missing_value_as_nan():
+    """
+    Asserts that the extremes of a field are its lowest and highest values,
+    and that a single missing value turns both into NaN.
+    """
+    assert extremes(DataArray([3.0, 1.0, 2.0])) == (1.0, 3.0)
+    assert all(map(isnan, extremes(DataArray([3.0, nan, 2.0]))))
 
 
 def test_the_front_and_the_ambient_read_the_columns_the_crop_keeps(
@@ -745,6 +882,29 @@ def test_the_front_is_each_column_s_distance_to_the_nearest_burning_one(
         front.isel(Time=-1).values,
         [0.0] * 8 + [40.0 * step for step in range(1, 13)]
     )
+
+
+def test_the_front_reads_only_a_flux_above_zero_as_burning(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that a cell whose ground heat flux sits barely above zero burns,
+    while a cell at zero or below it does not.
+    """
+    data = threat.dataset
+    flux = zeros_like(data.GRNHFX)
+    flux[{"south_north": 0, "west_east": 0}] = 0.001
+    flux[{"south_north": 0, "west_east": 1}] = -1.0
+
+    front = WrfOutput.from_dataset(
+        data.assign(GRNHFX=flux),
+        crop = crop
+    ).front.isel(Time=0)
+
+    assert_allclose(front.isel(south_north=0, west_east=0), 0.0)
+    assert_allclose(front.isel(south_north=0, west_east=1), 40.0)
+    assert_allclose(front.isel(south_north=1, west_east=1), 40.0 * sqrt(2))
 
 
 def test_the_height_above_the_ground_is_each_level_s_center(
@@ -836,6 +996,17 @@ def test_the_settings_naming_a_missing_simulation_raise(
 
     with raises(FileNotFoundError, match="absent.nc"):
         WrfOutput.from_settings(settings)
+
+
+def test_the_winds_read_no_air_temperature(crop: Crop, threat: ParametricThreat):
+    """
+    Asserts that the winds come back from an output whose air temperature is
+    missing, so a bad temperature raises only where the temperature is read.
+    """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(data.assign(T=full_like(data.T, nan)), crop=crop)
+
+    assert output.wind.sizes["bottom_top"] == 7
 
 
 @mark.parametrize(
