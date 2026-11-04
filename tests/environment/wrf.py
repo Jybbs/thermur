@@ -1,0 +1,590 @@
+"""
+Pins the conversions `WrfOutput` takes of a WRF-SFIRE output, read here off
+the dataset a parametric threat builds:
+
+- The air temperature, the height above the ground, and the destaggered
+  winds on the model's levels
+- The regridding onto fixed heights, the excess over the ambient profile,
+  and the distance to the front
+- The air they lay out, the crop each constructor applies, and the
+  functions applied along one dimension or one snapshot
+"""
+
+from numpy          import arange, array, inf, isfinite, sqrt, zeros
+from numpy.testing  import assert_allclose
+from pathlib        import Path
+from pytest         import MonkeyPatch, fixture, mark, param, raises
+from xarray         import DataArray, Dataset
+from xarray.testing import assert_identical
+
+from thermur.environment.schemas import (
+    BASE_K,
+    Crop,
+    GRAVITY_M_S2,
+    Grid,
+    HEAT_CAPACITY_J_KG_K,
+    ParametricThreat,
+    Span
+)
+from thermur.environment.wrf   import WrfOutput, destaggered, distances, spans
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
+
+
+@fixture
+def crop() -> Crop:
+    """
+    Builds the crop each case reads its output through, laying out the fixed
+    heights from 20 m to 100 m.
+    """
+    return Crop(floor_m=20.0, levels=5, spacing_m=20.0)
+
+
+@fixture
+def threat() -> ParametricThreat:
+    """
+    Builds a threat on a grid of 20 columns, 3 rows, and 12 levels 20 m
+    deep, over 3 snapshots 15 s apart, whose front advances 10 m each second
+    behind an edge 10 m wide.
+    """
+    return ParametricThreat(
+        edge_m = 10.0,
+        grid   = Grid(
+            columns   = 20,
+            levels    = 12,
+            rows      = 3,
+            snapshots = 3
+        ),
+        speed_m_s = 10.0
+    )
+
+
+@fixture
+def output(crop: Crop, threat: ParametricThreat) -> WrfOutput:
+    """
+    Wraps the dataset `threat` builds, cropped through `crop`.
+    """
+    return WrfOutput.from_threat(threat, crop=crop)
+
+
+def exner(heights: DataArray) -> DataArray:
+    """
+    Measures the ratio of the threat's base-state air temperature to its
+    potential temperature at each of `heights`, which falls by `g / c_p` per
+    meter over `BASE_K`.
+    """
+    return 1 - GRAVITY_M_S2 * heights / (HEAT_CAPACITY_J_KG_K * BASE_K)
+
+
+@mark.parametrize(
+    ("crop", "empty"),
+    [
+        param(Crop(window_s=(100.0, 200.0)), r"\['Time'\]", id="a-window"),
+        param(Crop(window_s=(30.0, 0.0)), r"\['Time'\]", id="a-reversed-window"),
+        param(Crop(x_m=(5.0, 10.0)), r"\['west_east'\]", id="a-neighborhood"),
+        param(
+            Crop(x_m=(300.0, 100.0)),
+            r"\['west_east', 'west_east_stag'\]",
+            id = "a-reversed-neighborhood"
+        )
+    ]
+)
+def test_a_crop_keeping_no_point_along_a_dimension_is_refused(
+    crop   : Crop,
+    empty  : str,
+    threat : ParametricThreat
+):
+    """
+    Asserts that a window holding no snapshot, or a neighborhood holding no
+    mass point, is refused, naming the dimension it empties, bounds given
+    from high to low among them.
+    """
+    with raises(ValueError, match=f"The crop keeps no point along {empty}"):
+        WrfOutput.from_threat(threat, crop=crop)
+
+
+def test_an_output_lacking_a_variable_is_refused_naming_it(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that an output lacking a variable the record keeps is refused,
+    naming that variable, such as a simulation run without its smoke tracer.
+    """
+    with raises(KeyError, match="tr17_1"):
+        WrfOutput.from_dataset(threat.dataset.drop_vars("tr17_1"), crop=crop)
+
+
+def test_an_output_on_disk_keeps_every_field_unloaded(
+    crop     : Crop,
+    threat   : ParametricThreat,
+    tmp_path : Path
+):
+    """
+    Asserts that opening and cropping an output on disk leaves each field
+    unread, which xarray reports through `Variable._in_memory`.
+    """
+    threat.dataset.to_netcdf(path := tmp_path / "wrfout.nc", engine="netcdf4")
+
+    dataset = WrfOutput.from_path(path, crop=crop).dataset
+
+    assert dataset.data_vars
+    assert not any(dataset[name].variable._in_memory for name in dataset.data_vars)
+
+
+def test_an_output_on_disk_reads_as_the_dataset_it_holds(
+    crop     : Crop,
+    output   : WrfOutput,
+    threat   : ParametricThreat,
+    tmp_path : Path
+):
+    """
+    Asserts that an output opened from a NetCDF file reads as the same
+    dataset the threat builds, cropped alike.
+    """
+    threat.dataset.to_netcdf(path := tmp_path / "wrfout.nc", engine="netcdf4")
+
+    assert_identical(
+        WrfOutput.from_path(path, crop=crop).dataset.load(),
+        output.dataset
+    )
+
+
+def test_destaggering_averages_each_pair_of_faces():
+    """
+    Asserts that a field destaggers onto the points between each pair of its
+    faces, along the dimension named without its `_stag` suffix and carrying
+    no coordinate there.
+    """
+    field = DataArray([0.0, 2.0, 6.0], coords={"x_stag": [0, 1, 2]}, dims="x_stag")
+
+    averaged = destaggered(field, dimension="x_stag")
+
+    assert averaged.dims == ("x",)
+    assert averaged.values.tolist() == [1.0, 4.0]
+    assert "x" not in averaged.coords
+
+
+def test_each_wind_is_averaged_from_its_faces_onto_the_mass_points(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that `u`, `v`, and `w` take the mean of the two faces of each
+    cell along the dimension the component is staggered on.
+    """
+    dataset = threat.dataset
+    faces   = {
+        "U" : ("west_east_stag", 21),
+        "V" : ("south_north_stag", 4),
+        "W" : ("bottom_top_stag", 13)
+    }
+    wind = WrfOutput.from_dataset(
+        dataset.assign(
+            {
+                name: DataArray(
+                    arange(size, dtype="float32"),
+                    dims = dimension
+                ).broadcast_like(
+                    dataset[name]
+                )
+                for name, (dimension, size) in faces.items()
+            }
+        ),
+        crop = crop
+    ).wind.isel(Time=0)
+
+    assert_allclose(wind.u.isel(bottom_top=0, south_north=0).values, arange(20) + 0.5)
+    assert_allclose(wind.v.isel(bottom_top=0, west_east=0).values, arange(3) + 0.5)
+    assert_allclose(wind.w.isel(south_north=0, west_east=0).values, arange(7) + 0.5)
+
+
+@mark.parametrize(
+    ("crop", "message"),
+    [
+        param(
+            Crop(floor_m=5.0, levels=5, spacing_m=20.0),
+            "cover 10 to .* short of the band from 5 to 85 m",
+            id = "below-the-lowest-level"
+        ),
+        param(
+            Crop(floor_m=20.0, levels=20, spacing_m=20.0),
+            "short of the band from 20 to 400 m",
+            id = "above-the-highest-level"
+        ),
+        param(
+            Crop(floor_m=10.0, levels=12, spacing_m=20.001),
+            "short of the band from 10 to 230.011 m",
+            id = "a-centimeter-above-the-highest-level"
+        )
+    ]
+)
+def test_the_air_aloft_refuses_heights_its_levels_do_not_reach(
+    crop    : Crop,
+    message : str,
+    threat  : ParametricThreat
+):
+    """
+    Asserts that regridding onto fixed heights beginning below the lowest
+    level, or ending above the highest the crop keeps, is refused rather
+    than read as the value at the column's edge.
+    """
+    with raises(ValueError, match=message):
+        WrfOutput.from_threat(threat, crop=crop).aloft
+
+
+def test_the_air_aloft_is_each_column_interpolated_onto_the_fixed_heights(
+    crop   : Crop,
+    output : WrfOutput,
+    threat : ParametricThreat
+):
+    """
+    Asserts that each field on the fixed heights is its column interpolated
+    linearly in height, exact here, since the threat's air temperature in a
+    column is linear in height and its smoke tracer constant along it.
+    """
+    aloft  = output.aloft
+    column = threat.dataset.isel(bottom_top=0, south_north=0, west_east=3)
+
+    assert aloft.temperature.dims == ("Time", "height", "south_north", "west_east")
+    assert_allclose(
+        aloft.temperature.isel(south_north=0, west_east=3).values,
+        ((column.T + BASE_K) * exner(crop.heights)).values,
+        rtol = 1e-5
+    )
+    assert_allclose(
+        output.smoke.isel(south_north=0, west_east=3).values,
+        column.tr17_1.broadcast_like(crop.heights).transpose("Time", "height").values,
+        rtol = 1e-5
+    )
+
+
+def test_the_air_aloft_takes_a_band_ending_on_the_levels_it_reads(
+    threat: ParametricThreat
+):
+    """
+    Asserts that a band beginning at the lowest level's center and ending at
+    the highest's is regridded, though those centers land a few micrometers
+    off in single precision.
+    """
+    crop = Crop(floor_m=10.0, levels=12, spacing_m=20.0)
+
+    assert WrfOutput.from_threat(threat, crop=crop).aloft.sizes["height"] == 12
+
+
+def test_the_air_lays_out_every_channel_finitely(output: WrfOutput):
+    """
+    Asserts that the air holds the winds, the smoke, the air temperature,
+    its excess, and the distance to the front, every value finite even in
+    the snapshot where nothing burns.
+    """
+    air = output.air
+
+    assert air.names == ("u", "v", "w", "smoke", "temperature", "excess", "front")
+    assert air.channels.shape == (7, 3, 5, 3, 20)
+    assert isfinite(air.channels).all()
+
+
+def test_the_air_temperature_is_the_potential_temperature_at_its_pressure(
+    output : WrfOutput,
+    threat : ParametricThreat
+):
+    """
+    Asserts that the air temperature is `T` plus 300 K scaled by the Exner
+    function of the pressure `P` plus `PB`, which the threat's base state
+    sets to its dry adiabatic profile.
+    """
+    potential = threat.dataset.T.isel(bottom_top=slice(7)) + BASE_K
+
+    assert_allclose(
+        output.temperature.values,
+        (potential * exner(threat.grid.heights.isel(bottom_top=slice(7)))).values,
+        rtol = 1e-5
+    )
+
+
+@mark.parametrize(
+    ("crop", "times", "sizes"),
+    [
+        param(
+            Crop(floor_m=20.0, levels=5, spacing_m=20.0),
+            [0.0, 15.0, 30.0],
+            (3, 20, 21, 7, 8),
+            id = "every-snapshot-and-column"
+        ),
+        param(
+            Crop(
+                floor_m   = 20.0,
+                levels    = 5,
+                spacing_m = 20.0,
+                window_s  = (10.0, 40.0)
+            ),
+            [15.0, 30.0],
+            (3, 20, 21, 7, 8),
+            id = "a-window"
+        ),
+        param(
+            Crop(
+                floor_m   = 20.0,
+                levels    = 5,
+                spacing_m = 20.0,
+                window_s  = (15.0, 30.0)
+            ),
+            [15.0, 30.0],
+            (3, 20, 21, 7, 8),
+            id = "a-window-whose-bounds-are-snapshots"
+        ),
+        param(
+            Crop(
+                floor_m   = 20.0,
+                levels    = 5,
+                spacing_m = 20.0,
+                window_s  = (15.0, 15.0)
+            ),
+            [15.0],
+            (3, 20, 21, 7, 8),
+            id = "a-window-on-one-snapshot"
+        ),
+        param(
+            Crop(
+                floor_m   = 20.0,
+                levels    = 5,
+                spacing_m = 20.0,
+                x_m       = (100.0, 300.0),
+                y_m       = (0.0, 70.0)
+            ),
+            [0.0, 15.0, 30.0],
+            (2, 6, 7, 7, 8),
+            id = "a-neighborhood"
+        )
+    ]
+)
+def test_a_crop_keeps_the_window_the_neighborhood_and_the_band(
+    crop   : Crop,
+    sizes  : tuple[int, ...],
+    threat : ParametricThreat,
+    times  : list[float]
+):
+    """
+    Asserts that a crop keeps the snapshots inside its window, the mass
+    points inside its neighborhood with the staggered points bounding them,
+    and the levels up to one past the first reaching the band's top, with
+    the time as seconds since the simulation started.
+    """
+    dataset = WrfOutput.from_threat(threat, crop=crop).dataset
+
+    assert dataset.Time.values.tolist() == times
+    assert tuple(
+        dataset.sizes[name]
+        for name in (
+            "south_north", "west_east", "west_east_stag",
+            "bottom_top", "bottom_top_stag"
+        )
+    ) == sizes
+    assert "XTIME" not in dataset
+
+
+def test_the_default_settings_lay_out_the_default_threat():
+    """
+    Asserts that the fixed heights the default crop lays out sit inside the
+    levels of the default threat, so the settings a fresh clone reads lay
+    out every channel finitely.
+    """
+    air = WrfOutput.from_settings(Settings()).air
+
+    assert air.channels.shape == (7, 9, 25, 50, 100)
+    assert isfinite(air.channels).all()
+
+
+def test_the_distances_measure_each_cell_to_the_nearest_burning_one():
+    """
+    Asserts that each cell's distance is measured to the nearest burning
+    cell along the spacing of the rows and the columns, and that every
+    distance is infinite where no cell burns.
+    """
+    burning       = zeros((2, 2), dtype=bool)
+    burning[0, 0] = True
+
+    assert_allclose(
+        distances(burning, sampling=(2.0, 3.0)),
+        array([[0.0, 3.0], [2.0, sqrt(13.0)]])
+    )
+    assert (distances(zeros((2, 2), dtype=bool), sampling=(2.0, 3.0)) == inf).all()
+
+
+def test_the_excess_is_the_heat_behind_the_front_over_the_air_ahead(
+    crop   : Crop,
+    output : WrfOutput,
+    threat : ParametricThreat
+):
+    """
+    Asserts that the ambient profile at each height is the air ahead of the
+    front, which covers most of the domain, so the excess is nothing far
+    ahead of the front and the anomaly's share of the air temperature far
+    behind it.
+    """
+    excess = output.excess.isel(Time=-1, south_north=0)
+
+    assert_allclose(
+        output.ambient.isel(Time=-1).values,
+        (BASE_K * exner(crop.heights)).values,
+        rtol = 1e-5
+    )
+    assert_allclose(excess.isel(west_east=-1).values, 0.0, atol=1e-3)
+    assert_allclose(
+        excess.isel(west_east=0).values,
+        (threat.anomaly_k * exner(crop.heights)).values,
+        rtol = 1e-3
+    )
+
+
+def test_the_front_and_the_ambient_read_the_columns_the_crop_keeps(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that a neighborhood ahead of the front holds no burning point,
+    so its distance to the front is infinite, and that one wholly behind the
+    front takes the hot air as its ambient profile, leaving no excess.
+    """
+    ahead  = crop.model_copy(update={"x_m": (500.0, 800.0)})
+    behind = crop.model_copy(update={"x_m": (0.0, 200.0)})
+
+    assert (WrfOutput.from_threat(threat, crop=ahead).front.values == inf).all()
+    assert_allclose(
+        WrfOutput.from_threat(threat, crop=behind).excess.isel(Time=-1).values,
+        0.0,
+        atol = 1e-3
+    )
+
+
+def test_the_front_is_each_column_s_distance_to_the_nearest_burning_one(
+    output: WrfOutput
+):
+    """
+    Asserts that every distance to the front is infinite in a snapshot where
+    nothing burns, and otherwise each column's distance to the easternmost
+    burning one, which the front reaches at 300 m by the last snapshot.
+    """
+    front = output.front.isel(south_north=1)
+
+    assert (front.isel(Time=0).values == inf).all()
+    assert_allclose(
+        front.isel(Time=-1).values,
+        [0.0] * 8 + [40.0 * step for step in range(1, 13)]
+    )
+
+
+def test_the_height_above_the_ground_is_each_level_s_center(
+    output : WrfOutput,
+    threat : ParametricThreat
+):
+    """
+    Asserts that the height of each mass point is the middle of the two
+    staggered levels around it, read from the geopotential above the
+    ground's own.
+    """
+    expected = threat.grid.heights.isel(bottom_top=slice(7)).values
+
+    assert_allclose(
+        output.heights.isel(Time=0, south_north=0, west_east=0).values,
+        expected,
+        rtol = 1e-6
+    )
+    assert_allclose(
+        output.heights.isel(Time=-1, south_north=-1, west_east=-1).values,
+        expected,
+        rtol = 1e-6
+    )
+
+
+def test_the_settings_choose_the_simulation_or_the_threat(
+    crop     : Crop,
+    output   : WrfOutput,
+    threat   : ParametricThreat,
+    tmp_path : Path
+):
+    """
+    Asserts that settings naming no simulation read the threat, and that
+    settings naming one read the file it names.
+    """
+    threat.dataset.assign(T=threat.dataset.T + 1).to_netcdf(
+        path := tmp_path / "wrfout.nc",
+        engine = "netcdf4"
+    )
+
+    read = WrfOutput.from_settings(Settings(crop=crop, simulation=path, threat=threat))
+
+    assert_identical(
+        WrfOutput.from_settings(Settings(crop=crop, threat=threat)).dataset,
+        output.dataset
+    )
+    assert_allclose(read.dataset.T.values, output.dataset.T.values + 1)
+
+
+def test_the_settings_name_a_simulation_relative_to_the_clone(
+    crop        : Crop,
+    monkeypatch : MonkeyPatch,
+    output      : WrfOutput,
+    threat      : ParametricThreat,
+    tmp_path    : Path
+):
+    """
+    Asserts that a simulation named by a relative path is read under the
+    clone the package was installed from.
+    """
+    (tmp_path / "data").mkdir()
+    threat.dataset.assign(T=threat.dataset.T + 1).to_netcdf(
+        tmp_path / "data/wrfout.nc",
+        engine = "netcdf4"
+    )
+    monkeypatch.setattr(
+        Checkout,
+        "installed",
+        classmethod(lambda _: Checkout(root=tmp_path))
+    )
+
+    read = WrfOutput.from_settings(
+        Settings(crop=crop, simulation=Path("data/wrfout.nc"), threat=threat)
+    )
+
+    assert_allclose(read.dataset.T.values, output.dataset.T.values + 1)
+
+
+def test_the_settings_naming_a_missing_simulation_raise(
+    crop     : Crop,
+    threat   : ParametricThreat,
+    tmp_path : Path
+):
+    """
+    Asserts that settings naming a file the clone does not hold raise the
+    error naming it, rather than reading the threat.
+    """
+    settings = Settings(crop=crop, simulation=tmp_path / "absent.nc", threat=threat)
+
+    with raises(FileNotFoundError, match="absent.nc"):
+        WrfOutput.from_settings(settings)
+
+
+@mark.parametrize(
+    ("bounds", "mass", "staggered"),
+    [
+        param((50.0, 110.0), slice(1, 3), slice(1, 4), id="a-span"),
+        param((60.0, 100.0), slice(1, 3), slice(1, 4), id="bounds-on-the-points"),
+        param((60.0, 60.0), slice(1, 2), slice(1, 3), id="bounds-on-one-point"),
+        param(None, slice(0, 4), slice(0, 5), id="no-span")
+    ]
+)
+def test_a_span_keeps_the_mass_points_inside_it_and_the_faces_bounding_them(
+    bounds    : Span,
+    mass      : slice,
+    staggered : slice
+):
+    """
+    Asserts that a span keeps each mass point whose coordinate falls inside
+    its bounds and the staggered points either side of them, and every point
+    where it names no bounds.
+    """
+    coordinate = Dataset(coords={"x": [20.0, 60.0, 100.0, 140.0]}).x
+
+    assert spans(coordinate, bounds=bounds) == {"x": mass, "x_stag": staggered}

@@ -390,9 +390,12 @@ def test_a_script_is_named_where_its_module_is_not_carried(
     carries no module for it, and passes where it names a module or a
     package, the package resolving to its `__init__.py`.
     """
-    (checkout.root / "src/thermur/cli").mkdir()
-    (checkout.root / "src/thermur/cli/__init__.py").write_text("app = None\n")
-    append(checkout, "pyproject.toml", f'\n[project.scripts]\nthermur = "{target}"\n')
+    edit(
+        checkout,
+        "pyproject.toml",
+        new = f'thermur = "{target}"',
+        old = 'thermur = "thermur.cli:app"'
+    )
 
     assert WheelCheck(checkout=checkout).findings == [
         Finding(
@@ -799,6 +802,60 @@ def test_a_page_whose_definitions_drift_is_named(checkout: Checkout):
     ]
 
 
+def test_a_page_whose_region_alone_drifts_is_named_for_the_region(checkout: Checkout):
+    """
+    Asserts that a page whose region was edited by hand, while its footnote
+    definitions stand as the bibliography gives them, is named once, for
+    the region.
+    """
+    page = "docs/pages/data/index.md"
+    edit(
+        checkout,
+        page,
+        new = "| `archive` | `edited.tar.gz` |",
+        old = "| `archive` | `samples.tar.gz` |"
+    )
+
+    assert RenderCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(page),
+            message = f"The `sample` region of `{page}` has drifted from the "
+            "declaration it is written from, which `mise render` writes again"
+        )
+    ]
+
+
+def test_a_page_whose_region_and_definitions_drift_is_named_for_each(
+    checkout: Checkout
+):
+    """
+    Asserts that a page whose region was edited by hand and whose citation
+    lacks its definition is named once for the region and once for the
+    definitions.
+    """
+    page = "docs/pages/data/index.md"
+    edit(
+        checkout,
+        page,
+        new = "| `archive` | `edited.tar.gz` |",
+        old = "| `archive` | `samples.tar.gz` |"
+    )
+    append(checkout, page, "\nOrdered flocks[^cavagna2010].\n")
+
+    assert RenderCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(page),
+            message = f"The `sample` region of `{page}` has drifted from the "
+            "declaration it is written from, which `mise render` writes again"
+        ),
+        Finding(
+            file    = Path(page),
+            message = f"The footnote definitions in `{page}` have drifted from their "
+            "entries in `docs/references.bib`, and `mise render` writes them again"
+        )
+    ]
+
+
 def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
     checkout    : Checkout,
     monkeypatch : MonkeyPatch
@@ -812,6 +869,18 @@ def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
     monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
 
     assert TaskCheck(checkout=checkout).findings == []
+
+
+def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
+    """
+    Asserts that a program under `.mise/bin/` is held to `--exact --locked`
+    as a task is.
+    """
+    edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
+
+    assert [finding.file for finding in LockfileCheck(checkout=checkout).findings] == [
+        Path(".mise/bin/pytest")
+    ]
 
 
 @mark.parametrize(
@@ -867,15 +936,25 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
+def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     """
-    Asserts that a program under `.mise/bin/` is held to `--exact --locked`
-    as a task is.
+    Asserts that a Python task is held to the `uv run` its shebang runs and
+    not to one its docstring mentions.
     """
-    edit(checkout, ".mise/bin/pytest", new="", old="--exact --locked ")
+    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
+    task(
+        checkout = checkout,
+        name     = "repo/sweep.py",
+        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
+    )
+    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
 
-    assert [finding.file for finding in LockfileCheck(checkout=checkout).findings] == [
-        Path(".mise/bin/pytest")
+    assert LockfileCheck(checkout=checkout).findings == [
+        Finding(
+            file    = path,
+            message = f"`{path}` runs `uv run` without `--exact --locked` opening its "
+            "arguments"
+        )
     ]
 
 
@@ -935,7 +1014,7 @@ def test_a_hashed_file_no_push_warms_is_named(
             "`uv.lock` resolves reads `=={minijinja}`",
             id = "unpinned"
         ),
-        param("rich==14.0.0", None, id="unlocked")
+        param("httpx==0.28.1", None, id="unlocked")
     ]
 )
 def test_a_script_pinning_another_version_than_the_lock_is_named(
@@ -1047,25 +1126,23 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
+def test_a_region_missing_its_pair_of_markers_is_named(checkout: Checkout):
     """
-    Asserts that a Python task is held to the `uv run` its shebang runs and
-    not to one its docstring mentions.
+    Asserts that a region whose page carries its opening marker twice is
+    named as refused, and the page as current, since the render leaves the
+    region as it stands.
     """
-    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
-    task(
-        checkout = checkout,
-        name     = "repo/sweep.py",
-        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
+    page = "docs/pages/data/index.md"
+    edit(
+        checkout,
+        page,
+        new = "<!-- crop -->\n\n## The Parametric",
+        old = "## The Parametric"
     )
-    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
 
-    assert LockfileCheck(checkout=checkout).findings == [
-        Finding(
-            file    = path,
-            message = f"`{path}` runs `uv run` without `--exact --locked` opening its "
-            "arguments"
-        )
+    assert [finding.message for finding in RenderCheck(checkout=checkout).findings] == [
+        f"`{page}` does not carry the opening and then the closing marker of its "
+        "`crop` region once each, so `mise render` leaves the region as it stands"
     ]
 
 

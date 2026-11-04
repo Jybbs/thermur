@@ -27,6 +27,8 @@ mise x -- uv sync
 source .venv/bin/activate
 ```
 
+Activating the environment puts the `thermur` command on the path, whose `thermur fetch sample` downloads the sample **[Data](https://thermur.fyi/data/)** describes.
+
 ---
 
 ## 🐦‍⬛ The Biological Inspiration
@@ -210,19 +212,7 @@ These emergent behaviors are verified through the comprehensive metrics suite de
 
 ### WRF-SFIRE Dataset
 
-The training data comes from 147 high-resolution wildfire simulations (5.33 TB total) generated using WRF-Fire [^20]:
-
-| Parameter | Range | Description |
-|-----------|-------|-------------|
-| **Wind Speed** | 3-12 m/s | Initial wind conditions |
-| **Fuel Type** | 13 categories | Anderson fuel models [^21] |
-| **Domain** | 40m resolution | LES with 4m fire mesh |
-| **Duration** | 20-30 minutes | Full plume development |
-| **Temperature** | Up to 600K | Includes extreme heating |
-
-### Data Management
-
-The sample is published as [`samples.tar.gz`](https://huggingface.co/datasets/Jybbs/sfire-samples/resolve/main/samples.tar.gz) in the `Jybbs/sfire-samples` dataset on Hugging Face, and the full dataset transfers from its Globus endpoint. For details on the WRF-SFIRE dataset and data procurement, see [`docs/data-procurement.md`](docs/data-procurement.md).
+The air the flock flies through comes from the large-eddy simulations of the [WRF-SFIRE LES Synthetic Wildfire Plume Dataset](https://doi.org/10.20383/102.0314), of which `mise fetch` downloads one output as a sample into `data/samples/`, at the revision and digest the package pins. **[Data](https://thermur.fyi/data/)** (`docs/pages/data/index.md`) sets out what the sample holds, how the graph reads an output, the parametric threat it flies through where no output is named, and how to reach the full dataset.
 
 ### Training Workflow
 
@@ -456,7 +446,8 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise scan` | Holds every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories through `uv audit` and `bun audit` |
 | `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, the actions the workflows pin, the runner image every job runs on, and the wrangler release `🐦‍⬛ Pages` deploys through, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
-| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the footnote definition of every study it cites out of `docs/references.bib` |
+| `mise fetch` | Downloads the WRF-SFIRE sample at the revision of its Hugging Face dataset the package pins, checks it against the pinned digest, and extracts it into `data/samples/` |
+| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/references.bib` |
 | `mise cite` | Prints the footnote definition of each study whose key it is given, out of `docs/references.bib`, for pasting into an issue, a pull request, or a comment |
 | `mise press` | Builds the docs site into `docs/.vitepress/dist`, failing on a link between pages that leads nowhere |
 | `mise serve` | Serves the docs site, reloading a page as it is edited |
@@ -473,7 +464,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 
 ## 📁 Project Structure
 
-The repository holds the pinned toolchain and its tasks, the package the audit and the pipeline run from and its test suite, the docs site and the documentation pages, and the manifest beside its lockfile, with the gitignored `data/` holding the NetCDF files a reader downloads under `raw/` and the record of each run under `runs/`:
+The repository holds the pinned toolchain and its tasks, the package the audit and the pipeline run from and its test suite, the docs site and the documentation pages, and the manifest beside its lockfile, with the gitignored `data/` holding the sample `mise fetch` downloads under `samples/` and the record of each run under `runs/`:
 
 ```
 thermur/
@@ -490,14 +481,14 @@ thermur/
 │   └── workflows/                  # 🐦‍⬛ CI and 🐦‍⬛ Site on a pull request, and 🐦‍⬛ Draft, 🐦‍⬛ Pages, and 🐦‍⬛ Warm on main
 │
 ├── .mise/
-│   ├── bin/                        # The script each task runs Prose and pytest through
+│   ├── bin/                        # The script each task runs Prose, pytest, and thermur through
 │   ├── config.toml                 # Pinned Python, uv, Node, Bun, lychee, and zizmor, the environment, and the doctor checks
 │   ├── lib/                        # The shell functions the lock tasks share
 │   ├── mise.lock                   # Locked tool downloads and checksums
-│   └── tasks/                      # The docs, gha, lock, py, repo, and site tasks
+│   └── tasks/                      # The data, docs, gha, lock, py, repo, and site tasks
 │
 ├── data/
-│   ├── raw/                        # NetCDF files from WRF-SFIRE
+│   ├── samples/                    # The WRF-SFIRE sample `mise fetch` downloads
 │   └── runs/                       # The record of each recorded run and the tables it saved
 │
 ├── docs/
@@ -506,11 +497,12 @@ thermur/
 │   ├── public/                     # The logo's files and the headers Cloudflare Pages serves the site with
 │   ├── package.json                # The docs site's packages, each an exact pin, beside bun.lock and bunfig.toml
 │   ├── references.bib              # Every study a page can cite, each with its annotation and priority
-│   ├── data-procurement.md         # Dataset acquisition guide
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
 ├── src/thermur/
+│   ├── cli/                        # The `thermur` command line, one module per command group
 │   ├── docs/                       # The bibliography's records and the files `mise render` writes into the docs site and each page
+│   ├── environment/                # The WRF-SFIRE output, the parametric threat, the sample, and the air a flight samples
 │   ├── identity/                   # The palette, the faces and the font files they ship as, the marks, and the tagline, declared once
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
 │   ├── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, the lift `mise lift` reports, and the clone the `repo` tasks and the pipeline read
@@ -579,10 +571,6 @@ To cite *Thermur*, use the *"Cite this repository"* link in the repository's sid
 [^18]: Nafi, Asif, Hadar Ben-Gida, Christopher G. Guglielmo, and Roi Gurka. 2020. "Aerodynamic Forces Acting on Birds During Flight: A Comparative Study of a Shorebird, Songbird and a Strigiform." *Experimental Thermal and Fluid Science* 113: 110018. https://doi.org/10.1016/j.expthermflusci.2019.110018
 
 [^19]: Ginelli, Francesco. 2016. "The Physics of the Vicsek Model." *The European Physical Journal Special Topics* 225 (11): 2099–2117. https://doi.org/10.1140/epjst/e2016-60066-8
-
-[^20]: Coen, Janice L., et al. 2013. "WRF-Fire: Coupled Weather–Wildland Fire Modeling with the Weather Research and Forecasting Model." *Journal of Applied Meteorology and Climatology* 52 (1): 16–38. https://doi.org/10.1175/JAMC-D-12-023.1
-
-[^21]: Rothermel, Richard C. 1972. "A Mathematical Model for Predicting Fire Spread in Wildland Fuels." *USDA Forest Service Research Paper INT-115*.
 
 [^22]: Ballerini, M., et al. 2008. "Empirical Investigation of Starling Flocks: A Benchmark Study in Collective Animal Behaviour." *Animal Behaviour* 76 (1): 201–215. https://doi.org/10.1016/j.anbehav.2008.02.004
 

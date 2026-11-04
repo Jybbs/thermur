@@ -8,6 +8,7 @@ import { mathRules }      from './lib/math.ts'
 import { pageData }       from './lib/page-data.ts'
 import * as paths         from './lib/paths.ts'
 import { themeConfig }    from './lib/site.ts'
+import { widgetRules }    from './lib/widgets.ts'
 
 const facts    = projectFacts(import.meta.url)
 const previews = new head.Previews(Cards.under(import.meta.url, facts), facts)
@@ -19,7 +20,7 @@ export default defineConfig({
   cleanUrls         : true,
   description       : facts.description,
   head              : head.siteHead(facts.base),
-  markdown          : { config: mathRules },
+  markdown          : { config: md => void md.use(mathRules).use(widgetRules) },
   sitemap           : { hostname: facts.homepage },
   srcDir            : paths.pagesDir(import.meta.url),
   themeConfig       : themeConfig(facts),

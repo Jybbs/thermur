@@ -1,0 +1,10 @@
+Usage: thermur fetch sample
+
+Fetches the WRF-SFIRE sample into the clone's data/ folder.                     
+
+Downloads the archive at the pinned revision of the Hugging Face dataset, checks
+it against the pinned SHA-256 digest, and extracts it, then prints the path of  
+the output the graph reads, relative to the clone, which the simulation setting 
+takes. Exits nonzero, extracting nothing, where the download fails or the       
+archive's digest differs from the pinned one.
+

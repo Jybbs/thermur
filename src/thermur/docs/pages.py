@@ -1,11 +1,12 @@
 """
-Holds `Page`, one Markdown file parsed the way the site parses a page, which
-finds the footnotes the file carries and rewrites the definition of each
-study it cites from `docs/references.bib`. The `docs:render` task runs it
-over every Markdown file git tracks, so a page carries only the marker, such
-as `[^cavagna2010]`, and the task writes its definition.
+Holds `Page`, one Markdown file parsed the way the site parses a page. The
+`docs:render` task runs it over every Markdown file git tracks, so a page
+carries only the marker of each study it cites, such as `[^cavagna2010]`,
+and the pair of HTML comments bounding each region, while the task writes
+each definition from `docs/references.bib` and the body of each region.
 """
 
+from collections.abc          import Mapping
 from functools                import cached_property
 from markdown_it              import MarkdownIt
 from markdown_it.token        import Token
@@ -74,6 +75,24 @@ class Page(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
             move_to_end       = False
         ).parse(self.text)
 
+    def bounds(self, name: str) -> tuple[int, int] | None:
+        """
+        Finds the body of the region named `name`, between the one opening
+        marker `<!-- name -->` the text carries and the one closing marker
+        `<!-- /name -->` after it.
+
+        Returns:
+            The offset of the body's first character and the offset of the
+            closing marker, or `None` where the text carries either marker
+            other than once, or the closing one first.
+        """
+        opening, closing = f"<!-- {name} -->", f"<!-- /{name} -->"
+        if self.text.count(opening) != 1 or self.text.count(closing) != 1:
+            return None
+
+        start, end = self.text.index(opening) + len(opening), self.text.index(closing)
+        return (start, end) if start <= end else None
+
     def cited(self, bibliography: Bibliography) -> str:
         """
         Rewrites the text with every definition of a study `bibliography`
@@ -98,6 +117,30 @@ class Page(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
             if index not in dropped
         ).rstrip()
         return "\n\n".join(filter(None, [body, bibliography.cite(*keys)])) + "\n"
+
+    def drifted(self, regions: Mapping[str, str]) -> list[str]:
+        """
+        Names each region of `regions` whose body in the text differs from
+        the one `filled` writes, leaving out one `bounds` finds no body for.
+        """
+        return [
+            name
+            for name, body in regions.items()
+            if self.bounds(name) and self.filled({name: body}) != self.text
+        ]
+
+    def filled(self, regions: Mapping[str, str]) -> str:
+        """
+        Rewrites the text with the body of each region `regions` names set
+        to its text, a blank line on either side, leaving a region `bounds`
+        finds no body for as it stands.
+        """
+        text = self.text
+        for name, body in regions.items():
+            if span := Page(text=text).bounds(name):
+                text = f"{text[: span[0]]}\n\n{body}\n\n{text[span[1] :]}"
+
+        return text
 
     def unknown(self, bibliography: Bibliography) -> list[tuple[int, str]]:
         """

@@ -9,7 +9,7 @@ import { type Tones, translucent } from './tones.ts'
  * pixels, 120 unless given, times `0.6 + 0.6 × fire`, where `fire` is the
  * fire's strength, which also sets how opaque both are.
  */
-interface Flame {
+export interface Flame {
   fire   : number
   half   : number
   scheme : Scheme

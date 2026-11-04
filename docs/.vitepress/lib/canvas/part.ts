@@ -34,6 +34,15 @@ export interface Geometry {
 }
 
 /**
+ * Where a stage's canvas sits, `pinned` behind the whole page and reading the
+ * pointer across the page in its coordinates, or else in the page's flow and
+ * reading the pointer over the canvas in its own.
+ */
+export interface Mount {
+  pinned : boolean
+}
+
+/**
  * One drawing on the stage, fitted to the page whenever the page changes size,
  * stepped on each frame while motion runs, painted on each frame and whenever
  * the page scrolls or the scheme changes while it stands still, and told of

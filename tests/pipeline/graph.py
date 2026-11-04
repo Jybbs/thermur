@@ -9,13 +9,13 @@ files a run, and what a recorded run keeps.
 
 from collections.abc import Callable
 from common.cached   import Pitch
+from common.runs     import computed
 from common.settings import Heading, Tuned
 from dataclasses     import make_dataclass
 from decimal         import Decimal
 from enum            import IntEnum, StrEnum
 from equinox         import Module
 from functools       import partial
-from hamilton.caching.adapter        import CachingEventType
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
 from importlib      import import_module
 from jax            import Array, numpy
@@ -29,7 +29,14 @@ from uuid           import UUID
 from xarray         import DataArray, DataTree, Dataset, open_dataset
 from xarray.testing import assert_identical
 
-from thermur.pipeline.graph    import Graph, NetcdfReader, NetcdfTreeReader, NetcdfWriter
+from thermur.pipeline.graph    import (
+    Graph,
+    NetcdfReader,
+    NetcdfTreeReader,
+    NetcdfWriter,
+    fingerprint,
+    tagged
+)
 from thermur.pipeline.schemas  import Run
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
@@ -77,19 +84,6 @@ def fingerprinted() -> Callable[[object], str]:
     """
     import_module("thermur.pipeline.graph")
     return hash_value
-
-
-def computed(graph: Graph) -> set[str]:
-    """
-    Names each node the graph's most recent run computed rather than read
-    back from its cache.
-    """
-    cache = graph.driver.cache
-    return {
-        node
-        for node, events in cache.logs(cache.last_run_id, level="debug").items()
-        if any(event.event_type is CachingEventType.EXECUTE_NODE for event in events)
-    }
 
 
 @mark.parametrize(
@@ -415,6 +409,36 @@ def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
     assert folder.parent == clone.root / "data" / "runs" / "thermur"
     with open_dataset(folder / "table.nc", engine="netcdf4") as saved:
         assert_identical(saved, results["table"])
+
+
+def test_a_tagged_handler_fingerprints_each_type_its_annotation_names():
+    """
+    Asserts that a handler `tagged` registers reads each member of the union
+    its first parameter is annotated with, and that the fingerprint joins
+    the digest the handler returns to the value's type, so two types the
+    handler gives one digest still fingerprint apart.
+    """
+
+    class Left:
+        """
+        One type the handler reads.
+        """
+
+    class Right:
+        """
+        The other type the handler reads.
+        """
+
+    @tagged
+    def handled(value: Left | Right, *, depth: int = 0) -> str:
+        """
+        Gives every value one digest.
+        """
+        return "digest"
+
+    assert hash_value(Left()) == fingerprint("digest", Left())
+    assert hash_value(Right()) == fingerprint("digest", Right())
+    assert hash_value(Left()) != hash_value(Right())
 
 
 def test_a_value_hamilton_cannot_read_stays_unhashable(

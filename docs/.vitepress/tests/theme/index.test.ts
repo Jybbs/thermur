@@ -4,14 +4,22 @@ import type { VNode }               from 'vue'
 import theme from '../../theme/index.ts'
 
 vi.mock('vitepress/theme-without-fonts', () => ({ default: { Layout: 'Layout' } }))
+vi.mock('../../theme/crop.ts', () => ({ default: 'CropKept' }))
 vi.mock('../../theme/front/hero.ts', () => ({ default: 'FrontHero' }))
 vi.mock('../../theme/front/sky.ts', () => ({ default: 'FrontSky' }))
 vi.mock('../../theme/not-found/page.ts', () => ({ default: 'NotFoundPage' }))
 vi.mock('../../theme/pause.ts', () => ({ default: 'MotionPause' }))
+vi.mock('../../theme/threat.ts', () => ({ default: 'ThreatFront' }))
 
 describe('the theme', () => {
   it('extends the default theme without its faces', () => {
     expect(theme.extends).toEqual({ Layout: 'Layout' })
+  })
+
+  it('registers the widgets a page’s rules write by name', () => {
+    const component = vi.fn<(name: string, widget: unknown) => void>()
+    theme.enhanceApp({ app: { component } } as unknown as Parameters<typeof theme.enhanceApp>[0])
+    expect(component.mock.calls).toEqual([['CropKept', 'CropKept'], ['ThreatFront', 'ThreatFront']])
   })
 
   it('fills the layout’s slots with the front page’s pieces, the pause, and the lost page', () => {

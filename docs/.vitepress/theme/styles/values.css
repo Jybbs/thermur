@@ -1,0 +1,34 @@
+.every-value { margin: 1rem 0; }
+
+.every-value > summary {
+  align-items    : center;
+  color          : var(--vp-c-text-2);
+  cursor         : pointer;
+  display        : inline-flex;
+  font           : 500 0.72rem / 1.6 var(--vp-font-family-mono);
+  gap            : 0.5rem;
+  letter-spacing : 0.08em;
+  list-style     : none;
+  text-transform : uppercase;
+}
+
+.every-value > summary::-webkit-details-marker { display: none; }
+
+.every-value > summary::before {
+  background    : linear-gradient(currentcolor, currentcolor) center / 0.5rem 1px no-repeat,
+                  linear-gradient(currentcolor, currentcolor) center / 1px 0.5rem no-repeat;
+  border        : 1px solid var(--vp-c-divider);
+  border-radius : 50%;
+  content       : '';
+  flex          : none;
+  height        : 1rem;
+  transition    : transform var(--th-settle) var(--th-settle-curve);
+  width         : 1rem;
+}
+
+.every-value[open] > summary::before {
+  background : linear-gradient(currentcolor, currentcolor) center / 0.5rem 1px no-repeat;
+  transform  : rotate(180deg);
+}
+
+.every-value > summary:hover { color: var(--vp-c-text-1); }

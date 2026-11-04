@@ -18,6 +18,13 @@ function uphill(field: Heat, x: number, y: number, out: [number, number]): void 
 }
 
 /**
+ * Adds two sources of heat into one.
+ */
+export const joined = (first: Heat, second: Heat): Heat => ({
+  heat: (x, y) => first.heat(x, y) + second.heat(x, y)
+})
+
+/**
  * Writes into `out` the push away from `field`'s heat at a point, down its
  * slope at `strength` once the heat `hot` there reaches 0.42, and in proportion
  * to it below that.

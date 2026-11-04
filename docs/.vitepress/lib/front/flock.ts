@@ -19,6 +19,23 @@ interface Flight {
 }
 
 /**
+ * How the site's flocks fly: from one seed, each bird between the two lengths
+ * `size` holds, keeping `sep` pixels from its nearest neighbors, and cruising
+ * at `speed` pixels a second.
+ */
+export const FLIGHT = { seed: 41, sep: 9, size: [4, 6.6], speed: 30 } as const
+
+/**
+ * Wanders a flock's roost from one side of the sky to the other, writing where
+ * it stands at `t` inside `box` into `out`.
+ */
+export function roost(t: number, box: common.Box, out: [number, number]): void {
+  const side = Math.sin(t * 0.035 + 2.2) >= 0 ? 1 : -1
+  out[0]     = box.x0 + (box.x1 - box.x0) * (0.5 + side * (0.3 + 0.08 * Math.sin(t * 0.11)))
+  out[1]     = box.y0 + (box.y1 - box.y0) * (0.5 + 0.22 * Math.sin(t * 0.09))
+}
+
+/**
  * A murmuration of birds that each read their seven nearest neighbors, align
  * with them, keep together and apart, follow a roost that wanders the sky, and
  * turn away from whatever heat the field around them gives off, an alarm

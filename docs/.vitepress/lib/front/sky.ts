@@ -1,12 +1,12 @@
-import type { Marks }  from '../canvas/marks.ts'
-import * as part       from '../canvas/part.ts'
-import type { Tones }  from '../canvas/tones.ts'
-import * as common     from '../common.ts'
-import type { Scheme } from '../identity.ts'
-import { Flock }       from './flock.ts'
-import type { Heat }   from './heat.ts'
-import { Plume }       from './plume.ts'
-import { PointerHeat } from './pointer-heat.ts'
+import type { Marks }        from '../canvas/marks.ts'
+import * as part             from '../canvas/part.ts'
+import type { Tones }        from '../canvas/tones.ts'
+import * as common           from '../common.ts'
+import type { Scheme }       from '../identity.ts'
+import * as flock            from './flock.ts'
+import { type Heat, joined } from './heat.ts'
+import { Plume, RISE }       from './plume.ts'
+import { PointerHeat }       from './pointer-heat.ts'
 
 /**
  * The flock the sky draws: how many birds it holds and how many seconds it
@@ -18,26 +18,10 @@ export interface Murmur {
 }
 
 /**
- * How the sky's flock flies: from one seed, each bird between the two lengths
- * `size` holds, keeping `sep` pixels from its nearest neighbors, and cruising
- * at `speed` pixels a second.
- */
-const FLIGHT = { seed: 41, sep: 9, size: [4, 6.6], speed: 30 } as const
-/**
  * The waves of the ridge at the hero's foot, which cancel at the base the sky's
  * fit sets 14 pixels below the horizon.
  */
 const RIDGE = { amplitude: 14, periods: [150, 61, 23], phases: [1.1, 2.2, 3.3] } as const
-
-/**
- * Wanders the flock's roost from one side of the sky to the other, writing
- * where it stands at `t` inside `box` into `out`.
- */
-function roost(t: number, box: common.Box, out: [number, number]): void {
-  const side = Math.sin(t * 0.035 + 2.2) >= 0 ? 1 : -1
-  out[0]     = box.x0 + (box.x1 - box.x0) * (0.5 + side * (0.3 + 0.08 * Math.sin(t * 0.11)))
-  out[1]     = box.y0 + (box.y1 - box.y0) * (0.5 + 0.22 * Math.sin(t * 0.09))
-}
 
 /**
  * Builds the ground beneath `height` across a drawing `w` pixels wide as a
@@ -86,10 +70,10 @@ export class Sky implements part.Part {
   horizon             = 0
   #bands              : readonly Path2D[] = []
   #edge               : Path2D | null = null
-  readonly #falcon    = new PointerHeat(80)
-  readonly #fire      = new Plume({ core: 22, gain: 1.7, lean: 0.42, reach: 300, spread: 0.24 })
-  readonly #field     : Heat = { heat: (x, y) => this.#fire.heat(x, y) + this.#falcon.heat(x, y) }
-  readonly #flock     : Flock
+  readonly #falcon    = new PointerHeat()
+  readonly #fire      = new Plume(RISE)
+  readonly #field     : Heat = joined(this.#fire, this.#falcon)
+  readonly #flock     : flock.Flock
   readonly #gradients = new Map<Scheme, CanvasGradient>()
   readonly #mark      = { fire: 0, half: 26, scheme: 'light' as Scheme, x: 0, y: 0 }
   readonly #marks     : Marks
@@ -103,7 +87,12 @@ export class Sky implements part.Part {
     this.#fire.fire = fire
     this.#mark.fire = fire
     this.#settle    = murmur.settle
-    this.#flock     = new Flock({ ...FLIGHT, count: murmur.count, glyphs: marks.count, roost })
+    this.#flock     = new flock.Flock({
+      ...flock.FLIGHT,
+      count  : murmur.count,
+      glyphs : marks.count,
+      roost  : flock.roost
+    })
   }
 
   /**
@@ -169,16 +158,16 @@ export class Sky implements part.Part {
       ctx.fill(this.#bands[k]!)
     }
     ctx.restore()
-    const flock = this.#flock
+    const birds = this.#flock
     const span  = Math.max(1, this.horizon - g.hero.top)
-    for (let i = 0; i < flock.x.length; i++) {
-      const x         = flock.x[i]!
-      const y         = flock.y[i]! - g.dy
-      const depth     = common.clamp((flock.y[i]! - g.hero.top) / span)
-      const angle     = Math.atan2(flock.vy[i]!, flock.vx[i]!)
+    for (let i = 0; i < birds.x.length; i++) {
+      const x         = birds.x[i]!
+      const y         = birds.y[i]! - g.dy
+      const depth     = common.clamp((birds.y[i]! - g.hero.top) / span)
+      const angle     = Math.atan2(birds.vy[i]!, birds.vx[i]!)
       const shade     = sky.shadeAlpha[0] + (sky.shadeAlpha[1] - sky.shadeAlpha[0]) * depth
       ctx.globalAlpha = shade * quietAt(g, x, y, 0.92)
-      this.#marks.bird(ctx, dpr, flock.glyph[i]!, x, y, angle, flock.size[i]!, sky.shade)
+      this.#marks.bird(ctx, dpr, birds.glyph[i]!, x, y, angle, birds.size[i]!, sky.shade)
     }
     ctx.globalAlpha = 1
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)

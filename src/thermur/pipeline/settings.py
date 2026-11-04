@@ -4,11 +4,13 @@ table of the clone's `pyproject.toml` sets for every run beneath a
 `THERMUR_` variable and a value passed in.
 """
 
-from pydantic_settings         import BaseSettings, PydanticBaseSettingsSource
+from pathlib           import Path
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
 
-from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Manifest
+from thermur.environment.schemas import Crop, ParametricThreat
+from thermur.repo.checkout       import Checkout
+from thermur.repo.schemas        import Manifest
 
 
 class Settings(
@@ -28,6 +30,24 @@ class Settings(
     the field, which takes precedence over the `[tool.thermur]` table, and
     the model is frozen, so a node reading the settings cannot move a value
     another node has already read.
+    """
+
+    crop: Crop = Crop()
+    """
+    The window, the neighborhood, and the band a WRF-SFIRE output is cropped
+    to, and the fixed heights its fields are regridded onto.
+    """
+
+    simulation: Path | None = None
+    """
+    The WRF-SFIRE output the graph reads, relative to the clone, such as the
+    `data/samples/wrf_sample.nc` the `thermur fetch sample` command writes,
+    or `None` to read the dataset `threat` builds.
+    """
+
+    threat: ParametricThreat = ParametricThreat()
+    """
+    The front of hot air the graph reads where `simulation` names no output.
     """
 
     @classmethod

@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
 
-import type { Geometry }                   from '../../../lib/canvas/part.ts'
-import { Lines }                           from '../../../lib/front/lines.ts'
-import { FIRE, LAYOUT, geometry, skyOver } from '../../common/front.ts'
+import type { Geometry }             from '../../../lib/canvas/part.ts'
+import { FIRE }                      from '../../../lib/front/drawing.ts'
+import { Lines }                     from '../../../lib/front/lines.ts'
+import { LAYOUT, geometry, skyOver } from '../../common/front.ts'
 
 /**
  * Eight lines fitted to `page` under a fitted sky, painting onto the stand-in

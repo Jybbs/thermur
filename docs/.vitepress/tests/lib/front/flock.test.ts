@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import type { Box }  from '../../../lib/common.ts'
-import { Flock }     from '../../../lib/front/flock.ts'
-import type { Heat } from '../../../lib/front/heat.ts'
-import { Ring }      from '../../../lib/front/ring.ts'
+import type { Box }      from '../../../lib/common.ts'
+import { FLIGHT, Flock } from '../../../lib/front/flock.ts'
+import type { Heat }     from '../../../lib/front/heat.ts'
+import { Ring }          from '../../../lib/front/ring.ts'
 
-/**
- * How the case's flock flies: sixty birds drawing from twenty-eight traced
- * birds, from one seed, cruising at 30 pixels a second.
- */
-const FLIGHT = { count: 60, glyphs: 28, seed: 41, sep: 9, size: [4, 6.6], speed: 30 } as const
 /**
  * The region the case's flock flies over, 600 by 300 pixels.
  */
@@ -24,7 +19,7 @@ const STILL: Heat = { heat: () => 0 }
  * for `seconds`, two unless given.
  */
 function flown(field: Heat = STILL, seconds = 2): Flock {
-  const flock = new Flock({ ...FLIGHT, roost: middle })
+  const flock = new Flock({ ...FLIGHT, count: 60, glyphs: 28, roost: middle })
   flock.region(REGION)
   flock.settle(seconds, field)
   return flock

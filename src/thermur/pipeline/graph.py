@@ -10,11 +10,11 @@ record, component, and path. It runs once a line first reads a name it
 defines.
 """
 
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Callable, Mapping, Sequence, Set
 from dataclasses     import dataclass
 from decimal         import Decimal
 from equinox         import Module
-from functools       import cached_property
+from functools       import cached_property, wraps
 from hamilton        import registry
 from hamilton.caching.fingerprinting import (
     UNHASHABLE,
@@ -364,74 +364,90 @@ def fingerprint(digest: str, value: object) -> str:
     return hash_primitive((kind.__module__, kind.__qualname__, digest))
 
 
-@hash_value.register(Array)
-@hash_value.register(generic)
-@hash_value.register(ndarray)
+def tagged(handler: Callable[..., str]) -> Callable[..., str]:
+    """
+    Registers `handler` with `hash_value` for each type the annotation
+    of its first parameter names, through a wrapper passing the digest it
+    returns to `fingerprint` beside the value it read.
+
+    The wrapper carries the handler's annotations, which `functools.wraps`
+    copies, so `hash_value.register` reads a union there as one registration
+    per member.
+    """
+
+    @wraps(handler)
+    def fingerprinted(value: object, *, depth: int = 0) -> str:
+        """
+        Fingerprints `value` by its type and the digest `handler` returns
+        for it.
+        """
+        return fingerprint(handler(value, depth=depth), value)
+
+    return hash_value.register(fingerprinted)
+
+
+@tagged
 def fingerprint_array(array: Array | generic | ndarray, *, depth: int = 0) -> str:
     """
-    Fingerprints a NumPy or a JAX array, or a NumPy scalar, by its type, its
-    shape, its dtype, and its values, where Hamilton reads a NumPy array's
-    bytes alone, which every array of zeros spanning as many bytes shares
-    whatever its shape or dtype, and gives a JAX array and a NumPy integer
-    or boolean the one fingerprint it gives an object it cannot read.
+    Hashes a NumPy or a JAX array, or a NumPy scalar, by its shape, its
+    dtype, and its values, where Hamilton reads a NumPy array's bytes alone,
+    which every array of zeros spanning as many bytes shares whatever its
+    shape or dtype, and gives a JAX array and a NumPy integer or boolean the
+    one fingerprint it gives an object it cannot read.
     """
-    values  = asarray(array)
-    payload = (values.shape, values.dtype.str, values.tobytes())
-    return fingerprint(hash_value(payload, depth=depth + 1), array)
+    values = asarray(array)
+    return hash_value(
+        (values.shape, values.dtype.str, values.tobytes()),
+        depth = depth + 1
+    )
 
 
-@hash_value.register(bytes)
+@tagged
 def fingerprint_bytes(data: bytes, *, depth: int = 0) -> str:
     """
-    Fingerprints bytes by their type and the hash Hamilton takes of the
-    bytes themselves, which Hamilton alone gives `b"1.0"` and the number
-    `1.0` alike.
+    Hashes bytes as Hamilton hashes them, which Hamilton alone gives
+    `b"1.0"` and the number `1.0` alike before the type joins the digest.
     """
-    return fingerprint(hash_bytes(data), data)
+    return hash_bytes(data)
 
 
-@hash_value.register(Mapping)
-@hash_value.register(Sequence)
-@hash_value.register(Set)
+@tagged
 def fingerprint_collection(
     collection : Mapping | Sequence | Set,
     *,
     depth      : int = 0
 ) -> str:
     """
-    Fingerprints a mapping, a sequence, or a set by its type and the hash
-    Hamilton takes of its items, which Hamilton alone gives a list and a
-    tuple, or a set and a `frozenset`, holding the same items.
+    Hashes a mapping, a sequence, or a set by its items, which Hamilton
+    alone gives a list and a tuple, or a set and a `frozenset`, holding the
+    same items alike before the type joins the digest.
     """
     match collection:
-        case Mapping() : digest = hash_mapping(collection, depth=depth)
-        case Set()     : digest = hash_set(collection, depth=depth)
-        case _         : digest = hash_sequence(collection, depth=depth)
-    return fingerprint(digest, collection)
+        case Mapping() : return hash_mapping(collection, depth=depth)
+        case Set()     : return hash_set(collection, depth=depth)
+        case _         : return hash_sequence(collection, depth=depth)
 
 
-@hash_value.register(DataArray)
-@hash_value.register(Dataset)
+@tagged
 def fingerprint_dataset(data: DataArray | Dataset, *, depth: int = 0) -> str:
     """
-    Fingerprints a `DataArray` or a `Dataset` by its type and every
-    variable's name, dimensions, attributes, and values, which `to_dict`
-    lays out as a mapping holding each variable's values as an array, where
-    Hamilton reads a `Dataset`'s data variable names alone and nothing of
-    a `DataArray`.
+    Hashes a `DataArray` or a `Dataset` by every variable's name,
+    dimensions, attributes, and values, which `to_dict` lays out as a
+    mapping holding each variable's values as an array, where Hamilton reads
+    a `Dataset`'s data variable names alone and nothing of a `DataArray`.
     """
-    return fingerprint(hash_value(data.to_dict(data="array"), depth=depth + 1), data)
+    return hash_value(data.to_dict(data="array"), depth=depth + 1)
 
 
-@hash_value.register(Module)
+@tagged
 def fingerprint_module(module: Module, *, depth: int = 0) -> str:
     """
-    Fingerprints an `equinox.Module` by its type and the value of each of
-    its fields, where Hamilton reads the fields alone, which two components
-    declaring the same parameters share, and gives a component declaring
-    none the one fingerprint it gives an object it cannot read.
+    Hashes an `equinox.Module` by the value of each of its fields, where
+    Hamilton reads the fields alone, which two components declaring the
+    same parameters share, and gives a component declaring none the one
+    fingerprint it gives an object it cannot read.
     """
-    return fingerprint(hash_value(vars(module), depth=depth + 1), module)
+    return hash_value(vars(module), depth=depth + 1)
 
 
 @hash_value.register(object)
@@ -449,34 +465,25 @@ def fingerprint_object(value: object, *, depth: int = 0) -> str:
     return digest if digest == UNHASHABLE else fingerprint(digest, value)
 
 
-@hash_value.register(BaseModel)
+@tagged
 def fingerprint_record(record: BaseModel, *, depth: int = 0) -> str:
     """
-    Fingerprints a Pydantic record by its type and the value of each field
-    its class declares, where Hamilton reads the record's `__dict__`,
-    which holds nothing for a record declaring no field and holds each
-    `cached_property` once read.
+    Hashes a Pydantic record by the value of each field its class declares,
+    where Hamilton reads the record's `__dict__`, which holds nothing for a
+    record declaring no field and holds each `cached_property` once read.
     """
-    return fingerprint(hash_value(record.model_dump(), depth=depth + 1), record)
+    return hash_value(record.model_dump(), depth=depth + 1)
 
 
-@hash_value.register(AnyUrl)
-@hash_value.register(bool)
-@hash_value.register(complex)
-@hash_value.register(Decimal)
-@hash_value.register(float)
-@hash_value.register(int)
-@hash_value.register(PurePath)
-@hash_value.register(str)
-@hash_value.register(UUID)
+@tagged
 def fingerprint_text(
     value : AnyUrl | bool | complex | Decimal | float | int | PurePath | str | UUID,
     *,
     depth : int = 0
 ) -> str:
     """
-    Fingerprints a number, a string, a path, a `UUID`, or a URL by its type
-    and the text `str` writes for it, which holds the whole value.
+    Hashes a number, a string, a path, a `UUID`, or a URL by the text `str`
+    writes for it, which holds the whole value.
 
     Hamilton reads the text of a `bool`, an `int`, a `float`, or a `str`
     without its type, so `1` and `"1"` share a fingerprint there, as do an
@@ -485,14 +492,13 @@ def fingerprint_text(
     text only where the value's `__module__` names a module built into the
     interpreter, and a complex number carries no `__module__` at all.
     """
-    return fingerprint(hash_primitive(value), value)
+    return hash_primitive(value)
 
 
-@hash_value.register(DataTree)
+@tagged
 def fingerprint_tree(tree: DataTree, *, depth: int = 0) -> str:
     """
-    Fingerprints a `DataTree` by its type and the `Dataset` at each of
-    its paths, where Hamilton reads the names of the tree's variables and
-    children alone.
+    Hashes a `DataTree` by the `Dataset` at each of its paths, where
+    Hamilton reads the names of the tree's variables and children alone.
     """
-    return fingerprint(hash_value(tree.to_dict(), depth=depth + 1), tree)
+    return hash_value(tree.to_dict(), depth=depth + 1)
