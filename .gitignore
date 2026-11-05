@@ -13,4 +13,5 @@ notes/
 
 .DS_Store
 
+docs/.vitepress/.temp/
 docs/node_modules/

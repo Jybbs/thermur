@@ -406,6 +406,29 @@ def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Che
     assert Path("LICENSE") not in files
 
 
+@mark.parametrize(
+    "written",
+    [
+        "docs/.vitepress/.temp/_headers", "docs/.vitepress/dist/_headers",
+        "docs/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs"
+    ]
+)
+def test_tracked_leaves_out_each_file_the_site_build_writes(
+    checkout : Checkout,
+    written  : str
+):
+    """
+    Asserts that a file the site's build writes is none of the files a
+    checkout tracks, so a reader listing them while the build runs names no
+    file the build may remove before the reader opens it.
+    """
+    path = checkout.root / written
+    path.parent.mkdir(parents=True)
+    path.touch()
+
+    assert Path(written) not in checkout.tracked()
+
+
 def test_unwrap_blanks_a_comment_and_keeps_the_blank_line_above_it():
     """
     Asserts that reading the lines a shell runs blanks an indented comment
