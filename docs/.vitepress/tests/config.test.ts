@@ -12,16 +12,18 @@ const root = repoRoot(import.meta.url)
 const site = await resolveConfig(path.join(root, 'docs'), 'build')
 
 test.for(['cacheDir', 'outDir', 'tempDir'] as const)(
-  'git ignores what a build writes under the %s VitePress resolves',
+  'git ignores the whole %s VitePress resolves',
   (folder, { repository }) => {
-    const file = path.join(path.relative(root, site[folder]), 'written')
+    const held = path.relative(root, site[folder])
     const git  = (...args: string[]): number | null =>
-      // Blanks the machine's own excludes file, so only what the repository lists counts.
+      // Blanks `core.excludesFile`, whose patterns otherwise count toward `check-ignore`.
       spawnSync('git', ['-c', 'core.excludesFile=', ...args], { cwd: repository.root }).status
 
     repository.write('.gitignore', fs.readFileSync(path.join(root, '.gitignore'), 'utf8'))
+    // A pattern ending in a slash matches no path missing from the disk, so this write creates the folder.
+    repository.write(path.join(held, 'written'), '')
 
     expect(git('init', '--quiet')).toBe(0)
-    expect(git('check-ignore', '--quiet', file)).toBe(0)
+    expect(git('check-ignore', '--quiet', held)).toBe(0)
   }
 )
