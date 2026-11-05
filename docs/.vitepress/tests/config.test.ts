@@ -20,10 +20,11 @@ test.for(['cacheDir', 'outDir', 'tempDir'] as const)(
       spawnSync('git', ['-c', 'core.excludesFile=', ...args], { cwd: repository.root }).status
 
     repository.write('.gitignore', fs.readFileSync(path.join(root, '.gitignore'), 'utf8'))
-    // A pattern ending in a slash matches no path missing from the disk, so this write creates the folder.
+    // A pattern ending in a slash matches a last segment only where a folder sits, so this write creates it.
     repository.write(path.join(held, 'written'), '')
 
-    expect(git('init', '--quiet')).toBe(0)
+    // Copies no template, whose `info/exclude` otherwise counts toward `check-ignore`.
+    expect(git('init', '--quiet', '--template=')).toBe(0)
     expect(git('check-ignore', '--quiet', held)).toBe(0)
   }
 )
