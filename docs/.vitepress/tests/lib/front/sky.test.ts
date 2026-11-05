@@ -83,9 +83,9 @@ describe('Sky in flight', () => {
       for (let frame = 0; frame < frames; frame++) drawn.step(1 / 60, geometry())
     }
     expect(across()).toBeGreaterThan(600)
-    fly(1200)
+    fly(1500)
     expect(across()).toBeGreaterThan(600)
-    fly(900)
+    fly(600)
     expect(across()).toBeLessThan(600)
   })
 
