@@ -79,8 +79,13 @@ describe('Sky in flight', () => {
       const placed = transforms(stand).filter(([scale]) => scale !== 1)
       return placed.reduce((sum, [, , , , x]) => sum + Number(x), 0) / placed.length
     }
+    const fly = (frames: number): void => {
+      for (let frame = 0; frame < frames; frame++) drawn.step(1 / 60, geometry())
+    }
     expect(across()).toBeGreaterThan(600)
-    for (let frame = 0; frame < 2100; frame++) drawn.step(1 / 60, geometry())
+    fly(1500)
+    expect(across()).toBeGreaterThan(600)
+    fly(600)
     expect(across()).toBeLessThan(600)
   })
 
