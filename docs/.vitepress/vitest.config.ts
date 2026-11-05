@@ -4,9 +4,10 @@ import { identityModule } from './lib/identity.ts'
 import { cacheDir }       from './lib/paths.ts'
 
 /**
- * The milliseconds a case runs before it fails. Each case spends its time on
- * the CPU, so the slowest takes half a second on an idle machine and more than
- * 30 seconds at a load average in the hundreds.
+ * The milliseconds a case runs before it fails. The slowest cases spend their
+ * time on the CPU, so on four workers the slowest takes half a second at a
+ * 1-minute load average of 5, under 20 seconds as that average climbs to 160,
+ * and 37 seconds as it climbs to 380.
  */
 const TEST_TIMEOUT = 60_000
 
