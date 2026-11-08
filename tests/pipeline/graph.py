@@ -10,7 +10,7 @@ files a run, and what a recorded run keeps.
 from collections.abc import Callable
 from common.cached   import Pitch
 from common.runs     import computed
-from common.settings import Heading, Tuned
+from common.settings import Tuned
 from dataclasses     import make_dataclass
 from decimal         import Decimal
 from enum            import IntEnum, StrEnum
@@ -29,6 +29,7 @@ from uuid           import UUID
 from xarray         import DataArray, DataTree, Dataset, open_dataset
 from xarray.testing import assert_identical
 
+from thermur.controller.components import Constant
 from thermur.pipeline.graph    import (
     Graph,
     NetcdfReader,
@@ -120,8 +121,8 @@ def fingerprinted() -> Callable[[object], str]:
             id = "tree-child-values"
         ),
         param(
-            Tuned.model_construct(heading=Heading(coupling_per_s=1.0)),
-            Tuned.model_construct(heading=Heading(coupling_per_s=2.0)),
+            Tuned.model_construct(coupling=Constant(coupling_per_s=1.0)),
+            Tuned.model_construct(coupling=Constant(coupling_per_s=2.0)),
             id = "record-component"
         ),
         param(
@@ -176,7 +177,7 @@ def test_values_differing_in_any_part_fingerprint_apart(
     [
         param(zeros(3, float32), numpy.zeros(3), id="numpy-jax"),
         param(int64(0), zeros((), int64), id="numpy-scalar-array"),
-        param(Heading(), Pitch(), id="components"),
+        param(Constant(), Pitch(), id="components"),
         param(Bare(), Settings.model_construct(), id="records"),
         param(
             Bare(),
@@ -226,7 +227,7 @@ def test_values_of_different_types_fingerprint_apart(
         ),
         param(lambda: DataTree(Dataset({"t": ("x", zeros(3))})), id="tree"),
         param(lambda: Tuned(radius_m=1.0), id="record"),
-        param(lambda: Heading(coupling_per_s=2.0), id="component"),
+        param(lambda: Constant(coupling_per_s=2.0), id="component"),
         param(lambda: Path("a.nc"), id="path"),
         param(lambda: int64(3), id="numpy-scalar"),
         param(lambda: [1, (2.0, "3"), {"x": {4}}], id="collection"),
@@ -503,7 +504,7 @@ def test_an_unrecorded_run_saves_nothing(
     "steps",
     [
         param(("jax_array", "numpy_array"), id="numpy-from-jax"),
-        param(("heading", "pitch"), id="components"),
+        param(("constant", "pitch"), id="components"),
         param(("pair_list", "pair_tuple"), id="list-tuple")
     ]
 )

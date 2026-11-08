@@ -9,7 +9,7 @@ from collections.abc import Iterator, Mapping
 from functools       import cached_property
 from json            import dumps
 from pathlib         import Path
-from pydantic        import BaseModel, Field
+from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
 from thermur.docs.pages          import Page
 from thermur.environment.schemas import (
@@ -21,9 +21,12 @@ from thermur.environment.schemas import (
     Ranges,
     Sample
 )
-from thermur.identity.schemas import Identity
-from thermur.repo.checkout    import Checkout
-from thermur.repo.schemas     import Finding
+from thermur.identity.schemas  import Identity
+from thermur.metrics.schemas   import Plan
+from thermur.metrics.trials    import Trial
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
+from thermur.repo.schemas      import Finding
 
 
 class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -94,14 +97,38 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         Renders the body of each region the render task writes into a page,
         by the page's path and then by the region's name, meaning the fields
         `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
-        Data page.
+        Data page, and on The Interaction Rules the fields `Plan` and the
+        contact declare beside those of each open slot's default and each of
+        its candidates, every one named for its component.
         """
+        defaults = Settings()
         return {
-            Path("docs/pages/data/index.md"): {
+            Path("docs/pages/data/index.md")    : {
                 "crop"   : tabled(Crop),
                 "ranges" : tabled(Ranges),
                 "sample" : tabled(Sample),
                 "threat" : tabled(ParametricThreat)
+            },
+            Path("docs/pages/methods/rules.md") : {
+                "contact" : tabled(type(defaults.contact)),
+                "plan"    : tabled(Plan)
+            } | {
+                trial.slot: tabled(
+                    kind = create_model(
+                        trial.slot,
+                        **{
+                            type(component).__name__.lower(): (
+                                type(component),
+                                component
+                            )
+                            for component in (
+                                getattr(defaults, trial.slot),
+                                *trial.candidates.values()
+                            )
+                        }
+                    )
+                )
+                for trial in Trial.listed()
             }
         }
 
@@ -218,14 +245,13 @@ def fielded(
             )
 
 
-def tabled(model: type[BaseModel]) -> str:
+def tabled(kind: type) -> str:
     """
-    Lays out each field `model` declares as a row of a Markdown table, in
-    the order the class declares them, the name and the default in code
-    beside the description, with a column of bounds only where a field sets
-    one.
+    Lays out each field `kind` declares as a row of a Markdown table, in the
+    order the class declares them, the name and the default in code beside
+    the description, with a column of bounds only where a field sets one.
     """
-    schema = model.model_json_schema()
+    schema = TypeAdapter(kind).json_schema()
     rows   = list(fielded(schema.get("$defs", {}), schema["properties"]))
     bounds = any(bound for _, _, bound, _ in rows)
     header = ["**Field**", "**Default**", *["**Bound**"] * bounds, "**Holds**"]

@@ -1,0 +1,146 @@
+.rules-bar {
+  align-items    : center;
+  display        : flex;
+  flex-wrap      : wrap;
+  gap            : 0.625rem 1rem;
+  padding-bottom : 2px;
+}
+
+.rules-title {
+  color          : var(--vp-c-text-2);
+  flex           : 1 0 100%;
+  font           : 500 0.66rem / 1.35 var(--vp-font-family-mono);
+  letter-spacing : 0.1em;
+  text-transform : uppercase;
+}
+
+.rules-radios {
+  align-items           : center;
+  border                : 1px solid var(--vp-c-divider);
+  border-radius         : 999px;
+  display               : inline-grid;
+  flex                  : none;
+  grid-template-columns : 1fr 1fr;
+  padding               : 3px;
+  position              : relative;
+}
+
+.rules-radios [role='radio'] {
+  align-items     : center;
+  background      : none;
+  border          : 0;
+  border-radius   : 999px;
+  color           : var(--vp-c-text-2);
+  cursor          : pointer;
+  display         : inline-flex;
+  font            : 500 0.7rem / 1.6 var(--vp-font-family-mono);
+  gap             : 0.375rem;
+  justify-content : center;
+  letter-spacing  : 0.1em;
+  padding         : 4px 12px;
+  position        : relative;
+  text-transform  : uppercase;
+  transition      : color var(--th-settle) var(--th-settle-curve);
+}
+
+.rules-radios [role='radio']:hover,
+.rules-radios [aria-checked='true'] { color: var(--vp-c-text-1); }
+
+.rules-radios [role='radio']:focus-visible,
+.rules-range input:focus-visible {
+  outline        : 2px solid var(--th-lead);
+  outline-offset : 2px;
+}
+
+.rules-radios svg {
+  fill   : currentcolor;
+  height : 14px;
+  width  : 14px;
+}
+
+.rules-radios [aria-checked='true'] svg { fill: var(--th-lead); }
+
+.rules-mode-thumb {
+  background    : color-mix(in oklab, var(--th-lead) 20%, transparent);
+  border-radius : 999px;
+  bottom        : 3px;
+  box-shadow    : inset 0 0 0 1px var(--th-lead);
+  left          : 3px;
+  position      : absolute;
+  top           : 3px;
+  transition    : transform var(--th-settle) var(--th-settle-curve);
+  width         : calc(50% - 3px);
+}
+
+.rules-mode[data-mode='select'] .rules-mode-thumb { transform: translateX(100%); }
+
+.rules-range {
+  align-items    : center;
+  color          : var(--vp-c-text-3);
+  display        : inline-flex;
+  flex           : 1 1 8rem;
+  font           : 500 0.66rem / 1.6 var(--vp-font-family-mono);
+  gap            : 0.625rem;
+  letter-spacing : 0.1em;
+  min-width      : 0;
+  text-transform : uppercase;
+  white-space    : nowrap;
+}
+
+.rules-range input {
+  accent-color : var(--th-series-3);
+  flex         : 1 1 auto;
+  min-width    : 5rem;
+}
+
+.rules-chip {
+  align-items   : baseline;
+  background    : color-mix(in srgb, var(--vp-c-text-1) 6%, transparent);
+  border-radius : 999px;
+  display       : inline-flex;
+  flex          : none;
+  gap           : 0.375rem;
+  padding       : 3px 10px 3px 9px;
+}
+
+.rules-chip-name {
+  color          : var(--vp-c-text-3);
+  font           : 500 0.6rem / 1 var(--vp-font-family-mono);
+  letter-spacing : 0.1em;
+  text-transform : uppercase;
+}
+
+.rules-chip-value {
+  color                : var(--vp-c-text-1);
+  font                 : 400 0.74rem / 1.45 var(--vp-font-family-mono);
+  font-variant-numeric : tabular-nums;
+  letter-spacing       : 0.06em;
+  text-transform       : uppercase;
+}
+
+.rules-stage {
+  aspect-ratio  : 2 / 1;
+  border-radius : 8px;
+  max-height    : 21rem;
+  min-height    : 18rem;
+  overflow      : hidden;
+  position      : relative;
+  width         : 100%;
+}
+
+.rules-stage canvas {
+  cursor       : crosshair;
+  display      : block;
+  height       : 100%;
+  touch-action : pan-y;
+  width        : 100%;
+}
+
+.rules-stage[data-mode='select'] canvas { cursor: pointer; }
+
+@media (width < 40rem) {
+  .rules-range {
+    flex-basis : 100%;
+    order      : 3;
+  }
+}

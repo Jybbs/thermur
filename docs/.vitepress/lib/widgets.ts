@@ -12,11 +12,14 @@ const SHUT = '</details>\n'
  * What each marker writes on the site, by the marker's name.
  */
 const MARKERS: Readonly<Record<string, string>> = {
-  '/crop'   : SHUT,
-  '/threat' : SHUT,
-  'crop'    : FOLD,
-  'kept'    : '<CropKept />\n',
-  'threat'  : `<ThreatFront />\n${FOLD}`
+  '/crop'        : SHUT,
+  '/threat'      : SHUT,
+  'crop'         : FOLD,
+  'kept'         : '<CropKept />\n',
+  'neighbors'    : '<RulesNeighbors />\n',
+  'polarization' : '<RulesSpacing />\n',
+  'reach'        : '<RulesReach />\n',
+  'threat'       : `<ThreatFront />\n${FOLD}`
 }
 
 /**

@@ -10,4 +10,6 @@
 @media (width < 40rem) {
   .vp-doc th,
   .vp-doc td { padding-inline: 0.5rem; }
+
+  .vp-doc td:first-child code { overflow-wrap: anywhere; }
 }

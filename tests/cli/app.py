@@ -1,7 +1,7 @@
 """
 Pins the `thermur` command line, meaning the version it reports, the help
 it prints for itself, for each group, and for each command, and that neither
-the version, a command's help, nor the fetch imports JAX or xarray.
+the version, the fetch's help, nor the fetch imports JAX or xarray.
 """
 
 from collections.abc    import Callable
@@ -40,11 +40,11 @@ def printed(
     return call
 
 
-def test_neither_the_version_nor_a_command_s_help_imports_jax_or_xarray():
+def test_neither_the_version_nor_the_fetch_s_help_imports_jax_or_xarray():
     """
-    Asserts that a fresh interpreter printing the version, a group's help,
-    and a command's help imports neither JAX nor xarray, which load only
-    once a command runs.
+    Asserts that a fresh interpreter printing the version, the fetch group's
+    help, and its command's help imports neither JAX nor xarray, which load
+    only once a command runs.
     """
     script = "; ".join(
         [
@@ -101,7 +101,8 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
     [
         param(("--help",), id="thermur"),
         param(("fetch", "--help"), id="fetch"),
-        param(("fetch", "sample", "--help"), id="fetch-sample")
+        param(("fetch", "sample", "--help"), id="fetch-sample"),
+        param(("fly", "--help"), id="fly")
     ]
 )
 def test_each_level_prints_its_help(
@@ -135,7 +136,7 @@ def test_a_level_given_no_command_prints_its_help(
 @mark.parametrize(
     ("tokens", "offered"),
     [
-        param(("bogus",), "fetch", id="thermur"),
+        param(("bogus",), "fetch, fly", id="thermur"),
         param(("fetch", "bogus"), "sample", id="fetch")
     ]
 )

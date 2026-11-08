@@ -18,3 +18,4 @@ app.command(
     )
 )
 app["fetch"].command("thermur.cli.fetch:sample")
+app.command("thermur.cli.fly:fly")

@@ -28,8 +28,13 @@ describe('widgetRules', () => {
     expect(html.indexOf('<table')).toBeLessThan(html.indexOf('</details>'))
   })
 
-  it('sets the crop’s widget alone where its marker stands', async () => {
-    expect(await rendered('<!-- kept -->\n')).toBe('<CropKept />\n')
+  it.for([
+    { marker: 'kept', widget: 'CropKept' },
+    { marker: 'neighbors', widget: 'RulesNeighbors' },
+    { marker: 'polarization', widget: 'RulesSpacing' },
+    { marker: 'reach', widget: 'RulesReach' }
+  ])('sets $widget alone where the $marker marker stands', async ({ marker, widget }) => {
+    expect(await rendered(`<!-- ${marker} -->\n`)).toBe(`<${widget} />\n`)
   })
 
   it.for(['<!-- sample -->', '<div>kept</div>'])('leaves %s as it was written', async block => {

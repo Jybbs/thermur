@@ -27,7 +27,7 @@ mise x -- uv sync
 source .venv/bin/activate
 ```
 
-Activating the environment puts the `thermur` command on the path, whose `thermur fetch sample` downloads the sample **[Data](https://thermur.fyi/data/)** describes.
+Activating the environment puts the `thermur` command on the path, whose `thermur fetch sample` downloads the sample **[Data](https://thermur.fyi/data/)** describes, and whose `thermur fly` flies the flock through the parametric threat and prints what the flight measures, by the rules **[Methods](https://thermur.fyi/methods/)** sets out.
 
 ---
 
@@ -447,7 +447,9 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, the actions the workflows pin, the runner image every job runs on, and the wrangler release `🐦‍⬛ Pages` deploys through, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 | `mise fetch` | Downloads the WRF-SFIRE sample at the revision of its Hugging Face dataset the package pins, checks it against the pinned digest, and extracts it into `data/samples/` |
+| `mise browse` | Opens Hamilton's experiment viewer over the runs `thermur fly` records under `data/runs/`, passing any further arguments to it |
 | `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/references.bib` |
+| `mise measure` | Writes the means and standard errors the docs site's charts of the interaction rules draw, out of the coupling and heading trials of the run under `data/runs/` it is given |
 | `mise cite` | Prints the footnote definition of each study whose key it is given, out of `docs/references.bib`, for pasting into an issue, a pull request, or a comment |
 | `mise press` | Builds the docs site into `docs/.vitepress/dist`, failing on a link between pages that leads nowhere |
 | `mise serve` | Serves the docs site, reloading a page as it is edited |
@@ -501,9 +503,11 @@ thermur/
 │
 ├── src/thermur/
 │   ├── cli/                        # The `thermur` command line, one module per command group
-│   ├── docs/                       # The bibliography's records and the files `mise render` writes into the docs site and each page
+│   ├── controller/                 # The composite each drone flies by, its slots, and the components borrowed from other physical systems that fill them
+│   ├── docs/                       # The bibliography's records, the files `mise render` writes into the docs site and each page, and the trials `mise measure` writes
 │   ├── environment/                # The WRF-SFIRE output, the parametric threat, the sample, and the air a flight samples
 │   ├── identity/                   # The palette, the faces and the font files they ship as, the marks, and the tagline, declared once
+│   ├── metrics/                    # The flight over seeds, the statistics its frames give, and the trials flying each slot's candidates against the reference
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
 │   ├── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, the lift `mise lift` reports, and the clone the `repo` tasks and the pipeline read
 │   └── startup/                    # The entry point `site` calls in every interpreter the environment starts, loading each top-level import lazily

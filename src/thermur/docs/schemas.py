@@ -116,13 +116,13 @@ class Study(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=Tru
     @property
     def stem(self) -> str:
         """
-        Spells the first author's surname in lowercase ASCII letters alone,
-        followed by the year, which the key opens on.
+        Spells the first author's surname in case-folded ASCII letters
+        alone, followed by the year, which the key opens on.
         """
         return sub(
             r"[^a-z]",
             "",
-            normalize("NFKD", self.surnames[0]).lower()
+            normalize("NFKD", self.surnames[0]).casefold()
         ) + self.year
 
     @property

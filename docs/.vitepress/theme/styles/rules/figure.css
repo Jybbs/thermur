@@ -1,0 +1,38 @@
+.vp-doc .rules-figure {
+  display               : grid;
+  gap                   : 0.625rem;
+  grid-template-columns : minmax(0, 1fr);
+  margin                : 1.25rem 0 1.375rem;
+}
+
+.rules-figure svg {
+  display      : block;
+  overflow     : visible;
+  touch-action : pan-y;
+}
+
+.rules-figure svg text { font-variant-numeric: tabular-nums; }
+
+.rules-chart { cursor: crosshair; }
+
+.rules-fade { transition: opacity var(--th-settle) var(--th-settle-curve); }
+
+.rules-knob {
+  cursor  : pointer;
+  outline : none;
+}
+
+.rules-knob:focus-visible circle:first-child,
+circle.rules-knob:focus-visible {
+  stroke       : var(--th-lead);
+  stroke-width : 3px;
+}
+
+.rules-knob[aria-checked='false'] .rules-knob-dot { opacity: 0; }
+
+.rules-knob-dot { transition: opacity var(--th-settle) var(--th-settle-curve); }
+
+.rules-track {
+  cursor       : ew-resize;
+  touch-action : none;
+}
