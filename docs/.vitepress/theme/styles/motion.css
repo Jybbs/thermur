@@ -1,8 +1,19 @@
 :root {
   --th-settle       : 240ms;
   --th-settle-curve : cubic-bezier(0.2, 0, 0, 1);
+  --th-fill-pace    : 1;
+  --th-fill-wait    : calc(90ms * var(--th-fill-pace));
+  --th-fill-cross   : calc(620ms * var(--th-fill-pace));
+  --th-fill-flare   : calc(60ms * var(--th-fill-pace));
+  --th-fill-ink     : calc(70ms * var(--th-fill-pace));
+  --th-fill-turn    : calc(10ms * var(--th-fill-pace));
+  --th-fill-cool    : calc(480ms * var(--th-fill-pace));
+  --th-fill-fade    : calc(120ms * var(--th-fill-pace));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :root { --th-settle: 0s; }
+  :root {
+    --th-settle    : 0s;
+    --th-fill-pace : 0;
+  }
 }

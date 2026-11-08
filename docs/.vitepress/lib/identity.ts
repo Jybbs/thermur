@@ -16,6 +16,25 @@ export type Identity = typeof source
 type Kind = 'fill' | 'ground' | 'mark' | 'rule' | 'text'
 
 /**
+ * A step of the heat ramp, counted from 1 at its lightest, laid over the ground
+ * at `share` where one is set.
+ */
+export interface Heat {
+  step   : number
+  share? : number
+}
+
+/**
+ * A custom property the theme sets to a step of the heat ramp in each scheme,
+ * under the kind of thing it paints.
+ */
+interface Fill {
+  dark  : Heat
+  kind  : Extract<Kind, 'fill' | 'mark'>
+  light : Heat
+}
+
+/**
  * A custom property the theme sets to a share of one of the palette's roles
  * laid over another, the ground unless `over` names a role, under the kind of
  * thing it paints.
@@ -48,6 +67,17 @@ const FACES = {
   '--vp-font-family-base' : 'body',
   '--vp-font-family-mono' : 'mono'
 } as const satisfies Record<string, keyof Identity['faces']>
+/**
+ * The colors of the fill a link and a chip take under the pointer, on keyboard
+ * focus, and on a tap, each a step of the heat ramp per scheme, meaning
+ * `--th-fill-hot` for the band crossing the words, `--th-fill-ember` for what it
+ * leaves behind them, and `--th-fill-edge` for the line along their foot.
+ */
+export const FILL: Readonly<Record<string, Fill>> = {
+  '--th-fill-edge'  : { dark: { step: 1 }, kind: 'mark', light: { step: 3 } },
+  '--th-fill-ember' : { dark: { step: 6 }, kind: 'fill', light: { share: 0.5, step: 1 } },
+  '--th-fill-hot'   : { dark: { step: 4 }, kind: 'fill', light: { step: 2 } }
+}
 /**
  * The default theme's custom properties the site sets, each to a share of a
  * palette role laid over the ground, or over the role its `over` names, so each
@@ -89,6 +119,18 @@ export const ON_LEAD = {
   '--vp-button-brand-hover-text'  : '--vp-c-brand-2',
   '--vp-button-brand-text'        : '--vp-c-brand-3'
 } as const
+
+/**
+ * Writes the color custom property `top` paints at `share` over the one
+ * `under` paints, or `top` alone at a full share.
+ */
+const laid = (top: string, share: number, under: string): string =>
+  share === 1 ? `var(${top})` : `color-mix(in srgb, var(${top}) ${Math.round(share * 100)}%, var(${under}))`
+
+/**
+ * Writes the color of a step of the heat ramp at its share over the ground.
+ */
+const heated = ({ share = 1, step }: Heat): string => laid(`--th-heat-${step}`, share, '--th-ground')
 
 /**
  * Writes the color of a role holding one per scheme, as its hex where the two
@@ -140,7 +182,7 @@ export const heatRamp = (identity: Identity): string[] =>
  * Writes the identity's stylesheet, declaring each palette role, each chart
  * series, and each step of the heat ramp as a custom property, the two colors
  * of a role differing between the schemes through `light-dark()`, then every
- * property `MIXES` names and every face's stack.
+ * property `MIXES` and `FILL` name and every face's stack.
  */
 export function identityCss(): string {
   const { palette } = source
@@ -151,15 +193,14 @@ export function identityCss(): string {
   const series = palette.series.map((role, index) => `  ${seriesProperty(index)}: ${schemed(role)};`)
   const heat   = heatRamp(source).map((hex, index) => `  --th-heat-${index + 1}: ${hex};`)
   const mixes  = Object.entries(MIXES).map(([property, { over = 'ground', role, share }]) =>
-    share === 1
-      ? `  ${property}: var(--th-${role});`
-      : `  ${property}: color-mix(in srgb, var(--th-${role}) ${Math.round(share * 100)}%, `
-      + `var(--th-${over}));`)
+    `  ${property}: ${laid(`--th-${role}`, share, `--th-${over}`)};`)
+  const fills  = Object.entries(FILL).map(([property, { dark, light }]) =>
+    `  ${property}: light-dark(${heated(light)}, ${heated(dark)});`)
   const labels = Object.keys(ON_LEAD).map(property => `  ${property}: var(--th-ground);`)
   const faces  = Object.entries(FACES).map(([property, kind]) =>
     `  ${property}: ${fontStack(source.faces[kind])};`)
 
-  return `:root {\n${[...roles, ...series, ...heat, ...mixes, ...labels, ...faces].join('\n')}\n}\n`
+  return `:root {\n${[...roles, ...series, ...heat, ...mixes, ...fills, ...labels, ...faces].join('\n')}\n}\n`
 }
 
 /**
