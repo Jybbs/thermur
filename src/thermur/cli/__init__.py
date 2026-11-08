@@ -1,7 +1,8 @@
 """
 Holds `app`, the `thermur` command line `[project.scripts]` names, which
-registers each command by its import path, so `thermur --version` and the
-help of a group import no module a command reads until that command runs.
+registers each command by its import path beside the one line of help a
+group lists it by, so `thermur --version` and the help of a group import no
+module a command reads until that command runs.
 """
 
 from cyclopts           import App
@@ -17,5 +18,11 @@ app.command(
         name = "fetch"
     )
 )
-app["fetch"].command("thermur.cli.fetch:sample")
-app.command("thermur.cli.fly:fly")
+app["fetch"].command(
+    "thermur.cli.fetch:sample",
+    help = "Fetches the WRF-SFIRE sample into the clone's `data/` folder."
+)
+app.command(
+    "thermur.cli.fly:fly",
+    help = "Flies the flock, or computes the steps of the graph named."
+)

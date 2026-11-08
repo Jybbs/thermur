@@ -1,6 +1,6 @@
 """
-Pins `measured`, meaning the given value and the summary by rule and
-condition it reads out of the trial tables a run saved.
+Pins `measured`, meaning the summary by rule and condition it reads out of
+the trial tables a run saved.
 """
 
 from numpy   import array
@@ -11,12 +11,11 @@ from thermur.docs.measured  import measured
 from thermur.metrics.trials import REFERENCE
 
 
-def test_the_trials_read_by_slot_given_value_rule_and_condition(tmp_path: Path):
+def test_the_trials_read_by_slot_rule_and_condition(tmp_path: Path):
     """
-    Asserts that each slot reads its conditions' launch spacing or turn,
-    that a condition its statistic never measured drops out, and that each
-    rule's mean and standard error across seeds sit under the condition's
-    name.
+    Asserts that a condition its statistic never measured drops out,
+    that each rule's mean and standard error across seeds sit under the
+    condition's name, and that nothing beside the rules is read.
     """
     for name, statistic, conditions in (
         ("coupling_trial", "polarization", ["dense", "middle", "sparse"]),
@@ -32,17 +31,15 @@ def test_the_trials_read_by_slot_given_value_rule_and_condition(tmp_path: Path):
 
     trials = measured(tmp_path)
 
-    assert trials["coupling"]["given"] == {
-        "dense"  : 10.0,
-        "middle" : 15.0,
-        "sparse" : 25.0
+    assert {slot: set(rules) for slot, rules in trials.items()} == {
+        "coupling" : {"other", REFERENCE},
+        "heading"  : {"other", REFERENCE}
     }
-    assert trials["heading"]["given"] == {"large": 90.0, "small": 20.0}
-    assert trials["coupling"]["measured"]["other"]["sparse"] == {
+    assert trials["coupling"]["other"]["sparse"] == {
         "error" : 0.0,
         "mean"  : 0.2
     }
-    assert trials["heading"]["measured"][REFERENCE] == {
+    assert trials["heading"][REFERENCE] == {
         "large" : {"error": 0.0707, "mean": 0.6},
         "small" : {"error": 0.0, "mean": 0.4}
     }

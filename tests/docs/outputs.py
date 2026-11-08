@@ -3,8 +3,9 @@ Pins what the render task writes and how it reads the copies the
 repository holds:
 
 - The identity as JSON, the crop with the shape of the sample as JSON, the
-  threat with the constants of its air as JSON, and each page carrying the
-  definition of every study it cites and each region written from its record
+  threat with the constants of its air as JSON, the conditions of each trial
+  as JSON, and each page carrying the definition of every study it cites and
+  each region written from its record
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused
@@ -249,6 +250,25 @@ def test_each_region_is_written_from_its_record(checkout: Checkout):
         for name, body in regions.items()
     )
     assert not {DATA, RULES} & set(outputs.drifted)
+
+
+def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
+    """
+    Asserts that the trials' file holds what each condition of each trial
+    sets, by slot, so the charts place each mean where the trial flew it,
+    and that the copy the repository holds has not drifted.
+    """
+    outputs = Outputs(checkout=checkout)
+
+    assert loads(outputs.written[outputs.trials]) == {
+        trial.slot: trial.conditions for trial in Trial.listed()
+    }
+    assert loads(outputs.written[outputs.trials])["coupling"] == {
+        "dense"  : {"spacing_m": 10.0},
+        "middle" : {"spacing_m": 15.0},
+        "sparse" : {"spacing_m": 25.0}
+    }
+    assert outputs.trials not in outputs.drifted
 
 
 def test_the_render_writes_the_crop_beside_the_shape_of_the_sample():

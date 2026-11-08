@@ -1,104 +1,91 @@
 {
   "coupling": {
-    "given": {
-      "dense": 10.0,
-      "middle": 15.0,
-      "sparse": 25.0
+    "reference": {
+      "dense": {
+        "error": 0.0139,
+        "mean": 0.9287
+      },
+      "middle": {
+        "error": 0.009,
+        "mean": 0.9402
+      },
+      "sparse": {
+        "error": 0.0075,
+        "mean": 0.9409
+      }
     },
-    "measured": {
-      "reference": {
-        "dense": {
-          "error": 0.0139,
-          "mean": 0.9287
-        },
-        "middle": {
-          "error": 0.009,
-          "mean": 0.9402
-        },
-        "sparse": {
-          "error": 0.0075,
-          "mean": 0.9409
-        }
+    "anisotropic": {
+      "dense": {
+        "error": 0.0187,
+        "mean": 0.9144
       },
-      "anisotropic": {
-        "dense": {
-          "error": 0.0187,
-          "mean": 0.9144
-        },
-        "middle": {
-          "error": 0.0064,
-          "mean": 0.9178
-        },
-        "sparse": {
-          "error": 0.005,
-          "mean": 0.9348
-        }
+      "middle": {
+        "error": 0.0064,
+        "mean": 0.9178
       },
-      "metric": {
-        "dense": {
-          "error": 0.0676,
-          "mean": 0.6553
-        },
-        "middle": {
-          "error": 0.0282,
-          "mean": 0.3155
-        },
-        "sparse": {
-          "error": 0.0089,
-          "mean": 0.1331
-        }
+      "sparse": {
+        "error": 0.005,
+        "mean": 0.9348
+      }
+    },
+    "metric": {
+      "dense": {
+        "error": 0.0676,
+        "mean": 0.6553
       },
-      "weighted": {
-        "dense": {
-          "error": 0.0643,
-          "mean": 0.7723
-        },
-        "middle": {
-          "error": 0.0179,
-          "mean": 0.7636
-        },
-        "sparse": {
-          "error": 0.023,
-          "mean": 0.3366
-        }
+      "middle": {
+        "error": 0.0282,
+        "mean": 0.3155
+      },
+      "sparse": {
+        "error": 0.0089,
+        "mean": 0.1331
+      }
+    },
+    "weighted": {
+      "dense": {
+        "error": 0.0643,
+        "mean": 0.7723
+      },
+      "middle": {
+        "error": 0.0179,
+        "mean": 0.7636
+      },
+      "sparse": {
+        "error": 0.023,
+        "mean": 0.3366
       }
     }
   },
   "heading": {
-    "given": {
-      "large": 90.0,
-      "small": 20.0
+    "reference": {
+      "large": {
+        "error": 0.0396,
+        "mean": 0.2132
+      },
+      "small": {
+        "error": 0.1848,
+        "mean": 0.8191
+      }
     },
-    "measured": {
-      "reference": {
-        "large": {
-          "error": 0.0396,
-          "mean": 0.2132
-        },
-        "small": {
-          "error": 0.1848,
-          "mean": 0.8191
-        }
+    "consensus": {
+      "large": {
+        "error": 0.071,
+        "mean": 0.2266
       },
-      "consensus": {
-        "large": {
-          "error": 0.071,
-          "mean": 0.2266
-        },
-        "small": {
-          "error": 0.2018,
-          "mean": 0.7844
-        }
+      "small": {
+        "error": 0.2018,
+        "mean": 0.7844
+      }
+    },
+    "delayed": {
+      "large": {
+        "error": 0.0443,
+        "mean": 0.0977
       },
-      "delayed": {
-        "large": {
-          "error": 0.0443,
-          "mean": 0.0977
-        },
-        "small": {
-          "error": 0.1244,
-          "mean": 0.3366
-        }
+      "small": {
+        "error": 0.1244,
+        "mean": 0.3366
       }
     }
   }

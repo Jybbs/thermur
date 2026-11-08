@@ -1,4 +1,5 @@
 import trials     from '../measured/trials.json' with { type: 'json' }
+import conditions from '../rendered/trials.json' with { type: 'json' }
 import { series } from './chart.ts'
 
 /**
@@ -26,8 +27,9 @@ export interface Rule {
   short  : string
 }
 /**
- * What one trial measured, as `mise measure` writes it: what each condition
- * sets, and each candidate's statistic by condition.
+ * What one trial measured: what each condition sets, as `mise render` writes
+ * it from the trial, and each candidate's statistic by condition, as
+ * `mise measure` writes it from a run.
  */
 export interface Trial {
   given    : Readonly<Record<string, number>>
@@ -35,10 +37,27 @@ export interface Trial {
 }
 
 /**
- * The coupling and the heading trials, read from the run `mise measure` last
- * wrote out.
+ * Reads the value `field` takes under each condition that sets it, out of the
+ * changes each condition makes to the plan.
  */
-export const TRIALS: Readonly<Record<'coupling' | 'heading', Trial>> = trials
+export const setting = (
+  changes : Readonly<Record<string, Readonly<Record<string, number>>>>,
+  field   : string
+): Record<string, number> =>
+  Object.fromEntries(
+    Object.entries(changes).flatMap(([condition, set]) =>
+      field in set ? [[condition, set[field]!]] : []
+    )
+  )
+
+/**
+ * The coupling trial by launch spacing and the heading trial by turn, read
+ * from the run `mise measure` last wrote out.
+ */
+export const TRIALS: Readonly<Record<'coupling' | 'heading', Trial>> = {
+  coupling : { given: setting(conditions.coupling, 'spacing_m'), measured: trials.coupling },
+  heading  : { given: setting(conditions.heading, 'turn_deg'), measured: trials.heading }
+}
 
 /**
  * Reads `rule` at `spacing` along the straight line between the two measured

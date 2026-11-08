@@ -1,13 +1,6 @@
 Usage: thermur fly [OPTIONS] [ARGS...]
 
-Flies the flock through the graph, recording the run under data/runs/.          
-
-With no step named, flies the reference flight through the parametric threat, or
-through the output --simulation names, then saves the flight's frames and       
-statistics and prints the statistics. With step names, computes those steps and 
-whatever they read, saving each table among them and printing each. Exits       
-nonzero, computing nothing, where a name matches no step, and with status 2     
-where a flag fails its bound.
+Flies the flock, or computes the steps of the graph named.
 
 ╭─ Arguments ──────────────────────────────────────────────────────────────────╮
 │ STEPS  Each step of the graph to compute.                                    │

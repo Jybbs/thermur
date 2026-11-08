@@ -57,6 +57,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     the constants its air is worked out from.
     """
 
+    trials: Path = Path("docs/.vitepress/lib/rendered/trials.json")
+    """
+    The file the charts on The Interaction Rules read what each condition of
+    a trial sets from.
+    """
+
     @property
     def drifted(self) -> list[Path]:
         """
@@ -157,9 +163,10 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         the identity as JSON with its fields in the order the records
         declare them, the crop's heights as JSON beside the sample's length
         and snapshot times, the default threat as JSON beside the constants
-        its air is worked out from, and each page with its regions as
-        `Page.filled` writes them and its definitions as `Page.cited` writes
-        them.
+        its air is worked out from, the changes each condition of each trial
+        makes to the plan as JSON by slot, and each page with its regions
+        as `Page.filled` writes them and its definitions as `Page.cited`
+        writes them.
         """
         crop   = Crop().model_dump(include={"floor_m", "levels", "spacing_m"})
         sample = Sample().model_dump(include={"length_m", "times_s"})
@@ -171,7 +178,11 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         return {
             self.crop     : dumps(crop | sample, indent=2) + "\n",
             self.identity : Identity.shipped().model_dump_json(indent=2) + "\n",
-            self.threat   : dumps(threat, indent=2) + "\n"
+            self.threat   : dumps(threat, indent=2) + "\n",
+            self.trials   : dumps(
+                {trial.slot: trial.conditions for trial in Trial.listed()},
+                indent = 2
+            ) + "\n"
         } | {
             path: Page(text=page.filled(self.regions.get(path, {}))).cited(
                 self.checkout.bibliography

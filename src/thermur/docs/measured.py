@@ -21,11 +21,12 @@ The decimal places each mean and standard error keeps.
 """
 
 
-def measured(run: Path) -> dict[str, dict[str, dict]]:
+def measured(run: Path) -> dict[str, dict[str, dict[str, dict[str, float]]]]:
     """
-    Reads the polarization each coupling rule holds at each launch spacing
+    Reads the polarization each coupling rule holds under each condition
     and the share of each turn each heading rule carries to the farthest
-    drones, out of the trial tables the run at `run` saved.
+    drones, out of the trial tables the run at `run` saved, leaving what
+    each condition sets to the file `mise render` writes from `Trial`.
 
     Args:
         run: The run's folder under `data/runs/`, holding the
@@ -33,33 +34,24 @@ def measured(run: Path) -> dict[str, dict[str, dict]]:
              coupling_trial heading_trial` saves.
 
     Returns:
-        The coupling's launch spacing and the heading's turn by condition,
-        beside each rule's mean and standard error across seeds by
-        condition, under the name of the trial's slot.
+        Each rule's mean and standard error across seeds by condition,
+        under the name of the trial's slot.
     """
     trials = {trial.slot: trial for trial in Trial.listed()}
-    read   = {
-        "coupling" : ("polarization", "spacing_m"),
-        "heading"  : ("turn_reach", "turn_deg")
-    }
     return {
-        slot: {
-            "given"    : {
-                name: changes[given]
-                for name, changes in trials[slot].conditions.items()
-                if given in changes
-            },
-            "measured" : tabled(
-                summary = summarized(
-                    (
-                        open_dataset(run / f"{trials[slot].name}.nc")[statistic]
-                        .dropna("condition", how="all")
-                        .astype("float64")
-                    )
-                ).round(DIGITS)
-            )
-        }
-        for slot, (statistic, given) in read.items()
+        slot: tabled(
+            summary = summarized(
+                (
+                    open_dataset(run / f"{trials[slot].name}.nc")[statistic]
+                    .dropna("condition", how="all")
+                    .astype("float64")
+                )
+            ).round(DIGITS)
+        )
+        for slot, statistic in {
+            "coupling" : "polarization",
+            "heading"  : "turn_reach"
+        }.items()
     }
 
 
