@@ -121,7 +121,7 @@ def test_a_flock_whose_heading_turns_partway_reads_one_start_a_second(
     starts     : float
 ):
     """
-    Asserts that a flock flying straight, then turning from 1.2 s on at
+    Asserts that a flock flying straight, then turning after 1.3 s at
     `rate_deg_s`, reads one start of a spontaneous turn over the second
     of settled frames where the rate passes `turning_deg_s` of 2, and none
     where it stays below.
@@ -135,27 +135,27 @@ def test_a_flock_whose_heading_turns_partway_reads_one_start_a_second(
     assert_allclose(flight.turn_rate_per_s, starts)
 
 
-def test_a_delayed_heading_flies_otherwise_than_the_overdamped_at_one_step(
-    composite: Composite
+@mark.parametrize("steps", [1, 2])
+def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
+    composite : Composite,
+    steps     : int
 ):
     """
-    Asserts that the delayed heading at a lag of one integrator step reads
-    each neighbor's velocity a step old, so its flight leaves the one the
-    overdamped heading flies from the same seed.
+    Asserts that the delayed heading at a lag of `steps` integrator steps
+    reads each neighbor's velocity that many steps old, so its flight
+    leaves the one flown from the same seed at a lag one step shorter, the
+    overdamped heading standing for a lag of none.
     """
-    plan = short()
+    plan    = short()
+    shorter = Delayed(lag_s=(steps - 1) * plan.step_s) if steps > 1 else Overdamped()
 
     assert not allclose(
         Flight.flown(
-            replace(composite, heading=Delayed(lag_s=plan.step_s)),
+            replace(composite, heading=Delayed(lag_s=steps * plan.step_s)),
             AIR,
             plan
         ).frames.velocities,
-        Flight.flown(
-            replace(composite, heading=Overdamped()),
-            AIR,
-            plan
-        ).frames.velocities,
+        Flight.flown(replace(composite, heading=shorter), AIR, plan).frames.velocities,
         atol = 1e-3
     )
 
@@ -218,28 +218,6 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
     assert ratio_on_hull(lattice, where(inside, 0.5, 1.0)) < 1.0
 
 
-def test_a_line_of_drone_pairs_reads_its_first_g_r_peak_over_shell_volume():
-    """
-    Asserts that four lines of three drones 10 m apart, each line far from
-    the others, read the first peak of $g(r)$ at the bin holding 10 m, its
-    height the eight pairs there over that bin's shell beside the four pairs
-    at 20 m over theirs.
-    """
-    line   = stack([10.0 * arange(3), zeros(3), zeros(3)], -1)
-    flight = laid(
-        positions  = concat([line + [0.0, 200.0 * row, 0.0] for row in range(4)]),
-        velocities = [10.0, 0.0, 0.0]
-    )
-    centers = flight.centers
-    near    = 8 / centers[5] ** 2
-
-    assert_allclose(
-        flight.peak,
-        ([centers[5]] * 2, [32 * near / (near + 4 / centers[10] ** 2)] * 2),
-        rtol = 1e-5
-    )
-
-
 def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     """
     Asserts that drones on the corners of a box 100 m long and 10 m across,
@@ -273,27 +251,6 @@ def test_a_replay_ranks_every_composite_it_is_given(
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
 
 
-@mark.parametrize(
-    ("gap_m", "groups"),
-    [param(44.0, 2.0, id="inside-the-hop"), param(46.0, 12.0, id="past-the-hop")]
-)
-def test_two_strings_of_drones_read_their_spacing_and_their_groups(
-    gap_m  : float,
-    groups : float
-):
-    """
-    Asserts that two strings of six drones 200 m apart, each drone `gap_m`
-    from the next, read that nearest-neighbor distance, and two groups where
-    the gap sits inside the hop of three launch spacings, or one group per
-    drone where it sits past it.
-    """
-    string = stack([gap_m * arange(6), zeros(6), zeros(6)], -1)
-    flight = laid(concat([string, string + [0.0, 200.0, 0.0]]), [10.0, 0.0, 0.0])
-
-    assert_allclose(flight.spacing_m, gap_m, rtol=1e-6)
-    assert_allclose(flight.fragments, groups)
-
-
 def test_a_replay_reads_a_delayed_heading_s_neighbors_lag_s_back():
     """
     Asserts that replaying a flock whose drones all gain one meter per
@@ -325,6 +282,27 @@ def test_a_replay_reads_a_delayed_heading_s_neighbors_lag_s_back():
     )
 
 
+@mark.parametrize(
+    ("gap_m", "groups"),
+    [param(44.0, 2.0, id="inside-the-hop"), param(46.0, 12.0, id="past-the-hop")]
+)
+def test_two_strings_of_drones_read_their_spacing_and_their_groups(
+    gap_m  : float,
+    groups : float
+):
+    """
+    Asserts that two strings of six drones 200 m apart, each drone `gap_m`
+    from the next, read that nearest-neighbor distance, and two groups where
+    the gap sits inside the hop of three launch spacings, or one group per
+    drone where it sits past it.
+    """
+    string = stack([gap_m * arange(6), zeros(6), zeros(6)], -1)
+    flight = laid(concat([string, string + [0.0, 200.0, 0.0]]), [10.0, 0.0, 0.0])
+
+    assert_allclose(flight.spacing_m, gap_m, rtol=1e-6)
+    assert_allclose(flight.fragments, groups)
+
+
 def test_a_replay_reads_the_likelihood_of_its_residual_across_each_velocity():
     """
     Asserts that a flight whose drones swing one meter per second across the
@@ -346,6 +324,29 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_velocity():
         [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
         rtol = 1e-5
     )
+
+
+def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
+    """
+    Asserts that shells of drones turning at times proportional to their
+    distance from the first drone read the speed of that spread, and a reach
+    of one where the farthest shell ends the flight turned through the whole
+    turn.
+    """
+    plan      = short(turn_deg=90.0, turning_window_s=0.1)
+    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
+
+    speed, reach = response(
+        distances = distances,
+        plan      = plan,
+        rotation  = exp(
+            1j * pi / 2 * (arange(
+                60
+            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
+        )
+    )
+
+    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
 
 
 @mark.parametrize(
@@ -374,44 +375,22 @@ def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
     assert allclose(speeds, 10.0, rtol=1e-4) == held
 
 
-def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
-    """
-    Asserts that shells of drones turning at times proportional to their
-    distance from the first drone read the speed of that spread, and a reach
-    of one where the farthest shell ends the flight turned through the whole
-    turn.
-    """
-    plan      = short(turn_deg=90.0, turning_window_s=0.1)
-    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
-
-    speed, reach = response(
-        distances = distances,
-        plan      = plan,
-        rotation  = exp(
-            1j * pi / 2 * (arange(
-                60
-            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
-        )
-    )
-
-    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
-
-
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
     """
     Asserts that a line of drones whose velocities across the course carry
     a wave at the flock's longest resolved wavelength, traveling at four
-    thirds of a hertz, reads its spectral peak at that frequency.
+    thirds of a hertz, reads its spectral peak at that frequency, since the
+    longest resolved wavelength leaves out a wave twice as fine and twice as
+    strong traveling at 2 Hz.
     """
     spots  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
     along  = spots[:, 0] - spots[:, 0].mean()
-    phase  = 2 * pi * (along / (4 * along.std()) - 4 / 3 * 0.1 * arange(20)[:, None])
+    times  = 0.1 * arange(20)[:, None]
+    longer = cos(2 * pi * (along / (4 * along.std()) - 4 / 3 * times))
+    swing  = longer + 2 * cos(2 * pi * (along / (2 * along.std()) - 2 * times))
     flight = laid(
         positions  = spots,
-        velocities = stack(
-            [full(phase.shape, 10.0), cos(phase), zeros(phase.shape)],
-            -1
-        )
+        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
     )
 
     assert_allclose(flight.spectral_peak_hz, 4 / 3, rtol=1e-5)
@@ -436,6 +415,28 @@ def test_each_seed_of_the_batch_flies_as_it_does_alone(
 
     assert_allclose(flight.frames.positions[1], alone.positions, atol=1e-3)
     assert_allclose(flight.frames.velocities[1], alone.velocities, atol=1e-4)
+
+
+def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
+    """
+    Asserts that four lines of three drones 10 m apart, each line far from
+    the others, read the first peak of $g(r)$ at the bin holding 10 m, its
+    height the eight pairs there over that bin's shell beside the four pairs
+    at 20 m over theirs.
+    """
+    line   = stack([10.0 * arange(3), zeros(3), zeros(3)], -1)
+    flight = laid(
+        positions  = concat([line + [0.0, 200.0 * row, 0.0] for row in range(4)]),
+        velocities = [10.0, 0.0, 0.0]
+    )
+    centers = flight.centers
+    near    = 8 / centers[5] ** 2
+
+    assert_allclose(
+        flight.peak,
+        ([centers[5]] * 2, [32 * near / (near + 4 / centers[10] ** 2)] * 2),
+        rtol = 1e-5
+    )
 
 
 @mark.parametrize(

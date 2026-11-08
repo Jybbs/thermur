@@ -72,13 +72,13 @@ describe('the rules out of a trial', () => {
   })
 
   it('places the coupling by launch spacing and the heading by turn, as `mise render` wrote them', () => {
-    expect(measured.TRIALS.coupling.given).toEqual({ dense: 10, middle: 15, sparse: 25 })
-    expect(measured.TRIALS.heading.given).toEqual({ large: 90, small: 20 })
+    expect(measured.TRIALS.coupling.given).toStrictEqual({ dense: 10, middle: 15, sparse: 25 })
+    expect(measured.TRIALS.heading.given).toStrictEqual({ large: 90, small: 20 })
   })
 
   it('reads a field only from the conditions that set it', () => {
     const changes = { large: { frame_every: 5, turn_deg: 90 }, spontaneous: {} }
-    expect(measured.setting(changes, 'turn_deg')).toEqual({ large: 90 })
-    expect(measured.setting(changes, 'spacing_m')).toEqual({})
+    expect(measured.setting(changes, 'turn_deg')).toStrictEqual({ large: 90 })
+    expect(measured.setting(changes, 'spacing_m')).toStrictEqual({})
   })
 })

@@ -51,8 +51,9 @@ export const setting = (
   )
 
 /**
- * The coupling trial by launch spacing and the heading trial by turn, read
- * from the run `mise measure` last wrote out.
+ * The coupling trial by launch spacing and the heading trial by turn, each
+ * condition placed where `mise render` wrote it from the trial and each mean
+ * read from the run `mise measure` last wrote out.
  */
 export const TRIALS: Readonly<Record<'coupling' | 'heading', Trial>> = {
   coupling : { given: setting(conditions.coupling, 'spacing_m'), measured: trials.coupling },
