@@ -48,9 +48,11 @@ where a flag fails its bound.
 │                               second. [default: 4.2]                         │
 │ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │
 │   FLOAT --plan.empty-axes     in proportion, the thin horizontal shape       │
-│                               measured on starling flocks, its long axis     │
-│                               along the course and its thin axis vertical.   │
-│                               [default: (5.6, 2.8, 1.0)]                     │
+│                               measured on starling flocks, whose long axis   │
+│                               holds no fixed bearing to their motion,        │
+│                               launched with its long axis along the course   │
+│                               and its thin axis vertical. [default: (5.6,    │
+│                               2.8, 1.0)]                                     │
 │ --plan.center-m FLOAT FLOAT   The center of the launch cloud, east, north,   │
 │   FLOAT                       and above the ground, in meters, by default on │
 │   --plan.empty-center-m       the parametric threat's course to the front it │

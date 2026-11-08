@@ -24,7 +24,8 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     axes: tuple[Positive, Positive, Positive] = (5.6, 2.8, 1.0)
     """
     The launch cloud's length, width, and depth, in proportion, the thin
-    horizontal shape measured on starling flocks, its long axis along the
+    horizontal shape measured on starling flocks, whose long axis holds no
+    fixed bearing to their motion, launched with its long axis along the
     course and its thin axis vertical.
     """
 

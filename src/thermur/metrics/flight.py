@@ -464,10 +464,10 @@ class Flight(Module):
         """
         Ranks `composites` by how well each one's drift explains the frames'
         one-step increments, each frame one integrator step apart, through
-        a Gaussian likelihood per step fitted to each composite's residuals,
-        the form heading likelihoods take, and through the coefficient of
-        each drift in a least-squares regression of the increments on all
-        of them.
+        a Gaussian likelihood per step fitted to each composite's residuals
+        in the plane across each velocity, the form heading likelihoods
+        take, and through the coefficient of each drift in a least-squares
+        regression of the increments on all of them.
 
         Returns:
             By composite, `log_likelihood`, per drone and per step, and
@@ -480,8 +480,10 @@ class Flight(Module):
         drifts = {name: asarray(
             self.drifts(item, air)
         ) for name, item in composites.items()}
-        variances = [((rates - drift) ** 2).mean() for drift in drifts.values()]
-        library   = stack([drift.ravel() for drift in drifts.values()], axis=1)
+        variances = [((rates - drift) ** 2).sum(
+            -1
+        ).mean() / 2 for drift in drifts.values()]
+        library = stack([drift.ravel() for drift in drifts.values()], axis=1)
         return Dataset(
             {
                 "coefficient"    : (
@@ -490,7 +492,7 @@ class Flight(Module):
                 ),
                 "log_likelihood" : (
                     "model",
-                    [-1.5 * (log(2 * pi * value) + 1) for value in variances]
+                    [-(log(2 * pi * value) + 1) for value in variances]
                 )
             },
             coords = {"model": list(drifts)}
@@ -556,7 +558,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
                 where(t >= plan.turn_at_s, plan.turned, moved.velocities[0])
             )
         ) if plan.turn_deg else moved
-        return (turned, roll(past, -1, axis=0).at[-1].set(moved.velocities)), None
+        return (turned, roll(past, -1, axis=0).at[-1].set(flock.velocities)), None
 
     def frame(  # prose: ignore[unsorted-positionals]
         state : tuple[Flock, Array],

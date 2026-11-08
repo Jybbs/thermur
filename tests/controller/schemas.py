@@ -142,7 +142,7 @@ def test_diffusion_drives_the_velocity_and_the_force_and_never_a_position():
 
     white      = composite(noise=White(amplitude=2.0)).diffusion(0.0, flock, sensed)
     persistent = composite(
-        noise = Persistent(persistence_s=2.0, strength_m_s2=3.0)
+        noise = Persistent(persistence_s=0.5, strength_m_s2=3.0)
     ).diffusion(
         0.0, flock, sensed
     )
@@ -152,7 +152,7 @@ def test_diffusion_drives_the_velocity_and_the_force_and_never_a_position():
     assert_allclose(white.diagonal.velocities, 2.0)
     assert_allclose(white.diagonal.forces, 0.0)
     assert_allclose(persistent.diagonal.velocities, 0.0)
-    assert_allclose(persistent.diagonal.forces, 3.0)
+    assert_allclose(persistent.diagonal.forces, 6.0)
 
 
 def test_documented_sets_each_field_s_doc_to_its_docstring_unindented():
@@ -261,6 +261,22 @@ def test_summing_a_neighbor_on_the_drone_stays_finite():
     zero, so a slot reading it stays finite.
     """
     assert_allclose(viewed([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]).bearings[0], 0.0)
+
+
+@mark.parametrize("rate", [0.0, 1.0, 2.0])
+def test_the_heading_turns_a_drone_at_the_rate_its_coupling_sets(rate: float):
+    """
+    Asserts that the composite hands its heading the rate the coupling sets,
+    so a drone whose neighbor flies one meter per second across it turns at
+    that rate times the difference.
+    """
+    view = viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]]))
+
+    assert_allclose(
+        composite(coupling=Constant(coupling_per_s=rate))(view),
+        [0.0, rate, 0.0],
+        atol = 1e-6
+    )
 
 
 @mark.parametrize(

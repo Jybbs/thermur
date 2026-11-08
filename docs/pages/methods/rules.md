@@ -22,7 +22,7 @@ The table is written from the record each flight reads, set under `[tool.thermur
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
-| `axes` | `[5.6, 2.8, 1.0]` |  | The launch cloud's length, width, and depth, in proportion, the thin horizontal shape measured on starling flocks, its long axis along the course and its thin axis vertical |
+| `axes` | `[5.6, 2.8, 1.0]` |  | The launch cloud's length, width, and depth, in proportion, the thin horizontal shape measured on starling flocks, whose long axis holds no fixed bearing to their motion, launched with its long axis along the course and its thin axis vertical |
 | `center_m` | `[1000.0, 1000.0, 100.0]` |  | The center of the launch cloud, east, north, and above the ground, in meters, by default on the parametric threat's course to the front it crosses within two minutes |
 | `course_deg` | `180.0` |  | The launch heading in degrees counterclockwise from east, by default west |
 | `cruise_m_s` | `10.0` | above 0 | The speed a flight holds each drone at, in meters per second |
@@ -59,7 +59,7 @@ Two drones closer than one diameter push apart through a harmonic soft-sphere co
 
 ## Heading
 
-The default heading rule is the overdamped limit of the inertial spin model at a constant speed[^cavagna2015], in which a drone's velocity relaxes toward each neighbor's at the rate the coupling sets, with no spin carried between steps. The candidates are a spinless second-order consensus, which leaves the speed free and relaxes a drone's velocity toward its neighbors' mean as well[^lizarraga2026], and alignment on the neighbors' velocities half a second old[^geiss2022]. The trial turns one drone through 20° and through 90° and measures how far the turn reaches across the flock and how fast it crosses, beside the polarization and the frequency at which the spontaneous velocity correlation $`C(k,\omega)`$ peaks. The table is written from each rule's record, the default declaring no parameter, and `mise render` rewrites it.
+The default heading rule is the overdamped limit of the inertial spin model at a constant speed[^cavagna2015], in which a drone's velocity relaxes toward each neighbor's at the rate the coupling sets, with no spin carried between steps. The candidates are a spinless second-order consensus, which leaves the speed free and relaxes a drone's velocity toward its neighbors' mean as well, where the source relaxes toward the whole flock's[^lizarraga2026], and alignment on the neighbors' velocities half a second old[^geiss2022]. The trial turns one drone through 20° and through 90° and measures how far the turn reaches across the flock and how fast it crosses, beside the polarization and the frequency at which the spontaneous velocity correlation $`C(k,\omega)`$ peaks. The table is written from each rule's record, the default declaring no parameter, and `mise render` rewrites it.
 
 <!-- heading -->
 
@@ -78,7 +78,7 @@ Under the overdamped and the consensus rules the farthest drones follow most of 
 
 ## Coupling
 
-The default coupling holds one constant rate $`J`$ over every one of a drone's seven neighbors[^bialek2012]. The candidates are a rule that turns metric once the air at a drone runs hot, which jackdaws show while mobbing a predator[^ling2019b], a rate that decays with distance even within a rank, which chimney swifts show[^evangelista2017], and a rate stronger for a neighbor flying abeam than for one ahead or behind, from the anisotropy of jackdaw interactions[^ling2019c]. The trial flies 100 drones launched at spacings of 10, 15, and 25 m and measures how the polarization changes with the density, and whether alignment between two drones depends on the neighbor's rank or on its distance. The table is written from each rule's record, and `mise render` rewrites it.
+The default coupling holds one constant rate $`J`$ over every one of a drone's seven neighbors[^bialek2012]. The candidates are a rule that drops each of a drone's seven neighbors past a fixed range once the air at the drone runs hot, after the interactions jackdaws show while mobbing a predator[^ling2019b], a rate that decays with distance even within a rank, after the interactions by physical distance rather than by rank that chimney swifts show[^evangelista2017], and a rate stronger for a neighbor flying abeam than for one ahead or behind, carrying over to alignment the anisotropy of the attraction measured between jackdaws, stronger across their flight than along it[^ling2019c]. The trial flies the metric rule with its onset below any excess, so from launch it drops each of a drone's seven neighbors past 25 m, and flies 100 drones launched at spacings of 10, 15, and 25 m and measures how the polarization changes with the density and how alignment between two drones falls with the neighbor's rank. The table is written from each rule's record, and `mise render` rewrites it.
 
 <!-- coupling -->
 
@@ -99,7 +99,7 @@ The chart below reads the polarization each coupling rule held at each launch sp
 
 <!-- polarization -->
 
-The constant and the anisotropic rules hold the polarization flat as the launch thins, whereas the metric rule loses order at every step and the distance-weighted rule loses it past the middle spacing. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
+The constant and the anisotropic rules hold the polarization flat as the launch thins, whereas the metric rule, dropping every neighbor past 25 m, loses order at every step, and the distance-weighted rule loses it past the middle spacing. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
 
 ## Noise
 
@@ -149,24 +149,24 @@ The figures below are the means across seeds that `thermur fly cohesion_trial co
 
 | **Slot** | **Rule** | **Measured** |
 |---|---|---|
-| Cohesion | Morse, the default | *3.25 groups at 30 drones and 9.5 at 100, border density 0.45 of the center's, $`g(r)`$ peak 4.23 times its mean* |
+| Cohesion | Morse, the default | *3.25 groups at 30 drones and 9.5 at 100, border density 0.45 of the center's, $`g(r)`$ peak 4.22 times its mean* |
 | Cohesion | Centroid spring | *1.25 groups at 30, border density 0.65, peak 3.40* |
 | Cohesion | Elastic springs | *1.00 group at 30, border density 0.65, peak 2.30* |
-| Cohesion | Fitted attraction | *2.00 groups at 30, border density 0.59, peak 2.29* |
+| Cohesion | Fitted attraction | *2.00 groups at 30, border density 0.59, peak 2.30* |
 | Cohesion | Coupling off | *29.25 groups at 30, polarization 0.06 to 0.18* |
 | Coupling | Constant, the default | *Polarization 0.929, 0.940, and 0.941 from the densest launch to the sparsest* |
 | Coupling | Anisotropic | *Polarization 0.914, 0.918, and 0.935* |
-| Coupling | Metric | *Polarization 0.656, 0.316, and 0.133* |
+| Coupling | Metric | *Polarization 0.655, 0.316, and 0.133* |
 | Coupling | Weighted by distance | *Polarization 0.772, 0.764, and 0.337* |
 | Heading | Overdamped, the default | *The farthest drones turning through 0.82 of a 20° turn and 0.21 of a 90° one, polarization 0.940* |
-| Heading | Consensus | *0.79 and 0.23, polarization 0.873* |
-| Heading | Delayed | *0.34 and 0.10, polarization 0.968* |
+| Heading | Consensus | *0.78 and 0.23, polarization 0.873* |
+| Heading | Delayed | *0.34 and 0.10, polarization 0.969* |
 | Noise | White, the default | *Polarization 0.973, 0.940, and 0.928 at 30, 100, and 200 drones, 0.21 spontaneous turns a second at 100* |
 | Noise | Intrinsic | *Polarization 0.975, 0.951, and 0.931, 0.19 turns a second* |
 | Noise | Persistent | *Polarization 0.973, 0.880, and 0.867, 0.11 turns a second* |
 | Noise | Vectorial | *Polarization 0.973, 0.947, and 0.928, 0.18 turns a second* |
 
-The default flock does not hold together, splitting into 9.5 groups at 100 drones with its drones 22 m from their nearest neighbors against a launch spacing of 15 m, and it is less dense at its border than at its center, where starling flocks are denser at the border[^ballerini2008b]. The elastic springs and the centroid spring each keep a small flock nearly whole and raise the border's density, but each lowers the peak of $`g(r)`$, so neither passes. A constant coupling keeps the polarization flat as the density changes, as a topological rule does, while the metric and weighted rules lose order as the flock thins. Under every heading rule, fewer than three of the five shells of drones around the turning drone turned through half of a 90° turn, so the speed of a large turn reads zero. On every replayed flight, the composite that flew it ranks first by one-step log-likelihood or ties for first. Its margin reaches 2.6 where a spring pulls toward the neighbors and 3.4 under the persistent force, both of which the drift carries, whereas between rules whose drifts differ little it stays under 0.05, since at one 0.02 s step per frame the Brownian increment dominates each step's residual. The noises that enter through the increment alone tie, because the replay reads only the drift.
+The default flock does not hold together, splitting into 9.5 groups at 100 drones with its drones 22 m from their nearest neighbors against a launch spacing of 15 m, and it is less dense at its border than at its center, where starling flocks are denser at the border[^ballerini2008b]. The elastic springs and the centroid spring each keep a small flock nearly whole and raise the border's density, but each lowers the peak of $`g(r)`$, so neither passes. A constant coupling keeps the polarization flat as the density changes, as a topological rule does, while the metric and weighted rules lose order as the flock thins. Under every heading rule the speed of a large turn reads zero, since in all but one flight fewer than three of the five shells of drones around the turning drone turned through half of a 90° turn, and in that one, under the consensus rule, the two farthest of the three shells that did turned before the nearer one, so the fit through their times gives no outward speed. On every replayed flight, the composite that flew it ranks first by one-step log-likelihood or ties for first. Its margin over the default reaches 1.6 to 1.8 where a spring pulls toward the neighbors and 2.3 under the persistent force, both of which the drift carries, though the three springs stay within 0.002 of one another. Between rules whose drifts differ less it stays under 0.2, since at one 0.02 s step per frame the Brownian increment dominates each step's residual. The noises that enter through the increment alone tie, because the replay reads only the drift.
 
 [^ballerini2008a]: Ballerini et al. 2008. "Interaction ruling animal collective behavior depends on topological rather than metric distance: Evidence from a field study." *Proceedings of the National Academy of Sciences* 105(4): 1232–1237. <https://doi.org/10.1073/pnas.0711437105>
 

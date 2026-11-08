@@ -35,7 +35,7 @@ describe('the heading chart', () => {
     expect(readings(chart)).toEqual([
       '16.4°', 'of 20° · 82% ± 18',
       '15.7°', 'of 20° · 78% ± 20',
-      '6.8°', 'of 20° · 34% ± 12'
+      '6.7°', 'of 20° · 34% ± 12'
     ])
     expect(knobs(chart).map(knob => knob.getAttribute('aria-checked'))).toEqual(['true', 'false'])
   })
@@ -50,10 +50,14 @@ describe('the heading chart', () => {
 })
 
 describe('the stops on the dial’s rim', () => {
-  it('sweeps to the turn picked on the rim', () => {
+  it('sweeps to the turn picked on the rim, reading each rule’s reach of it', () => {
     const chart = charted(RulesReach, 672)
     knobs(chart)[1]!.dispatchEvent(new Event('click'))
-    expect(readings(chart)[1]).toMatch(/^of 90° · /u)
+    expect(readings(chart)).toEqual([
+      '19.2°', 'of 90° · 21% ± 4',
+      '20.4°', 'of 90° · 23% ± 7',
+      '8.8°', 'of 90° · 10% ± 4'
+    ])
     expect(knobs(chart).map(knob => knob.getAttribute('tabindex'))).toEqual(['-1', '0'])
   })
 
@@ -96,7 +100,7 @@ describe('the rings', () => {
     const chart = charted(RulesReach, 672)
     chart.stand.frames.run(1, 400)
     const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
-    expect(Number(outer!.slice(0, -1)) / 16.4).toBeGreaterThan(Number(inner!.slice(0, -1)) / 6.8)
+    expect(Number(outer!.slice(0, -1)) / 16.4).toBeGreaterThan(Number(inner!.slice(0, -1)) / 6.7)
     chart.stand.frames.run(20, 400)
     expect(readings(chart)[0]).toBe('16.4°')
   })

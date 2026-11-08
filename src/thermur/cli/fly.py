@@ -1,6 +1,6 @@
 """
-Holds `fly`, the command `thermur fly` runs and the tasks computing a step
-of the graph wrap.
+Holds `fly`, the command `thermur fly` runs, flying the reference flight or
+computing the steps of the graph it names.
 """
 
 from cyclopts import Parameter

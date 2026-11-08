@@ -159,6 +159,20 @@ describe('the strips', () => {
     expect(labels().at(-1)).toEqual([`seven by rank, ${NEIGHBORS}`, 12, 300 - 78 + 15])
   })
 
+  it('counts every other bird inside the ring around the marked one, the marked one left out', () => {
+    const chart  = drawn()
+    const last   = frame(chart.birds)
+    const marked = last.at(-1)!
+    const reach  = Math.max(...chart.stand.context.arc!.mock.calls.map(([, , radius]) => radius as number))
+    const within = last.slice(0, -1)
+      .filter(bird => Math.hypot(bird.x - marked.x, bird.y - marked.y) <= reach).length
+    const counts = chart.stand.context.fillText!.mock.calls
+      .map(([words]) => String(words))
+      .filter(words => words.startsWith('within range'))
+    expect(within).toBeGreaterThan(0)
+    expect(counts.at(-1)).toBe(`within range, ${within}`)
+  })
+
   it('counts the birds inside the range as the flock flies under the falcon, leaving nothing behind', () => {
     const chart  = drawn(false)
     const before = frame(chart.birds)

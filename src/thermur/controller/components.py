@@ -27,7 +27,8 @@ from thermur.environment.schemas import NonNegative, Positive
 class Anisotropic(Component):
     """
     The coupling strengthening a neighbor flying beside a drone over one
-    ahead of or behind it, from the anisotropy of jackdaw interactions.
+    ahead of or behind it, carrying over to alignment the anisotropy of the
+    attraction measured between jackdaws.
     """
 
     across: NonNegative = 1.0
@@ -460,8 +461,8 @@ class Vectorial(Noise):
 @documented
 class Weighted(Component):
     """
-    The coupling decaying with distance even within a rank, the rule chimney
-    swifts show.
+    The coupling decaying with distance even within a rank, after the
+    interactions by physical distance that chimney swifts show.
     """
 
     coupling_per_s: NonNegative = 1.2

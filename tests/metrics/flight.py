@@ -5,7 +5,7 @@ the first drone's turn, the replay ranking composites, and the helpers each
 statistic reads.
 """
 
-from common.drones import short, still_air
+from common.drones import flock_of, short, still_air
 from dataclasses   import replace
 from jax           import jit
 from jax.numpy     import array
@@ -13,27 +13,58 @@ from jax.random    import key, split
 from numpy         import (
     allclose,
     arange,
+    asarray,
+    broadcast_to,
+    clip,
+    concat,
+    cos,
+    deg2rad,
+    diag,
+    diff,
     exp,
     full,
     isfinite,
     isnan,
     linalg,
     linspace,
+    log,
     meshgrid,
     ones,
     pi,
+    sin,
     stack,
-    where
+    trapezoid,
+    where,
+    zeros
 )
 from numpy.testing import assert_allclose, assert_array_equal
 from pytest        import fixture, mark, param
 
-from thermur.controller.components import Consensus, Overdamped
-from thermur.controller.schemas    import Composite, Heading
-from thermur.metrics.flight        import Flight, first_zero, kept, ratio_on_hull, response
-from thermur.pipeline.settings     import Settings
+from thermur.controller.components import (
+    Centroid,
+    Consensus,
+    Constant,
+    Delayed,
+    Overdamped,
+    SoftCore,
+    White
+)
+from thermur.controller.schemas import Composite, Heading, across
+from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response
+from thermur.pipeline.settings  import Settings
 
 AIR = still_air()
+
+STILL = Composite(
+    cohesion = Centroid(stiffness_per_s2=0.0),
+    contact  = SoftCore(stiffness_m_s2=0.0),
+    coupling = Constant(coupling_per_s=0.0),
+    heading  = Overdamped(),
+    noise    = White()
+)
+"""
+The composite whose drift is zero on every flock.
+"""
 
 
 @fixture(scope="module")
@@ -50,6 +81,83 @@ def flight(composite: Composite) -> Flight:
     Flies the short plan under the default composite through still air.
     """
     return Flight.flown(composite, AIR, short())
+
+
+def laid(positions: object, velocities: object, **changes: object) -> Flight:
+    """
+    Lays a flight out by hand under the default composite, broadcasting
+    `positions` and `velocities`, each per drone or per frame and drone,
+    across every seed and frame of the short plan carrying `changes`.
+    """
+    plan  = short(**changes)
+    shape = (plan.seeds, plan.frames, asarray(positions).shape[-2], 3)
+    return Flight(
+        composite = Composite.from_settings(Settings()),
+        frames    = flock_of(
+            broadcast_to(positions, shape),
+            broadcast_to(velocities, shape)
+        ),
+        plan = plan
+    )
+
+
+def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
+    """
+    Asserts that drones in pairs on each axis at 30, 20, and 10 m from the
+    center read an aspect ratio of three, the longest axis over the thinnest
+    rather than over the middle one.
+    """
+    spots = concat([diag([30.0, 20.0, 10.0]), -diag([30.0, 20.0, 10.0])] * 2)
+
+    assert_allclose(laid(spots, [10.0, 0.0, 0.0]).aspect_ratio, 3.0, rtol=1e-5)
+
+
+@mark.parametrize(
+    ("rate_deg_s", "starts"),
+    [param(1.0, 0.0, id="below-the-rate"), param(4.0, 1.0, id="past-the-rate")]
+)
+def test_a_flock_whose_heading_turns_partway_reads_one_start_a_second(
+    rate_deg_s : float,
+    starts     : float
+):
+    """
+    Asserts that a flock flying straight, then turning from 1.2 s on at
+    `rate_deg_s`, reads one start of a spontaneous turn over the second
+    of settled frames where the rate passes `turning_deg_s` of 2, and none
+    where it stays below.
+    """
+    turned = deg2rad(rate_deg_s) * 0.1 * clip(arange(20) - 12, 0, None)
+    flight = laid(
+        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
+        velocities = 10.0 * stack([cos(turned), sin(turned), zeros(20)], -1)[:, None]
+    )
+
+    assert_allclose(flight.turn_rate_per_s, starts)
+
+
+def test_a_delayed_heading_flies_otherwise_than_the_overdamped_at_one_step(
+    composite: Composite
+):
+    """
+    Asserts that the delayed heading at a lag of one integrator step reads
+    each neighbor's velocity a step old, so its flight leaves the one the
+    overdamped heading flies from the same seed.
+    """
+    plan = short()
+
+    assert not allclose(
+        Flight.flown(
+            replace(composite, heading=Delayed(lag_s=plan.step_s)),
+            AIR,
+            plan
+        ).frames.velocities,
+        Flight.flown(
+            replace(composite, heading=Overdamped()),
+            AIR,
+            plan
+        ).frames.velocities,
+        atol = 1e-3
+    )
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
@@ -69,6 +177,34 @@ def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     assert (another.frames.positions != flight.frames.positions).any()
 
 
+def test_a_heading_swinging_back_and_forth_integrates_to_its_first_zero():
+    """
+    Asserts that half the drones swinging their heading one way and half
+    the other, over a period of ten frames, integrate their autocorrelation
+    only up to the first lag at which it falls to zero, each lag's product
+    averaged over the frames it spans.
+    """
+    swing  = cos(2 * pi * arange(20) / 10)[:, None] * where(arange(12) < 6, 1.0, -1.0)
+    flight = laid(
+        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
+        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
+    )
+    headings = asarray(flight.settled.headings)[0]
+    relative = headings - headings.mean(1, keepdims=True)
+    curve    = [
+        (relative[lag:] * relative[: 15 - lag]).sum((1, 2)).mean()
+        for lag in range(15)
+    ]
+    curve = asarray(curve) / curve[0]
+
+    assert_allclose(
+        flight.autocorrelation_s,
+        trapezoid(curve[: first_zero(curve)], dx=0.1),
+        rtol = 1e-5
+    )
+    assert first_zero(curve) == 3
+
+
 def test_a_lattice_s_border_is_as_dense_as_its_inside():
     """
     Asserts that a regular lattice, every drone a step from its nearest
@@ -80,6 +216,136 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
 
     assert_allclose(ratio_on_hull(lattice, ones(len(lattice))), 1.0)
     assert ratio_on_hull(lattice, where(inside, 0.5, 1.0)) < 1.0
+
+
+def test_a_line_of_drone_pairs_reads_its_first_g_r_peak_over_shell_volume():
+    """
+    Asserts that four lines of three drones 10 m apart, each line far from
+    the others, read the first peak of $g(r)$ at the bin holding 10 m, its
+    height the eight pairs there over that bin's shell beside the four pairs
+    at 20 m over theirs.
+    """
+    line   = stack([10.0 * arange(3), zeros(3), zeros(3)], -1)
+    flight = laid(
+        positions  = concat([line + [0.0, 200.0 * row, 0.0] for row in range(4)]),
+        velocities = [10.0, 0.0, 0.0]
+    )
+    centers = flight.centers
+    near    = 8 / centers[5] ** 2
+
+    assert_allclose(
+        flight.peak,
+        ([centers[5]] * 2, [32 * near / (near + 4 / centers[10] ** 2)] * 2),
+        rtol = 1e-5
+    )
+
+
+def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
+    """
+    Asserts that drones on the corners of a box 100 m long and 10 m across,
+    each 10 m from its nearest corner, around four drones on its axis 20 m
+    apart, read a border density eight times the inside's from each drone's
+    nearest neighbor rather than its farthest.
+    """
+    corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
+    axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
+
+    assert_allclose(
+        laid(concat([corners, axis]), [10.0, 0.0, 0.0]).border_density,
+        8.0,
+        rtol = 1e-5
+    )
+
+
+def test_a_replay_ranks_every_composite_it_is_given(
+    composite : Composite,
+    flight    : Flight
+):
+    """
+    Asserts that replaying the frames gives one drift a frame but the last,
+    and one log-likelihood and one coefficient for each composite named.
+    """
+    ranked = flight.likelihoods({"one": composite, "two": composite}, AIR)
+
+    assert flight.drifts(composite, AIR).shape == (2, 19, 12, 3)
+    assert list(ranked.model.values) == ["one", "two"]
+    assert isfinite(ranked.log_likelihood).all()
+    assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
+
+
+@mark.parametrize(
+    ("gap_m", "groups"),
+    [param(44.0, 2.0, id="inside-the-hop"), param(46.0, 12.0, id="past-the-hop")]
+)
+def test_two_strings_of_drones_read_their_spacing_and_their_groups(
+    gap_m  : float,
+    groups : float
+):
+    """
+    Asserts that two strings of six drones 200 m apart, each drone `gap_m`
+    from the next, read that nearest-neighbor distance, and two groups where
+    the gap sits inside the hop of three launch spacings, or one group per
+    drone where it sits past it.
+    """
+    string = stack([gap_m * arange(6), zeros(6), zeros(6)], -1)
+    flight = laid(concat([string, string + [0.0, 200.0, 0.0]]), [10.0, 0.0, 0.0])
+
+    assert_allclose(flight.spacing_m, gap_m, rtol=1e-6)
+    assert_allclose(flight.fragments, groups)
+
+
+def test_a_replay_reads_a_delayed_heading_s_neighbors_lag_s_back():
+    """
+    Asserts that replaying a flock whose drones all gain one meter per
+    second across the course each frame through the delayed heading at a
+    lag of two frames turns each drone toward the velocity two frames back,
+    the first frames reading the first, while the overdamped heading, every
+    neighbor flying as the drone does, turns none.
+    """
+    velocities = stack([full(20, 10.0), arange(20.0), zeros(20)], -1)
+    flight     = laid(
+        positions  = stack([zeros(12), 10.0 * arange(12), zeros(12)], -1),
+        velocities = velocities[:, None]
+    )
+    delayed = replace(STILL, coupling=Constant(), heading=Delayed(lag_s=0.2))
+    behind  = velocities[clip(arange(19) - 2, 0, None)] - velocities[:-1]
+
+    assert_allclose(
+        flight.drifts(replace(delayed, heading=Overdamped()), AIR),
+        0.0,
+        atol = 1e-5
+    )
+    assert_allclose(
+        flight.drifts(delayed, AIR),
+        broadcast_to(
+            asarray(across(7 * 0.6 * behind, velocities[:-1]))[None, :, None],
+            (2, 19, 12, 3)
+        ),
+        atol = 1e-4
+    )
+
+
+def test_a_replay_reads_the_likelihood_of_its_residual_across_each_velocity():
+    """
+    Asserts that a flight whose drones swing one meter per second across the
+    course and back each frame, replayed through a composite whose drift is
+    zero, reads the log-likelihood of a Gaussian in the plane across each
+    velocity, its variance per axis half the mean squared residual.
+    """
+    swing  = 10.0 * stack([ones(20), arange(20) % 2 / 10.0, zeros(20)], -1)[:, None]
+    flight = laid(stack([10.0 * arange(12), zeros(12), zeros(12)], -1), swing)
+    rates  = asarray(
+        across(
+            diff(flight.frames.velocities, axis=1) / 0.1,
+            flight.frames.velocities[:, :-1]
+        )
+    )
+
+    assert_allclose(
+        flight.likelihoods({"still": STILL}, AIR).log_likelihood,
+        [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
+        rtol = 1e-5
+    )
 
 
 @mark.parametrize(
@@ -108,22 +374,6 @@ def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
     assert allclose(speeds, 10.0, rtol=1e-4) == held
 
 
-def test_a_replay_ranks_every_composite_it_is_given(
-    composite : Composite,
-    flight    : Flight
-):
-    """
-    Asserts that replaying the frames gives one drift a frame but the last,
-    and one log-likelihood and one coefficient for each composite named.
-    """
-    ranked = flight.likelihoods({"one": composite, "two": composite}, AIR)
-
-    assert flight.drifts(composite, AIR).shape == (2, 19, 12, 3)
-    assert list(ranked.model.values) == ["one", "two"]
-    assert isfinite(ranked.log_likelihood).all()
-    assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
-
-
 def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
     """
     Asserts that shells of drones turning at times proportional to their
@@ -145,6 +395,26 @@ def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
     )
 
     assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
+
+
+def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
+    """
+    Asserts that a line of drones whose velocities across the course carry
+    a wave at the flock's longest resolved wavelength, traveling at four
+    thirds of a hertz, reads its spectral peak at that frequency.
+    """
+    spots  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
+    along  = spots[:, 0] - spots[:, 0].mean()
+    phase  = 2 * pi * (along / (4 * along.std()) - 4 / 3 * 0.1 * arange(20)[:, None])
+    flight = laid(
+        positions  = spots,
+        velocities = stack(
+            [full(phase.shape, 10.0), cos(phase), zeros(phase.shape)],
+            -1
+        )
+    )
+
+    assert_allclose(flight.spectral_peak_hz, 4 / 3, rtol=1e-5)
 
 
 def test_each_seed_of_the_batch_flies_as_it_does_alone(

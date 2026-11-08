@@ -4,7 +4,7 @@ counts it derives from its length and its step, and the launch it draws.
 """
 
 from common.drones import short
-from jax.numpy     import array, cos, deg2rad, sin
+from jax.numpy     import arccos, array, cos, deg2rad, sin, sqrt
 from jax.random    import key
 from numpy.testing import assert_allclose
 from pydantic      import ValidationError
@@ -75,6 +75,21 @@ def test_a_launch_flies_the_course_at_the_cruise_in_a_cloud_about_its_center():
     assert_allclose(flock.positions.mean(0), plan.center_m, atol=10.0)
     assert spread[0] > spread[1] > spread[2]
     assert_allclose(plan.launched(key(3)).positions, flock.positions)
+
+
+def test_a_launch_scatters_each_heading_about_the_course_by_scatter_deg():
+    """
+    Asserts that a launch at a `scatter_deg` of 10 tilts each heading off
+    the course by a root-mean-square angle near 10 degrees times the root of
+    two, the two axes across the course each drawing that spread.
+    """
+    velocities = short(drones=400, scatter_deg=10.0).launched(key(3)).velocities
+
+    assert_allclose(
+        sqrt((arccos(-velocities[:, 0] / 10.0) ** 2).mean()),
+        deg2rad(10.0) * sqrt(2.0),
+        rtol = 0.1
+    )
 
 
 def test_a_plan_counts_its_steps_and_frames_from_its_length():

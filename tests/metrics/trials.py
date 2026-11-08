@@ -9,7 +9,7 @@ from dataclasses   import fields
 from math          import inf
 from numpy         import array
 from pytest        import mark, param
-from xarray        import Dataset
+from xarray        import Dataset, concat
 
 from thermur.controller.components import Constant, Elastic, Weighted
 from thermur.controller.schemas    import Composite
@@ -120,12 +120,25 @@ def test_a_candidate_is_kept_only_where_no_measure_leaves_it_worse(
     """
     Asserts that a candidate is kept where one measure leaves it better than
     the reference beyond the standard error and none leaves it worse, and
-    that the reference itself is never kept.
+    that neither the reference nor a control scoring as the candidate does
+    is ever kept.
     """
-    kept = trial(*measures).favored(TABLE)
+    kept = trial(*measures).favored(
+        concat(
+            [
+                TABLE,
+                (
+                    TABLE.sel(candidate=["other"])
+                         .assign_coords(candidate=["uncoupled"])
+                )
+            ],
+            "candidate"
+        )
+    )
 
     assert kept.sel(candidate="other") == favored
     assert not kept.sel(candidate=REFERENCE)
+    assert not kept.sel(candidate="uncoupled")
 
 
 def test_a_summary_reads_the_mean_across_seeds_beside_its_standard_error():

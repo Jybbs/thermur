@@ -152,6 +152,18 @@ def test_moving_a_drone_outside_the_neighbors_leaves_an_action_as_it_stands(
             id = "metric-cool"
         ),
         param(
+            Metric(coupling_per_s=0.6, onset_k=5.0, range_m=25.0),
+            viewed([[10.0, 0.0, 0.0], [30.0, 0.0, 0.0]], excess=5.0),
+            [0.6, 0.0],
+            id = "metric-at-onset"
+        ),
+        param(
+            Metric(coupling_per_s=0.6, onset_k=5.0, range_m=25.0),
+            viewed([[10.0, 0.0, 0.0], [25.0, 0.0, 0.0]], excess=10.0),
+            [0.6, 0.6],
+            id = "metric-at-range"
+        ),
+        param(
             Weighted(coupling_per_s=1.2, range_m=20.0),
             viewed([[20.0, 0.0, 0.0]]),
             [1.2 * exp(-1.0)],
@@ -263,9 +275,9 @@ def test_each_force_follows_its_source_s_form(
             id = "intrinsic-disagreeing"
         ),
         param(
-            Persistent(persistence_s=2.0, strength_m_s2=3.8),
+            Persistent(persistence_s=0.5, strength_m_s2=3.0),
             viewed([[10.0, 0.0, 0.0]]),
-            (0.0, 3.8),
+            (0.0, 6.0),
             id = "persistent"
         ),
         param(
