@@ -1,0 +1,5 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "browse"
+#MISE description = "Open Hamilton's experiment viewer over the runs under `data/runs/`"
+
+h_experiments "$@" data/runs

@@ -107,7 +107,12 @@ def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
             ["bug.md", "spec.md"],
             id = "templates"
         ),
-        param(".mise/bin", "scripts", ["prose", "pytest", "thermur"], id="scripts")
+        param(
+            ".mise/bin",
+            "scripts",
+            ["h_experiments", "prose", "pytest", "thermur"],
+            id = "scripts"
+        )
     ]
 )
 def test_a_listing_leaves_out_a_dotfile(

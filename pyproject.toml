@@ -8,8 +8,10 @@ dependencies    = [
     "apache-hamilton",
     "bibtexparser",
     "cyclopts",
+    "diffrax",
     "equinox",
     "jax",
+    "lineax",
     "markdown-it-py",
     "mdit-py-plugins",
     "netcdf4",
@@ -50,6 +52,8 @@ Repository = "https://github.com/Jybbs/thermur"
 
 [dependency-groups]
 dev = [
+    "apache-hamilton[experiments]",
+    "hypothesis",
     "minijinja",
     "prose-formatter",
     "pytest",
@@ -63,6 +67,7 @@ dev = [
 directory = ".cache/coverage/html"
 
 [tool.coverage.report]
+fail_under   = 95
 precision    = 2
 show_missing = true
 

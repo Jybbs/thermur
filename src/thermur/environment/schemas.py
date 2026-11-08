@@ -23,6 +23,7 @@ from xarray             import DataArray, Dataset
 # the gravitational acceleration, the specific heat of dry air at constant
 # pressure, and the pressure potential temperature is referred to.
 type Count           = Annotated[int, Field(ge=1)]
+type NonNegative     = Annotated[float, Field(ge=0)]
 type Positive        = Annotated[float, Field(gt=0)]
 type Range           = tuple[float, float]
 type Span            = Range | None
@@ -393,7 +394,7 @@ class ParametricThreat(
     The grid the dataset is laid out on.
     """
 
-    speed_m_s: Annotated[float, Field(ge=0)] = 1.0
+    speed_m_s: NonNegative = 1.0
     """
     The speed at which the front advances east, in meters per second.
     """

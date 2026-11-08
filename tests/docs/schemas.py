@@ -194,6 +194,7 @@ def test_an_article_reads_in_the_footnote_form(read: Callable[..., Bibliography]
             id = "apostrophe"
         ),
         param("Vásárhelyi, Gábor and Virágh, Csaba", "vasarhelyi2014", id="accents"),
+        param("Geiß, Daniel and Kroy, Klaus", "geiss2014", id="sharp-s"),
         param("Virágh, Csaba and Vásárhelyi, Gábor", "viragh2014b", id="letter")
     ]
 )
@@ -204,8 +205,8 @@ def test_a_key_folds_the_first_surname_to_lowercase_letters(
 ):
     """
     Asserts that a key spells the first author's surname in lowercase ASCII
-    letters alone before the year, dropping accents and apostrophes, and
-    takes one letter after the year.
+    letters alone before the year, dropping accents and apostrophes and
+    spelling a sharp s as two, and takes one letter after the year.
     """
     assert key in read(author=author, key=key).studies
 

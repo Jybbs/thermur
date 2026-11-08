@@ -3,8 +3,9 @@ Pins what the render task writes and how it reads the copies the
 repository holds:
 
 - The identity as JSON, the crop with the shape of the sample as JSON, the
-  threat with the constants of its air as JSON, and each page carrying the
-  definition of every study it cites and each region written from its record
+  threat with the constants of its air as JSON, the conditions of each trial
+  as JSON, and each page carrying the definition of every study it cites and
+  each region written from its record
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused
@@ -17,7 +18,8 @@ from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
 
-from thermur.docs.outputs        import Outputs, tabled
+from thermur.controller.components import SoftCore
+from thermur.docs.outputs          import Outputs, tabled
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -28,13 +30,15 @@ from thermur.environment.schemas import (
     Sample
 )
 from thermur.identity.schemas import Identity
+from thermur.metrics.schemas  import Plan
+from thermur.metrics.trials   import Trial
 from thermur.repo.checkout    import Checkout
 from thermur.repo.schemas     import Finding
 
-DATA = Path("docs/pages/data/index.md")
-"""
-The page whose regions the render writes from the fire data's records.
-"""
+# `DATA` and `RULES` hold the pages whose regions the render writes, from the
+# fire data's records and from the flight's.
+DATA  = Path("docs/pages/data/index.md")
+RULES = Path("docs/pages/methods/rules.md")
 
 
 class Inner(BaseModel, use_attribute_docstrings=True):
@@ -225,28 +229,46 @@ def test_each_marker_naming_no_entry_is_listed_on_its_page(checkout: Checkout):
     assert outputs.drifted == [page]
 
 
-def test_each_region_of_the_data_page_is_written_from_its_record(checkout: Checkout):
+def test_each_region_is_written_from_its_record(checkout: Checkout):
     """
     Asserts that the Data page carries the fields `Sample`, `Crop`,
-    `Ranges`, and `ParametricThreat` declare, each between its pair of
-    markers as the render writes it, so the copy the repository holds has
-    not drifted.
+    `Ranges`, and `ParametricThreat` declare, and that every region of every
+    page sits between its pair of markers as the render writes it, so the
+    copies the repository holds have not drifted.
     """
     outputs = Outputs(checkout=checkout)
 
-    assert outputs.regions == {
-        DATA: {
-            "crop"   : tabled(Crop),
-            "ranges" : tabled(Ranges),
-            "sample" : tabled(Sample),
-            "threat" : tabled(ParametricThreat)
-        }
+    assert outputs.regions[DATA] == {
+        "crop"   : tabled(Crop),
+        "ranges" : tabled(Ranges),
+        "sample" : tabled(Sample),
+        "threat" : tabled(ParametricThreat)
     }
     assert all(
-        f"<!-- {name} -->\n\n{body}\n\n<!-- /{name} -->" in checkout.read(DATA)
-        for name, body in outputs.regions[DATA].items()
+        f"<!-- {name} -->\n\n{body}\n\n<!-- /{name} -->" in checkout.read(page)
+        for page, regions in outputs.regions.items()
+        for name, body in regions.items()
     )
-    assert DATA not in outputs.drifted
+    assert not {DATA, RULES} & set(outputs.drifted)
+
+
+def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
+    """
+    Asserts that the trials' file holds what each condition of each trial
+    sets, by slot, so the charts place each mean where the trial flew it,
+    and that the copy the repository holds has not drifted.
+    """
+    outputs = Outputs(checkout=checkout)
+
+    assert loads(outputs.written[outputs.trials]) == {
+        trial.slot: trial.conditions for trial in Trial.listed()
+    }
+    assert loads(outputs.written[outputs.trials])["coupling"] == {
+        "dense"  : {"spacing_m": 10.0},
+        "middle" : {"spacing_m": 15.0},
+        "sparse" : {"spacing_m": 25.0}
+    }
+    assert outputs.trials not in outputs.drifted
 
 
 def test_the_render_writes_the_crop_beside_the_shape_of_the_sample():
@@ -290,3 +312,29 @@ def test_the_render_writes_the_threat_beside_the_constants_of_its_air():
         "gravity_m_s2"         : GRAVITY_M_S2,
         "heat_capacity_j_kg_k" : HEAT_CAPACITY_J_KG_K
     } | ParametricThreat().model_dump()
+
+
+def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
+    checkout: Checkout
+):
+    """
+    Asserts that The Interaction Rules carries the fields of the plan and
+    the contact, and for each open slot those of its default and then each
+    candidate, every field named after its component.
+    """
+    regions = Outputs(checkout=checkout).regions[RULES]
+    rows    = regions["cohesion"].splitlines()[2:]
+
+    assert regions["contact"] == tabled(SoftCore)
+    assert regions["plan"] == tabled(Plan)
+    assert set(regions) == {
+        "contact",
+        "plan",
+        *(trial.slot for trial in Trial.listed())
+    }
+    assert [row.split("`")[1].partition(".")[0] for row in rows] == [
+        *["morse"] * 4,
+        "centroid",
+        *["elastic"] * 2,
+        *["fitted"] * 4
+    ]

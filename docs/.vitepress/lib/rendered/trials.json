@@ -1,0 +1,46 @@
+{
+  "cohesion": {
+    "large": {
+      "drones": 200
+    },
+    "middle": {
+      "drones": 100
+    },
+    "small": {
+      "drones": 30
+    }
+  },
+  "coupling": {
+    "dense": {
+      "spacing_m": 10.0
+    },
+    "middle": {
+      "spacing_m": 15.0
+    },
+    "sparse": {
+      "spacing_m": 25.0
+    }
+  },
+  "heading": {
+    "large": {
+      "frame_every": 5,
+      "turn_deg": 90.0
+    },
+    "small": {
+      "frame_every": 5,
+      "turn_deg": 20.0
+    },
+    "spontaneous": {}
+  },
+  "noise": {
+    "large": {
+      "drones": 200
+    },
+    "middle": {
+      "drones": 100
+    },
+    "small": {
+      "drones": 30
+    }
+  }
+}

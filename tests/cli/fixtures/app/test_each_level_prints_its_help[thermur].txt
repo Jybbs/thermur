@@ -5,6 +5,7 @@ way it breaks around a falcon.
 
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
 │ fetch        Fetches the data a run reads into the clone's data/ folder.     │
+│ fly          Flies the flock, or computes the steps of the graph named.      │
 │ --help (-h)  Display this message and exit.                                  │
 │ --version    Display application version.                                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯

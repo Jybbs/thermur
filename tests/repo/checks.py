@@ -326,13 +326,14 @@ def test_a_copy_differing_byte_for_byte_is_named(checkout: Checkout):
     named against that first program, even where the two match in size and
     in modification time.
     """
+    first = next(iter(checkout.scripts))
     edit(checkout, ".mise/bin/pytest", new="--frozen", old="--locked")
-    copystat(checkout.root / ".mise/bin/prose", checkout.root / ".mise/bin/pytest")
+    copystat(checkout.root / first, checkout.root / ".mise/bin/pytest")
 
     assert BinCheck(checkout=checkout).findings == [
         Finding(
             file    = Path(".mise/bin/pytest"),
-            message = "`.mise/bin/pytest` differs byte for byte from `.mise/bin/prose`"
+            message = f"`.mise/bin/pytest` differs byte for byte from `{first}`"
         )
     ]
 

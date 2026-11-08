@@ -9,6 +9,9 @@ vi.mock('../../theme/front/hero.ts', () => ({ default: 'FrontHero' }))
 vi.mock('../../theme/front/sky.ts', () => ({ default: 'FrontSky' }))
 vi.mock('../../theme/not-found/page.ts', () => ({ default: 'NotFoundPage' }))
 vi.mock('../../theme/pause.ts', () => ({ default: 'MotionPause' }))
+vi.mock('../../theme/rules/neighbors.ts', () => ({ default: 'RulesNeighbors' }))
+vi.mock('../../theme/rules/reach.ts', () => ({ default: 'RulesReach' }))
+vi.mock('../../theme/rules/spacing.ts', () => ({ default: 'RulesSpacing' }))
 vi.mock('../../theme/threat.ts', () => ({ default: 'ThreatFront' }))
 
 describe('the theme', () => {
@@ -19,7 +22,13 @@ describe('the theme', () => {
   it('registers the widgets a page’s rules write by name', () => {
     const component = vi.fn<(name: string, widget: unknown) => void>()
     theme.enhanceApp({ app: { component } } as unknown as Parameters<typeof theme.enhanceApp>[0])
-    expect(component.mock.calls).toEqual([['CropKept', 'CropKept'], ['ThreatFront', 'ThreatFront']])
+    expect(component.mock.calls).toEqual([
+      ['CropKept', 'CropKept'],
+      ['RulesNeighbors', 'RulesNeighbors'],
+      ['RulesReach', 'RulesReach'],
+      ['RulesSpacing', 'RulesSpacing'],
+      ['ThreatFront', 'ThreatFront']
+    ])
   })
 
   it('fills the layout’s slots with the front page’s pieces, the pause, and the lost page', () => {

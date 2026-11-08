@@ -1,0 +1,123 @@
+Usage: thermur fly [OPTIONS] [ARGS...]
+
+Flies the flock, or computes the steps of the graph named.
+
+╭─ Arguments ──────────────────────────────────────────────────────────────────╮
+│ STEPS  Each step of the graph to compute.                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ --cohesion.attraction-m       The decay length of the attraction, in meters. │
+│   FLOAT                       [default: 12.0]                                │
+│ --cohesion.attraction-m2-s2   The strength of the attraction, in square      │
+│   FLOAT                       meters per square second. [default: 80.0]      │
+│ --cohesion.repulsion-m FLOAT  The decay length of the repulsion, in meters.  │
+│                               [default: 2.4]                                 │
+│ --cohesion.repulsion-m2-s2    The strength of the repulsion, in square       │
+│   FLOAT                       meters per square second. [default: 10400.0]   │
+│ --contact.diameter-m FLOAT    The distance within which two drones push      │
+│                               apart, in meters. [default: 6.0]               │
+│ --contact.stiffness-m-s2      The acceleration at full overlap, in meters    │
+│   FLOAT                       per second squared. [default: 8.0]             │
+│ --coupling.coupling-per-s     The rate at which a drone aligns with each     │
+│   FLOAT                       neighbor, in reciprocal seconds. [default:     │
+│                               0.6]                                           │
+│ --crop.floor-m FLOAT          The lowest fixed height above the ground, in   │
+│                               meters. [default: 20.0]                        │
+│ --crop.levels INT             The number of fixed heights, which reach 500 m │
+│                               above the ground at the default floor and      │
+│                               spacing. [default: 25]                         │
+│ --crop.spacing-m FLOAT        The distance between neighboring fixed         │
+│                               heights, in meters. [default: 20.0]            │
+│ --crop.window-s FLOAT FLOAT   The first and the last time kept, in seconds   │
+│   --crop.empty-window-s       since the simulation started, or None to keep  │
+│                               every snapshot.                                │
+│ --crop.x-m FLOAT FLOAT        The westernmost and the easternmost mass point │
+│   --crop.empty-x-m            kept, in meters from the domain's western      │
+│                               edge, or None to keep every column.            │
+│ --crop.y-m FLOAT FLOAT        The southernmost and the northernmost mass     │
+│   --crop.empty-y-m            point kept, in meters from the domain's        │
+│                               southern edge, or None to keep every row.      │
+│ --noise.amplitude FLOAT       The amplitude, in meters per second per root   │
+│                               second. [default: 4.2]                         │
+│ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │
+│   FLOAT --plan.empty-axes     in proportion, the thin horizontal shape       │
+│                               measured on starling flocks, whose long axis   │
+│                               holds no fixed bearing to their motion,        │
+│                               launched with its long axis along the course   │
+│                               and its thin axis vertical. [default: (5.6,    │
+│                               2.8, 1.0)]                                     │
+│ --plan.center-m FLOAT FLOAT   The center of the launch cloud, east, north,   │
+│   FLOAT                       and above the ground, in meters, by default on │
+│   --plan.empty-center-m       the parametric threat's course to the front it │
+│                               crosses within two minutes. [default: (1000.0, │
+│                               1000.0, 100.0)]                                │
+│ --plan.course-deg FLOAT       The launch heading in degrees counterclockwise │
+│                               from east, by default west. [default: 180.0]   │
+│ --plan.cruise-m-s FLOAT       The speed a flight holds each drone at, in     │
+│                               meters per second. [default: 10.0]             │
+│ --plan.drones INT             The size of the flock. [default: 100]          │
+│ --plan.duration-s FLOAT       The length of the flight, in seconds.          │
+│                               [default: 120.0]                               │
+│ --plan.frame-every INT        The number of steps between two kept frames.   │
+│                               [default: 25]                                  │
+│ --plan.neighbors INT          The number of topological neighbors each drone │
+│                               senses. [default: 7]                           │
+│ --plan.resolution-s FLOAT     The time resolution of the Brownian path, in   │
+│                               seconds, which a flight at a smaller step_s    │
+│                               replays unchanged. [default: 0.005]            │
+│ --plan.scatter-deg FLOAT      The spread of the launch headings about the    │
+│                               course, in degrees. [default: 10.0]            │
+│ --plan.seed INT               The value every draw of a flight derives from. │
+│                               [default: 0]                                   │
+│ --plan.seeds INT              The number of launches flown together under    │
+│                               vmap. [default: 4]                             │
+│ --plan.settled-s FLOAT        The start of the flight a statistic leaves     │
+│                               out, in seconds. [default: 20.0]               │
+│ --plan.spacing-m FLOAT        The launch cloud's cube root of the volume per │
+│                               drone, in meters. [default: 15.0]              │
+│ --plan.step-s FLOAT           The step of the integrator, in seconds.        │
+│                               [default: 0.02]                                │
+│ --plan.turn-at-s FLOAT        The moment the first drone starts the turn, in │
+│                               seconds. [default: 25.0]                       │
+│ --plan.turn-deg FLOAT         The angle the first drone turns through and    │
+│                               then holds, in degrees counterclockwise, none  │
+│                               by default. [default: 0.0]                     │
+│ --plan.turning-deg-s FLOAT    The rotation of the flock's mean heading, over │
+│                               turning_window_s, past which a spontaneous     │
+│                               turn counts as started, in degrees per second. │
+│                               [default: 2.0]                                 │
+│ --plan.turning-window-s       The time over which the flock's mean heading   │
+│   FLOAT                       or a drone's heading is read for a turn, in    │
+│                               seconds, longer than a step's noise on either. │
+│                               [default: 5.0]                                 │
+│ --simulation PATH             The WRF-SFIRE output the graph reads, relative │
+│                               to the clone, such as the                      │
+│                               data/samples/wrf_sample.nc the thermur fetch   │
+│                               sample command writes, or None to read the     │
+│                               dataset threat builds.                         │
+│ --threat.anomaly-k FLOAT      The potential temperature behind the front in  │
+│                               excess of the air ahead of it, in kelvin.      │
+│                               [default: 20.0]                                │
+│ --threat.edge-m FLOAT         The scale of the hyperbolic tangent carrying   │
+│                               the anomaly to zero ahead of the front, in     │
+│                               meters, one grid spacing by default, so 76% of │
+│                               the anomaly falls within this distance on      │
+│                               either side of the front. [default: 40.0]      │
+│ --threat.grid.columns INT     The number of mass points from west to east.   │
+│                               [default: 100]                                 │
+│ --threat.grid.interval-s      The time between neighboring snapshots, in     │
+│   FLOAT                       seconds, the interval each output of the plume │
+│                               dataset is written at. [default: 15.0]         │
+│ --threat.grid.level-m FLOAT   The depth of each model level, in meters.      │
+│                               [default: 20.0]                                │
+│ --threat.grid.levels INT      The number of model levels. [default: 30]      │
+│ --threat.grid.rows INT        The number of mass points from south to north. │
+│                               [default: 50]                                  │
+│ --threat.grid.snapshots INT   The number of snapshots, which span two        │
+│                               minutes at the default interval. [default: 9]  │
+│ --threat.grid.spacing-m       The distance between neighboring mass points,  │
+│   FLOAT                       in meters, the horizontal spacing of the plume │
+│                               dataset. [default: 40.0]                       │
+│ --threat.speed-m-s FLOAT      The speed at which the front advances east, in │
+│                               meters per second. [default: 1.0]              │
+╰──────────────────────────────────────────────────────────────────────────────╯

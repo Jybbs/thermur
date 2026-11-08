@@ -5,21 +5,22 @@ same parameter, a list and a tuple holding the same items, and a table and a
 tree the cache stores as NetCDF files.
 """
 
-from common.settings import Heading
-from equinox         import Module
+from equinox import Module
 from hamilton.function_modifiers import cache
 from jax    import Array, numpy
 from numpy  import arange, asarray, ndarray
 from xarray import DataTree, Dataset
 
+from thermur.controller.components import Constant
+
 
 class Pitch(Module):
     """
-    A stand-in component declaring the one parameter `Heading` declares,
+    A stand-in component declaring the one parameter `Constant` declares,
     under the same default.
     """
 
-    coupling_per_s: float = 1.0
+    coupling_per_s: float = 0.6
     """
     The rate at which a drone levels toward its neighbors, in reciprocal
     seconds.
@@ -34,11 +35,11 @@ def netcdf_table() -> Dataset:
     return Dataset({"t": ("x", arange(3.0))}, attrs={"units": "K"})
 
 
-def heading() -> Heading:
+def constant() -> Constant:
     """
-    Builds the stand-in heading component at its default.
+    Builds the constant coupling at its default.
     """
-    return Heading()
+    return Constant()
 
 
 def jax_array() -> Array:

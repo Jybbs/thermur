@@ -9,7 +9,7 @@ from collections.abc import Iterator, Mapping
 from functools       import cached_property
 from json            import dumps
 from pathlib         import Path
-from pydantic        import BaseModel, Field
+from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
 from thermur.docs.pages          import Page
 from thermur.environment.schemas import (
@@ -21,9 +21,12 @@ from thermur.environment.schemas import (
     Ranges,
     Sample
 )
-from thermur.identity.schemas import Identity
-from thermur.repo.checkout    import Checkout
-from thermur.repo.schemas     import Finding
+from thermur.identity.schemas  import Identity
+from thermur.metrics.schemas   import Plan
+from thermur.metrics.trials    import Trial
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
+from thermur.repo.schemas      import Finding
 
 
 class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -52,6 +55,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
     The file the Data page's drawing of the front reads the default record and
     the constants its air is worked out from.
+    """
+
+    trials: Path = Path("docs/.vitepress/lib/rendered/trials.json")
+    """
+    The file the charts on The Interaction Rules read what each condition of
+    a trial sets from.
     """
 
     @property
@@ -94,14 +103,38 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         Renders the body of each region the render task writes into a page,
         by the page's path and then by the region's name, meaning the fields
         `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
-        Data page.
+        Data page, and on The Interaction Rules the fields `Plan` and the
+        contact declare beside those of each open slot's default and each of
+        its candidates, every one named for its component.
         """
+        defaults = Settings()
         return {
-            Path("docs/pages/data/index.md"): {
+            Path("docs/pages/data/index.md")    : {
                 "crop"   : tabled(Crop),
                 "ranges" : tabled(Ranges),
                 "sample" : tabled(Sample),
                 "threat" : tabled(ParametricThreat)
+            },
+            Path("docs/pages/methods/rules.md") : {
+                "contact" : tabled(type(defaults.contact)),
+                "plan"    : tabled(Plan)
+            } | {
+                trial.slot: tabled(
+                    kind = create_model(
+                        trial.slot,
+                        **{
+                            type(component).__name__.lower(): (
+                                type(component),
+                                component
+                            )
+                            for component in (
+                                getattr(defaults, trial.slot),
+                                *trial.candidates.values()
+                            )
+                        }
+                    )
+                )
+                for trial in Trial.listed()
             }
         }
 
@@ -130,9 +163,10 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         the identity as JSON with its fields in the order the records
         declare them, the crop's heights as JSON beside the sample's length
         and snapshot times, the default threat as JSON beside the constants
-        its air is worked out from, and each page with its regions as
-        `Page.filled` writes them and its definitions as `Page.cited` writes
-        them.
+        its air is worked out from, the changes each condition of each trial
+        makes to the plan as JSON by slot, and each page with its regions
+        as `Page.filled` writes them and its definitions as `Page.cited`
+        writes them.
         """
         crop   = Crop().model_dump(include={"floor_m", "levels", "spacing_m"})
         sample = Sample().model_dump(include={"length_m", "times_s"})
@@ -144,7 +178,11 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         return {
             self.crop     : dumps(crop | sample, indent=2) + "\n",
             self.identity : Identity.shipped().model_dump_json(indent=2) + "\n",
-            self.threat   : dumps(threat, indent=2) + "\n"
+            self.threat   : dumps(threat, indent=2) + "\n",
+            self.trials   : dumps(
+                {trial.slot: trial.conditions for trial in Trial.listed()},
+                indent = 2
+            ) + "\n"
         } | {
             path: Page(text=page.filled(self.regions.get(path, {}))).cited(
                 self.checkout.bibliography
@@ -218,14 +256,13 @@ def fielded(
             )
 
 
-def tabled(model: type[BaseModel]) -> str:
+def tabled(kind: type) -> str:
     """
-    Lays out each field `model` declares as a row of a Markdown table, in
-    the order the class declares them, the name and the default in code
-    beside the description, with a column of bounds only where a field sets
-    one.
+    Lays out each field `kind` declares as a row of a Markdown table, in the
+    order the class declares them, the name and the default in code beside
+    the description, with a column of bounds only where a field sets one.
     """
-    schema = model.model_json_schema()
+    schema = TypeAdapter(kind).json_schema()
     rows   = list(fielded(schema.get("$defs", {}), schema["properties"]))
     bounds = any(bound for _, _, bound, _ in rows)
     header = ["**Field**", "**Default**", *["**Bound**"] * bounds, "**Holds**"]

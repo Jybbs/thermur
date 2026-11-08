@@ -2,14 +2,16 @@
 Defines the fixtures every test folder shares, each described where it is
 defined, beside the plain-file extension every snapshot is written through.
 The autouse `environment` fixture isolates every test from the machine
-running it, and the collection hook lets a test open a network connection
-only when it carries the `network` mark.
+running it, the collection hook lets a test open a network connection only
+when it carries the `network` mark, and Hypothesis's `ci` and `default`
+profiles each run a set number of examples.
 """
 
 from collections.abc    import Callable
 from common.edits       import executable
 from common.environment import CLEARED
 from common.stand_ins   import StandIn
+from hypothesis         import settings
 from json               import loads
 from os                 import environ, pathsep
 from pathlib            import Path
@@ -30,6 +32,14 @@ from tomllib import loads as from_toml
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 from thermur.repo.schemas      import read_pin
+
+settings.register_profile("ci", settings.get_profile("ci"), max_examples=200)
+settings.register_profile(
+    "default",
+    settings.get_profile("default"),
+    deadline     = None,
+    max_examples = 25
+)
 
 
 class PlainFile(SingleFileSnapshotExtension):

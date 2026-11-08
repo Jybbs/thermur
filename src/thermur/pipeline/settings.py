@@ -4,13 +4,17 @@ table of the clone's `pyproject.toml` sets for every run beneath a
 `THERMUR_` variable and a value passed in.
 """
 
+from cyclopts          import Parameter
 from pathlib           import Path
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
+from typing import Annotated
 
-from thermur.environment.schemas import Crop, ParametricThreat
-from thermur.repo.checkout       import Checkout
-from thermur.repo.schemas        import Manifest
+from thermur.controller.components import Constant, Morse, Overdamped, SoftCore, White
+from thermur.environment.schemas   import Crop, ParametricThreat
+from thermur.metrics.schemas       import Plan
+from thermur.repo.checkout         import Checkout
+from thermur.repo.schemas          import Manifest
 
 
 class Settings(
@@ -32,10 +36,43 @@ class Settings(
     another node has already read.
     """
 
+    cohesion: Morse = Morse()
+    """
+    The acceleration holding a drone at a spacing from its neighbors.
+    """
+
+    contact: SoftCore = SoftCore()
+    """
+    The acceleration pushing apart two drones that overlap.
+    """
+
+    coupling: Constant = Constant()
+    """
+    The rate at which a drone aligns with each neighbor.
+    """
+
     crop: Crop = Crop()
     """
     The window, the neighborhood, and the band a WRF-SFIRE output is cropped
     to, and the fixed heights its fields are regridded onto.
+    """
+
+    # `Overdamped` declares no field, which cyclopts renders as one flag taking a
+    # value no conversion accepts, so the command line leaves the slot out.
+    heading: Annotated[Overdamped, Parameter(parse=False)] = Overdamped()
+    """
+    The acceleration turning a drone toward its neighbors.
+    """
+
+    noise: White = White()
+    """
+    The random increments driving each drone's velocity and force.
+    """
+
+    plan: Plan = Plan()
+    """
+    The flock's size, its launch, the flight's length and step, and the seeds
+    it flies.
     """
 
     simulation: Path | None = None

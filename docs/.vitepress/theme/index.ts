@@ -2,12 +2,11 @@ import type { Theme } from 'vitepress'
 import DefaultTheme   from 'vitepress/theme-without-fonts'
 import { h }          from 'vue'
 
-import CropKept     from './crop.ts'
-import FrontHero    from './front/hero.ts'
-import FrontSky     from './front/sky.ts'
-import NotFoundPage from './not-found/page.ts'
-import MotionPause  from './pause.ts'
-import ThreatFront  from './threat.ts'
+import { COMPONENTS } from './components.ts'
+import FrontHero      from './front/hero.ts'
+import FrontSky       from './front/sky.ts'
+import NotFoundPage   from './not-found/page.ts'
+import MotionPause    from './pause.ts'
 
 import 'katex/dist/katex.min.css'
 import 'virtual:identity.css'
@@ -21,6 +20,8 @@ import './styles/not-found/track.css'
 import './styles/pause.css'
 import './styles/crop.css'
 import './styles/threat.css'
+import './styles/rules/figure.css'
+import './styles/rules/neighbors.css'
 import './styles/values.css'
 
 /**
@@ -41,7 +42,6 @@ export default {
   extends : DefaultTheme,
 
   enhanceApp: ({ app }) => {
-    app.component('CropKept', CropKept)
-    app.component('ThreatFront', ThreatFront)
+    for (const [name, component] of Object.entries(COMPONENTS)) app.component(name, component)
   }
 } satisfies Theme

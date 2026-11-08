@@ -10,7 +10,7 @@ as they run.
 
 from sys import set_lazy_imports, set_lazy_imports_filter
 
-EAGER = frozenset({"_pytest", "pandas", "xarray"})
+EAGER = frozenset({"_pytest", "hypothesis", "jax", "pandas", "xarray"})
 """
 The packages whose own imports load as they run, since each fails once they
 load lazily, each listed below beside its defect, its upstream issue where one
@@ -22,6 +22,17 @@ passes, with its issue read for whether a fix has shipped:
   `fnmatch` and so enters itself again through the lazy import of `fnmatch`,
   raising `ImportCycleError` (pytest-dev/pytest#14632, with a fix proposed
   in pytest-dev/pytest#14844), reproduced by `mise test -- --collect-only`
+- `hypothesis`, each of whose strategies enters the table
+  `hypothesis.strategies` checks its exports against only as a side effect of
+  importing the module defining it, so the first strategy read raises
+  `AssertionError` naming every export, with no upstream issue filed,
+  reproduced by
+  `mise x -- uv run --locked python -c "import hypothesis.strategies as s; s.integers"`
+- `jax`, each of whose random generators enters the table `jax.random.key`
+  reads only as a side effect of importing the module defining it, such as
+  `jax._src.random.threefry2x32`, so a first key raises `AssertionError`
+  naming the default generator, with no upstream issue filed, reproduced by
+  `mise x -- uv run --locked python -c "import jax; jax.random.key(0)"`
 - `pandas`, which imports the modules setting its C API capsules and its
   options only for that effect, so its compiled modules read them unset
   (pandas-dev/pandas#71173, with a fix proposed in pandas-dev/pandas#71178),

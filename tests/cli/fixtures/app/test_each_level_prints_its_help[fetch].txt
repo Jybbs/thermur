@@ -3,5 +3,5 @@ Usage: thermur fetch COMMAND
 Fetches the data a run reads into the clone's data/ folder.
 
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
-│ sample                                                                       │
+│ sample  Fetches the WRF-SFIRE sample into the clone's data/ folder.          │
 ╰──────────────────────────────────────────────────────────────────────────────╯

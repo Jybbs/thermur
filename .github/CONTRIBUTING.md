@@ -40,7 +40,7 @@ Every pull request runs `🐦‍⬛ CI` except one touching only the site's own 
 | `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, `docs/bun.lock`, or the lockfile beside a task script drifts from its manifest, or `.mise/mise.lock` lacks a pinned tool for the running platform |
 | `⛈️ Advisories` | `mise scan` | A package `uv.lock`, `docs/bun.lock`, or a task script's lockfile resolves carries a published advisory, or the advisory service cannot be reached |
 | `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the line it concerns |
-| `☂️ Coverage` | `mise coverage` | A test fails under coverage, or the suite fails to collect |
+| `☂️ Coverage` | `mise coverage` | A test fails under coverage, the suite fails to collect, or the package's coverage falls below 95% |
 | `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` makes a finding at the error level, such as a file restating a value otherwise than its source, or this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
 | `🗝️ Workflows` | `mise vet` | [zizmor](https://docs.zizmor.sh/) cannot parse a workflow or the composite action, or finds a hazard in one, such as template injection, an unpinned action, an over-broad permission, checkout credentials left on disk, or a cache a privileged job restores |
 | `🪁 Press` | `mise press` | VitePress fails to build a page, or a link between pages leads nowhere |

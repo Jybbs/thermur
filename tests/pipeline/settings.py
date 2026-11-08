@@ -1,23 +1,24 @@
 """
 Pins where the settings read each value from, meaning the order of a value
 passed in, a `THERMUR_` variable, and the `[tool.thermur]` table of the
-installed clone, and what the model refuses, over a stand-in field and a
-stand-in component, beside the fire data's settings each source sets.
+installed clone, and what the model refuses, over a stand-in field and the
+coupling slot, beside the fire data's settings each source sets.
 """
 
 from common.edits    import append, edit
-from common.settings import Heading, Tuned
+from common.settings import Tuned
 from pathlib         import Path
 from pydantic        import ValidationError
 from pytest          import MonkeyPatch, TempPathFactory, fixture, mark, param, raises
 
-from thermur.repo.checkout import Checkout
+from thermur.controller.components import Constant
+from thermur.repo.checkout         import Checkout
 
 TABLE = """
 [tool.thermur]
 radius_m = 7.0
 
-[tool.thermur.heading]
+[tool.thermur.coupling]
 coupling_per_s = 2.5
 """
 
@@ -27,7 +28,7 @@ def installed(checkout: Checkout, monkeypatch: MonkeyPatch) -> Checkout:
     """
     Stands the copy `checkout` makes in for the clone the package was
     installed from, holding a `[tool.thermur]` table that sets the stand-in
-    field and the stand-in component.
+    field and the coupling slot.
     """
     append(checkout, "pyproject.toml", TABLE)
     monkeypatch.setattr(Checkout, "installed", classmethod(lambda _: checkout))
@@ -68,10 +69,10 @@ def test_a_component_outside_its_bound_fails(installed: Checkout):
     fails validation at that parameter.
     """
     with raises(ValidationError) as error:
-        Tuned(heading={"coupling_per_s": 50})
+        Tuned(coupling={"coupling_per_s": -1})
 
     assert [detail["loc"] for detail in error.value.errors()] == [
-        ("heading", "coupling_per_s")
+        ("coupling", "coupling_per_s")
     ]
 
 
@@ -98,9 +99,9 @@ def test_a_variable_sets_a_component_as_json(
     Asserts that a prefixed variable holding a JSON object sets a component
     over the table.
     """
-    monkeypatch.setenv("THERMUR_HEADING", '{"coupling_per_s": 4}')
+    monkeypatch.setenv("THERMUR_COUPLING", '{"coupling_per_s": 4}')
 
-    assert Tuned().heading == Heading(coupling_per_s=4.0)
+    assert Tuned().coupling == Constant(coupling_per_s=4.0)
 
 
 def test_a_variable_sets_the_simulation(installed: Checkout, monkeypatch: MonkeyPatch):
@@ -140,13 +141,13 @@ def test_the_table_is_read_from_the_installed_clone(
 
 def test_the_table_sets_a_field_and_a_component(installed: Checkout):
     """
-    Asserts that the table sets the stand-in field and the stand-in
-    component, which reads back as the component's own `Module` type.
+    Asserts that the table sets the stand-in field and the coupling slot,
+    which reads back as the component's own `Module` type.
     """
     settings = Tuned()
 
-    assert (settings.radius_m, settings.heading) == (7.0, Heading(coupling_per_s=2.5))
-    assert type(settings.heading) is Heading
+    assert (settings.radius_m, settings.coupling) == (7.0, Constant(coupling_per_s=2.5))
+    assert type(settings.coupling) is Constant
 
 
 def test_the_table_sets_the_simulation_the_crop_and_the_threat(installed: Checkout):
@@ -177,4 +178,4 @@ def test_without_a_table_each_field_keeps_its_default(installed: Checkout):
     """
     edit(installed, "pyproject.toml", new="", old=TABLE)
 
-    assert Tuned() == Tuned(heading=Heading(), radius_m=5.0)
+    assert Tuned() == Tuned(coupling=Constant(), radius_m=5.0)
