@@ -53,14 +53,14 @@
 }
 
 .vp-doc a:not([class]) > code {
-  transition : --th-ember var(--th-fill-cool) ease-out,
-               --th-front 0s linear var(--th-fill-cool),
-               color var(--th-fill-fade) linear var(--th-fill-cool);
+  transition: --th-ember var(--th-fill-cool) ease-out,
+              --th-front 0s linear var(--th-fill-cool),
+              color var(--th-fill-fade) linear var(--th-fill-cool);
 }
 
 .vp-doc a:not([class]):has(> code) {
-  transition : color var(--th-fill-fade) linear var(--th-fill-cool),
-               text-decoration-color var(--th-fill-fade) linear var(--th-fill-cool);
+  transition: color var(--th-fill-fade) linear var(--th-fill-cool),
+              text-decoration-color var(--th-fill-fade) linear var(--th-fill-cool);
 }
 
 .vp-doc :not(a, pre) > code {
@@ -70,6 +70,15 @@
   background-size     : var(--th-reach) var(--th-fill-line);
   transition          : --th-ember var(--th-fill-cool) ease-out,
                         --th-front 0s linear var(--th-fill-cool);
+}
+
+.vp-doc a:not([class]):active,
+.vp-doc :not(a, pre) > code:active {
+  --th-fill-wait  : var(--th-fill-press-wait);
+  --th-fill-cross : var(--th-fill-press-cross);
+  --th-fill-flare : var(--th-fill-press-flare);
+  --th-fill-ink   : var(--th-fill-press-ink);
+  --th-fill-turn  : var(--th-fill-press-turn);
 }
 
 @media (hover: hover) {

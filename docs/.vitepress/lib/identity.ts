@@ -26,7 +26,8 @@ export interface Heat {
 
 /**
  * A custom property the theme sets to a step of the heat ramp in each scheme,
- * under the kind of thing it paints.
+ * laid over the ground at a share where one is set, under the kind of thing it
+ * paints.
  */
 interface Fill {
   dark  : Heat
@@ -68,13 +69,15 @@ const FACES = {
   '--vp-font-family-mono' : 'mono'
 } as const satisfies Record<string, keyof Identity['faces']>
 /**
- * The colors of the fill a link and a chip take under the pointer, on keyboard
- * focus, and on a tap, each a step of the heat ramp per scheme, meaning
- * `--th-fill-hot` for the band crossing the words, `--th-fill-ember` for what it
- * leaves behind them, and `--th-fill-edge` for the line along their foot.
+ * The colors of the fill a link, and a chip inside one, take under the pointer,
+ * on keyboard focus, and on a tap, and a chip outside a link takes under the
+ * pointer and on a tap, each a step of the heat ramp per scheme laid over the
+ * ground at a share where one is set, meaning `--th-fill-hot` for the band
+ * crossing the words, `--th-fill-ember` for what it leaves behind them, and
+ * `--th-fill-edge` for the line along their foot.
  */
 export const FILL: Readonly<Record<string, Fill>> = {
-  '--th-fill-edge'  : { dark: { step: 1 }, kind: 'mark', light: { step: 3 } },
+  '--th-fill-edge'  : { dark: { step: 1 }, kind: 'mark', light: { step: 4 } },
   '--th-fill-ember' : { dark: { step: 6 }, kind: 'fill', light: { share: 0.5, step: 1 } },
   '--th-fill-hot'   : { dark: { step: 4 }, kind: 'fill', light: { step: 2 } }
 }

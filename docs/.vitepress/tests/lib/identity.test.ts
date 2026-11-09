@@ -89,8 +89,18 @@ describe.for(SCHEMES)('under the %s scheme', scheme => {
     expect(wcagContrast(painted(ink, scheme), painted(fill, scheme))).toBeGreaterThanOrEqual(FLOORS.text)
   })
 
+  it.for(source.palette.series.map((pair, index) => [index + 1, pair] as const))(
+    'chart series %i holds a mark’s contrast against the ground',
+    ([, pair]) => {
+      const ground = identity.colorOf(source.palette.ground[scheme])
+      expect(wcagContrast(identity.colorOf(pair[scheme]), ground)).toBeGreaterThanOrEqual(FLOORS.mark)
+    }
+  )
+})
+
+describe.for(SCHEMES)('the fill under the %s scheme', scheme => {
   it.for(ofKind(identity.FILL, 'fill'))(
-    'the ink holds a text’s contrast against the fill’s %s',
+    'the ink holds a text’s contrast against its %s',
     ([, fill]) => {
       expect(wcagContrast(painted(ink, scheme), heated(fill[scheme], scheme))).toBeGreaterThanOrEqual(
         FLOORS.text
@@ -99,7 +109,7 @@ describe.for(SCHEMES)('under the %s scheme', scheme => {
   )
 
   it.for(overGrounds(ofKind(identity.FILL, 'mark')))(
-    'the fill’s %s holds a mark’s contrast against %s',
+    'its %s holds a mark’s contrast against %s',
     ([, , fill, ground]) => {
       expect(wcagContrast(heated(fill[scheme], scheme), painted(ground, scheme))).toBeGreaterThanOrEqual(
         FLOORS.mark
@@ -107,13 +117,12 @@ describe.for(SCHEMES)('under the %s scheme', scheme => {
     }
   )
 
-  it.for(source.palette.series.map((pair, index) => [index + 1, pair] as const))(
-    'chart series %i holds a mark’s contrast against the ground',
-    ([, pair]) => {
-      const ground = identity.colorOf(source.palette.ground[scheme])
-      expect(wcagContrast(identity.colorOf(pair[scheme]), ground)).toBeGreaterThanOrEqual(FLOORS.mark)
-    }
-  )
+  it('its edge holds a mark’s contrast against the ember behind it on a link', () => {
+    const { '--th-fill-edge': edge, '--th-fill-ember': ember } = identity.FILL
+    expect(wcagContrast(heated(edge![scheme], scheme), heated(ember![scheme], scheme))).toBeGreaterThanOrEqual(
+      FLOORS.mark
+    )
+  })
 })
 
 describe('colorOf', () => {
@@ -167,7 +176,7 @@ describe('identityCss', () => {
 
   it('sets each fill color to a step of the heat ramp per scheme, the ember laid over the ground', () => {
     const css = identity.identityCss()
-    expect(css).toContain('--th-fill-edge: light-dark(var(--th-heat-3), var(--th-heat-1));')
+    expect(css).toContain('--th-fill-edge: light-dark(var(--th-heat-4), var(--th-heat-1));')
     expect(css).toContain('--th-fill-hot: light-dark(var(--th-heat-2), var(--th-heat-4));')
     expect(css).toContain(
         '--th-fill-ember: light-dark(color-mix(in srgb, var(--th-heat-1) 50%, var(--th-ground)), '
