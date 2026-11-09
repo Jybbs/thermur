@@ -41,3 +41,21 @@ export function declared(property: string, selector: string, sheet: string): str
   const rules = [...opened(sheet).style.sheet!.cssRules] as CSSStyleRule[]
   return rules.find(rule => rule.selectorText?.replaceAll(/\s+/gu, ' ') === selector)!.style.getPropertyValue(property)
 }
+
+/**
+ * Lists every style rule in `list`, those inside an at-rule such as `@media`
+ * included.
+ */
+function flattened(list: CSSRuleList): CSSStyleRule[] {
+  return [...list].flatMap(rule =>
+    'selectorText' in rule ? [rule as CSSStyleRule] : 'cssRules' in rule ? flattened((rule as CSSGroupingRule).cssRules) : []
+  )
+}
+
+/**
+ * Lists every style rule the theme's stylesheet `sheet` holds, those inside an
+ * at-rule such as `@media` included.
+ */
+export function styled(sheet: string): CSSStyleRule[] {
+  return flattened(opened(sheet).style.sheet!.cssRules)
+}

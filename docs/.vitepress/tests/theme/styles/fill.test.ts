@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { declared } from '../../common/sheets.ts'
+import { declared, styled } from '../../common/sheets.ts'
 
 /**
  * The links and the chips outside a link that a press fills.
@@ -14,5 +14,10 @@ describe('a press', () => {
 
   it.for(['cool', 'fade'])('leaves the fill’s %s, which runs once the press lifts, at its own', step => {
     expect(declared(`--th-fill-${step}`, PRESSED, 'fill.css')).toBe('')
+  })
+
+  it('times no other rule by the press’s own, so hover and keyboard focus keep the fill’s', () => {
+    const pressed = styled('fill.css').filter(rule => rule.style.cssText.includes('--th-fill-press-'))
+    expect(pressed.map(rule => rule.selectorText.replaceAll(/\s+/gu, ' '))).toEqual([PRESSED])
   })
 })
