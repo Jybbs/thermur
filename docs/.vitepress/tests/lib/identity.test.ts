@@ -27,26 +27,48 @@ const checked = Object.entries(identity.MIXES).filter(([, mix]) => mix.kind in F
 const call = <T>(hook: unknown, id: string): T => (hook as (id: string) => T)(id)
 
 /**
- * Lists each custom property of `kind`, by its name.
+ * Lists each custom property of `record` whose kind is `kind`, by its name.
  */
-const kinded = (kind: string): [string, identity.Mix][] =>
-  Object.entries(identity.MIXES).filter(([, mix]) => mix.kind === kind)
+const ofKind = <T extends { kind: string }>(record: Record<string, T>, kind: string): [string, T][] =>
+  Object.entries(record).filter(([, entry]) => entry.kind === kind)
+
+/**
+ * Lists each custom property the theme mixes of `kind`, by its name.
+ */
+const kinded = (kind: string): [string, identity.Mix][] => ofKind(identity.MIXES, kind)
+
+/**
+ * Reads the color `top` paints at `share` over `under`, as `color-mix` in sRGB
+ * lays it.
+ */
+const laid = (under: string, top: string, share: number): string =>
+  interpolate([under, top], 'rgb')(share) as unknown as string
 
 /**
  * Reads the color `mix` paints under `scheme`, its role laid over the role
- * beneath it at its share, as `color-mix` in sRGB lays it.
+ * beneath it at its share.
  */
-const painted = ({ over = 'ground', role, share }: identity.Mix, scheme: identity.Scheme): string => {
-  const { palette } = source
-  const colors      = [palette[over][scheme], palette[role][scheme]].map(name => identity.colorOf(name))
-  return interpolate(colors, 'rgb')(share) as unknown as string
-}
+const painted = ({ over = 'ground', role, share }: identity.Mix, scheme: identity.Scheme): string =>
+  laid(identity.shadeOf(over, scheme), identity.shadeOf(role, scheme), share)
+
+/**
+ * Reads the color `heat` paints under `scheme`, its step of the heat ramp laid
+ * over the ground at its share.
+ */
+const heated = ({ share = 1, step }: identity.Heat, scheme: identity.Scheme): string =>
+  laid(identity.shadeOf('ground', scheme), identity.heatRamp(source)[step - 1]!, share)
+
+/**
+ * Pairs each of `entries` with each ground it is laid over.
+ */
+const overGrounds = <T>(entries: [string, T][]): (readonly [string, string, T, identity.Mix])[] =>
+  entries.flatMap(([name, entry]) =>
+    kinded('ground').map(([ground, under]) => [name, ground, entry, under] as const))
 
 /**
  * Pairs each property holding a floor with each ground it is laid over.
  */
-const pairs = checked.flatMap(([name, mix]) => kinded('ground').map(([ground, under]) =>
-  [name, ground, mix, under] as const))
+const pairs = overGrounds(checked)
 
 describe.for(SCHEMES)('under the %s scheme', scheme => {
   it.for(Object.entries(identity.ON_LEAD))(
@@ -74,6 +96,33 @@ describe.for(SCHEMES)('under the %s scheme', scheme => {
       expect(wcagContrast(identity.colorOf(pair[scheme]), ground)).toBeGreaterThanOrEqual(FLOORS.mark)
     }
   )
+})
+
+describe.for(SCHEMES)('the fill under the %s scheme', scheme => {
+  it.for(ofKind(identity.FILL, 'fill'))(
+    'the ink holds a text’s contrast against its %s',
+    ([, fill]) => {
+      expect(wcagContrast(painted(ink, scheme), heated(fill[scheme], scheme))).toBeGreaterThanOrEqual(
+        FLOORS.text
+      )
+    }
+  )
+
+  it.for(overGrounds(ofKind(identity.FILL, 'mark')))(
+    'its %s holds a mark’s contrast against %s',
+    ([, , fill, ground]) => {
+      expect(wcagContrast(heated(fill[scheme], scheme), painted(ground, scheme))).toBeGreaterThanOrEqual(
+        FLOORS.mark
+      )
+    }
+  )
+
+  it('its edge holds a mark’s contrast against the ember behind it on a link', () => {
+    const { '--th-fill-edge': edge, '--th-fill-ember': ember } = identity.FILL
+    expect(wcagContrast(heated(edge![scheme], scheme), heated(ember![scheme], scheme))).toBeGreaterThanOrEqual(
+      FLOORS.mark
+    )
+  })
 })
 
 describe('colorOf', () => {
@@ -123,6 +172,16 @@ describe('identityCss', () => {
     expect(css).toContain('--vp-c-text-1: var(--th-ink);')
     expect(css).toContain('--vp-c-brand-2: color-mix(in srgb, var(--th-lead) 80%, var(--th-ink));')
     expect(css).toContain("--th-font-display: 'Bellefair', Didot, Georgia, serif;")
+  })
+
+  it('sets each fill color to a step of the heat ramp per scheme, the ember laid over the ground', () => {
+    const css = identity.identityCss()
+    expect(css).toContain('--th-fill-edge: light-dark(var(--th-heat-4), var(--th-heat-1));')
+    expect(css).toContain('--th-fill-hot: light-dark(var(--th-heat-2), var(--th-heat-4));')
+    expect(css).toContain(
+        '--th-fill-ember: light-dark(color-mix(in srgb, var(--th-heat-1) 50%, var(--th-ground)), '
+      + 'var(--th-heat-6));'
+    )
   })
 
   it('carries no hex outside the identity’s own colors', () => {

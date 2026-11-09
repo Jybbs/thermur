@@ -1,0 +1,152 @@
+@property --th-front {
+  syntax        : '<number>';
+  inherits      : false;
+  initial-value : 0;
+}
+
+@property --th-ember {
+  syntax        : '<number>';
+  inherits      : false;
+  initial-value : 0;
+}
+
+.vp-doc {
+  --th-fill-band : 30px;
+  --th-fill-line : 2px;
+}
+
+.vp-doc a:not([class]):focus-visible {
+  outline        : 2px solid var(--th-lead);
+  outline-offset : 3px;
+  border-radius  : 2px;
+}
+
+.vp-doc a:not([class], :has(> code)),
+.vp-doc :not(pre) > code {
+  --th-lit-edge  : color-mix(in srgb, var(--th-fill-edge) calc(var(--th-ember) * 100%), transparent);
+  --th-lit-ember : color-mix(in srgb, var(--th-fill-ember) calc(var(--th-ember) * 100%), transparent);
+  --th-reach     : calc(var(--th-front) * 100%);
+}
+
+.vp-doc a:not([class], :has(> code)),
+.vp-doc a:not([class]) > code {
+  background-image    : linear-gradient(to right, transparent, var(--th-fill-hot) 72%, transparent),
+                        linear-gradient(var(--th-lit-edge) 0 0),
+                        linear-gradient(var(--th-lit-ember) 0 0);
+  background-position : calc(var(--th-reach) + (2 * var(--th-front) - 1) * var(--th-fill-band)) 0,
+                        0 100%,
+                        0 0;
+  background-repeat   : no-repeat;
+  background-size     : var(--th-fill-band) 100%,
+                        var(--th-reach) var(--th-fill-line),
+                        var(--th-reach) 100%;
+}
+
+.vp-doc a:not([class], :has(> code)) {
+  margin-inline : -0.125em;
+  padding       : 0 0.125em 3px;
+  border-radius : 3px;
+  transition    : --th-ember var(--th-fill-cool) ease-out,
+                  --th-front 0s linear var(--th-fill-cool),
+                  color var(--th-fill-fade) linear var(--th-fill-cool),
+                  text-decoration-color var(--th-fill-fade) linear var(--th-fill-cool);
+}
+
+.vp-doc a:not([class]) > code {
+  transition: --th-ember var(--th-fill-cool) ease-out,
+              --th-front 0s linear var(--th-fill-cool),
+              color var(--th-fill-fade) linear var(--th-fill-cool);
+}
+
+.vp-doc a:not([class]):has(> code) {
+  transition: color var(--th-fill-fade) linear var(--th-fill-cool),
+              text-decoration-color var(--th-fill-fade) linear var(--th-fill-cool);
+}
+
+.vp-doc :not(a, pre) > code {
+  background-image    : linear-gradient(var(--th-lit-edge) 0 0);
+  background-position : 0 100%;
+  background-repeat   : no-repeat;
+  background-size     : var(--th-reach) var(--th-fill-line);
+  transition          : --th-ember var(--th-fill-cool) ease-out,
+                        --th-front 0s linear var(--th-fill-cool);
+}
+
+.vp-doc a:not([class]):active,
+.vp-doc :not(a, pre) > code:active {
+  --th-fill-wait  : var(--th-fill-press-wait);
+  --th-fill-cross : var(--th-fill-press-cross);
+  --th-fill-flare : var(--th-fill-press-flare);
+  --th-fill-ink   : var(--th-fill-press-ink);
+  --th-fill-turn  : var(--th-fill-press-turn);
+}
+
+@media (hover: hover) {
+  .vp-doc a:not([class], :has(> code)):hover {
+    --th-front            : 1;
+    --th-ember            : 1;
+    color                 : var(--th-ink);
+    text-decoration-color : transparent;
+    transition            : --th-front var(--th-fill-cross) linear var(--th-fill-wait),
+                            --th-ember var(--th-fill-flare) linear var(--th-fill-wait),
+                            color var(--th-fill-ink) linear var(--th-fill-turn),
+                            text-decoration-color var(--th-fill-ink) linear var(--th-fill-turn);
+  }
+
+  .vp-doc a:not([class]):hover > code {
+    --th-front : 1;
+    --th-ember : 1;
+    color      : var(--th-ink);
+    transition : --th-front var(--th-fill-cross) linear var(--th-fill-wait),
+                 --th-ember var(--th-fill-flare) linear var(--th-fill-wait),
+                 color var(--th-fill-ink) linear var(--th-fill-turn);
+  }
+
+  .vp-doc a:not([class]):has(> code):hover {
+    color                 : var(--th-ink);
+    text-decoration-color : transparent;
+    transition            : color var(--th-fill-ink) linear var(--th-fill-turn),
+                            text-decoration-color var(--th-fill-ink) linear var(--th-fill-turn);
+  }
+
+  .vp-doc :not(a, pre) > code:hover {
+    --th-front : 1;
+    --th-ember : 1;
+    transition : --th-front var(--th-fill-cross) linear var(--th-fill-wait),
+                 --th-ember var(--th-fill-flare) linear var(--th-fill-wait);
+  }
+}
+
+.vp-doc a:not([class], :has(> code)):is(:focus-visible, :active) {
+  --th-front            : 1;
+  --th-ember            : 1;
+  color                 : var(--th-ink);
+  text-decoration-color : transparent;
+  transition            : --th-front var(--th-fill-cross) linear var(--th-fill-wait),
+                          --th-ember var(--th-fill-flare) linear var(--th-fill-wait),
+                          color var(--th-fill-ink) linear var(--th-fill-turn),
+                          text-decoration-color var(--th-fill-ink) linear var(--th-fill-turn);
+}
+
+.vp-doc a:not([class]):is(:focus-visible, :active) > code {
+  --th-front : 1;
+  --th-ember : 1;
+  color      : var(--th-ink);
+  transition : --th-front var(--th-fill-cross) linear var(--th-fill-wait),
+               --th-ember var(--th-fill-flare) linear var(--th-fill-wait),
+               color var(--th-fill-ink) linear var(--th-fill-turn);
+}
+
+.vp-doc a:not([class]):has(> code):is(:focus-visible, :active) {
+  color                 : var(--th-ink);
+  text-decoration-color : transparent;
+  transition            : color var(--th-fill-ink) linear var(--th-fill-turn),
+                          text-decoration-color var(--th-fill-ink) linear var(--th-fill-turn);
+}
+
+.vp-doc :not(a, pre) > code:active {
+  --th-front : 1;
+  --th-ember : 1;
+  transition : --th-front var(--th-fill-cross) linear var(--th-fill-wait),
+               --th-ember var(--th-fill-flare) linear var(--th-fill-wait);
+}
