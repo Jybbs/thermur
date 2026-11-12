@@ -12,7 +12,7 @@ Pins the records the `repo` tasks read and report:
 - The keys and values `GithubSettings` accepts, the calls `Toggles` writes,
   the checks a `Ruleset` requires and the call it writes, and the command
   and body each `Request` sends
-- The releases a `Package` holds packages to under `overrides`
+- The release or range each rule a `Package` reads from `overrides` gives
 - The release a requirement pins, whether a `Lag` is major and the row and
   files it names, what an `Edit` writes, the advisories an `Audit` clears,
   and the packages a `Tree` finds
@@ -766,18 +766,22 @@ def test_a_template_reads_its_labels_from_a_list_or_one_string(
 
 def test_a_package_reads_its_overrides_or_none(pytestconfig: Config):
     """
-    Asserts that `Package` reads the release `overrides` holds each package
-    to, and reads none where `docs/package.json` declares no `overrides`.
+    Asserts that `Package` reads the release or range each rule of
+    `overrides` gives, and reads none where `docs/package.json` declares
+    no `overrides`.
     """
     file   = Path(Package.model_config["title"])
     parsed = Package.load(
         file.suffix,
         (pytestconfig.rootpath / file).read_text(encoding="utf-8")
     )
-    declared = {**parsed, "overrides": {"fflate": "0.7.5"}}
+    declared = {**parsed, "overrides": {"fflate": "0.7.5", "glob": "^14.0.0"}}
     absent   = {key: value for key, value in parsed.items() if key != "overrides"}
 
-    assert Package.model_validate(declared).overrides == {"fflate": "0.7.5"}
+    assert Package.model_validate(declared).overrides == {
+        "fflate" : "0.7.5",
+        "glob"   : "^14.0.0"
+    }
     assert Package.model_validate(absent).overrides == {}
 
 

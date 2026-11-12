@@ -5,9 +5,10 @@ then prints, writes, and tries:
 
 - The pins `Tools`, `Locked`, `Scripts`, `Builds`, `Site`, `Actions`,
   `Images`, and `Wrangler` report lagging, those `Site` reports including
-  each release `overrides` holds a package to, each beside its newest release's
-  date and the advisories the lift clears, and the edits each writes into
-  the copy
+  each exact release `overrides` gives a package, each beside its newest
+  release's date and the advisories the lift clears, and the edits each
+  writes into the copy
+- The releases `Site` reads as exact, and the ranges it leaves alone
 - The table the lift prints, the holds naming no row, and the pins it
   lifts short of its holds
 - The commands the write runs, and the trial's verdict in a scratch clone
@@ -23,6 +24,7 @@ from datetime         import UTC, datetime
 from json             import dumps, loads
 from pathlib          import Path
 from pytest           import MonkeyPatch, fixture, mark, param, raises
+from re               import fullmatch
 from shlex            import quote
 from shutil           import which
 from subprocess       import CalledProcessError
@@ -499,12 +501,12 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
 ):
     """
     Asserts that `Site` reports each package `overrides` holds to a release
-    other than the one its `latest` tag names, after the rows `bun outdated`
+    behind the one its `latest` tag names, after the rows `bun outdated`
     prints and beside the date `bun info` gives that release, and that
-    writing its edit lifts the override. An override at its newest release
-    makes no row, `bun info` never runs for a range, and a package `bun
-    outdated` already lists makes one row, whose edit lifts its override
-    as well.
+    writing its edit lifts the override. An override at or ahead of its
+    newest release makes no row, `bun info` never runs for a caret, an
+    x-range, or a bare major, and a package `bun outdated` already lists
+    makes one row, whose edit lifts its override as well.
     """
     vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
     manifest = override(
@@ -512,7 +514,10 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
         pins     = {
             "fflate"    : "0.7.5",
             "glob"      : "^14.0.0",
+            "knip"      : "6.x",
             "minimatch" : "11.0.8",
+            "picomatch" : "4",
+            "vitepress" : "2.0.0-alpha.20",
             "vue"       : vue
         }
     )
@@ -526,6 +531,7 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             ),
             '"info fflate version"'    : printed("0.8.3"),
             '"info minimatch version"' : printed("11.0.8"),
+            '"info vitepress version"' : printed("1.6.4"),
             '"info "*" time --json"'   : printed(
                 value = {
                     "0.8.3" : "2026-05-16T00:14:03Z",
@@ -550,6 +556,28 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
         "vue"    : "9.9.9"
     }
     assert lifted["devDependencies"]["vue"] == "9.9.9"
+
+
+@mark.parametrize(
+    ("version", "exact"),
+    [
+        param("1.2.3", True, id="release"),
+        param("2.0.0-alpha.20", True, id="prerelease"),
+        param("1.2.3+build.5", True, id="build"),
+        param("14", False, id="major"),
+        param("1.2", False, id="minor"),
+        param("14.x", False, id="x-range"),
+        param("1.0.0||2.0.0", False, id="union"),
+        param("^14.0.0", False, id="caret"),
+        param(">=1", False, id="comparator")
+    ]
+)
+def test_site_reads_only_an_exact_release_as_a_pin(exact: bool, version: str):
+    """
+    Asserts that `Site.release` matches a whole release, with or without a
+    prerelease or a build, and no range Bun takes under `overrides`.
+    """
+    assert bool(fullmatch(Site.release, version)) is exact
 
 
 @mark.parametrize(

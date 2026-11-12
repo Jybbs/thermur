@@ -573,13 +573,14 @@ class Scripts(Manager):
 class Site(Manager):
     """
     Bun, reporting each package `docs/package.json` pins that `bun outdated`
-    lists, and each release `overrides` holds a package to, against the
-    release its `latest` tag names.
+    lists, and each exact release `overrides` holds a package to, against
+    the release its `latest` tag names.
     """
 
-    release: ClassVar[str] = r"\d\S*"
+    release: ClassVar[str] = r"\d+\.\d+\.\d+(?:[-+][\w.+-]+)?"
     """
-    The pattern an exact release matches, as Bun writes one.
+    The pattern an exact release matches, three dotted integers and an
+    optional prerelease or build.
     """
 
     @property
@@ -587,7 +588,7 @@ class Site(Manager):
         """
         Lists each package `bun outdated` prints a row for, then each
         package it lists no row for that `overrides` holds to an exact
-        release other than its newest, beside the advisories the lift clears
+        release behind its newest, beside the advisories the lift clears
         on it.
         """
         package = self.checkout.package
@@ -605,6 +606,7 @@ class Site(Manager):
             if name not in listed
             and fullmatch(self.release, current)
             and (newest := self.latest(name)) != current
+            and read_release(newest)          >= read_release(current)
         }
         return self.cleared(
             [

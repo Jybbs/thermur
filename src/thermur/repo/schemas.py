@@ -563,7 +563,7 @@ class Package(Document, title="docs/package.json"):
     """
     The pins `docs/package.json` declares that restate another pin or that
     another pin restates, each an exact version, as Bun installs it, and the
-    release `overrides` holds each package to.
+    specifier `overrides` gives each package.
     """
 
     coverage: str = Field(
@@ -575,8 +575,9 @@ class Package(Document, title="docs/package.json"):
 
     overrides: frozendict[str, str] = frozendict()
     """
-    The release Bun installs of each package `overrides` names, wherever the
-    site's tree reaches it, by the package's name.
+    The release or range each top-level rule of `overrides` gives the
+    package it names, by the package's name, leaving out the nested and
+    scoped rules Bun also takes.
     """
 
     types: Major = Field(validation_alias=AliasPath("devDependencies", "@types/node"))
