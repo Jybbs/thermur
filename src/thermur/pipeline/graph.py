@@ -11,6 +11,7 @@ defines.
 """
 
 from collections.abc import Callable, Mapping, Sequence, Set
+from contextlib      import closing
 from dataclasses     import dataclass
 from decimal         import Decimal
 from equinox         import Module
@@ -236,11 +237,23 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             if NetcdfWriter.applies_to(node.type)
         }
 
+    def close(self):
+        """
+        Closes the connection the cache's SQLite store holds for the calling
+        thread, which the store opens again on its next read.
+
+        Hamilton's store keeps one connection per thread and, once deleted,
+        closes only the connection of the thread deleting it. A collection
+        running on another thread therefore leaves this thread's connection
+        open until the connection is freed, which raises `ResourceWarning`.
+        """
+        self.driver.cache.metadata_store._close_connection()
+
     def compute(self, *steps: str) -> dict[str, object]:
         """
-        Computes the nodes `steps` names and whatever they read, saving
-        each table among them into the run's folder where the graph records
-        its runs.
+        Computes the nodes `steps` names and whatever they read, saving each
+        table among them into the run's folder where the graph records its
+        runs, and closes the cache's connection once the run ends.
 
         Returns:
             Each result under the name of the node that computed it.
@@ -265,8 +278,9 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             for step in steps
             if self.recorded and step in self.tables
         ]
-        self.driver.validate_materialization(*savers, **arguments)
-        _, results = self.driver.materialize(*savers, **arguments)
+        with closing(self):
+            self.driver.validate_materialization(*savers, **arguments)
+            _, results = self.driver.materialize(*savers, **arguments)
 
         return results
 

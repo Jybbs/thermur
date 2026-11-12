@@ -11,6 +11,7 @@ from collections.abc import Callable
 from common.cached   import Pitch
 from common.runs     import computed
 from common.settings import Tuned
+from contextlib      import closing
 from dataclasses     import make_dataclass
 from decimal         import Decimal
 from enum            import IntEnum, StrEnum
@@ -617,12 +618,10 @@ def test_the_cache_keeps_nothing_of_a_saver(
     graph = graphed(recorded=True)
     graph.compute("table")
     cache = graph.driver.cache
+    with closing(graph):
+        rows = cache.metadata_store.get_run(cache.last_run_id)
 
-    assert {row["node_name"] for row in cache.metadata_store.get_run(
-        cache.last_run_id
-    )} == {
-        "pipeline_digest", "table"
-    }
+    assert {row["node_name"] for row in rows} == {"pipeline_digest", "table"}
     assert not list((clone.root / ".cache/hamilton").glob("table_saved*"))
 
 
@@ -637,11 +636,12 @@ def test_the_recorder_writes_no_record_for_an_execution_it_never_opened(
     graph  = graphed(recorded=True)
     failed = partial(graph.driver.materialize, additional_vars=["tabel"])
 
-    with raises(ValueError, match="Unknown nodes"):
-        failed()
-    graph.compute("table")
-    record = graph.recorder.cache.read(graph.recorder.run_id)
-    with raises(ValueError, match="Unknown nodes"):
-        failed()
+    with closing(graph):
+        with raises(ValueError, match="Unknown nodes"):
+            failed()
+        graph.compute("table")
+        record = graph.recorder.cache.read(graph.recorder.run_id)
+        with raises(ValueError, match="Unknown nodes"):
+            failed()
 
     assert graph.recorder.cache.read(graph.recorder.run_id) == record
