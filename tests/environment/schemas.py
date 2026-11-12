@@ -517,7 +517,7 @@ def test_a_threat_s_base_state_cools_at_the_dry_adiabatic_rate():
         param(
             {"convected_k": [nan, nan, nan]},
             30.0,
-            "by no more than the nan K",
+            "holds no air the smoke has not reached",
             id = "with-no-ambient-air"
         ),
         param(
@@ -581,4 +581,4 @@ def test_the_hub_serves_the_pinned_file_under_the_pinned_digest():
 
     with redirect.value as response:
         assert response.headers["X-Linked-Etag"].strip('"') == Sample().digest
-        assert int(response.headers["X-Linked-Size"]) == 455338688
+        assert int(response.headers["X-Linked-Size"]) == 455334138

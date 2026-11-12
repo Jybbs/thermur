@@ -8,16 +8,16 @@ The dataset holds 147 simulations, each over a domain 20 km long and 10 km wide 
 
 ## The Sample
 
-The sample is `wrfout_W5F7R4`, the output of one simulation, cut to the last two minutes of its fire, nine snapshots 15 s apart from 4,680 s to 4,800 s after the simulation starts, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the model levels the default crop keeps, holding the variables the graph reads: the ground heat flux `GRNHFX`, the perturbation potential temperature `T`, the pressure `P` and `PB`, the geopotential `PH` and `PHB`, the winds `U`, `V`, and `W`, the smoke tracer `tr17_1`, and the times `XTIME`. Across the window, the area burning grows from 1.27 km² to 1.44 km² and the hottest air on the fixed heights reaches 322.0 K. In every snapshot, the air above a burning cell exceeds the median at its height by more than 23 K, whereas air the smoke has not reached, which only the ambient convection warms, exceeds it by less than 5 K.
+The sample is `wrfout_W5F7R4`, the output of one simulation, cut to its last two minutes, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the model levels the default crop keeps, holding the variables the graph reads: the ground heat flux `GRNHFX`, the perturbation potential temperature `T`, the pressure `P` and `PB`, the geopotential `PH` and `PHB`, the winds `U`, `V`, and `W`, the smoke tracer `tr17_1`, and the times `XTIME`. The table below pins the snapshots the window holds, the area of the cells whose ground heat flux shows burning in its first snapshot and its last, and the hottest air on the fixed heights. In every snapshot, the hottest air above the burning cells exceeds the median at its height by more than air the smoke has not reached, which only the ambient convection warms, exceeds it in any snapshot.
 
-`mise fetch` runs `thermur fetch sample`, which downloads the file the table names at the pinned revision of its Hugging Face dataset, checks it against the digest, moves it into `data/samples/`, and prints its path. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file compressed with zlib, and it refuses the cut where the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
+`mise fetch` runs `thermur fetch sample`, which downloads the file the table names at the pinned revision of its Hugging Face dataset, checks it against the digest, moves it into `data/samples/`, and prints its path. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file compressed with zlib, and it refuses the cut where the file is not the one `simulation` names or the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
 
 <!-- sample -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
-| `burning_m2` | `[1272000.0, 1443200.0]` |  | The area burning in the first snapshot and in the last, in square meters |
-| `digest` | `9c873030397f9d7a1507d956dde484cd113c2c71e62c20ce07c748f1d25ace51` |  | The SHA-256 digest of the file |
+| `burning_m2` | `[1272000.0, 1443200.0]` |  | The area of the cells whose ground heat flux shows burning, in the first snapshot and in the last, in square meters |
+| `digest` | `5452b4ce701588a85215987fba0532ee3b8450474316a4a4ab34c661c27dc66a` |  | The SHA-256 digest of the file |
 | `file` | `wrf_sample.nc` |  | The file the dataset publishes the sample as, under the name the fetch writes it by |
 | `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
 | `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |

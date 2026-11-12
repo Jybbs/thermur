@@ -6,6 +6,7 @@ wrf-python diagnostics share.
 
 from hashlib            import file_digest
 from importlib.metadata import version
+from math               import isnan
 from numpy              import arange, tanh, zeros
 from pathlib            import Path
 from pydantic           import BaseModel, Field, model_validator
@@ -241,13 +242,13 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
 
     burning_m2: tuple[NonNegative, NonNegative] = (1272000.0, 1443200.0)
     """
-    The area burning in the first snapshot and in the last, in square
-    meters.
+    The area of the cells whose ground heat flux shows burning, in the first
+    snapshot and in the last, in square meters.
     """
 
     digest: Annotated[str, Field(
         pattern = r"^[0-9a-f]{64}$"
-    )] = "9c873030397f9d7a1507d956dde484cd113c2c71e62c20ce07c748f1d25ace51"
+    )] = "5452b4ce701588a85215987fba0532ee3b8450474316a4a4ab34c661c27dc66a"
     """
     The SHA-256 digest of the file.
     """
@@ -355,9 +356,8 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
 
         - Its snapshots fall at `times_s`, spanning at least `duration_s`
         - A cell burns in every snapshot
-        - The air above a burning cell in every snapshot exceeds the
-          ambient profile by more than the ambient convection does in any
-          snapshot
+        - The hottest air above the burning cells in every snapshot exceeds
+          the ambient profile by more than the ambient convection does in any
         - Its burning areas and its hottest air match `burning_m2` and
           `hottest_k`, the air to a tenth of a kelvin
 
@@ -377,15 +377,18 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
 
                 "holds a snapshot in which no cell burns": 0 in burning,
 
-                f"burns {burning[0]:g} and {burning[-1]:g} m² rather than the "
-                f"pinned {self.burning_m2[0]:g} and {self.burning_m2[-1]:g} m²": (
+                f"burns {burning[0]:,.0f} and {burning[-1]:,.0f} m² rather than the "
+                f"pinned {self.burning_m2[0]:,.0f} and {self.burning_m2[-1]:,.0f} m²": (
                     burning[0],
                     burning[-1]
                 ) != self.burning_m2,
 
+                "holds no air the smoke has not reached, so no ambient convection "
+                "is measured": isnan(warmest),
+
                 "holds a snapshot whose air above the fire exceeds the ambient "
                 f"profile by no more than the {warmest:.1f} K the ambient "
-                "convection reaches": not (plume.heated_k > warmest).all(),
+                "convection reaches": (plume.heated_k <= warmest).any(),
 
                 f"reaches {hottest:g} K rather than the pinned {self.hottest_k:g} K":
                     hottest != self.hottest_k,

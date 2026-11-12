@@ -8,7 +8,7 @@ The `wrf_output` step builds the record and the `air` step reads it.
 from functools     import cached_property
 from math          import prod
 from netCDF4       import default_fillvals
-from numpy         import arange, full, inf, interp, ndarray
+from numpy         import arange, full, inf, int32, interp, ndarray
 from pathlib       import Path
 from pydantic      import BaseModel, InstanceOf
 from scipy.ndimage import distance_transform_edt
@@ -291,7 +291,7 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         placed   = dataset[list(cls.variables)].reset_coords(drop=True)
         spacings = {"south_north": placed.attrs["DY"], "west_east": placed.attrs["DX"]}
         placed   = placed.assign_coords(
-            Time = placed.XTIME * 60,
+            Time = placed.XTIME.drop_attrs() * 60,
             **{
                 **{
                     name           : (arange(placed.sizes[name]) + 0.5) * spacing,
@@ -344,9 +344,15 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         a flight lasting `settings.plan.duration_s`.
 
         Raises:
-            ValueError: Where the window misses a figure `Sample.check`
-                        holds it to.
+            ValueError: Where `path` names another output than
+                        `sample.simulation`, or the window misses a figure
+                        `Sample.check` holds it to.
         """
+        if path.name != sample.simulation:
+            raise ValueError(
+                f"`{path.name}` is not `{sample.simulation}`, the output the sample "
+                "is cut from"
+            )
         output = cls.from_path(
             path,
             crop = settings.crop.model_copy(update={"window_s": sample.window_s})
@@ -379,8 +385,9 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
     def write(self, path: Path) -> Path:
         """
         Writes the cropped output to `path` as one NetCDF-4 file through
-        netCDF4, each variable compressed with zlib and `XTIME` restored
-        from the snapshots' times, so `from_path` reads the file as it reads
+        netCDF4, each data variable compressed with zlib, `XTIME` restored
+        from the snapshots' times, and WRF's grid attributes giving the
+        sizes the crop keeps, so `from_path` reads the file as it reads
         a simulation.
 
         Returns:
@@ -389,6 +396,18 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         path.parent.mkdir(exist_ok=True, parents=True)
         written = self.dataset.drop_encoding().assign(
             XTIME = (self.dataset.Time / 60).astype("float32")
+        ).assign_attrs(
+            {
+                f"{name.upper().replace('_', '-')}_{attribute}": int32(
+                    self.dataset.sizes[dimension]
+                )
+                for name in ("bottom_top", "south_north", "west_east")
+                for attribute, dimension in (
+                    ("GRID_DIMENSION", f"{name}_stag"),
+                    ("PATCH_END_STAG", f"{name}_stag"),
+                    ("PATCH_END_UNSTAG", name)
+                )
+            }
         )
         written.to_netcdf(
             path,

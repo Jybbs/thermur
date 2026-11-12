@@ -29,8 +29,9 @@ def sample(
     crop the graph reads, checks that the window holds a developed plume
     at the figures the sample pins, and writes it as one NetCDF-4 file
     compressed with zlib, then prints the path of the file relative to the
-    clone. Exits nonzero, writing nothing, where the window misses a figure
-    it is held to, naming each one it misses.
+    clone. Exits nonzero, writing nothing, where `source` names another
+    output than the one the sample is cut from, or where the window misses a
+    figure it is held to, naming each one it misses.
     """
     root, pinned = Checkout.installed().root, Sample()
     output       = WrfOutput.from_sample(source, sample=pinned, settings=Settings())

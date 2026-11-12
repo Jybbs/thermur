@@ -42,6 +42,24 @@ def test_a_window_missing_its_figures_writes_nothing_and_prints_nothing(
     assert capsys.readouterr().out == ""
 
 
+def test_another_output_than_the_sample_s_writes_nothing_and_prints_nothing(
+    capsys      : CaptureFixture[str],
+    monkeypatch : MonkeyPatch,
+    tmp_path    : Path
+):
+    """
+    Asserts that the command refuses an output named other than the one the
+    sample is cut from, leaving no file written and nothing printed.
+    """
+    monkeypatch.setattr(Checkout, "installed", lambda: Checkout(root=tmp_path))
+
+    with raises(ValueError, match="`wrfout_W5F7R3` is not `wrfout_W5F7R4`"):
+        app(["cut", "sample", "wrfout_W5F7R3"], result_action="return_value")
+
+    assert not (tmp_path / Sample().folder).exists()
+    assert capsys.readouterr().out == ""
+
+
 def test_the_sample_is_cut_into_the_clone_and_named_relative_to_it(
     capsys      : CaptureFixture[str],
     monkeypatch : MonkeyPatch,
