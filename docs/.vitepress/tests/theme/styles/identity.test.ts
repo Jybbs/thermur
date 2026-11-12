@@ -1,8 +1,6 @@
-import fs from 'node:fs'
-
 import { describe, expect, it } from 'vitest'
 
-import { computed, declared, styled } from '../../common/sheets.ts'
+import { computed, declared, source, styled } from '../../common/sheets.ts'
 
 /**
  * A chart series' switch, turned off.
@@ -21,7 +19,7 @@ const widthOf = (part: string): number =>
   Number(declared('stroke-width', `.identity-level-${part}`, 'identity/palette.css'))
 
 describe.for(SHEETS)('%s', sheet => {
-  const text = fs.readFileSync(new URL(`../../../theme/styles/${sheet}`, import.meta.url), 'utf8')
+  const text = source(sheet)
 
   it('closes every block it opens', () => {
     expect(text.split('{').length).toBe(text.split('}').length)

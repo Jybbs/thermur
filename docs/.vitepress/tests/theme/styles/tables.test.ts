@@ -1,8 +1,11 @@
-import fs from 'node:fs'
-
 import { describe, expect, it } from 'vitest'
 
-import { computed, declared, styled } from '../../common/sheets.ts'
+import { computed, declared, source, styled } from '../../common/sheets.ts'
+
+/**
+ * The selector of the dot between two values on a card's middle line.
+ */
+const SEPARATOR = '.vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before'
 
 /**
  * Reads the value the tables' sheet declares for `property` in the rule whose
@@ -54,13 +57,11 @@ describe('a table at a phone’s width', () => {
   })
 
   it('separates two values on a line with a dot a screen reader leaves unread', () => {
-    const separator = '.vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before'
-    expect(narrow('content', separator)).toBe(`' · ' / ''`)
+    expect(narrow('content', SEPARATOR)).toBe(`' · ' / ''`)
   })
 
   it('declares the dot without alternative text first, for a browser that drops the form with it', () => {
-    const sheet = fs.readFileSync(new URL('../../../theme/styles/tables.css', import.meta.url), 'utf8')
-    expect(sheet).toMatch(/content : ' · ';\n\s*content : ' · ' \/ '';/u)
+    expect(source('tables.css')).toMatch(/content\s*:\s*' · ';\s*content\s*:\s*' · ' \/ '';/u)
   })
 })
 
@@ -72,13 +73,15 @@ describe('the box of a card’s parts at a phone’s width', () => {
     ['overflow', 'hidden', '.vp-doc thead'],
     ['white-space', 'nowrap', '.vp-doc thead'],
     ['padding', '0.625rem 0.75rem', '.vp-doc tr'],
+    ['border', '1px solid', '.vp-doc tr'],
+    ['border-color', 'var(--vp-c-divider)', '.vp-doc tr'],
     ['padding', '0px', '.vp-doc td'],
     ['border', '0px', '.vp-doc td'],
     ['margin-bottom', '0.375rem', '.vp-doc td:first-child'],
     ['margin-top', '0.25rem', '.vp-doc td:last-child'],
     ['color', 'var(--vp-c-text-2)', '.vp-doc td:last-child'],
-    ['color', 'var(--vp-c-text-3)', '.vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before']
-  ])('declares %s as %s on %s', ([property, value, selector]) => {
-    expect(narrow(property!, selector!)).toBe(value)
+    ['color', 'var(--vp-c-text-3)', SEPARATOR]
+  ] as const)('declares %s as %s on %s', ([property, value, selector]) => {
+    expect(narrow(property, selector)).toBe(value)
   })
 })
