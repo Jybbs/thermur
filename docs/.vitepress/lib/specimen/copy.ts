@@ -1,4 +1,4 @@
-import { type Ref, onBeforeUnmount, ref } from 'vue'
+import { type Ref, nextTick, onBeforeUnmount, ref } from 'vue'
 
 /**
  * What a widget copies through: the copy itself, and the words a screen reader
@@ -23,8 +23,9 @@ export const COPY_HOLD = 1400
  * `COPY_HOLD` milliseconds through `data-copied`, restarting the mark on a
  * second press, with a copied hex set as `--copied` for the confirmation to
  * draw in. Each copy writes what it copied into `said`, or that it could not
- * copy where the clipboard refuses the text, and every hold still running ends
- * as the widget unmounts.
+ * copy where the clipboard refuses the text, emptying `said` first so a screen
+ * reader hears a second copy of the same value, and every hold still running
+ * ends as the widget unmounts.
  */
 export function useCopy(): Copier {
   const said   = ref('')
@@ -32,12 +33,17 @@ export function useCopy(): Copier {
   onBeforeUnmount(() => {
     for (const timer of timers.values()) clearTimeout(timer)
   })
+  const say    = async (words: string): Promise<void> => {
+    said.value = ''
+    await nextTick()
+    said.value = words
+  }
   const copy   = async (text: string, event: Event): Promise<void> => {
     const node = event.currentTarget as HTMLElement
     try {
       await navigator.clipboard.writeText(text)
     } catch {
-      said.value = `Could not copy ${text}`
+      await say(`Could not copy ${text}`)
       return
     }
     clearTimeout(timers.get(node))
@@ -48,11 +54,11 @@ export function useCopy(): Copier {
     // its confirmation over.
     void node.offsetWidth
     node.dataset.copied = ''
-    said.value = `Copied ${text}`
     timers.set(node, window.setTimeout(() => {
       delete node.dataset.copied
       timers.delete(node)
     }, COPY_HOLD))
+    await say(`Copied ${text}`)
   }
   return { copy, said }
 }

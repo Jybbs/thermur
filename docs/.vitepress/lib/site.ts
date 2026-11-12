@@ -1,6 +1,6 @@
 import type { DefaultTheme } from 'vitepress'
 
-import { TITLE }             from './head.ts'
+import { wordmarkImage }    from './head.ts'
 import type { Identity }     from './identity.ts'
 import type { ProjectFacts } from './manifest.ts'
 import { navOf, sidebarOf }  from './navigation.ts'
@@ -24,13 +24,4 @@ export function themeConfig(facts: ProjectFacts, pages: string, identity: Identi
     siteTitle   : false,
     socialLinks : [{ icon: 'github', link: facts.repository }]
   }
-}
-
-/**
- * Names the wordmark's file in each scheme beneath the site's root, as the
- * image the default theme's logo and hero take, under the site's title.
- */
-export function wordmarkImage(identity: Identity = source): DefaultTheme.ThemeableImage {
-  const { wordmark } = identity.marks
-  return { alt: TITLE, dark: `/${wordmark.dark}`, light: `/${wordmark.light}` }
 }

@@ -87,6 +87,11 @@ describe('the flight’s panel', () => {
     expect(sketch.entryAt(second!)[0]).toBe(at)
   })
 
+  it.for(sketch.LOG.map(([at, ...words]) => [at, words.join('')] as const))(
+    'words the log line at second %i as published prose', ([, line]) => {
+      expect(line).toReadAsPublished()
+    })
+
   it('reads the hottest air where the flock meets the plume, and the widest split after it', () => {
     expect(sketch.readingsAt(96).air).toBe(440)
     expect(sketch.readingsAt(120).split).toBe(100)

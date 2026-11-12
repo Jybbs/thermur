@@ -33,19 +33,19 @@
 }
 
 .identity-switch {
-  display    : grid;
-  gap        : 0.125rem;
-  padding    : 0.25rem;
-  transition : opacity var(--th-settle) var(--th-settle-curve);
+  display : grid;
+  gap     : 0.125rem;
+  padding : 0.25rem;
 }
 
-.identity-switch[aria-checked='false'] { opacity: 0.45; }
+.identity-switch[aria-checked='false'] .identity-spark { opacity: 0.45; }
 
 .identity-switch .identity-caps { white-space: nowrap; }
 
 .identity-spark {
-  height : 1.25rem;
-  width  : 100%;
+  height     : 1.25rem;
+  transition : opacity var(--th-settle) var(--th-settle-curve);
+  width      : 100%;
 }
 
 .identity-spark path {

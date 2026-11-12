@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { mount }                                           from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h }                              from 'vue'
+import { defineComponent, h, watch }                       from 'vue'
 
 import * as copy from '../../../lib/specimen/copy.ts'
 
@@ -55,22 +55,15 @@ describe('useCopy', () => {
     expect(button.style.getPropertyValue('--copied')).toBe('')
   })
 
-  it('starts the hold over on a second press', async () => {
-    const { button } = mounted('#5069ad')
-    await press(button)
-    vi.advanceTimersByTime(copy.COPY_HOLD - 100)
-    await press(button)
-    vi.advanceTimersByTime(200)
-    expect(button.dataset.copied).toBe('')
-    vi.advanceTimersByTime(copy.COPY_HOLD)
-    expect(button.dataset.copied).toBeUndefined()
-  })
-
-  it('says a copy the clipboard refuses failed, and leaves the control unmarked', async () => {
-    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'))
+  it('starts the hold over on a second press, ending it a full hold after that press', async () => {
     const { button, copier } = mounted('#5069ad')
-    button.click()
-    await vi.waitFor(() => expect(copier.said.value).toBe('Could not copy #5069ad'))
+    const pressed            = { currentTarget: button } as unknown as Event
+    await copier.copy('#5069ad', pressed)
+    vi.advanceTimersByTime(copy.COPY_HOLD - 100)
+    await copier.copy('#5069ad', pressed)
+    vi.advanceTimersByTime(copy.COPY_HOLD - 1)
+    expect(button.dataset.copied).toBe('')
+    vi.advanceTimersByTime(1)
     expect(button.dataset.copied).toBeUndefined()
   })
 
@@ -80,5 +73,25 @@ describe('useCopy', () => {
     const cleared = vi.spyOn(globalThis, 'clearTimeout')
     unmount()
     expect(cleared).toHaveBeenCalledOnce()
+  })
+})
+
+describe('what useCopy says', () => {
+  it('empties what it says before each copy, so a second copy of one value is heard again', async () => {
+    const { button, copier } = mounted('#5069ad')
+    const pressed            = { currentTarget: button } as unknown as Event
+    const heard: string[]    = []
+    watch(copier.said, words => heard.push(words), { flush: 'sync' })
+    await copier.copy('#5069ad', pressed)
+    await copier.copy('#5069ad', pressed)
+    expect(heard).toEqual(['Copied #5069ad', '', 'Copied #5069ad'])
+  })
+
+  it('says a copy the clipboard refuses failed, and leaves the control unmarked', async () => {
+    vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValueOnce(new Error('denied'))
+    const { button, copier } = mounted('#5069ad')
+    button.click()
+    await vi.waitFor(() => expect(copier.said.value).toBe('Could not copy #5069ad'))
+    expect(button.dataset.copied).toBeUndefined()
   })
 })

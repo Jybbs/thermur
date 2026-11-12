@@ -35,12 +35,18 @@ describe('IdentityHeat', () => {
       .toBe(`${knot} m · ${Math.round(kelvin)} K · Step ${place + 1}`)
   })
 
+  it('labels its temperatures as made up', () => {
+    expect(mount(IdentityHeat).get('figcaption').text()).toBe('A sketch, its temperatures made up')
+  })
+
   it('copies the hex of the knot’s step from its chip', async () => {
     const widget = mount(IdentityHeat, { attachTo: document.body })
     const ramp   = heatRamp(source)
     const hex    = ramp[sketch.stepAt(sketch.warmthAt(sketch.PROFILE.knot), ramp.length)]!
     const chip   = widget.get('.identity-chip')
     expect(chip.get('.identity-hex').text()).toBe(hex)
+    expect(chip.get('i').attributes('style'))
+      .toBe(`background: var(--th-heat-${ramp.indexOf(hex) + 1});`)
     await chip.trigger('click')
     await vi.waitFor(async () => expect(await navigator.clipboard.readText()).toBe(hex))
     await vi.waitFor(() => expect(widget.get('[aria-live]').text()).toBe(`Copied ${hex}`))

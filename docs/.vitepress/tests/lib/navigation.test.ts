@@ -20,11 +20,11 @@ describe('sidebarOf', () => {
     repository.write('pages/data/index.md', '# Data\n')
     repository.write('pages/methods/index.md', '# Methods\n')
     repository.write('pages/methods/rules.md', 'Lead.\n\n# The Rules\n')
-    repository.write('pages/methods/alarm.md', '# An Alarm\n')
+    repository.write('pages/methods/zeta.md', '# An Alarm\n')
     expect(sidebarOf(path.join(repository.root, 'pages'), REGISTRY)).toEqual({
       '/data/'    : [{ items: [], link: '/data/', text: 'Data' }],
       '/methods/' : [{
-        items: [{ link: '/methods/alarm', text: 'An Alarm' }, { link: '/methods/rules', text: 'The Rules' }],
+        items: [{ link: '/methods/zeta', text: 'An Alarm' }, { link: '/methods/rules', text: 'The Rules' }],
         link : '/methods/',
         text : 'Methods'
       }]

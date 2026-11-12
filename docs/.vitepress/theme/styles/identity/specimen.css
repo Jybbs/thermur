@@ -77,7 +77,7 @@
 }
 
 .identity-quiet {
-  fill           : color-mix(in oklab, var(--th-ink) 55%, var(--th-ground));
+  fill           : color-mix(in oklab, var(--th-ink) 60%, var(--th-ground));
   font-weight    : 400;
   letter-spacing : 0.04em;
 }

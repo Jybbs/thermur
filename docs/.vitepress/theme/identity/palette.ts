@@ -31,7 +31,7 @@ const anchored = (second: number): string =>
 function chart(shown: readonly boolean[]): VNode {
   const { height, width } = sketch.CHART
   return h('svg', {
-    'aria-label' : 'Temperatures through a plume, one line per chart series, beneath the warning and '
+    'aria-label' : 'Temperatures through a plume, one line per chart series, against the warning and '
                  + 'critical lines',
     'class'      : 'identity-chart',
     'role'       : 'img',
@@ -143,7 +143,7 @@ function seriesCard(copied: Copying, place: number, shown: Ref<boolean[]>): VNod
 
 /**
  * The palette at work: a sketch of temperatures through a plume drawn in each
- * chart series over the warning and critical lines, a switch per series that
+ * chart series against the warning and critical lines, a switch per series that
  * draws its line on or lifts it off beside a press that copies its hex, and a
  * key per role that copies the role's hex, each hex the one of the scheme on
  * display.

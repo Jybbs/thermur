@@ -20,6 +20,15 @@ describe('the rows', () => {
     expect(rows[2]!.get('.identity-hex').text()).toBe(fontStack(source.faces.mono))
   })
 
+  it('sets each row in its own face and each weight at that weight', () => {
+    const rows = mount(IdentityFaces).findAll('.identity-face')
+    Object.values(source.faces).forEach((face, place) => {
+      expect(rows[place]!.attributes('style')).toEqual(expect.stringContaining(face.family))
+      expect(rows[place]!.findAll('.identity-weights span').map(weight => weight.attributes('style')))
+        .toEqual(face.weights.map(weight => `font-weight: ${weight};`))
+    })
+  })
+
   it('copies a face’s stack on a press', async () => {
     const widget = mount(IdentityFaces, { attachTo: document.body })
     await widget.findAll('.identity-face')[1]!.trigger('click')
@@ -82,4 +91,8 @@ describe('the panel', () => {
     widget.unmount()
     expect(stop).toHaveBeenCalledTimes(2)
   })
+})
+
+it('labels its readings as made up', () => {
+  expect(mount(IdentityFaces).get('figcaption').text()).toBe('A sketch, its readings made up')
 })

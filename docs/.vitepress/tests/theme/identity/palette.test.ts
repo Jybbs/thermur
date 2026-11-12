@@ -27,6 +27,13 @@ describe('IdentityPalette', () => {
       .toEqual(source.palette.series.map((_, place) => `Chart ${place + 1}`))
   })
 
+  it('draws each series’s line and spark in that series’s color', () => {
+    const widget  = mount(IdentityPalette)
+    const colored = source.palette.series.map((_, place) => `stroke: var(--th-series-${place + 1});`)
+    expect(widget.findAll('.identity-line').map(line => line.attributes('style'))).toEqual(colored)
+    expect(widget.findAll('.identity-spark path').map(spark => spark.attributes('style'))).toEqual(colored)
+  })
+
   it('lifts a series’s line off and draws it back on from its switch', async () => {
     const widget = mount(IdentityPalette)
     const toggle = widget.findAll('[role="switch"]')[2]!
@@ -41,6 +48,8 @@ describe('IdentityPalette', () => {
     const widget = mount(IdentityPalette)
     const keys   = widget.findAll('.identity-key')
     expect(keys.map(key => key.get('.identity-caps').text())).toEqual(roles)
+    expect(keys.map(key => key.get('i').attributes('style')))
+      .toEqual(roles.map(role => `background: var(--th-${role});`))
     const lead   = keys[roles.indexOf('lead')]!
     expect(lead.get('.identity-on-light').text()).toBe(colorOf(source.palette.lead.light))
     expect(lead.get('.identity-on-dark').text()).toBe(colorOf(source.palette.lead.dark))

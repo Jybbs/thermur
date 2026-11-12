@@ -40,9 +40,9 @@ const faceOf = (event: Event): TextKind | null =>
 
 /**
  * Lays out the row of the face `face`, naming it in its own letters beside the
- * text it sets, each weight it ships set at that weight, its italic where it
- * has one, and its stack, which a press copies. Pointing at the row or moving
- * the focus onto it holds the face in `held`.
+ * text it sets, each weight the site loads it at set at that weight, its italic
+ * where the site loads one, and its stack, which a press copies. Pointing at
+ * the row or moving the focus onto it holds the face in `held`.
  */
 function row(copy: Copier['copy'], [kind, face]: Face, held: Ref<TextKind | null>): VNode {
   const stack = fontStack(face)
@@ -114,9 +114,9 @@ function panel(
  * The faces at work: a sketch of a flight's panel, its title in the display
  * face, a log in the body face that a time scrubber moves through, and each
  * reading in the mono face, each figure settling to its new value, over a row
- * per face naming it in its own letters beside each weight and style it ships.
- * Pointing at a row or at the panel picks out that face's parts of the panel,
- * and a press on a row copies its stack.
+ * per face naming it in its own letters beside each weight and style the site
+ * loads it in. Pointing at a row or at the panel picks out that face's parts of
+ * the panel, and a press on a row copies its stack.
  */
 export default defineComponent({
   name: 'IdentityFaces',

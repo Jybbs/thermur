@@ -1,6 +1,6 @@
 # The Visual Identity
 
-*Thermur* draws its site, its charts, and its marks in one identity, whose theme is fire, weather, and the flock. The palette leads with the fire of the logo over the page's own ink, the heat ramp colors temperature alone, and the marks lay the logo's birds along a gradient that runs from the ink to the fire. The package declares the identity once in `thermur.identity`, and every table below is written from that declaration, so a value copied from here onto a slide or into a figure drawn outside the repository is the value the site and the charts read.
+*Thermur* draws its site, its charts, and its marks in one identity, whose theme is fire, weather, and the flock. The palette leads with the fire of the logo over the page's own ink, the heat ramp colors temperature and a link's fire, and the marks lay the logo's birds along a gradient that runs from the ink to the fire. The package declares the identity once in `thermur.identity`, and every table below is written from that declaration, so a value copied from here onto a slide or into a figure drawn outside the repository is the value the site and the charts read.
 
 ## The Palette
 
@@ -27,7 +27,7 @@ The table is written from `Palette` in `thermur.identity` by `mise render`.
 
 ## The Heat Ramp
 
-The heat ramp colors temperature and nothing else, from its first step, the lightest and the hottest, to its sixth, the darkest. Critical takes the ramp's fourth step, so a failed state and that step of the heat share one color.
+The heat ramp colors temperature, from its first step, the lightest and the hottest, to its last, the darkest, and lends its steps to the fire a link burns with under the pointer, on keyboard focus, and on a tap. Critical takes one step of the ramp as its color, so a failed state and that step of the heat share one color.
 
 <!-- heat -->
 

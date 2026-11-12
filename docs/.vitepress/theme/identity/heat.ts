@@ -45,9 +45,9 @@ function readout(copy: Copier['copy'], steps: readonly string[]): VNode {
 
 /**
  * The heat ramp at work: a sketch of the air's temperature over height above a
- * fire, filled in the step of the ramp each temperature takes, its knot fixed
- * at one height over a readout of the air there and a chip that copies the
- * step's hex.
+ * fire, shaded through the heat ramp from its darkest step at the cool end to
+ * its lightest at the hot end, its knot fixed at one height over a readout of
+ * the air there and a chip that copies the step's hex.
  */
 export default defineComponent({
   name: 'IdentityHeat',
@@ -58,8 +58,8 @@ export default defineComponent({
     const steps                   = heatRamp(source)
     return () => h('figure', { class: 'identity-heat' }, [
       h('svg', {
-        'aria-label' : 'The air’s temperature over height above a fire, filled in the step of the heat '
-                     + 'ramp each temperature takes',
+        'aria-label' : 'The air’s temperature over height above a fire, shaded through the heat ramp '
+                     + 'from its darkest step at the cool end to its lightest at the hot end',
         'class'      : 'identity-profile',
         'role'       : 'img',
         'viewBox'    : `0 0 ${width} ${height}`

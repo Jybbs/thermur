@@ -47,7 +47,7 @@
 }
 
 .identity-unit {
-  color : color-mix(in oklab, var(--th-ink) 55%, var(--th-ground));
+  color : color-mix(in oklab, var(--th-ink) 60%, var(--th-ground));
   font  : 400 0.7rem / 1 var(--vp-font-family-mono);
 }
 
