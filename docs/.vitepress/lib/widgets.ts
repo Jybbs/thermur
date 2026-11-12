@@ -13,10 +13,18 @@ const SHUT = '</details>\n'
  */
 const MARKERS: Readonly<Record<string, string>> = {
   '/crop'        : SHUT,
+  '/faces'       : SHUT,
+  '/heat'        : SHUT,
+  '/marks'       : SHUT,
+  '/palette'     : SHUT,
   '/threat'      : SHUT,
   'crop'         : FOLD,
+  'faces'        : `<IdentityFaces />\n${FOLD}`,
+  'heat'         : `<IdentityHeat />\n${FOLD}`,
   'kept'         : '<CropKept />\n',
+  'marks'        : `<IdentityMarks />\n${FOLD}`,
   'neighbors'    : '<RulesNeighbors />\n',
+  'palette'      : `<IdentityPalette />\n${FOLD}`,
   'polarization' : '<RulesSpacing />\n',
   'reach'        : '<RulesReach />\n',
   'threat'       : `<ThreatFront />\n${FOLD}`

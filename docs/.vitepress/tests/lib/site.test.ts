@@ -3,12 +3,13 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { publicDir }   from '../../lib/paths.ts'
-import source          from '../../lib/rendered/identity.json' with { type: 'json' }
-import { themeConfig } from '../../lib/site.ts'
-import { FACTS }       from '../common/facts.ts'
+import { navOf, sidebarOf }    from '../../lib/navigation.ts'
+import { pagesDir, publicDir } from '../../lib/paths.ts'
+import source                  from '../../lib/rendered/identity.json' with { type: 'json' }
+import { themeConfig }         from '../../lib/site.ts'
+import { FACTS }               from '../common/facts.ts'
 
-const config = themeConfig(FACTS)
+const config = themeConfig(FACTS, pagesDir(import.meta.url))
 
 describe('themeConfig', () => {
   it('sets the wordmark in place of the site’s title, a file the public folder holds per scheme', () => {
@@ -22,5 +23,13 @@ describe('themeConfig', () => {
 
   it('links the repository the manifest names', () => {
     expect(config.socialLinks).toEqual([{ icon: 'github', link: 'https://github.com/example/flock' }])
+  })
+
+  it('lists each section in the navigation bar and gives each a sidebar of its pages', () => {
+    expect(config.nav).toEqual(navOf())
+    expect(config.sidebar).toEqual(sidebarOf(pagesDir(import.meta.url)))
+    expect(config.sidebar).toHaveProperty(['/reference/', 0, 'items'], [
+      { link: '/reference/identity', text: 'The Visual Identity' }
+    ])
   })
 })

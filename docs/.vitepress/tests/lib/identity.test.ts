@@ -191,6 +191,12 @@ describe('identityCss', () => {
   })
 })
 
+describe('roles', () => {
+  it('lists every palette entry holding a color per scheme, sorted by name', () => {
+    expect(identity.roles).toEqual(['critical', 'ground', 'ink', 'lead', 'warning'])
+  })
+})
+
 describe('identityModule', () => {
   const plugin = identity.identityModule()
 

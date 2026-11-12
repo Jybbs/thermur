@@ -5,6 +5,10 @@ import theme from '../../theme/index.ts'
 
 vi.mock('vitepress/theme-without-fonts', () => ({ default: { Layout: 'Layout' } }))
 vi.mock('../../theme/crop.ts', () => ({ default: 'CropKept' }))
+vi.mock('../../theme/identity/faces.ts', () => ({ default: 'IdentityFaces' }))
+vi.mock('../../theme/identity/heat.ts', () => ({ default: 'IdentityHeat' }))
+vi.mock('../../theme/identity/marks.ts', () => ({ default: 'IdentityMarks' }))
+vi.mock('../../theme/identity/palette.ts', () => ({ default: 'IdentityPalette' }))
 vi.mock('../../theme/front/hero.ts', () => ({ default: 'FrontHero' }))
 vi.mock('../../theme/front/sky.ts', () => ({ default: 'FrontSky' }))
 vi.mock('../../theme/not-found/page.ts', () => ({ default: 'NotFoundPage' }))
@@ -24,6 +28,10 @@ describe('the theme', () => {
     theme.enhanceApp({ app: { component } } as unknown as Parameters<typeof theme.enhanceApp>[0])
     expect(component.mock.calls).toEqual([
       ['CropKept', 'CropKept'],
+      ['IdentityFaces', 'IdentityFaces'],
+      ['IdentityHeat', 'IdentityHeat'],
+      ['IdentityMarks', 'IdentityMarks'],
+      ['IdentityPalette', 'IdentityPalette'],
       ['RulesNeighbors', 'RulesNeighbors'],
       ['RulesReach', 'RulesReach'],
       ['RulesSpacing', 'RulesSpacing'],
