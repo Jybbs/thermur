@@ -37,6 +37,7 @@
   .vp-doc td:not(:first-child, :last-child) { display: inline; }
 
   .vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before {
+    content : ' · ';
     content : ' · ' / '';
     color   : var(--vp-c-text-3);
   }

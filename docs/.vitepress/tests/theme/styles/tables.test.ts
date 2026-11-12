@@ -1,3 +1,5 @@
+import fs from 'node:fs'
+
 import { describe, expect, it } from 'vitest'
 
 import { computed, declared, styled } from '../../common/sheets.ts'
@@ -54,5 +56,29 @@ describe('a table at a phone’s width', () => {
   it('separates two values on a line with a dot a screen reader leaves unread', () => {
     const separator = '.vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before'
     expect(narrow('content', separator)).toBe(`' · ' / ''`)
+  })
+
+  it('declares the dot without alternative text first, for a browser that drops the form with it', () => {
+    const sheet = fs.readFileSync(new URL('../../../theme/styles/tables.css', import.meta.url), 'utf8')
+    expect(sheet).toMatch(/content : ' · ';\n\s*content : ' · ' \/ '';/u)
+  })
+})
+
+describe('the box of a card’s parts at a phone’s width', () => {
+  it.for([
+    ['position', 'absolute', '.vp-doc thead'],
+    ['width', '1px', '.vp-doc thead'],
+    ['height', '1px', '.vp-doc thead'],
+    ['overflow', 'hidden', '.vp-doc thead'],
+    ['white-space', 'nowrap', '.vp-doc thead'],
+    ['padding', '0.625rem 0.75rem', '.vp-doc tr'],
+    ['padding', '0px', '.vp-doc td'],
+    ['border', '0px', '.vp-doc td'],
+    ['margin-bottom', '0.375rem', '.vp-doc td:first-child'],
+    ['margin-top', '0.25rem', '.vp-doc td:last-child'],
+    ['color', 'var(--vp-c-text-2)', '.vp-doc td:last-child'],
+    ['color', 'var(--vp-c-text-3)', '.vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before']
+  ])('declares %s as %s on %s', ([property, value, selector]) => {
+    expect(narrow(property!, selector!)).toBe(value)
   })
 })
