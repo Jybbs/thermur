@@ -503,22 +503,27 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     Asserts that `Site` reports each package `overrides` holds to a release
     behind the one its `latest` tag names, after the rows `bun outdated`
     prints and beside the date `bun info` gives that release, and that
-    writing its edit lifts the override. An override at or ahead of its
-    newest release makes no row, `bun info` never runs for a caret, an
-    x-range, or a bare major, and a package `bun outdated` already lists
-    makes one row, whose edit lifts its override as well.
+    writing its edit lifts the override. A prerelease of the newest release
+    lags it, while an override at or ahead of its newest release makes no
+    row, a release ahead of a newest prerelease included. `bun info` never
+    runs for a caret, an x-range, a bare major, or a union opening on a
+    release, and a package `bun outdated` already lists makes one row, whose
+    edit lifts its override as well.
     """
     vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
     manifest = override(
         checkout = checkout,
         pins     = {
-            "fflate"    : "0.7.5",
-            "glob"      : "^14.0.0",
-            "knip"      : "6.x",
-            "minimatch" : "11.0.8",
-            "picomatch" : "4",
-            "vitepress" : "2.0.0-alpha.20",
-            "vue"       : vue
+            "chokidar"   : "2.0.0",
+            "fflate"     : "0.7.5",
+            "glob"       : "^14.0.0",
+            "knip"       : "6.x",
+            "minimatch"  : "11.0.8",
+            "picomatch"  : "4",
+            "semver"     : "7.5.2 || 7.6.0",
+            "tinyglobby" : "1.0.0-rc.1",
+            "vitepress"  : "2.0.0-alpha.20",
+            "vue"        : vue
         }
     )
     answer(
@@ -529,16 +534,19 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
                 "|---------|---------|--------|--------|\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 |"
             ),
+            '"info chokidar version"'  : printed("2.0.0-beta.1"),
             '"info fflate version"'    : printed("0.8.3"),
             '"info minimatch version"' : printed("11.0.8"),
-            '"info vitepress version"' : printed("1.6.4"),
-            '"info "*" time --json"'   : printed(
+            '"info tinyglobby version"' : printed("1.0.0"),
+            '"info vitepress version"'  : printed("1.6.4"),
+            '"info "*" time --json"'    : printed(
                 value = {
                     "0.8.3" : "2026-05-16T00:14:03Z",
+                    "1.0.0" : "2026-03-02T00:00:00Z",
                     "9.9.9" : "2026-10-13T00:00:00Z"
                 }
             ),
-            '"audit --json"'           : printed({}),
+            '"audit --json"'            : printed({}),
             "*": "exit 1"
         }
     )
@@ -547,13 +555,15 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
 
     assert [(lag.pin, lag.current, lag.newest, lag.published) for lag in lags] == [
         ("vue", vue, "9.9.9", datetime(2026, 10, 13, tzinfo=UTC)),
-        ("fflate", "0.7.5", "0.8.3", datetime(2026, 5, 16, 0, 14, 3, tzinfo=UTC))
+        ("fflate", "0.7.5", "0.8.3", datetime(2026, 5, 16, 0, 14, 3, tzinfo=UTC)),
+        ("tinyglobby", "1.0.0-rc.1", "1.0.0", datetime(2026, 3, 2, tzinfo=UTC))
     ]
     lifted = loads(checkout.read(PACKAGE))
     assert lifted["overrides"] == {
         **manifest["overrides"],
-        "fflate" : "0.8.3",
-        "vue"    : "9.9.9"
+        "fflate"     : "0.8.3",
+        "tinyglobby" : "1.0.0",
+        "vue"        : "9.9.9"
     }
     assert lifted["devDependencies"]["vue"] == "9.9.9"
 

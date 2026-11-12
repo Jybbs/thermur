@@ -26,6 +26,7 @@ from thermur.repo.schemas  import (
     Tree,
     read_minor,
     read_pin,
+    read_precedence,
     read_release
 )
 
@@ -605,8 +606,8 @@ class Site(Manager):
             for name, current in package.overrides.items()
             if name not in listed
             and fullmatch(self.release, current)
-            and (newest := self.latest(name)) != current
-            and read_release(newest)          >= read_release(current)
+            and read_precedence(newest := self.latest(name))
+            > read_precedence(current)
         }
         return self.cleared(
             [

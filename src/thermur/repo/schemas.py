@@ -575,9 +575,9 @@ class Package(Document, title="docs/package.json"):
 
     overrides: frozendict[str, str] = frozendict()
     """
-    The release or range each top-level rule of `overrides` gives the
-    package it names, by the package's name, leaving out the nested and
-    scoped rules Bun also takes.
+    The release or range each rule of `overrides` gives, by the key naming
+    its package, so a nested rule fails validation and a scoped key such as
+    `a>b` reads in whole as a name.
     """
 
     types: Major = Field(validation_alias=AliasPath("devDependencies", "@types/node"))
@@ -2114,6 +2114,28 @@ def read_pin(requirement: Requirement) -> str | None:
             return version
 
     return None
+
+
+def read_precedence(
+    version: str
+) -> tuple[tuple[int, ...], bool, tuple[tuple[bool, int, str], ...]]:
+    """
+    Reads the order Semantic Versioning 2.0.0 ranks the release `version`
+    in, its dotted integers first and its build ignored, where a release
+    ranks above each of its prereleases, which rank by their dot-separated
+    identifiers, a numeric one by its value and below every alphanumeric
+    one, so `2.0.0-alpha.3` ranks below `2.0.0-alpha.20` and both below
+    `2.0.0`.
+    """
+    release, _, prerelease = version.partition("+")[0].partition("-")
+    return (
+        read_release(release),
+        not prerelease,
+        tuple(
+            (not part.isdigit(), int(part) if part.isdigit() else 0, part)
+            for part in (prerelease.split(".") if prerelease else ())
+        )
+    )
 
 
 def read_release(version: str) -> tuple[int, ...]:

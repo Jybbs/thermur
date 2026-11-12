@@ -55,7 +55,8 @@ from thermur.repo.schemas import (
     Tree,
     Trigger,
     Workflow,
-    read_pin
+    read_pin,
+    read_precedence
 )
 
 ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
@@ -855,6 +856,14 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
+def test_a_release_ranks_level_with_itself_under_another_build():
+    """
+    Asserts that two builds of one release rank level, since precedence
+    ignores the build.
+    """
+    assert read_precedence("1.2.3+build.1") == read_precedence("1.2.3+build.2")
+
+
 def test_a_required_check_naming_no_app_sends_no_app():
     """
     Asserts that a required check naming no `integration_id` is sent without
@@ -891,29 +900,6 @@ def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
     ).jobs["a"].steps[0]
 
     assert step.env == {"RETRIES": 3}
-
-
-def test_a_toggle_turns_its_endpoint_on_or_off():
-    """
-    Asserts that each toggle reads as the endpoint it names, which `PUT`
-    turns on and `DELETE` turns off, in the order the record declares its
-    fields whatever order the table lists them in.
-    """
-    toggles = Toggles.model_validate(
-        {
-            "automated-security-fixes"        : False,
-            "immutable-releases"              : True,
-            "private-vulnerability-reporting" : True,
-            "vulnerability-alerts"            : False
-        }
-    )
-
-    assert [(call.method, call.endpoint) for call in toggles.requests] == [
-        ("DELETE", "automated-security-fixes"),
-        ("PUT", "immutable-releases"),
-        ("PUT", "private-vulnerability-reporting"),
-        ("DELETE", "vulnerability-alerts")
-    ]
 
 
 @mark.parametrize(
@@ -1036,17 +1022,27 @@ def test_a_request_sends_its_body_on_standard_input(
     assert (call.command, call.payload) == (command, payload)
 
 
-def test_a_toml_task_declares_no_requirements(tmp_path: Path):
+def test_a_toggle_turns_its_endpoint_on_or_off():
     """
-    Asserts that a task declared in TOML, which holds no file of its own,
-    declares no requirements.
+    Asserts that each toggle reads as the endpoint it names, which `PUT`
+    turns on and `DELETE` turns off, in the order the record declares its
+    fields whatever order the table lists them in.
     """
-    assert Task(
-        file   = None,
-        name   = "t",
-        run    = (),
-        source = tmp_path
-    ).dependencies == []
+    toggles = Toggles.model_validate(
+        {
+            "automated-security-fixes"        : False,
+            "immutable-releases"              : True,
+            "private-vulnerability-reporting" : True,
+            "vulnerability-alerts"            : False
+        }
+    )
+
+    assert [(call.method, call.endpoint) for call in toggles.requests] == [
+        ("DELETE", "automated-security-fixes"),
+        ("PUT", "immutable-releases"),
+        ("PUT", "private-vulnerability-reporting"),
+        ("DELETE", "vulnerability-alerts")
+    ]
 
 
 @mark.parametrize(
@@ -1095,43 +1091,17 @@ def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
     )
 
 
-def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
+def test_a_toml_task_declares_no_requirements(tmp_path: Path):
     """
-    Asserts that a tree keeps each package it resolves under its normalized
-    name, leaving out the script it is rooted at, and that each reads its
-    earliest upload across its source distribution and wheels, or none.
+    Asserts that a task declared in TOML, which holds no file of its own,
+    declares no requirements.
     """
-    tree = Tree.model_validate(
-        {
-            "resolution": {
-                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
-                "pydantic-core" : {
-                    "kind"    : "package",
-                    "name"    : "pydantic_core",
-                    "version" : "2.50.1",
-                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
-                    "wheels"  : [
-                        {"upload_time": "2026-10-11T18:33:07.153Z"},
-                        {"upload_time": None}
-                    ]
-                },
-                "script"        : {"kind": "script"}
-            }
-        }
-    )
-
-    assert sorted(tree.packages) == ["bare", "pydantic-core"]
-    assert tree.package("Pydantic.Core").uploaded == datetime(
-        2026,
-        10,
-        11,
-        18,
-        33,
-        7,
-        153000,
-        tzinfo = UTC
-    )
-    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
+    assert Task(
+        file   = None,
+        name   = "t",
+        run    = (),
+        source = tmp_path
+    ).dependencies == []
 
 
 @mark.parametrize(
@@ -1174,14 +1144,43 @@ def test_a_document_holding_mappings_hashes_alike_across_reads(
     assert hash(kind.read(root, path)) == hash(kind.read(root, path))
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that a tree keeps each package it resolves under its normalized
+    name, leaving out the script it is rooted at, and that each reads its
+    earliest upload across its source distribution and wheels, or none.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+    tree = Tree.model_validate(
+        {
+            "resolution": {
+                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
+                "pydantic-core" : {
+                    "kind"    : "package",
+                    "name"    : "pydantic_core",
+                    "version" : "2.50.1",
+                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
+                    "wheels"  : [
+                        {"upload_time": "2026-10-11T18:33:07.153Z"},
+                        {"upload_time": None}
+                    ]
+                },
+                "script"        : {"kind": "script"}
+            }
+        }
+    )
 
-    assert finding.annotation == "::warning file=a.toml::m"
+    assert sorted(tree.packages) == ["bare", "pydantic-core"]
+    assert tree.package("Pydantic.Core").uploaded == datetime(
+        2026,
+        10,
+        11,
+        18,
+        33,
+        7,
+        153000,
+        tzinfo = UTC
+    )
+    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize("table", list(GithubSettings.model_fields))
@@ -1252,6 +1251,37 @@ def test_a_requirement_pins_a_release_only_through_one_exact_specifier(
     it names a range or nothing at all.
     """
     assert read_pin(Requirement(requirement)) == pin
+
+
+@mark.parametrize(
+    ("lower", "higher"),
+    [
+        param("1.9.9", "1.10.0", id="release"),
+        param("2.0.0-beta.1", "2.0.0", id="prerelease-below-release"),
+        param("2.0.0-alpha.3", "2.0.0-alpha.20", id="numeric-identifier"),
+        param("2.0.0-alpha.20", "2.0.0-beta", id="alphanumeric-identifier"),
+        param("1.0.0-9", "1.0.0-rc", id="numeric-below-alphanumeric"),
+        param("1.0.0-alpha", "1.0.0-alpha.1", id="fewer-identifiers"),
+        param("1.0.0-rc.1+build.9", "1.0.0", id="build-ignored")
+    ]
+)
+def test_a_release_ranks_by_its_semantic_version_precedence(higher: str, lower: str):
+    """
+    Asserts that a release ranks by its dotted integers, then above each of
+    its prereleases, which rank by their identifiers as Semantic Versioning
+    2.0.0 orders them.
+    """
+    assert read_precedence(lower) < read_precedence(higher)
+
+
+def test_a_warning_prints_as_a_warning_annotation():
+    """
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
+    """
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+
+    assert finding.annotation == "::warning file=a.toml::m"
 
 
 @mark.parametrize(
