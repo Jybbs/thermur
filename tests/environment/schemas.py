@@ -58,7 +58,7 @@ def measured(**figures: list[float]) -> Dataset:
     """
     plume = {
         "Time"        : [15.0, 30.0, 45.0],
-        "burning_m2"  : [100.0, 200.0, 300.0],
+        "burning_m2"  : [100.0, 200.0, 3000.0],
         "convected_k" : [1.0, 2.0, 1.5],
         "heated_k"    : [5.0, 6.0, 7.0],
         "hottest_k"   : [310.0, 312.04, 311.0]
@@ -74,7 +74,7 @@ def pinned() -> Sample:
     Builds the sample pinning the figures `measured` lays out by default.
     """
     return Sample(
-        burning_m2 = (100.0, 300.0),
+        burning_m2 = (100.0, 3000.0),
         hottest_k  = 312.0,
         times_s    = (15.0, 30.0, 45.0)
     )
@@ -359,8 +359,8 @@ def test_a_sample_refuses_a_window_naming_every_figure_it_misses():
     Asserts that a window missing several figures is refused once, naming
     each of them.
     """
-    with raises(ValueError, match="no cell burns, and burns 0 and 300 m²"):
-        pinned().check(measured(burning_m2=[0.0, 200.0, 300.0]), duration_s=30.0)
+    with raises(ValueError, match="no cell burns, and burns 0 and 3,000 m²"):
+        pinned().check(measured(burning_m2=[0.0, 200.0, 3000.0]), duration_s=30.0)
 
 
 def test_a_sample_requests_its_file_naming_the_package_alone():
@@ -497,7 +497,7 @@ def test_a_threat_s_base_state_cools_at_the_dry_adiabatic_rate():
             id = "too-short"
         ),
         param(
-            {"burning_m2": [100.0, 0.0, 300.0]},
+            {"burning_m2": [100.0, 0.0, 3000.0]},
             30.0,
             "holds a snapshot in which no cell burns",
             id = "burning-out"
@@ -505,7 +505,7 @@ def test_a_threat_s_base_state_cools_at_the_dry_adiabatic_rate():
         param(
             {"burning_m2": [100.0, 200.0, 4000.0]},
             30.0,
-            "burns 100 and 4,000 m² rather than the pinned 100 and 300 m²",
+            "burns 100 and 4,000 m² rather than the pinned 100 and 3,000 m²",
             id = "burning-another-area"
         ),
         param(
