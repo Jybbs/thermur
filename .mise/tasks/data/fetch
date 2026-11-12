@@ -1,5 +1,5 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "fetch"
-#MISE description = "Fetch the WRF-SFIRE sample into `data/` at the pinned revision and digest"
+#MISE description = "Fetch the WRF-SFIRE sample into `data/` at the pinned digest"
 
 thermur fetch sample

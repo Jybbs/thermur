@@ -20,8 +20,8 @@ from pydantic           import ValidationError
 from pytest             import MonkeyPatch, mark, param, raises
 from tempfile           import NamedTemporaryFile
 from unittest.mock      import Mock
-from urllib.error       import HTTPError, URLError
-from urllib.request     import HTTPRedirectHandler, Request, build_opener
+from urllib.error       import URLError
+from urllib.request     import Request, urlopen
 from xarray             import Dataset
 
 from thermur.environment.schemas import (
@@ -36,18 +36,6 @@ from thermur.environment.schemas import (
     Sample
 )
 from thermur.repo.checkout import Checkout
-
-
-class Unfollowed(HTTPRedirectHandler):
-    """
-    The redirect handler that follows no redirect, so a request answered
-    with one raises `HTTPError` carrying the redirect's own headers.
-    """
-
-    def redirect_request(self, *_: object):
-        """
-        Declines every redirect.
-        """
 
 
 def measured(**figures: list[float]) -> Dataset:
@@ -80,15 +68,16 @@ def pinned() -> Sample:
     )
 
 
-def served(data: bytes, folder: Path) -> Sample:
+def served(data: bytes, folder: Path, *, digest: str | None = None) -> Sample:
     """
     Writes `data` where the sample's address points once `folder` stands in
-    for the Hub.
+    for the bucket.
 
     Returns:
-        The sample pinning the digest of `data`, with `folder` as its Hub.
+        The sample pinning `digest`, or the digest of `data` where none is
+        given, with `folder` as its host.
     """
-    sample = Sample(digest=sha256(data).hexdigest(), hub=folder.as_uri())
+    sample = Sample(digest=digest or sha256(data).hexdigest(), host=folder.as_uri())
     (path := Path.from_uri(sample.address)).parent.mkdir(parents=True)
     path.write_bytes(data)
     return sample
@@ -117,7 +106,7 @@ def test_a_fetch_downloads_into_a_temporary_file_beside_its_target(
     spy = Mock(wraps=NamedTemporaryFile)
     monkeypatch.setattr("thermur.environment.schemas.NamedTemporaryFile", spy)
 
-    served(b"CDF", tmp_path / "hub").fetch(tmp_path / "clone")
+    served(b"CDF", tmp_path / "bucket").fetch(tmp_path / "clone")
 
     spy.assert_called_once_with(dir=tmp_path / "clone/data/samples")
 
@@ -128,7 +117,7 @@ def test_a_fetch_moves_a_file_matching_its_digest_into_place(tmp_path: Path):
     under the clone, leaves nothing else in its folder, and returns that
     path.
     """
-    fetched = served(b"CDF", tmp_path / "hub").fetch(tmp_path / "clone")
+    fetched = served(b"CDF", tmp_path / "bucket").fetch(tmp_path / "clone")
 
     assert fetched == tmp_path / "clone/data/samples/wrf_sample.nc"
     assert fetched.read_bytes() == b"CDF"
@@ -140,10 +129,10 @@ def test_a_fetch_moves_nothing_from_a_file_with_another_digest(tmp_path: Path):
     Asserts that a fetch whose file hashes to another digest than the pinned
     one raises naming both, leaving the folder empty.
     """
-    sample = served(b"CDF", tmp_path / "hub")
+    sample = served(b"CDF", tmp_path / "bucket", digest="0" * 64)
 
-    with raises(ValueError, match=f"hashes to `{sample.digest}`"):
-        sample.model_copy(update={"digest": "0" * 64}).fetch(tmp_path / "clone")
+    with raises(ValueError, match=f"hashes to `{sha256(b'CDF').hexdigest()}`"):
+        sample.fetch(tmp_path / "clone")
 
     assert list((tmp_path / "clone/data/samples").iterdir()) == []
 
@@ -182,7 +171,7 @@ def test_a_fetch_whose_download_fails_moves_nothing(tmp_path: Path):
     raised, leaving the folder empty.
     """
     with raises(URLError):
-        Sample(hub=(tmp_path / "hub").as_uri()).fetch(tmp_path / "clone")
+        Sample(host=(tmp_path / "bucket").as_uri()).fetch(tmp_path / "clone")
 
     assert list((tmp_path / "clone/data/samples").iterdir()) == []
 
@@ -266,17 +255,33 @@ def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():
     assert grid.zeros("west_east_stag", "Time").shape == (5, 5)
 
 
-def test_a_sample_addresses_its_file_at_its_revision():
+@mark.parametrize(
+    ("sample", "address"),
+    [
+        param(
+            Sample(),
+            "https://data.thermur.fyi/samples/"
+            "e046eeddac6576bea4922804fe36a15c585762e19b0681c76898a95e63521946/"
+            "wrf_sample.nc",
+            id = "the-pinned-sample"
+        ),
+        param(
+            Sample(digest="a" * 64, host="https://bucket.test"),
+            f"https://bucket.test/samples/{'a' * 64}/wrf_sample.nc",
+            id = "another-digest-on-another-host"
+        )
+    ]
+)
+def test_a_sample_addresses_its_file_under_a_key_carrying_its_digest(
+    address : str,
+    sample  : Sample
+):
     """
-    Asserts that the sample's address names the Hub, the dataset, the pinned
-    revision, and the file, in the form the Hub resolves a file of a dataset
-    at a commit.
+    Asserts that the sample's address names its host and then the key the
+    file is published under, `samples/`, the digest, and the file, so each
+    digest takes an address of its own.
     """
-    sample = Sample(hub="https://hub.test", repository="owner/data", revision="a" * 40)
-
-    assert sample.address == (
-        f"https://hub.test/datasets/owner/data/resolve/{'a' * 40}/wrf_sample.nc"
-    )
+    assert sample.address == address
 
 
 @mark.parametrize(
@@ -379,16 +384,13 @@ def test_a_sample_requests_its_file_naming_the_package_alone():
     "field",
     [
         param({"digest": "6f97"}, id="a-short-digest"),
-        param(
-            {"revision": "E7D4FC2CA1F99E82DFEEC3CA2F7BA1C714965913"},
-            id = "an-uppercase-revision"
-        )
+        param({"digest": "E" * 64}, id="an-uppercase-digest")
     ]
 )
 def test_a_sample_refuses_a_pin_outside_its_form(field: dict[str, str]):
     """
-    Asserts that a digest other than 64 lowercase hexadecimal digits, or a
-    revision other than 40, is refused.
+    Asserts that a digest other than 64 lowercase hexadecimal digits is
+    refused.
     """
     with raises(ValidationError):
         Sample(**field)
@@ -409,7 +411,7 @@ def test_a_second_fetch_replaces_the_file_afresh(tmp_path: Path):
     Asserts that fetching again over an earlier fetch replaces the file, so
     a file edited since reads as the dataset publishes it.
     """
-    sample = served(b"CDF", tmp_path / "hub")
+    sample = served(b"CDF", tmp_path / "bucket")
     sample.fetch(tmp_path / "clone").write_bytes(b"edited")
 
     assert sample.fetch(tmp_path / "clone").read_bytes() == b"CDF"
@@ -563,22 +565,15 @@ def test_a_threat_warms_and_burns_behind_its_front_alone():
 
 
 @mark.network
-@mark.skipif(
-    Sample().revision == "0" * 40,
-    reason = "`Sample.revision` names no commit until the file is published"
-)
-def test_the_hub_serves_the_pinned_file_under_the_pinned_digest():
+def test_the_bucket_serves_the_pinned_file_at_its_address():
     """
-    Asserts that the Hub answers the request for the file with a redirect
-    naming the pinned digest as the file's linked ETag and its linked size,
-    read from the redirect's headers rather than from the file.
+    Asserts that the bucket answers the request for the file at the sample's
+    address with the file's pinned size, read from the response's headers
+    rather than from the file, whose digest the fetch checks.
     """
     request        = Sample().request
     request.method = "HEAD"
 
-    with raises(HTTPError) as redirect:
-        build_opener(Unfollowed).open(request)
-
-    with redirect.value as response:
-        assert response.headers["X-Linked-Etag"].strip('"') == Sample().digest
-        assert int(response.headers["X-Linked-Size"]) == 455334207
+    with urlopen(request, timeout=Sample().timeout_s) as response:
+        assert response.status == 200
+        assert int(response.headers["Content-Length"]) == 455334207

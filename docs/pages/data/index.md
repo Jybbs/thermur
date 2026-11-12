@@ -8,9 +8,23 @@ The dataset holds 147 simulations, each over a domain 20 km long and 10 km wide 
 
 ## The Sample
 
-The sample is `wrfout_W5F7R4`, the output of one simulation, cut to its last two minutes, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the model levels the default crop keeps, holding the variables the graph reads: the ground heat flux `GRNHFX`, the perturbation potential temperature `T`, the pressure `P` and `PB`, the geopotential `PH` and `PHB`, the winds `U`, `V`, and `W`, the smoke tracer `tr17_1`, and the times `XTIME`. The table below pins the snapshots the window holds, the area of the cells whose ground heat flux shows burning in its first snapshot and its last, and the hottest air on the fixed heights. In every snapshot, the hottest air above the burning cells exceeds the median at its height by more than air the smoke has not reached, which only the ambient convection warms, exceeds it in any snapshot.
+The sample is `wrfout_W5F7R4`, the output of one simulation 3,000 m deep whose fire burns for 20 minutes after an hour of spin-up, cut to its last two minutes, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the model levels the default crop keeps, holding the variables the graph reads:
 
-`mise fetch` runs `thermur fetch sample`, which downloads the file the table names at the pinned revision of its Hugging Face dataset, checks it against the digest, moves it into `data/samples/`, and prints its path. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file compressed with zlib, and it refuses the cut where the file is not the one `simulation` names or the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
+| **Variable** | **Holds** |
+|---|---|
+| `GRNHFX` | *The ground heat flux the fire releases, in W/m²* |
+| `T` | *The perturbation potential temperature, in kelvin, over a base of 300 K* |
+| `P`, `PB` | *The perturbation pressure and the base-state pressure, in pascals* |
+| `PH`, `PHB` | *The perturbation geopotential and the base-state geopotential on the staggered levels, in m²/s²* |
+| `U`, `V`, `W` | *The winds along each axis on the faces of each cell, in m/s* |
+| `tr17_1` | *The smoke tracer the fire emits* |
+| `XTIME` | *The time of each snapshot, in minutes since the simulation started* |
+| `Time` | *The time of each snapshot, in seconds since the simulation started* |
+| `south_north`, `west_east`, `south_north_stag`, `west_east_stag` | *The position of each cell's center and of each face along each axis, in meters from the domain's southwest corner* |
+
+The table below pins the snapshots the window holds, the area of the cells whose ground heat flux shows burning in its first snapshot and its last, and the hottest air on the fixed heights. In every snapshot, the hottest air above the burning cells exceeds the median at its height by more than any air the smoke has not reached exceeds it in any snapshot, since only the ambient convection warms that air.
+
+`mise fetch` runs `thermur fetch sample`, which downloads the file the table names from `host`, under a key carrying its digest, checks it against that digest, moves it into `data/samples/`, and prints its path. A later cut takes a key and an address of its own rather than replacing this one. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file, each data variable compressed with zlib, and it refuses the cut where the file is not the one `simulation` names or the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
 
 <!-- sample -->
 
@@ -18,13 +32,11 @@ The sample is `wrfout_W5F7R4`, the output of one simulation, cut to its last two
 |---|---|---|---|
 | `burning_m2` | `[1272000.0, 1443200.0]` |  | The area of the cells whose ground heat flux shows burning, in the first snapshot and in the last, in square meters |
 | `digest` | `e046eeddac6576bea4922804fe36a15c585762e19b0681c76898a95e63521946` |  | The SHA-256 digest of the file |
-| `file` | `wrf_sample.nc` |  | The file the dataset publishes the sample as, under the name the fetch writes it by |
+| `file` | `wrf_sample.nc` |  | The file the bucket serves the sample as, under the name the fetch writes it by |
 | `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
+| `host` | `https://data.thermur.fyi` |  | The address of the public Cloudflare R2 bucket serving the file, on its custom domain |
 | `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |
-| `hub` | `https://huggingface.co` |  | The address of the Hugging Face Hub publishing the dataset |
 | `length_m` | `20000.0` | above 0 | The length of the domain the output covers from west to east, in meters |
-| `repository` | `Jybbs/sfire-samples` |  | The Hugging Face dataset publishing the file |
-| `revision` | `0000000000000000000000000000000000000000` |  | The commit of the dataset the file is read at |
 | `simulation` | `wrfout_W5F7R4` |  | The output of the plume dataset the sample is cut from |
 | `timeout_s` | `60.0` | above 0 | The longest the download waits on the connection or on one read, in seconds |
 | `times_s` | `[4680.0, 4695.0, 4710.0, 4725.0, 4740.0, 4755.0, 4770.0, 4785.0, 4800.0]` |  | The time of each snapshot the output holds, in seconds since the simulation started |

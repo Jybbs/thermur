@@ -236,8 +236,8 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     """
     The WRF-SFIRE sample the `thermur fetch sample` command downloads and
     the `thermur cut sample` command writes, one window of one simulation's
-    output pinned to one revision of the Hugging Face dataset publishing it
-    and to its SHA-256 digest, beside the figures the window measures.
+    output pinned to its SHA-256 digest, which keys the file in the bucket
+    serving it, beside the figures the window measures.
     """
 
     burning_m2: tuple[NonNegative, NonNegative] = (1272000.0, 1443200.0)
@@ -255,7 +255,7 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
 
     file: Path = Path("wrf_sample.nc")
     """
-    The file the dataset publishes the sample as, under the name the fetch
+    The file the bucket serves the sample as, under the name the fetch
     writes it by.
     """
 
@@ -264,29 +264,20 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The folder the fetch writes the file into, relative to the clone.
     """
 
+    host: str = "https://data.thermur.fyi"
+    """
+    The address of the public Cloudflare R2 bucket serving the file, on its
+    custom domain.
+    """
+
     hottest_k: Positive = 322.0
     """
     The hottest air on the fixed heights in any snapshot, in kelvin.
     """
 
-    hub: str = "https://huggingface.co"
-    """
-    The address of the Hugging Face Hub publishing the dataset.
-    """
-
     length_m: Positive = 20000.0
     """
     The length of the domain the output covers from west to east, in meters.
-    """
-
-    repository: str = "Jybbs/sfire-samples"
-    """
-    The Hugging Face dataset publishing the file.
-    """
-
-    revision: Annotated[str, Field(pattern=r"^[0-9a-f]{40}$")] = "0" * 40
-    """
-    The commit of the dataset the file is read at.
     """
 
     simulation: str = "wrfout_W5F7R4"
@@ -312,14 +303,10 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     @property
     def address(self) -> str:
         """
-        Composes the address the file downloads from at `revision`.
+        Composes the address the file downloads from, keyed under `host` by
+        `digest`, so each cut of the sample takes an address of its own.
         """
-        return "/".join(
-            [
-                self.hub, "datasets", self.repository, "resolve", self.revision,
-                self.file.as_posix()
-            ]
-        )
+        return f"{self.host}/samples/{self.digest}/{self.file.as_posix()}"
 
     @property
     def path(self) -> Path:
