@@ -21,7 +21,11 @@ export interface Section {
  * The sections of the site in the alphabetical order a registry keeps, each
  * one's place in the list numbering it from one.
  */
-export const SECTIONS = [] as const satisfies readonly Section[]
+export const SECTIONS = [
+  { name: 'data', question: 'Where the plume simulations come from and how to fetch them.' },
+  { name: 'methods', question: 'How each drone reads its neighbors and the air around it.' },
+  { name: 'reference', question: 'What each color, face, and mark of the identity holds.' }
+] as const satisfies readonly Section[]
 
 /**
  * Labels a section by its folder's name with the first letter capitalized, the

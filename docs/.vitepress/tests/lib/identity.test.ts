@@ -1,13 +1,10 @@
-import { interpolate, wcagContrast } from 'culori'
-import { describe, expect, it }      from 'vitest'
+import { wcagContrast }          from 'culori'
+import { describe, expect, it } from 'vitest'
 
-import * as identity from '../../lib/identity.ts'
-import source        from '../../lib/rendered/identity.json' with { type: 'json' }
+import * as identity             from '../../lib/identity.ts'
+import source                    from '../../lib/rendered/identity.json' with { type: 'json' }
+import { FLOORS, laid, painted } from '../common/contrast.ts'
 
-/**
- * The contrast WCAG 2.2 sets for text and for a mark that carries meaning.
- */
-const FLOORS = { mark: 3, text: 4.5 } as const
 /**
  * The two schemes every contrast holds under.
  */
@@ -36,20 +33,6 @@ const ofKind = <T extends { kind: string }>(record: Record<string, T>, kind: str
  * Lists each custom property the theme mixes of `kind`, by its name.
  */
 const kinded = (kind: string): [string, identity.Mix][] => ofKind(identity.MIXES, kind)
-
-/**
- * Reads the color `top` paints at `share` over `under`, as `color-mix` in sRGB
- * lays it.
- */
-const laid = (under: string, top: string, share: number): string =>
-  interpolate([under, top], 'rgb')(share) as unknown as string
-
-/**
- * Reads the color `mix` paints under `scheme`, its role laid over the role
- * beneath it at its share.
- */
-const painted = ({ over = 'ground', role, share }: identity.Mix, scheme: identity.Scheme): string =>
-  laid(identity.shadeOf(over, scheme), identity.shadeOf(role, scheme), share)
 
 /**
  * Reads the color `heat` paints under `scheme`, its step of the heat ramp laid
@@ -188,6 +171,12 @@ describe('identityCss', () => {
     const declared = new Set(Object.values(source.palette.colors))
     const written  = [...identity.identityCss().matchAll(/#[\da-f]{6}/gu)].map(([hex]) => hex)
     expect(written.filter(hex => !declared.has(hex))).toEqual([])
+  })
+})
+
+describe('roles', () => {
+  it('lists every palette entry holding a color per scheme, sorted by name', () => {
+    expect(identity.roles).toEqual(['critical', 'ground', 'ink', 'lead', 'warning'])
   })
 })
 

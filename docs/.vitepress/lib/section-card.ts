@@ -76,7 +76,7 @@ function plumeHeat(x: number, y: number): number {
  * Measures how far the plume raises a band's edge at a point, up to 18 pixels
  * at the plume's center and less toward its sides and its foot.
  */
-function plumeLift(x: number, y: number): number {
+function plumeRise(x: number, y: number): number {
   const rise   = SKY.horizon - y
   const spread = 34 + 0.25 * rise
   const fade   = 0.25 + 0.75 * Math.sin(Math.PI * Math.min(1, rise / SKY.horizon + 0.1))
@@ -85,7 +85,7 @@ function plumeLift(x: number, y: number): number {
 
 /**
  * Draws the sky of the section at `section.place` as an SVG's markup: its bands
- * lifting over the plume, the fire's glow and its line on the ridge, and the
+ * rising over the plume, the fire's glow and its line on the ridge, and the
  * flock crossing low as a silhouette, parted where the plume rises.
  */
 function sky({ glyphs, identity, section }: SectionCard): string {
@@ -114,7 +114,7 @@ function sky({ glyphs, identity, section }: SectionCard): string {
   return [
     `<defs>${scene.glyphDefs(glyphs)}${glow}</defs>`,
     `<rect width="${width}" height="${height}" fill="${NIGHT.sky}"/>`,
-    scene.skyBands({ edges: skyEdges(), lift: plumeLift, tones: skyTones(identity, section.place), width }),
+    scene.skyBands({ edges: skyEdges(), rise: plumeRise, tones: skyTones(identity, section.place), width }),
     `<ellipse cx="${fire}" cy="${rim(fire)}" rx="120" ry="40" fill="${heat[1]}" fill-opacity="0.55" `
   + 'filter="url(#glow)"/>',
     `<path d="${scene.trace(width, ridge)}L${width} ${height}L0 ${height}Z" fill="${NIGHT.ridge}"/>`,

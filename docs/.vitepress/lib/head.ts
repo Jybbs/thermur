@@ -1,4 +1,4 @@
-import type { HeadConfig, TransformContext } from 'vitepress'
+import type { DefaultTheme, HeadConfig, TransformContext } from 'vitepress'
 
 import type { Card, Cards }  from './cards.ts'
 import { type Identity, type Scheme, fontsHref, shadeOf } from './identity.ts'
@@ -233,4 +233,13 @@ export function siteHead(base: string, identity: Identity = source): HeadConfig[
       name    : 'theme-color'
     }])
   ]
+}
+
+/**
+ * Names the wordmark's file in each scheme beneath the site's root, as the
+ * image the default theme's logo and hero take, under the site's title.
+ */
+export function wordmarkImage(identity: Identity = source): DefaultTheme.ThemeableImage {
+  const { wordmark } = identity.marks
+  return { alt: TITLE, dark: `/${wordmark.dark}`, light: `/${wordmark.light}` }
 }

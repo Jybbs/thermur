@@ -23,7 +23,7 @@ export default defineConfig({
   markdown          : { config: md => void md.use(mathRules).use(widgetRules) },
   sitemap           : { hostname: facts.homepage },
   srcDir            : paths.pagesDir(import.meta.url),
-  themeConfig       : themeConfig(facts),
+  themeConfig       : themeConfig(facts, paths.pagesDir(import.meta.url)),
   title             : head.TITLE,
   transformHead     : context => previews.head(context),
   transformPageData : page => pageData(page, facts.repository),

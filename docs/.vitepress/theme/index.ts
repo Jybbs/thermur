@@ -24,6 +24,11 @@ import './styles/threat.css'
 import './styles/rules/figure.css'
 import './styles/rules/neighbors.css'
 import './styles/values.css'
+import './styles/identity/specimen.css'
+import './styles/identity/palette.css'
+import './styles/identity/heat.css'
+import './styles/identity/faces.css'
+import './styles/identity/marks.css'
 
 /**
  * The default layout's slots the theme fills: the front page's background
