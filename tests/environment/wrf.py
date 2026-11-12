@@ -217,7 +217,7 @@ def test_a_cut_from_another_output_than_the_sample_s_is_refused(
 
 def test_a_cut_is_written_compressed_and_reads_back_as_the_output_cut(
     crop     : Crop,
-    output   : WrfOutput,
+    threat   : ParametricThreat,
     tmp_path : Path
 ):
     """
@@ -227,11 +227,18 @@ def test_a_cut_is_written_compressed_and_reads_back_as_the_output_cut(
     giving the sizes of the levels, the rows, and the columns the crop keeps
     rather than those of the output it was cut from.
     """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(
+        data.assign_attrs({"BOTTOM-TOP_GRID_DIMENSION": data.sizes["bottom_top_stag"]}),
+        crop = crop
+    )
     path = output.write(tmp_path / "samples" / "wrf_sample.nc")
 
     with open_dataset(path, engine="netcdf4") as written:
         assert all(written[name].encoding["zlib"] for name in written.data_vars)
         assert written.XTIME.values.tolist() == [0.0, 0.25, 0.5]
+        assert written.XTIME.attrs["description"] == "minutes since simulation start"
+        assert written.attrs["BOTTOM-TOP_GRID_DIMENSION"].dtype == "int32"
 
     assert_identical(
         WrfOutput.from_path(path, crop=crop).dataset.load(),

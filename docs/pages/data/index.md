@@ -17,7 +17,7 @@ The sample is `wrfout_W5F7R4`, the output of one simulation, cut to its last two
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
 | `burning_m2` | `[1272000.0, 1443200.0]` |  | The area of the cells whose ground heat flux shows burning, in the first snapshot and in the last, in square meters |
-| `digest` | `5452b4ce701588a85215987fba0532ee3b8450474316a4a4ab34c661c27dc66a` |  | The SHA-256 digest of the file |
+| `digest` | `e046eeddac6576bea4922804fe36a15c585762e19b0681c76898a95e63521946` |  | The SHA-256 digest of the file |
 | `file` | `wrf_sample.nc` |  | The file the dataset publishes the sample as, under the name the fetch writes it by |
 | `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
 | `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |

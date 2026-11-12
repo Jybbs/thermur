@@ -503,9 +503,9 @@ def test_a_threat_s_base_state_cools_at_the_dry_adiabatic_rate():
             id = "burning-out"
         ),
         param(
-            {"burning_m2": [100.0, 200.0, 400.0]},
+            {"burning_m2": [100.0, 200.0, 4000.0]},
             30.0,
-            "burns 100 and 400 m² rather than the pinned 100 and 300 m²",
+            "burns 100 and 4,000 m² rather than the pinned 100 and 300 m²",
             id = "burning-another-area"
         ),
         param(
@@ -581,4 +581,4 @@ def test_the_hub_serves_the_pinned_file_under_the_pinned_digest():
 
     with redirect.value as response:
         assert response.headers["X-Linked-Etag"].strip('"') == Sample().digest
-        assert int(response.headers["X-Linked-Size"]) == 455334138
+        assert int(response.headers["X-Linked-Size"]) == 455334207

@@ -248,7 +248,7 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
 
     digest: Annotated[str, Field(
         pattern = r"^[0-9a-f]{64}$"
-    )] = "5452b4ce701588a85215987fba0532ee3b8450474316a4a4ab34c661c27dc66a"
+    )] = "e046eeddac6576bea4922804fe36a15c585762e19b0681c76898a95e63521946"
     """
     The SHA-256 digest of the file.
     """

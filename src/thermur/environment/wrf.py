@@ -395,7 +395,9 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         """
         path.parent.mkdir(exist_ok=True, parents=True)
         written = self.dataset.drop_encoding().assign(
-            XTIME = (self.dataset.Time / 60).astype("float32")
+            XTIME = (self.dataset.Time / 60).astype("float32").assign_attrs(
+                description = "minutes since simulation start"
+            )
         ).assign_attrs(
             {
                 f"{name.upper().replace('_', '-')}_{attribute}": int32(
