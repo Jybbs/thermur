@@ -53,7 +53,8 @@ class CacheConnection(Connection):
     Hamilton's store keeps one connection per thread and, once deleted,
     closes only the connection of the thread deleting it. A collection
     deleting the store on another thread therefore frees this thread's
-    connection, which closes here rather than raising `ResourceWarning`.
+    connection, which closes here rather than raising `ResourceWarning`,
+    since the store opens each connection with `check_same_thread=False`.
     """
 
     def __del__(self):

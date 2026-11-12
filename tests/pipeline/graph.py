@@ -25,6 +25,7 @@ from numpy          import float32, int32, int64, ones, zeros
 from pathlib        import Path
 from pydantic       import BaseModel, HttpUrl, create_model
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
+from sqlite3        import connect
 from threading      import Thread
 from unittest.mock  import Mock
 from uuid           import UUID
@@ -33,6 +34,7 @@ from xarray.testing import assert_identical
 
 from thermur.controller.components import Constant
 from thermur.pipeline.graph    import (
+    CacheConnection,
     Graph,
     NetcdfReader,
     NetcdfTreeReader,
@@ -320,6 +322,24 @@ def test_a_failed_save_raises_its_own_error_where_the_run_began(
         graphed(recorded=True).compute("table")
 
     assert Path.cwd() == clone.root
+
+
+def test_a_freed_cache_connection_releases_the_lock_it_held(tmp_path: Path):
+    """
+    Asserts that a `CacheConnection` freed by a collection on another thread
+    closes, releasing the lock its open transaction held.
+    """
+    database = tmp_path / "store.db"
+    held     = connect(database, check_same_thread=False, factory=CacheConnection)
+    held.execute("begin exclusive")
+    cycle = [held]
+    cycle.append(cycle)
+    del cycle, held
+    collector = Thread(target=collect)
+    collector.start()
+    collector.join()
+
+    connect(database, factory=CacheConnection, timeout=0).execute("begin exclusive")
 
 
 def test_a_graph_reads_every_subpackage_s_steps_by_default(
