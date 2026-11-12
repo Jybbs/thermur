@@ -1,0 +1,7 @@
+Usage: thermur cut COMMAND
+
+Cuts the data a run reads out of a full output.
+
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ sample  Cuts the WRF-SFIRE sample into the clone's data/ folder.             │
+╰──────────────────────────────────────────────────────────────────────────────╯

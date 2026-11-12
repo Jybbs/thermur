@@ -4,28 +4,30 @@ The air *Thermur*'s flock flies through comes from the [WRF-SFIRE LES Synthetic 
 
 ## The Simulations
 
-The dataset holds 147 simulations, each over a domain 20 km long and 10 km wide at 40 m horizontal spacing, either 3,000 m deep on 51 levels or 5,000 m deep on 71, and each running 20 or 30 minutes after an hour of spin-up, with the fire spreading on a 4 m mesh beneath the atmosphere. The simulations vary the wind, the sounding the atmosphere starts from, the fuel, and the length of the fireline. The Federated Research Data Repository publishes the dataset under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and its files transfer through [Globus](https://www.globus.org/), which takes a Globus account.
+The dataset holds 147 simulations, each over a domain 20 km long and 10 km wide at 40 m horizontal spacing, either 3,000 m deep on 51 levels or 5,000 m deep on 71, and each running 20 or 30 minutes after an hour of spin-up, with the fire spreading on a 4 m mesh beneath the atmosphere. The simulations vary the wind, the sounding the atmosphere starts from, the fuel, and the length of the fireline. The Federated Research Data Repository publishes the dataset under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), and serves each file over HTTPS with no account, as well as through [Globus](https://www.globus.org/), which takes a Globus account.
 
 ## The Sample
 
-The sample is `wrfout_W5F7R4`, the output of one simulation, cut to four snapshots 15 s apart, from 3,615 s to 3,660 s after the simulation starts, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the 50 levels of mass points between its 51 staggered levels. The ground heat flux and the smoke tracer are zero across the domain in the first two snapshots.
+The sample is `wrfout_W5F7R4`, the output of one simulation, cut to the last two minutes of its fire, nine snapshots 15 s apart from 4,680 s to 4,800 s after the simulation starts, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the model levels the default crop keeps, holding the variables the graph reads: the ground heat flux `GRNHFX`, the perturbation potential temperature `T`, the pressure `P` and `PB`, the geopotential `PH` and `PHB`, the winds `U`, `V`, and `W`, the smoke tracer `tr17_1`, and the times `XTIME`. Across the window, the area burning grows from 1.27 km² to 1.44 km² and the hottest air on the fixed heights reaches 322.0 K. In every snapshot, the air above a burning cell exceeds the median at its height by more than 23 K, whereas air the smoke has not reached, which only the ambient convection warms, exceeds it by less than 5 K.
 
-`mise fetch` runs `thermur fetch sample`, which downloads the archive the table names at the pinned revision of its Hugging Face dataset, checks it against the digest, extracts it under `data/`, and prints the path of the output inside it. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
+`mise fetch` runs `thermur fetch sample`, which downloads the file the table names at the pinned revision of its Hugging Face dataset, checks it against the digest, moves it into `data/samples/`, and prints its path. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file compressed with zlib, and it refuses the cut where the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
 
 <!-- sample -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
-| `archive` | `samples.tar.gz` |  | The archive the dataset publishes the sample as |
-| `digest` | `6f97d0bd35b56e224720692f81747fb5e1deddfbc3d1397e6b82ddb42518acfa` |  | The SHA-256 digest of the archive |
-| `folder` | `data` |  | The folder the archive extracts into, relative to the clone |
+| `burning_m2` | `[1272000.0, 1443200.0]` |  | The area burning in the first snapshot and in the last, in square meters |
+| `digest` | `9c873030397f9d7a1507d956dde484cd113c2c71e62c20ce07c748f1d25ace51` |  | The SHA-256 digest of the file |
+| `file` | `wrf_sample.nc` |  | The file the dataset publishes the sample as, under the name the fetch writes it by |
+| `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
+| `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |
 | `hub` | `https://huggingface.co` |  | The address of the Hugging Face Hub publishing the dataset |
 | `length_m` | `20000.0` | above 0 | The length of the domain the output covers from west to east, in meters |
-| `member` | `samples/wrf_sample.nc` |  | The WRF-SFIRE output inside the archive |
-| `repository` | `Jybbs/sfire-samples` |  | The Hugging Face dataset publishing the archive |
-| `revision` | `e7d4fc2ca1f99e82dfeec3ca2f7ba1c714965913` |  | The commit of the dataset the archive is read at |
+| `repository` | `Jybbs/sfire-samples` |  | The Hugging Face dataset publishing the file |
+| `revision` | `0000000000000000000000000000000000000000` |  | The commit of the dataset the file is read at |
+| `simulation` | `wrfout_W5F7R4` |  | The output of the plume dataset the sample is cut from |
 | `timeout_s` | `60.0` | above 0 | The longest the download waits on the connection or on one read, in seconds |
-| `times_s` | `[3615.0, 3630.0, 3645.0, 3660.0]` |  | The time of each snapshot the output holds, in seconds since the simulation started |
+| `times_s` | `[4680.0, 4695.0, 4710.0, 4725.0, 4740.0, 4755.0, 4770.0, 4785.0, 4800.0]` |  | The time of each snapshot the output holds, in seconds since the simulation started |
 
 <!-- /sample -->
 

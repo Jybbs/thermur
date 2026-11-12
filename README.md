@@ -446,7 +446,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise scan` | Holds every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories through `uv audit` and `bun audit` |
 | `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, the actions the workflows pin, the runner image every job runs on, and the wrangler release `🐦‍⬛ Pages` deploys through, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
-| `mise fetch` | Downloads the WRF-SFIRE sample at the revision of its Hugging Face dataset the package pins, checks it against the pinned digest, and extracts it into `data/samples/` |
+| `mise fetch` | Downloads the WRF-SFIRE sample at the revision of its Hugging Face dataset the package pins and checks it against the pinned digest before moving it into `data/samples/` |
 | `mise browse` | Opens Hamilton's experiment viewer over the runs `thermur fly` records under `data/runs/`, passing any further arguments to it |
 | `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/references.bib` |
 | `mise measure` | Writes the means and standard errors the docs site's charts of the interaction rules draw, out of the coupling and heading trials of the run under `data/runs/` it is given |

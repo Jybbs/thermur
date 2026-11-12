@@ -4,6 +4,7 @@ Flies a drone flock as a starling murmuration that breaks around a wildfire the
 way it breaks around a falcon.
 
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ cut          Cuts the data a run reads out of a full output.                 │
 │ fetch        Fetches the data a run reads into the clone's data/ folder.     │
 │ fly          Flies the flock, or computes the steps of the graph named.      │
 │ --help (-h)  Display this message and exit.                                  │

@@ -1,0 +1,8 @@
+Usage: thermur cut sample SOURCE
+
+Cuts the WRF-SFIRE sample into the clone's data/ folder.
+
+╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ *  SOURCE --source  The full output the sample is cut from, such as          │
+│                     wrfout_W5F7R4. [required]                                │
+╰──────────────────────────────────────────────────────────────────────────────╯

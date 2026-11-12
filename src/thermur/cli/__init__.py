@@ -14,6 +14,16 @@ app = App(
 )
 app.command(
     App(
+        help = "Cuts the data a run reads out of a full output.",
+        name = "cut"
+    )
+)
+app["cut"].command(
+    "thermur.cli.cut:sample",
+    help = "Cuts the WRF-SFIRE sample into the clone's `data/` folder."
+)
+app.command(
+    App(
         help = "Fetches the data a run reads into the clone's `data/` folder.",
         name = "fetch"
     )

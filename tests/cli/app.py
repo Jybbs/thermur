@@ -1,7 +1,7 @@
 """
 Pins the `thermur` command line, meaning the version it reports, the help
 it prints for itself, for each group, and for each command, and that neither
-the version, the fetch's help, nor the fetch imports JAX or xarray.
+the version, the help of either group, nor the fetch imports JAX or xarray.
 """
 
 from collections.abc    import Callable
@@ -40,11 +40,11 @@ def printed(
     return call
 
 
-def test_neither_the_version_nor_the_fetch_s_help_imports_jax_or_xarray():
+def test_neither_the_version_nor_a_group_s_help_imports_jax_or_xarray():
     """
-    Asserts that a fresh interpreter printing the version, the fetch group's
-    help, and its command's help imports neither JAX nor xarray, which load
-    only once a command runs.
+    Asserts that a fresh interpreter printing the version, and the help of
+    the cut and the fetch groups and of their commands, imports neither JAX
+    nor xarray, which load only once a command runs.
     """
     script = "; ".join(
         [
@@ -53,6 +53,8 @@ def test_neither_the_version_nor_the_fetch_s_help_imports_jax_or_xarray():
                 f"app({tokens!r}, result_action='return_value')"
                 for tokens in (
                     ["--version"],
+                    ["cut", "--help"],
+                    ["cut", "sample", "--help"],
                     ["fetch", "--help"],
                     ["fetch", "sample", "--help"]
                 )
@@ -80,7 +82,7 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
         [
             "import sys", "from thermur.cli import app",
             "from thermur.environment import schemas",
-            "schemas.Sample.fetch = lambda self, root: root / self.member",
+            "schemas.Sample.fetch = lambda self, root: root / self.path",
             "app(['fetch', 'sample'], result_action='return_value')",
             "print(sorted({'jax', 'xarray'} & set(sys.modules)))"
         ]
@@ -100,6 +102,8 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
     "tokens",
     [
         param(("--help",), id="thermur"),
+        param(("cut", "--help"), id="cut"),
+        param(("cut", "sample", "--help"), id="cut-sample"),
         param(("fetch", "--help"), id="fetch"),
         param(("fetch", "sample", "--help"), id="fetch-sample"),
         param(("fly", "--help"), id="fly")
@@ -120,7 +124,11 @@ def test_each_level_prints_its_help(
 
 @mark.parametrize(
     "tokens",
-    [param((), id="thermur"), param(("fetch",), id="fetch")]
+    [
+        param((), id="thermur"),
+        param(("cut",), id="cut"),
+        param(("fetch",), id="fetch")
+    ]
 )
 def test_a_level_given_no_command_prints_its_help(
     printed : Callable[..., str],
@@ -136,7 +144,8 @@ def test_a_level_given_no_command_prints_its_help(
 @mark.parametrize(
     ("tokens", "offered"),
     [
-        param(("bogus",), "fetch, fly", id="thermur"),
+        param(("bogus",), "cut, fetch, fly", id="thermur"),
+        param(("cut", "bogus"), "sample", id="cut"),
         param(("fetch", "bogus"), "sample", id="fetch")
     ]
 )

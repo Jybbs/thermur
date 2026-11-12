@@ -197,8 +197,8 @@ def test_an_edited_region_drifts_and_is_written_again(checkout: Checkout):
     edit(
         checkout,
         str(DATA),
-        new = "| `archive` | `edited.tar.gz` |",
-        old = "| `archive` | `samples.tar.gz` |"
+        new = "| `file` | `edited.nc` |",
+        old = "| `file` | `wrf_sample.nc` |"
     )
 
     assert Outputs(checkout=checkout).write() == [DATA]

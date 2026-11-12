@@ -6,6 +6,7 @@ The `wrf_output` step builds the record and the `air` step reads it.
 """
 
 from functools     import cached_property
+from math          import prod
 from netCDF4       import default_fillvals
 from numpy         import arange, full, inf, interp, ndarray
 from pathlib       import Path
@@ -25,6 +26,7 @@ from thermur.environment.schemas import (
     REFERENCE_PA,
     Range,
     Ranges,
+    Sample,
     Span
 )
 from thermur.pipeline.settings import Settings
@@ -127,6 +129,17 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         """
         return self.aloft.temperature.median(["south_north", "west_east"])
 
+    @cached_property
+    def burning(self) -> DataArray:
+        """
+        Marks each mass point the crop keeps whose ground heat flux `GRNHFX`
+        shows burning, one snapshot at a time.
+
+        Raises:
+            ValueError: Where `GRNHFX` holds a missing or fill value.
+        """
+        return unfilled(self.dataset.GRNHFX) > 0
+
     @property
     def excess(self) -> DataArray:
         """
@@ -139,19 +152,13 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
     def front(self) -> DataArray:
         """
         Measures each mass point's horizontal distance to the nearest one
-        the crop keeps whose ground heat flux `GRNHFX` shows burning, in
-        meters, one snapshot at a time.
-
-        Raises:
-            ValueError: Where `GRNHFX` holds a missing or fill value.
+        `burning` marks, in meters, one snapshot at a time.
         """
         return apply_ufunc(
             distances,
-            unfilled(self.dataset.GRNHFX) > 0,
-            input_core_dims = [["south_north", "west_east"]],
-            kwargs          = {
-                "sampling": (self.dataset.attrs["DY"], self.dataset.attrs["DX"])
-            },
+            self.burning,
+            input_core_dims  = [["south_north", "west_east"]],
+            kwargs           = {"sampling": self.sampling},
             output_core_dims = [["south_north", "west_east"]],
             vectorize        = True
         )
@@ -180,6 +187,39 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
             bounds = self.ranges.height_m,
             unit   = "m"
         )
+
+    @property
+    def plume(self) -> Dataset:
+        """
+        Measures the fire and the air above it in each snapshot, meaning:
+
+        - `burning_m2`, the area `burning` marks, in square meters
+        - `convected_k`, the largest excess over the ambient profile in air
+          the smoke tracer has not reached, which the ambient convection
+          produces
+        - `heated_k`, the largest excess over it above a burning cell
+        - `hottest_k`, the hottest air on the fixed heights
+
+        An excess with no air to measure it over is NaN.
+        """
+        excess = self.excess
+        return Dataset(
+            {
+                "burning_m2"  : self.burning.sum(["south_north", "west_east"])
+                * prod(self.sampling),
+                "convected_k" : excess.where(self.smoke <= 0).max(Air.axes[1:]),
+                "heated_k"    : excess.where(self.burning).max(Air.axes[1:]),
+                "hottest_k"   : self.aloft.temperature.max(Air.axes[1:])
+            }
+        )
+
+    @property
+    def sampling(self) -> tuple[float, float]:
+        """
+        Reads the spacing of the rows and of the columns of mass points, in
+        meters, from the output's `DY` and `DX` attributes.
+        """
+        return self.dataset.attrs["DY"], self.dataset.attrs["DX"]
 
     @property
     def smoke(self) -> DataArray:
@@ -296,6 +336,25 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         return cls.from_dataset(open_dataset(path, engine="netcdf4"), crop=crop)
 
     @classmethod
+    def from_sample(cls, path: Path, *, sample: Sample, settings: Settings) -> Self:
+        """
+        Opens the full WRF-SFIRE output at `path` as `from_path` does,
+        cropped to `settings.crop` over the window `sample` holds, and
+        checks the figures it measures there through `Sample.check` against
+        a flight lasting `settings.plan.duration_s`.
+
+        Raises:
+            ValueError: Where the window misses a figure `Sample.check`
+                        holds it to.
+        """
+        output = cls.from_path(
+            path,
+            crop = settings.crop.model_copy(update={"window_s": sample.window_s})
+        )
+        sample.check(output.plume, duration_s=settings.plan.duration_s)
+        return output
+
+    @classmethod
     def from_settings(cls, settings: Settings) -> Self:
         """
         Opens the output `settings.simulation` names under the clone, or
@@ -316,6 +375,27 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         `from_dataset` crops a simulation.
         """
         return cls.from_dataset(threat.dataset, crop=crop)
+
+    def write(self, path: Path) -> Path:
+        """
+        Writes the cropped output to `path` as one NetCDF-4 file through
+        netCDF4, each variable compressed with zlib and `XTIME` restored
+        from the snapshots' times, so `from_path` reads the file as it reads
+        a simulation.
+
+        Returns:
+            `path`, once written.
+        """
+        path.parent.mkdir(exist_ok=True, parents=True)
+        written = self.dataset.drop_encoding().assign(
+            XTIME = (self.dataset.Time / 60).astype("float32")
+        )
+        written.to_netcdf(
+            path,
+            encoding = {name: {"zlib": True} for name in written.data_vars},
+            engine   = "netcdf4"
+        )
+        return path
 
 
 def checked(field: DataArray, *, bounds: Range, unit: str) -> DataArray:

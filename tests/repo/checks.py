@@ -813,8 +813,8 @@ def test_a_page_whose_region_alone_drifts_is_named_for_the_region(checkout: Chec
     edit(
         checkout,
         page,
-        new = "| `archive` | `edited.tar.gz` |",
-        old = "| `archive` | `samples.tar.gz` |"
+        new = "| `file` | `edited.nc` |",
+        old = "| `file` | `wrf_sample.nc` |"
     )
 
     assert RenderCheck(checkout=checkout).findings == [
@@ -838,8 +838,8 @@ def test_a_page_whose_region_and_definitions_drift_is_named_for_each(
     edit(
         checkout,
         page,
-        new = "| `archive` | `edited.tar.gz` |",
-        old = "| `archive` | `samples.tar.gz` |"
+        new = "| `file` | `edited.nc` |",
+        old = "| `file` | `wrf_sample.nc` |"
     )
     append(checkout, page, "\nOrdered flocks[^cavagna2010].\n")
 

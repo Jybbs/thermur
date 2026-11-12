@@ -121,8 +121,8 @@ describe('the gathering of a strip’s birds', () => {
   it.each([
     { picks: [0, 0, 0], tight: 1, top: 500 },
     { picks: [0, 0, 1], tight: 1, top: 200 },
-    { picks: [0, 1, 1], tight: Math.SQRT1_2, top: 200 },
-    { picks: [1, 1, 1], tight: 0.5, top: 200 }
+    { picks: [0, 1, 1], tight: Math.sqrt(crop.LATE), top: 200 },
+    { picks: [1, 1, 1], tight: Math.sqrt(crop.LATE / 2), top: 200 }
   ])('closes them to $tight of their spacing at the picks $picks', ({ picks, tight, top }) => {
     const strip            = crop.painted(crop.CROWD, picks)
     const [first, ...rest] = crop.draws(strip)
@@ -135,17 +135,19 @@ describe('the gathering of a strip’s birds', () => {
   })
 
   it('leaves the middle of the birds showing where it stands', () => {
-    const strip  = crop.painted(crop.CROWD, [1, 1, 1])
-    const shown  = Array.from({ length: 19 }, (_, bird) => Math.min(3, 18.5 - bird) / 3)
-    const weight = shown.reduce((total, share) => total + share)
-    const middle = shown.reduce((total, share, bird) => total + share * strip.birds.x[bird]!, 0) / weight
+    const strip   = crop.painted(crop.CROWD, [1, 1, 1])
+    const showing = strip.kept.share * strip.birds.x.length
+    const shown   = Array.from({ length: Math.ceil(showing + 1.5) }, (_, bird) => Math.min(3, showing + 1.5 - bird) / 3)
+    const weight  = shown.reduce((total, share) => total + share)
+    const middle  = shown.reduce((total, share, bird) => total + share * strip.birds.x[bird]!, 0) / weight
+    const tight   = Math.sqrt(crop.LATE / 2)
     for (const { index, x } of crop.draws(strip)) {
-      expect(x / crop.scaleAt(200)).toBeCloseTo(middle + (strip.birds.x[index]! - middle) * 0.5, 2)
+      expect(x / crop.scaleAt(200)).toBeCloseTo(middle + (strip.birds.x[index]! - middle) * tight, 2)
     }
   })
 
   it.each([
-    { most: 18, picks: [1, 1, 1] },
+    { most: Math.floor(34 * crop.LATE + 1.5), picks: [1, 1, 1] },
     { most: 171, picks: [0, 0, 0] }
   ])('shows them in step with the share kept, up to bird $most at the picks $picks', ({ most, picks }) => {
     const strip = crop.painted(crop.CROWD, picks)
@@ -191,7 +193,7 @@ describe('the pointer over a strip', () => {
     const placed = crop.draws(strip)
     strip.part.step(0, geometry({ ...crop.STRIP, pointer: [100, 60] }))
     const falcon = heat.mock.contexts.at(-1) as PointerHeat
-    const reach  = 0.5 * crop.scaleAt(200)
+    const reach  = Math.sqrt(crop.LATE / 2) * crop.scaleAt(200)
     expect(falcon.on).toBe(true)
     for (const { index, x, y } of placed) {
       expect(x - 100).toBeCloseTo((strip.birds.x[index]! - falcon.x) * reach, 2)
