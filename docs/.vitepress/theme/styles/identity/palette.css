@@ -1,12 +1,12 @@
 .identity-axis { stroke: color-mix(in oklab, var(--th-ink) 30%, transparent); }
 
-.identity-level line {
-  stroke           : var(--level);
-  stroke-dasharray : 4 4;
-  stroke-width     : 1.2;
-}
+.identity-level line { stroke-dasharray: 4 4; }
 
-.identity-level text { fill: var(--level); }
+.identity-level-edge { stroke-width: 3.2; }
+
+.identity-level-line { stroke-width: 1.2; }
+
+.identity-level-swatch { stroke-width: 1; }
 
 .identity-line {
   fill              : none;

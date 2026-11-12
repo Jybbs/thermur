@@ -2,7 +2,7 @@ import fs from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { computed, styled } from '../../common/sheets.ts'
+import { computed, declared, styled } from '../../common/sheets.ts'
 
 /**
  * A chart series' switch, turned off.
@@ -13,6 +13,12 @@ const OFF = '<button class="identity-switch" role="switch" aria-checked="false">
  * The sheets the identity's widgets are drawn in.
  */
 const SHEETS = ['faces', 'heat', 'marks', 'palette', 'specimen'].map(name => `identity/${name}.css`)
+
+/**
+ * Reads the stroke width the palette's sheet sets for part `part` of a level.
+ */
+const widthOf = (part: string): number =>
+  Number(declared('stroke-width', `.identity-level-${part}`, 'identity/palette.css'))
 
 describe.for(SHEETS)('%s', sheet => {
   const text = fs.readFileSync(new URL(`../../../theme/styles/${sheet}`, import.meta.url), 'utf8')
@@ -35,4 +41,8 @@ describe.for(SHEETS)('%s', sheet => {
 it('dims only the spark of a series switched off, leaving its label at full strength', () => {
   expect(computed(OFF, 'opacity', '.identity-switch', 'identity/palette.css')).toBe('')
   expect(computed(OFF, 'opacity', '.identity-spark', 'identity/palette.css')).toBe('0.45')
+})
+
+it('outlines each level line wider than the stroke drawn over it', () => {
+  expect(widthOf('edge')).toBeGreaterThan(widthOf('line') + 1)
 })

@@ -1,16 +1,23 @@
 // @vitest-environment happy-dom
-import { enableAutoUnmount, mount }            from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSSRApp, ref }                   from 'vue'
-import { renderToString }                      from 'vue/server-renderer'
+import { type DOMWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
+import { wcagContrast }                              from 'culori'
+import { afterEach, describe, expect, it, vi }       from 'vitest'
+import { createSSRApp, ref }                         from 'vue'
+import { renderToString }                            from 'vue/server-renderer'
 
-import { colorOf, roles } from '../../../lib/identity.ts'
-import source             from '../../../lib/rendered/identity.json' with { type: 'json' }
-import IdentityPalette    from '../../../theme/identity/palette.ts'
+import { colorOf, roles, shadeOf } from '../../../lib/identity.ts'
+import source                      from '../../../lib/rendered/identity.json' with { type: 'json' }
+import IdentityPalette             from '../../../theme/identity/palette.ts'
+import { FLOORS, paintedIn }       from '../../common/contrast.ts'
 
 const isDark = ref(false)
 
 vi.mock('vitepress', () => ({ useData: () => ({ isDark }) }))
+
+/**
+ * Mounts the palette and finds the warning and critical lines of its chart.
+ */
+const levels = (): DOMWrapper<Element>[] => mount(IdentityPalette).findAll('.identity-level')
 
 enableAutoUnmount(afterEach)
 
@@ -59,6 +66,26 @@ describe('IdentityPalette', () => {
     const html = await renderToString(createSSRApp(IdentityPalette))
     expect(html).toContain('A sketch, its temperatures made up')
     expect(html).toContain('role="img"')
+  })
+})
+
+describe('the warning and critical lines of IdentityPalette', () => {
+  it('names each level in ink beside a swatch of its role', () => {
+    expect(levels().map(level => [level.get('text').text(), level.get('text').attributes('style')]))
+      .toEqual([['warning', 'fill: var(--vp-c-text-1);'], ['critical', 'fill: var(--vp-c-text-1);']])
+    expect(levels().map(level => level.get('rect').attributes('style')))
+      .toEqual(['warning', 'critical'].map(role => `fill: var(--th-${role}); stroke: var(--vp-c-text-1);`))
+  })
+
+  it.for(['dark', 'light'] as const)('holds each level’s name and marks to their contrast on the %s ground', scheme => {
+    const ground = shadeOf('ground', scheme)
+    for (const level of levels()) {
+      const name = paintedIn(level.get('text').attributes('style')!, 'fill', scheme)
+      const edge = paintedIn(level.get('.identity-level-edge').attributes('style')!, 'stroke', scheme)
+      const ring = paintedIn(level.get('rect').attributes('style')!, 'stroke', scheme)
+      expect(wcagContrast(name, ground)).toBeGreaterThanOrEqual(FLOORS.text)
+      expect(Math.min(wcagContrast(edge, ground), wcagContrast(ring, ground))).toBeGreaterThanOrEqual(FLOORS.mark)
+    }
   })
 })
 

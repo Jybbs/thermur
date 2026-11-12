@@ -18,6 +18,11 @@ type Copying = (pair: Schemed) => (event: Event) => Promise<void>
 type Schemed = identity.Identity['palette']['series'][number]
 
 /**
+ * The side of the swatch beside each level's name, in the chart's units.
+ */
+const SWATCH = 6
+
+/**
  * Writes where a mark of the seconds along the chart's foot anchors its text,
  * the first and the last at their ends and the rest at their middles.
  */
@@ -100,15 +105,32 @@ const hexOf = (pair: Schemed): VNode =>
   ])
 
 /**
- * Lays out the line the flight chart rules across at `role`'s level, in the
- * color of the role.
+ * Lays out the line the flight chart rules across at `role`'s level, its stroke
+ * in the color of the role over an outline in ink, and the role's name in ink
+ * beside a swatch of that color ringed in ink.
  */
 function level(role: keyof typeof sketch.LEVELS): VNode {
   const [left, right] = [sketch.chartX(0), sketch.chartX(sketch.SPAN)]
+  const [color, ink]  = [`var(--th-${role})`, 'var(--vp-c-text-1)']
   const y             = sketch.chartY(sketch.LEVELS[role])
-  return h('g', { class: 'identity-level', style: { '--level': `var(--th-${role})` } }, [
-    h('line', { x1: left, x2: right, y1: y, y2: y }),
-    h('text', { 'class': 'identity-mono', 'text-anchor': 'end', 'x': right, 'y': y - 5 }, role)
+  return h('g', { class: 'identity-level' }, [
+    h('line', { class: 'identity-level-edge', style: { stroke: ink }, x1: left, x2: right, y1: y, y2: y }),
+    h('line', { class: 'identity-level-line', style: { stroke: color }, x1: left, x2: right, y1: y, y2: y }),
+    h('rect', {
+      class  : 'identity-level-swatch',
+      height : SWATCH,
+      style  : { fill: color, stroke: ink },
+      width  : SWATCH,
+      x      : right - SWATCH,
+      y      : y - 5 - SWATCH
+    }),
+    h('text', {
+      'class'       : 'identity-mono',
+      'style'       : { fill: ink },
+      'text-anchor' : 'end',
+      'x'           : right - SWATCH - 4,
+      'y'           : y - 5
+    }, role)
   ])
 }
 
