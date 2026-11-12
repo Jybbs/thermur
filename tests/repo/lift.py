@@ -504,17 +504,19 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     behind the one its `latest` tag names, after the rows `bun outdated`
     prints and beside the date `bun info` gives that release, and that
     writing its edit lifts the override. A prerelease of the newest release
-    lags it, while an override at or ahead of its newest release makes no
-    row, a release ahead of a newest prerelease included. `bun info` never
-    runs for a caret, an x-range, a bare major, or a union opening on a
-    release, and a package `bun outdated` already lists makes one row, whose
-    edit lifts its override as well.
+    lags it, while an override at or ahead of its newest release makes
+    no row, a release ahead of a newest prerelease included. `bun info`
+    never runs for a caret, an x-range, a bare major, a union opening on a
+    release, or a release Semantic Versioning rejects, and a package `bun
+    outdated` already lists makes one row, whose edit lifts its override
+    as well.
     """
     vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
     manifest = override(
         checkout = checkout,
         pins     = {
             "chokidar"   : "2.0.0",
+            "esbuild"    : "1.0.0-01",
             "fflate"     : "0.7.5",
             "glob"       : "^14.0.0",
             "knip"       : "6.x",

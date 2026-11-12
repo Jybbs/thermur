@@ -55,8 +55,7 @@ from thermur.repo.schemas import (
     Tree,
     Trigger,
     Workflow,
-    read_pin,
-    read_precedence
+    read_pin
 )
 
 ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
@@ -856,14 +855,6 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
-def test_a_release_ranks_level_with_itself_under_another_build():
-    """
-    Asserts that two builds of one release rank level, since precedence
-    ignores the build.
-    """
-    assert read_precedence("1.2.3+build.1") == read_precedence("1.2.3+build.2")
-
-
 def test_a_required_check_naming_no_app_sends_no_app():
     """
     Asserts that a required check naming no `integration_id` is sent without
@@ -1251,27 +1242,6 @@ def test_a_requirement_pins_a_release_only_through_one_exact_specifier(
     it names a range or nothing at all.
     """
     assert read_pin(Requirement(requirement)) == pin
-
-
-@mark.parametrize(
-    ("lower", "higher"),
-    [
-        param("1.9.9", "1.10.0", id="release"),
-        param("2.0.0-beta.1", "2.0.0", id="prerelease-below-release"),
-        param("2.0.0-alpha.3", "2.0.0-alpha.20", id="numeric-identifier"),
-        param("2.0.0-alpha.20", "2.0.0-beta", id="alphanumeric-identifier"),
-        param("1.0.0-9", "1.0.0-rc", id="numeric-below-alphanumeric"),
-        param("1.0.0-alpha", "1.0.0-alpha.1", id="fewer-identifiers"),
-        param("1.0.0-rc.1+build.9", "1.0.0", id="build-ignored")
-    ]
-)
-def test_a_release_ranks_by_its_semantic_version_precedence(higher: str, lower: str):
-    """
-    Asserts that a release ranks by its dotted integers, then above each of
-    its prereleases, which rank by their identifiers as Semantic Versioning
-    2.0.0 orders them.
-    """
-    assert read_precedence(lower) < read_precedence(higher)
 
 
 def test_a_warning_prints_as_a_warning_annotation():

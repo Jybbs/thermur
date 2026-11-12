@@ -22,6 +22,7 @@ dependencies    = [
     "pylatexenc",
     "pyyaml",
     "scipy",
+    "semver",
     "xarray",
     "yaml-rs"
 ]

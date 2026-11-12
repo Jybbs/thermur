@@ -2116,28 +2116,6 @@ def read_pin(requirement: Requirement) -> str | None:
     return None
 
 
-def read_precedence(
-    version: str
-) -> tuple[tuple[int, ...], bool, tuple[tuple[bool, int, str], ...]]:
-    """
-    Reads the order Semantic Versioning 2.0.0 ranks the release `version`
-    in, its dotted integers first and its build ignored, where a release
-    ranks above each of its prereleases, which rank by their dot-separated
-    identifiers, a numeric one by its value and below every alphanumeric
-    one, so `2.0.0-alpha.3` ranks below `2.0.0-alpha.20` and both below
-    `2.0.0`.
-    """
-    release, _, prerelease = version.partition("+")[0].partition("-")
-    return (
-        read_release(release),
-        not prerelease,
-        tuple(
-            (not part.isdigit(), int(part) if part.isdigit() else 0, part)
-            for part in (prerelease.split(".") if prerelease else ())
-        )
-    )
-
-
 def read_release(version: str) -> tuple[int, ...]:
     """
     Reads the dotted integers `version` opens on past a leading `v`,
