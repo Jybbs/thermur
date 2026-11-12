@@ -21,6 +21,13 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     `seed`.
     """
 
+    airspeeds_m_s: tuple[Positive, Positive] = (6.9, 15.2)
+    """
+    The slowest and the fastest speed at which a drone's speed stays stable
+    under one step of the integrator, in meters per second, the range the
+    centers of starling flocks fly at.
+    """
+
     axes: tuple[Positive, Positive, Positive] = (5.6, 2.8, 1.0)
     """
     The launch cloud's length, width, and depth, in proportion, the thin
@@ -43,7 +50,7 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
 
     cruise_m_s: Positive = 10.0
     """
-    The speed a flight holds each drone at, in meters per second.
+    The speed each drone launches and cruises at, in meters per second.
     """
 
     drones: Count = 100
@@ -217,6 +224,7 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         return Flock(
             forces     = zeros_like(offsets),
             positions  = array(self.center_m) + offsets,
+            spins      = zeros_like(offsets),
             velocities = self.cruise_m_s * unit(course + scatter)
         )
 

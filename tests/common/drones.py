@@ -4,8 +4,9 @@ one drone's view, a flock laid out by hand, a still parcel of air, and a
 short plan.
 """
 
-from jax.numpy import array, asarray, full, ones, zeros
-from xarray    import Dataset
+from jax.numpy        import array, asarray, full, ones, zeros
+from jax.numpy.linalg import norm
+from xarray           import Dataset
 
 from thermur.controller.schemas import Flock, Observation
 from thermur.environment.air    import Air
@@ -14,11 +15,13 @@ from thermur.metrics.schemas    import Plan
 
 def flock_of(positions: object, velocities: object) -> Flock:
     """
-    Builds a flock at `positions` and `velocities`, holding no force.
+    Builds a flock at `positions` and `velocities`, holding no force and
+    no spin.
     """
     return Flock(
         forces     = zeros(asarray(positions).shape),
         positions  = asarray(positions),
+        spins      = zeros(asarray(positions).shape),
         velocities = asarray(velocities)
     )
 
@@ -79,11 +82,13 @@ def viewed(  # prose: ignore[unsorted-positionals]
     return Observation(
         **{
             "air"       : {"excess": asarray(excess)},
+            "cruise"    : norm(own),
             "delayed"   : own * ones((len(offsets), 3)),
             "distances" : (spots**2).sum(-1) ** 0.5,
             "force"     : zeros(3),
             "neighbors" : own * ones((len(offsets), 3)),
             "offsets"   : spots,
+            "spin"      : zeros(3),
             "velocity"  : own,
             "weights"   : ones(len(offsets)),
             **fields

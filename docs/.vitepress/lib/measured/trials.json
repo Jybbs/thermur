@@ -2,90 +2,120 @@
   "coupling": {
     "reference": {
       "dense": {
-        "error": 0.0139,
-        "mean": 0.9287
+        "error": 0.0063,
+        "mean": 0.6808
       },
       "middle": {
-        "error": 0.009,
-        "mean": 0.9402
+        "error": 0.0488,
+        "mean": 0.6618
       },
       "sparse": {
-        "error": 0.0075,
-        "mean": 0.9409
+        "error": 0.0822,
+        "mean": 0.7726
       }
     },
     "anisotropic": {
       "dense": {
-        "error": 0.0187,
-        "mean": 0.9144
+        "error": 0.0293,
+        "mean": 0.6286
       },
       "middle": {
-        "error": 0.0064,
-        "mean": 0.9178
+        "error": 0.0777,
+        "mean": 0.6054
       },
       "sparse": {
-        "error": 0.005,
-        "mean": 0.9348
+        "error": 0.0543,
+        "mean": 0.7977
       }
     },
     "metric": {
       "dense": {
-        "error": 0.0676,
-        "mean": 0.6553
+        "error": 0.0065,
+        "mean": 0.1522
       },
       "middle": {
-        "error": 0.0282,
-        "mean": 0.3155
+        "error": 0.0155,
+        "mean": 0.1778
       },
       "sparse": {
-        "error": 0.0089,
-        "mean": 0.1331
+        "error": 0.004,
+        "mean": 0.1134
       }
     },
     "weighted": {
       "dense": {
-        "error": 0.0643,
-        "mean": 0.7723
+        "error": 0.0762,
+        "mean": 0.5475
       },
       "middle": {
-        "error": 0.0179,
-        "mean": 0.7636
+        "error": 0.0274,
+        "mean": 0.5913
       },
       "sparse": {
-        "error": 0.023,
-        "mean": 0.3366
+        "error": 0.0255,
+        "mean": 0.4152
       }
     }
   },
   "heading": {
     "reference": {
       "large": {
-        "error": 0.0396,
-        "mean": 0.2132
+        "error": 0.2258,
+        "mean": 1.0622
       },
       "small": {
-        "error": 0.1848,
-        "mean": 0.8191
+        "error": 1.1766,
+        "mean": 3.8307
       }
     },
     "consensus": {
       "large": {
-        "error": 0.071,
-        "mean": 0.2266
+        "error": 0.1247,
+        "mean": 0.8355
       },
       "small": {
-        "error": 0.2018,
-        "mean": 0.7844
+        "error": 0.7505,
+        "mean": 4.9961
       }
     },
     "delayed": {
       "large": {
-        "error": 0.0443,
-        "mean": 0.0977
+        "error": 0.0185,
+        "mean": 0.0797
       },
       "small": {
-        "error": 0.1244,
-        "mean": 0.3366
+        "error": 0.0457,
+        "mean": 0.3661
+      }
+    },
+    "nonmutual": {
+      "large": {
+        "error": 0.171,
+        "mean": 0.6166
+      },
+      "small": {
+        "error": 0.7042,
+        "mean": 2.333
+      }
+    },
+    "overdamped": {
+      "large": {
+        "error": 0.0115,
+        "mean": 0.1584
+      },
+      "small": {
+        "error": 0.1005,
+        "mean": 0.6814
+      }
+    },
+    "quartic": {
+      "large": {
+        "error": 0.1715,
+        "mean": 1.0809
+      },
+      "small": {
+        "error": 0.5948,
+        "mean": 5.8928
       }
     }
   }

@@ -8,7 +8,7 @@ from common.drones import flock_of, still_air, viewed
 from equinox       import filter_jit
 from hypothesis    import given, strategies
 from jax           import Array, vmap
-from jax.numpy     import append, array, exp, sqrt
+from jax.numpy     import array, concatenate, exp, newaxis, sqrt, zeros
 from jax.random    import key, normal
 from numpy.testing import assert_allclose
 from pytest        import mark, param, raises
@@ -21,21 +21,32 @@ from thermur.controller.components import (
     Delayed,
     Elastic,
     Fitted,
+    InertialSpin,
     Intrinsic,
+    Marginal,
     Metric,
     Morse,
+    Nonmutual,
     Overdamped,
     Persistent,
+    Quartic,
     SoftCore,
     Vectorial,
     Weighted,
     White
 )
-from thermur.controller.schemas import Component, Composite, Noise, Observation, nearest
-from thermur.environment.air    import Air
-from thermur.metrics.schemas    import Plan
-from thermur.metrics.trials     import Trial
-from thermur.pipeline.settings  import Settings
+from thermur.controller.schemas import (
+    Component,
+    Composite,
+    Noise,
+    Observation,
+    across,
+    nearest
+)
+from thermur.environment.air   import Air
+from thermur.metrics.schemas   import Plan
+from thermur.metrics.trials    import Trial
+from thermur.pipeline.settings import Settings
 
 COMPOSITES = {
     name: composite
@@ -58,20 +69,25 @@ def acted(
     velocities : Array
 ) -> Array:
     """
-    Computes the last drone's acceleration followed by the amplitude of its
-    velocity's noise, each drone sensing as many nearest neighbors in `air`
-    as a flight does.
+    Computes the last drone's acceleration and the rate of change of its
+    spin, followed by the amplitude of its velocity's noise, each drone
+    sensing as many nearest neighbors in `air` as a flight does.
     """
     sensed = Observation.sensed(
         flock_of(positions, velocities),
         velocities,
         air,
         0.0,
-        NEIGHBORS
+        NEIGHBORS,
+        Plan().cruise_m_s
     )
-    return append(
-        vmap(composite)(sensed)[-1],
-        vmap(composite.noise.amplitudes)(sensed)[0][-1]
+    accelerations, spun = vmap(composite)(sensed)
+    return concatenate(
+        [
+            accelerations[-1],
+            spun[-1],
+            vmap(composite.noise.amplitudes)(sensed)[0][-1, newaxis]
+        ]
     )
 
 
@@ -233,10 +249,25 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             id = "morse"
         ),
         param(
+            Nonmutual(asymmetry=0.5),
+            viewed(
+                [[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0]],
+                neighbors = array([[10.0, 1.0, 0.0], [10.0, 1.0, 0.0]])
+            ),
+            [0.0, 1.5 + 0.5, 0.0],
+            id = "nonmutual"
+        ),
+        param(
             Overdamped(),
             viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]])),
             [0.0, 1.0, 0.0],
             id = "overdamped"
+        ),
+        param(
+            Quartic(quartic=10.0),
+            viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 2.0, 0.0]])),
+            [0.0, 2.0 * (1 + 10.0 * 4.0 / 100.0), 0.0],
+            id = "quartic"
         ),
         param(
             SoftCore(diameter_m=6.0, stiffness_m_s2=8.0),
@@ -310,6 +341,55 @@ def test_each_noise_scales_its_increments_by_its_source_s_form(
     assert_allclose(noise.amplitudes(observation), expected, rtol=1e-6)
 
 
+def test_a_marginal_speed_imitates_the_neighbors_and_restores_the_cruise():
+    """
+    Asserts that the speed slot pulls a drone along its velocity by the
+    weighted differences in speed with its neighbors, and pushes a drone
+    off the cruise speed back by the negative gradient of the potential, `8
+    lambda (u^2 - v0^2)^3 u / v0^6`.
+    """
+    speed = Marginal(confinement_per_s=0.2)
+    slow  = viewed([[10.0, 0.0, 0.0]] * 2, neighbors=array([[11.0, 0.0, 0.0]] * 2))
+    fast  = viewed([[10.0, 0.0, 0.0]], velocity=(12.0, 0.0, 0.0), cruise=array(10.0))
+
+    assert_allclose(speed(slow), [2.0, 0.0, 0.0], rtol=1e-6)
+    assert_allclose(
+        speed(fast),
+        [-8 * 0.2 * (144.0 - 100.0) ** 3 * 12.0 / 10.0**6, 0.0, 0.0],
+        rtol = 1e-5
+    )
+
+
+def test_a_marginal_speed_kicks_only_along_the_velocity():
+    """
+    Asserts that the speed slot scales the part of an increment along the
+    drone's velocity by its amplitude and leaves out the part across it.
+    """
+    view = viewed([[10.0, 0.0, 0.0]], velocity=(0.0, 10.0, 0.0))
+
+    assert_allclose(
+        Marginal(amplitude=0.5).kicked(array([3.0, 4.0, 5.0]), view),
+        [0.0, 2.0, 0.0]
+    )
+
+
+def test_a_marginal_speed_s_curvature_is_flat_at_the_cruise():
+    """
+    Asserts that the potential's curvature along the velocity is zero at
+    the cruise speed, the marginal confinement, and matches the second
+    derivative of `lambda (u^2 - v0^2)^4 / v0^6` away from it.
+    """
+    speed = Marginal(confinement_per_s=0.2)
+    gap   = 15.2**2 - 100.0
+
+    assert_allclose(speed.stiffness(10.0, 10.0), 0.0, atol=1e-6)
+    assert_allclose(
+        speed.stiffness(10.0, 15.2),
+        8 * 0.2 / 10.0**6 * (6 * 15.2**2 * gap**2 + gap**3),
+        rtol = 1e-4
+    )
+
+
 def test_a_morse_cohesion_inside_the_collapse_region_is_refused():
     """
     Asserts that a Morse cohesion whose repulsion, times the cube of its
@@ -332,3 +412,47 @@ def test_a_persistent_force_enters_the_acceleration_and_decays():
     assert_allclose(Persistent(persistence_s=2.0).relaxation(view), -force / 2.0)
     assert_allclose(White()(view), 0.0)
     assert_allclose(White().relaxation(view), 0.0)
+
+
+def test_an_inertial_spin_holds_at_the_spin_its_pull_sets():
+    """
+    Asserts that a drone spinning at the torque of its pull, `v x pull /
+    |v|^2`, keeps that spin at a friction of one and turns its velocity as
+    the overdamped heading does.
+    """
+    neighbors = array([[10.0, 3.0, 1.0]])
+    pull      = Overdamped()(viewed([[10.0, 0.0, 0.0]], neighbors=neighbors))
+    view      = viewed(
+        [[10.0, 0.0, 0.0]],
+        neighbors = neighbors,
+        spin      = array([0.0, -pull[2], pull[1]]) / 10.0
+    )
+
+    turned, spun = InertialSpin(friction=1.0, inertia_s=4.0).steered(zeros(3), view)
+
+    assert_allclose(spun, 0.0, atol=1e-6)
+    assert_allclose(turned, across(pull, view.velocity), atol=1e-6)
+
+
+def test_an_inertial_spin_relaxes_its_spin_at_the_friction_over_the_inertia():
+    """
+    Asserts that a spin with no pull and no force decays at `friction /
+    inertia_s` and turns the velocity at that spin.
+    """
+    view         = viewed([[10.0, 0.0, 0.0]], spin=array([0.0, 0.0, 0.2]))
+    turned, spun = InertialSpin(friction=0.5, inertia_s=2.0).steered(zeros(3), view)
+
+    assert_allclose(spun, [0.0, 0.0, -0.05], atol=1e-6)
+    assert_allclose(turned, [0.0, 2.0, 0.0], atol=1e-6)
+
+
+def test_an_inertial_spin_turns_the_velocity_by_the_other_slots_directly():
+    """
+    Asserts that the other slots' force turns a drone holding no spin and no
+    pull by the part of the force across its velocity, and drives no spin.
+    """
+    force        = array([2.0, 0.5, -0.2])
+    turned, spun = InertialSpin().steered(force, viewed([[10.0, 0.0, 0.0]]))
+
+    assert_allclose(turned, [0.0, 0.5, -0.2], atol=1e-6)
+    assert_allclose(spun, 0.0, atol=1e-6)

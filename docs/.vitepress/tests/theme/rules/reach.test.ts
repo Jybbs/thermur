@@ -31,11 +31,13 @@ afterEach(() => {
 describe('the heading chart', () => {
   it('reads each rule’s reach at the smallest turn, named in full beside a wide dial', () => {
     const chart = charted(RulesReach, 672)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Overdamped, the default', 'Consensus', 'Delayed']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Inertial spin, the default', 'Consensus', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(readings(chart)).toEqual([
-      '16.4°', 'of 20° · 82% ± 18',
-      '15.7°', 'of 20° · 78% ± 20',
-      '6.7°', 'of 20° · 34% ± 12'
+      '76.6°', 'of 20° · 383% ± 118',
+      '99.9°', 'of 20° · 500% ± 75',
+      '7.3°', 'of 20° · 37% ± 5',
+      '46.7°', 'of 20° · 233% ± 70',
+      '117.9°', 'of 20° · 589% ± 59'
     ])
     expect(knobs(chart).map(knob => knob.getAttribute('aria-checked'))).toEqual(['true', 'false'])
   })
@@ -43,7 +45,7 @@ describe('the heading chart', () => {
   it('sets the shorter names under the dial on a narrow column', () => {
     const chart = charted(RulesReach, 672)
     chart.widen(390)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Overdamped', 'Consensus', 'Delayed']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Inertial spin', 'Consensus', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(chart.host.querySelector('svg')!.getAttribute('width')).toBe('390')
   })
 
@@ -54,9 +56,11 @@ describe('the stops on the dial’s rim', () => {
     const chart = charted(RulesReach, 672)
     knobs(chart)[1]!.dispatchEvent(new Event('click'))
     expect(readings(chart)).toEqual([
-      '19.2°', 'of 90° · 21% ± 4',
-      '20.4°', 'of 90° · 23% ± 7',
-      '8.8°', 'of 90° · 10% ± 4'
+      '95.6°', 'of 90° · 106% ± 23',
+      '75.2°', 'of 90° · 84% ± 12',
+      '7.2°', 'of 90° · 8% ± 2',
+      '55.5°', 'of 90° · 62% ± 17',
+      '97.3°', 'of 90° · 108% ± 17'
     ])
     expect(knobs(chart).map(knob => knob.getAttribute('tabindex'))).toEqual(['-1', '0'])
   })
@@ -89,9 +93,18 @@ describe('the rings', () => {
     const groups  = [...chart.host.querySelectorAll<SVGElement>('g.rules-fade')]
     const opacity = (): string[] => groups.map(group => group.style.getPropertyValue('opacity'))
     groups[2]!.dispatchEvent(new Event('pointerenter'))
-    expect(opacity()).toEqual(['0.3', '0.3', '1', '1', '0.3', '0.3'])
+    expect(opacity()).toEqual(['0.3', '0.3', '1', '1', '0.3', '0.3', '0.3', '0.3', '0.3', '0.3'])
     groups[3]!.dispatchEvent(new Event('pointerleave'))
     expect(new Set(opacity())).toEqual(new Set(['1']))
+  })
+
+  it.for([0, 1])('stops each ring at the first drone’s turn on stop %i, inside the dial’s quarter', stop => {
+    const chart = charted(RulesReach, 672)
+    knobs(chart)[stop]!.dispatchEvent(new Event('click'))
+    const paths  = [...chart.host.querySelectorAll('path')].map(path => path.getAttribute('d')!)
+    const center = Number(paths.find(d => d.includes(' L'))!.slice(1).split(',')[0])
+    const xs     = [...paths.join(' ').matchAll(/(-?[\d.]+),-?[\d.]+/gu)].map(([, x]) => Number(x))
+    expect(Math.min(...xs)).toBeGreaterThanOrEqual(center - 1e-6)
   })
 
   it('staggers the rings over the theme’s settling time, outer first', () => {
@@ -100,9 +113,9 @@ describe('the rings', () => {
     const chart = charted(RulesReach, 672)
     chart.stand.frames.run(1, 400)
     const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
-    expect(Number(outer!.slice(0, -1)) / 16.4).toBeGreaterThan(Number(inner!.slice(0, -1)) / 6.7)
+    expect(Number(outer!.slice(0, -1)) / 76.6).toBeGreaterThan(Number(inner!.slice(0, -1)) / 7.3)
     chart.stand.frames.run(20, 400)
-    expect(readings(chart)[0]).toBe('16.4°')
+    expect(readings(chart)[0]).toBe('76.6°')
   })
 
   it('leaves no listener, observer, or frame behind once it unmounts mid-sweep', () => {

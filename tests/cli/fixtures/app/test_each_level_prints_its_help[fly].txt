@@ -37,8 +37,17 @@ Flies the flock, or computes the steps of the graph named.
 │ --crop.y-m FLOAT FLOAT        The southernmost and the northernmost mass     │
 │   --crop.empty-y-m            point kept, in meters from the domain's        │
 │                               southern edge, or None to keep every row.      │
+│ --heading.friction FLOAT      The friction on the spin, which relaxes it at  │
+│                               friction / inertia_s. [default: 0.3]           │
+│ --heading.inertia-s FLOAT     The inertia of the spin, in seconds. [default: │
+│                               8.0]                                           │
 │ --noise.amplitude FLOAT       The amplitude, in meters per second per root   │
 │                               second. [default: 4.2]                         │
+│ --plan.airspeeds-m-s FLOAT    The slowest and the fastest speed at which a   │
+│   FLOAT                       drone's speed stays stable under one step of   │
+│   --plan.empty-airspeeds-m-s  the integrator, in meters per second, the      │
+│                               range the centers of starling flocks fly at.   │
+│                               [default: (6.9, 15.2)]                         │
 │ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │
 │   FLOAT --plan.empty-axes     in proportion, the thin horizontal shape       │
 │                               measured on starling flocks, whose long axis   │
@@ -53,8 +62,8 @@ Flies the flock, or computes the steps of the graph named.
 │                               1000.0, 100.0)]                                │
 │ --plan.course-deg FLOAT       The launch heading in degrees counterclockwise │
 │                               from east, by default west. [default: 180.0]   │
-│ --plan.cruise-m-s FLOAT       The speed a flight holds each drone at, in     │
-│                               meters per second. [default: 10.0]             │
+│ --plan.cruise-m-s FLOAT       The speed each drone launches and cruises at,  │
+│                               in meters per second. [default: 10.0]          │
 │ --plan.drones INT             The size of the flock. [default: 100]          │
 │ --plan.duration-s FLOAT       The length of the flight, in seconds.          │
 │                               [default: 120.0]                               │
@@ -95,6 +104,14 @@ Flies the flock, or computes the steps of the graph named.
 │                               data/samples/wrf_sample.nc the thermur fetch   │
 │                               sample command writes, or None to read the     │
 │                               dataset threat builds.                         │
+│ --speed.fixed                 Whether a flight holds each drone at the       │
+│   --speed.no-fixed            cruise speed, leaving no speed to fluctuate.   │
+│                               [default: False]                               │
+│ --speed.amplitude FLOAT       The amplitude of the random increments of the  │
+│                               speed, in meters per second per root second.   │
+│                               [default: 1.0]                                 │
+│ --speed.confinement-per-s     The strength of the potential, in reciprocal   │
+│   FLOAT                       seconds. [default: 0.2]                        │
 │ --threat.anomaly-k FLOAT      The potential temperature behind the front in  │
 │                               excess of the air ahead of it, in kelvin.      │
 │                               [default: 20.0]                                │

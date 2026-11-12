@@ -56,13 +56,15 @@ const BAND = { 'opacity': 0.55, 'stroke-linecap': 'round', 'stroke-width': 3 } a
  */
 export const DIAL: Tuning = { lag: 0.14, narrow: 520, sweep: 5 }
 /**
- * The name each heading rule reads under, the default's first, beside the
- * shorter name a narrow chart sets.
+ * The name each heading rule the chart draws reads under, the default's first,
+ * beside the shorter name a narrow chart sets.
  */
 export const NAMES = {
-  reference : ['Overdamped, the default', 'Overdamped'],
+  reference : ['Inertial spin, the default', 'Inertial spin'],
   consensus : ['Consensus', 'Consensus'],
-  delayed   : ['Delayed', 'Delayed']
+  delayed   : ['Delayed', 'Delayed'],
+  nonmutual : ['Nonmutual', 'Nonmutual'],
+  quartic   : ['Quartic', 'Quartic']
 } as const
 /**
  * How the ring of each stop on the dial's rim is drawn.

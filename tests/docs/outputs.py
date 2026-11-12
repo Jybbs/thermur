@@ -19,7 +19,7 @@ from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
 
-from thermur.controller.components import SoftCore
+from thermur.controller.components import Marginal, SoftCore
 from thermur.docs.outputs          import Outputs, markdown_table, specimens, tabled
 from thermur.environment.schemas import (
     BASE_K,
@@ -364,18 +364,20 @@ def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
     checkout: Checkout
 ):
     """
-    Asserts that The Interaction Rules carries the fields of the plan and
-    the contact, and for each open slot those of its default and then each
-    candidate, every field named after its component.
+    Asserts that The Interaction Rules carries the fields of the plan, the
+    contact, and the speed, and for each open slot those of its default and
+    then each candidate, every field named after its component.
     """
     regions = Outputs(checkout=checkout).regions[RULES]
     rows    = regions["cohesion"].splitlines()[2:]
 
     assert regions["contact"] == tabled(SoftCore)
     assert regions["plan"] == tabled(Plan)
+    assert regions["speed"] == tabled(Marginal)
     assert set(regions) == {
         "contact",
         "plan",
+        "speed",
         *(trial.slot for trial in Trial.listed())
     }
     assert [row.split("`")[1].partition(".")[0] for row in rows] == [

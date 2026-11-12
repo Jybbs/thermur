@@ -1,13 +1,16 @@
 """
 Holds the components filling each slot of the controller, each borrowed from
 another physical system and cited on the page that explains the choice among
-them, meaning the headings, the couplings, the noises, the cohesions, and
-the one contact.
+them, meaning the headings, the couplings, the noises, the cohesions, the
+one contact, and the one speed.
 """
 
-from jax        import Array
+from equinox import field
+from jax     import Array, grad, hessian
 from jax.numpy  import (
+    array,
     asarray,
+    cross,
     exp,
     full,
     linalg,
@@ -17,9 +20,20 @@ from jax.numpy  import (
     where,
     zeros_like
 )
-from typing   import ClassVar
+from pydantic import Field
+from typing   import Annotated, ClassVar
 
-from thermur.controller.schemas  import Component, Heading, Noise, Observation, documented, unit
+from thermur.controller.schemas  import (
+    Component,
+    Heading,
+    Noise,
+    Observation,
+    Speed,
+    along,
+    documented,
+    torque,
+    unit
+)
 from thermur.environment.schemas import NonNegative, Positive
 
 
@@ -89,9 +103,9 @@ class Consensus(Heading):
     in reciprocal seconds.
     """
 
-    confined: ClassVar[bool] = False
+    steering: ClassVar[bool] = False
     """
-    Leaves each drone's speed to the sum of the slots.
+    Lets the pull change the drone's speed beside the speed slot.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -246,6 +260,74 @@ class Intrinsic(Noise):
 
 
 @documented
+class Marginal(Speed):
+    """
+    The speed channel of marginal confinement, in which a drone imitates its
+    neighbors' speeds at the rates the coupling sets and is held about the
+    cruise speed by a potential rising as the fourth power of the difference
+    of the squared speeds, flat at the cruise speed itself.
+    """
+
+    amplitude: NonNegative = 1.0
+    """
+    The amplitude of the random increments of the speed, in meters per second
+    per root second.
+    """
+
+    confinement_per_s: Positive = 0.2
+    """
+    The strength of the potential, in reciprocal seconds.
+    """
+
+    fixed: bool = field(default=False, static=True)
+    """
+    Whether a flight holds each drone at the cruise speed, leaving no speed
+    to fluctuate.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Sums the weighted differences between each neighbor's speed and the
+        drone's own along its velocity, beside the force of the potential.
+        """
+        velocity  = observation.velocity
+        imitation = observation.weights @ (
+            linalg.norm(observation.neighbors, axis=-1) - linalg.norm(velocity)
+        )
+        return imitation * unit(velocity) - grad(self.potential, argnums=1)(
+            observation.cruise,
+            velocity
+        )
+
+    def kicked(self, increment: Array, observation: Observation) -> Array:
+        """
+        Scales the part of a unit Brownian increment along the drone's
+        velocity by `amplitude`.
+        """
+        return self.amplitude * along(increment, observation.velocity)
+
+    def potential(self, cruise: Array, velocity: Array) -> Array:
+        """
+        Computes the confining potential at `velocity` about the speed
+        `cruise`, in square meters per cubic second.
+        """
+        return (
+            self.confinement_per_s / cruise**6 * (velocity @ velocity - cruise**2) ** 4
+        )
+
+    def stiffness(self, cruise: float, speed: float) -> Array:
+        """
+        Computes the curvature of the potential along the velocity at
+        `speed`, in reciprocal seconds, the rate at which the force restores
+        a speed displaced from it.
+        """
+        return hessian(self.potential, argnums=1)(
+            cruise,
+            array([speed, 0.0, 0.0])
+        )[0, 0]
+
+
+@documented
 class Metric(Component):
     """
     The coupling holding `Constant`'s rate until the air at the drone runs
@@ -365,6 +447,105 @@ class Overdamped(Heading):
 
 
 @documented
+class InertialSpin(Overdamped):
+    """
+    The inertial spin model, in which the pull of the neighbors drives a
+    spin under an inertia and a friction and the spin turns the velocity, so
+    a turn travels as a wave rather than spreading by diffusion.
+
+    The other slots' forces turn the velocity directly, as a force on the
+    velocity rather than on the spin, and the model reduces to `Overdamped`
+    at a `friction` of one as `inertia_s` falls to zero.
+    """
+
+    friction: Positive = 0.3
+    """
+    The friction on the spin, which relaxes it at `friction / inertia_s`.
+    """
+
+    inertia_s: Positive = 8.0
+    """
+    The inertia of the spin, in seconds.
+    """
+
+    def kicked(self, increment: Array, observation: Observation) -> tuple[Array, Array]:
+        """
+        Passes the torque of a Brownian increment of the velocity across
+        it to the spin, scaled by the square root of `friction` over
+        `inertia_s`, which leaves the overdamped heading's noise at a
+        `friction` of one as `inertia_s` falls to zero.
+
+        Args:
+            increment   : The increment of the velocity, in meters per
+                          second.
+            observation : What the drone senses.
+
+        Returns:
+            The increment of the drone's velocity, in meters per second, and
+            of its spin, in radians per second.
+        """
+        return (
+            zeros_like(increment),
+            sqrt(self.friction) * torque(
+                increment,
+                observation.velocity
+            ) / self.inertia_s
+        )
+
+    def steered(self, force: Array, observation: Observation) -> tuple[Array, Array]:
+        """
+        Turns the velocity at the drone's spin and at the rate `force` turns
+        it, which carries the spin with the velocity, and relaxes the spin
+        toward the torque of the pull.
+
+        Args:
+            force       : The other slots' acceleration on the drone, in
+                          meters per second squared.
+            observation : What the drone senses, its weights set.
+
+        Returns:
+            The drone's acceleration, in meters per second squared, and the
+            rate of change of its spin, in radians per second squared.
+        """
+        velocity = observation.velocity
+        spin     = observation.spin
+        turning  = torque(force, velocity)
+        return (
+            cross(spin + turning, velocity),
+            (torque(
+                self(observation),
+                velocity
+            ) - self.friction * spin) / self.inertia_s
+            + cross(turning, spin)
+        )
+
+
+@documented
+class Nonmutual(InertialSpin):
+    """
+    The inertial spin under nonmutual torques, in which a neighbor ahead of
+    a drone turns it harder than one behind does, so the torque two drones
+    exert on each other differs.
+    """
+
+    asymmetry: Annotated[float, Field(ge=0, le=1)] = 0.5
+    """
+    The added share of a neighbor's weight per unit cosine of its bearing off
+    the drone's velocity, which takes the weight of a neighbor straight behind
+    to zero at one.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Sums the differences in velocity with each neighbor, weighted by the
+        coupling and by the neighbor's bearing.
+        """
+        return observation.weights * (1 + self.asymmetry * observation.ahead) @ (
+            observation.neighbors - observation.velocity
+        )
+
+
+@documented
 class Persistent(Noise):
     """
     The random force of an inertial active Ornstein-Uhlenbeck particle,
@@ -401,6 +582,37 @@ class Persistent(Noise):
         Decays the force over `persistence_s`.
         """
         return -observation.force / self.persistence_s
+
+
+@documented
+class Quartic(InertialSpin):
+    """
+    The inertial spin under an alignment adding a quartic term to the
+    quadratic one, so a neighbor's pull grows with the square of its
+    difference in velocity, and a large turn crosses the flock as a front
+    whose speed rises with its amplitude while small fluctuations stay
+    damped.
+    """
+
+    friction: Positive = 0.6
+    """
+    The friction on the spin, which relaxes it at `friction / inertia_s`.
+    """
+
+    quartic: NonNegative = 10.0
+    """
+    The strength of the quartic term over the quadratic one, at a difference
+    in velocity equal to the cruise speed.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Sums the differences in velocity with each neighbor, each weighted
+        by the coupling and grown by the quartic term.
+        """
+        differences = observation.neighbors - observation.velocity
+        growth = self.quartic * square(differences).sum(-1) / square(observation.cruise)
+        return observation.weights * (1 + growth) @ differences
 
 
 @documented

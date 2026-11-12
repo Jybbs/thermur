@@ -4,17 +4,26 @@ table of the clone's `pyproject.toml` sets for every run beneath a
 `THERMUR_` variable and a value passed in.
 """
 
-from cyclopts          import Parameter
+from jax               import vmap
+from jax.numpy         import linspace
 from pathlib           import Path
+from pydantic          import model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
-from typing import Annotated
+from typing import Self
 
-from thermur.controller.components import Constant, Morse, Overdamped, SoftCore, White
-from thermur.environment.schemas   import Crop, ParametricThreat
-from thermur.metrics.schemas       import Plan
-from thermur.repo.checkout         import Checkout
-from thermur.repo.schemas          import Manifest
+from thermur.controller.components import (
+    Constant,
+    InertialSpin,
+    Marginal,
+    Morse,
+    SoftCore,
+    White
+)
+from thermur.environment.schemas import Crop, ParametricThreat
+from thermur.metrics.schemas     import Plan
+from thermur.repo.checkout       import Checkout
+from thermur.repo.schemas        import Manifest
 
 
 class Settings(
@@ -57,9 +66,7 @@ class Settings(
     to, and the fixed heights its fields are regridded onto.
     """
 
-    # `Overdamped` declares no field, which cyclopts renders as one flag taking a
-    # value no conversion accepts, so the command line leaves the slot out.
-    heading: Annotated[Overdamped, Parameter(parse=False)] = Overdamped()
+    heading: InertialSpin = InertialSpin()
     """
     The acceleration turning a drone toward its neighbors.
     """
@@ -82,10 +89,47 @@ class Settings(
     or `None` to read the dataset `threat` builds.
     """
 
+    speed: Marginal = Marginal()
+    """
+    The acceleration along a drone's velocity.
+    """
+
     threat: ParametricThreat = ParametricThreat()
     """
     The front of hot air the graph reads where `simulation` names no output.
     """
+
+    @model_validator(mode="after")
+    def confined(self) -> Self:
+        """
+        Holds one step of the integrator within the stability bound of the
+        speed slot's confinement at every speed in `plan.airspeeds_m_s`, the
+        step times the potential's curvature staying at or below two.
+
+        Raises:
+            ValueError: Where `plan.step_s` times the curvature at a speed
+                        in the range exceeds two, under which a drone at
+                        that speed overshoots the cruise speed further at
+                        each step.
+        """
+        if self.speed.fixed:
+            return self
+
+        plan      = self.plan
+        curvature = abs(
+            vmap(self.speed.stiffness, in_axes=(None, 0))(
+                plan.cruise_m_s,
+                linspace(*plan.airspeeds_m_s, 64)
+            )
+        ).max()
+        if plan.step_s * curvature > 2:
+            raise ValueError(
+                f"A step of {plan.step_s:g} s times the confinement's curvature "
+                f"of {curvature:.3g} per second exceeds two within "
+                f"{plan.airspeeds_m_s[0]:g} to {plan.airspeeds_m_s[1]:g} m/s"
+            )
+
+        return self
 
     @classmethod
     def settings_customise_sources(

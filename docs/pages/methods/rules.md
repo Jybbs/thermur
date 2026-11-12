@@ -1,6 +1,6 @@
 # The Interaction Rules
 
-Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, and the contact keeping two drones apart. Each slot holds a rule borrowed from another physical system, a starling flock, a jamming solid, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it, and in the flights below no candidate passed, so every slot holds its default.
+Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, and the speed it flies at. Each slot holds a rule borrowed from another physical system, a starling flock, a jamming solid, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it, and in the flights below the centroid spring and the metric rule pass while every slot still holds its default, for the reasons Choosing Among Candidates gives.
 
 ## The Neighbors a Drone Senses
 
@@ -14,7 +14,7 @@ The suite checks this with a property test, which moves a drone that another dro
 
 ## The Flight
 
-A flight integrates each drone's velocity and position under the sum of the slots through the Euler-Maruyama scheme, one step of diffrax's Euler solver at a time, its noise the Brownian increment a virtual Brownian tree draws, which carries the $`\sqrt{\Delta t}`$ scaling of a stochastic differential equation[^higham2001]. Every draw derives from one seed, and several seeds fly together as one batch. The flock launches in a thin horizontal cloud, its axes in the proportion 5.6 to 2.8 to 1 measured on starling flocks, its thin axis vertical[^ballerini2008b]. Each drone holds a constant cruise speed, so under a heading rule that holds the speed, the part of the acceleration along a drone's velocity is removed and the velocity returns to the cruise speed after every step.
+A flight integrates each drone's velocity, spin, and position under the sum of the slots through the Euler-Maruyama scheme, one step of diffrax's Euler solver at a time, its noise the Brownian increment a virtual Brownian tree draws, which carries the $`\sqrt{\Delta t}`$ scaling of a stochastic differential equation[^higham2001]. Every draw derives from one seed, and several seeds fly together as one batch. The flock launches in a thin horizontal cloud, its axes in the proportion 5.6 to 2.8 to 1 measured on starling flocks, its thin axis vertical[^ballerini2008b]. After each step a drone keeps as its speed the part of its new velocity along its old heading, since a turn taken in one explicit step otherwise adds speed in proportion to the square of the step, and its velocity turns once more by the change in its spin across the step, which keeps a spin with no friction from gaining energy step by step.
 
 The table is written from the record each flight reads, set under `[tool.thermur.plan]` or through a `--plan.` flag of `thermur fly`, and `mise render` rewrites it.
 
@@ -22,10 +22,11 @@ The table is written from the record each flight reads, set under `[tool.thermur
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
+| `airspeeds_m_s` | `[6.9, 15.2]` |  | The slowest and the fastest speed at which a drone's speed stays stable under one step of the integrator, in meters per second, the range the centers of starling flocks fly at |
 | `axes` | `[5.6, 2.8, 1.0]` |  | The launch cloud's length, width, and depth, in proportion, the thin horizontal shape measured on starling flocks, whose long axis holds no fixed bearing to their motion, launched with its long axis along the course and its thin axis vertical |
 | `center_m` | `[1000.0, 1000.0, 100.0]` |  | The center of the launch cloud, east, north, and above the ground, in meters, by default on the parametric threat's course to the front it crosses within two minutes |
 | `course_deg` | `180.0` |  | The launch heading in degrees counterclockwise from east, by default west |
-| `cruise_m_s` | `10.0` | above 0 | The speed a flight holds each drone at, in meters per second |
+| `cruise_m_s` | `10.0` | above 0 | The speed each drone launches and cruises at, in meters per second |
 | `drones` | `100` | at least 1 | The size of the flock |
 | `duration_s` | `120.0` | above 0 | The length of the flight, in seconds |
 | `frame_every` | `25` | at least 1 | The number of steps between two kept frames |
@@ -59,14 +60,24 @@ Two drones closer than one diameter push apart through a harmonic soft-sphere co
 
 ## Heading
 
-The default heading rule is the overdamped limit of the inertial spin model at a constant speed[^cavagna2015], in which a drone's velocity relaxes toward each neighbor's at the rate the coupling sets, with no spin carried between steps. The candidates are a spinless second-order consensus, which leaves the speed free and relaxes a drone's velocity toward its neighbors' mean as well, where the source relaxes toward the whole flock's[^lizarraga2026], and alignment on the neighbors' velocities half a second old[^geiss2022]. The trial turns one drone through 20° and through 90° and measures how far the turn reaches across the flock and how fast it crosses, beside the polarization and the frequency at which the spontaneous velocity correlation $`C(k,\omega)`$ peaks. The table is written from each rule's record, the default declaring no parameter, and `mise render` rewrites it.
+The default heading rule is the inertial spin model[^cavagna2015]. The pull of a drone's neighbors, the difference between each neighbor's velocity and its own at the rate the coupling sets, exerts a torque on the drone's spin, the spin carries an inertia $`\chi`$ and a friction $`\eta`$, and the spin turns the velocity, so a turn crosses the flock as a wave at the neighbor spacing $`a`$ times $`\sqrt{J n_c / \chi}`$ rather than spreading by diffusion, $`J n_c`$ being the sum of the rates the coupling sets. At the spacing the default flock holds, that speed works out to 32 to 37 m/s, beside the 20 to 40 m/s measured on turning starling flocks[^attanasi2014]. A turn reaches across a flock of size $`L`$ where $`\eta < a \sqrt{J n_c \chi} / L`$, and the default's friction of 0.3 at an inertia of 8 s holds that bound at the 30, 100, and 200 drones the noise and cohesion trials fly, the bound reading 1.03, 0.51, and 0.34 with $`a`$ the root-mean-square distance to a drone's seven neighbors and $`L`$ the largest distance between two drones. The cohesion, the contact, and the noise's force turn the velocity directly, as the force Carruitero et al. add to the velocity's own equation[^carruitero2024], rather than as a torque on the spin, under which a drone's offset from its neighbors answers the cohesion only through the spin's inertia and the flock comes apart. The noise reaches the spin rather than the heading, scaled by $`\sqrt{\eta} / \chi`$, which leaves the overdamped limit's noise at a friction of one as the inertia falls to zero, that limit being a drone's velocity relaxing toward its neighbors' with no spin carried between steps.
+
+The candidates are the overdamped limit itself, a spinless second-order consensus, which leaves the speed free and relaxes a drone's velocity toward its neighbors' mean as well, where the source relaxes toward the whole flock's[^lizarraga2026], alignment on the neighbors' velocities half a second old[^geiss2022], and two variants of the spin. One adds to the alignment a quartic term in the difference between two velocities, weak under the small differences of spontaneous fluctuation and strong under a turn, so the turn travels while the spontaneous fluctuations stay damped[^cavagna2026]. The other weights a neighbor ahead of a drone above one behind, so the torques two drones exert on each other differ[^dadhichi2020]. The trial turns one drone through 20° and through 90° and measures how far the turn reaches across the flock and how fast it crosses, beside the polarization and the frequency at which the spontaneous velocity correlation $`C(k,\omega)`$ peaks. The table is written from each rule's record, the overdamped limit declaring no parameter, and `mise render` rewrites it.
 
 <!-- heading -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
+| `inertialspin.friction` | `0.3` | above 0 | The friction on the spin, which relaxes it at `friction / inertia_s` |
+| `inertialspin.inertia_s` | `8.0` | above 0 | The inertia of the spin, in seconds |
 | `consensus.centering_per_s` | `0.1` | at least 0 | The rate at which a drone's velocity relaxes toward its neighbors' mean, in reciprocal seconds |
 | `delayed.lag_s` | `0.5` | above 0 | The age of the neighbor states the slot reads, in seconds |
+| `nonmutual.friction` | `0.3` | above 0 | The friction on the spin, which relaxes it at `friction / inertia_s` |
+| `nonmutual.inertia_s` | `8.0` | above 0 | The inertia of the spin, in seconds |
+| `nonmutual.asymmetry` | `0.5` | at least 0 and at most 1 | The added share of a neighbor's weight per unit cosine of its bearing off the drone's velocity, which takes the weight of a neighbor straight behind to zero at one |
+| `quartic.friction` | `0.6` | above 0 | The friction on the spin, which relaxes it at `friction / inertia_s` |
+| `quartic.inertia_s` | `8.0` | above 0 | The inertia of the spin, in seconds |
+| `quartic.quartic` | `10.0` | at least 0 | The strength of the quartic term over the quadratic one, at a difference in velocity equal to the cruise speed |
 
 <!-- /heading -->
 
@@ -74,7 +85,21 @@ The chart below reads the share of the first drone's turn that the farthest of f
 
 <!-- reach -->
 
-Under the overdamped and the consensus rules the farthest drones follow most of a 20° turn and about a fifth of a 90° one, whereas under the delayed rule they follow about a third of the small turn and a tenth of the large. The standard errors on the small turn run wide, since four seeds separate the rules poorly there.
+Under the inertial spin, the quartic variant, and the consensus rule the farthest drones end the flight turned through more than the first drone's turn, 1.06 to 1.08 of a 90° turn and 3.8 to 5.9 of a 20° one, since these flocks rotate of their own accord over the flight and the share reads the farthest drones' heading at its end. The chart stops each ring, its band, and its bar at the first drone's turn and prints the share past it. Under the nonmutual variant the farthest drones follow 0.62 of the large turn, and under the delayed rule a tenth of it, the delayed flock holding a polarization of 0.97 and turning least. The standard errors on the small turn run wide, since four seeds separate the rules poorly there.
+
+## Speed
+
+Each drone's speed has a channel of its own. A drone imitates its neighbors' speeds at the rates the coupling sets, accelerating along its velocity by the weighted differences between their speeds and its own[^bialek2014], and a marginal potential $`V = \lambda (\lVert v \rVert^2 - v_0^2)^4 / v_0^6`$ holds it about the cruise speed $`v_0`$, its force the gradient of $`-V`$ with respect to the velocity, whose curvature at $`v_0`$ is zero, so the confinement leaves a small departure from the cruise speed free and restores a large one[^cavagna2022]. A random increment along the velocity drives the speed at an amplitude of its own. A setting holds every drone at the cruise speed instead, the control under which no speed fluctuates[^cavagna2010], and the settings refuse a confinement under which one step at a speed between 6.9 and 15.2 m/s, the range of the mean speeds measured on starling flocks[^ballerini2008b], overshoots the cruise speed. The speed is fixed rather than open, and the table is written from its record, set under `[tool.thermur.speed]` or through a `--speed.` flag of `thermur fly`, which `mise render` rewrites.
+
+<!-- speed -->
+
+| **Field** | **Default** | **Bound** | **Holds** |
+|---|---|---|---|
+| `fixed` | `False` |  | Whether a flight holds each drone at the cruise speed, leaving no speed to fluctuate |
+| `amplitude` | `1.0` | at least 0 | The amplitude of the random increments of the speed, in meters per second per root second |
+| `confinement_per_s` | `0.2` | above 0 | The strength of the potential, in reciprocal seconds |
+
+<!-- /speed -->
 
 ## Coupling
 
@@ -99,7 +124,7 @@ The chart below reads the polarization each coupling rule held at each launch sp
 
 <!-- polarization -->
 
-The constant and the anisotropic rules hold the polarization flat as the launch thins, whereas the metric rule, dropping every neighbor past 25 m, loses order at every step, and the distance-weighted rule loses it past the middle spacing. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
+The constant and the anisotropic rules hold a polarization of 0.6 to 0.8 at every spacing, rising at the sparsest, whereas the metric rule, dropping every neighbor past 25 m, holds under 0.2 at every spacing, and the distance-weighted rule loses order past the middle spacing. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
 
 ## Noise
 
@@ -149,24 +174,27 @@ The figures below are the means across seeds that `thermur fly cohesion_trial co
 
 | **Slot** | **Rule** | **Measured** |
 |---|---|---|
-| Cohesion | Morse, the default | *3.25 groups at 30 drones and 9.5 at 100, border density 0.45 of the center's, $`g(r)`$ peak 4.22 times its mean* |
-| Cohesion | Centroid spring | *1.25 groups at 30, border density 0.65, peak 3.40* |
-| Cohesion | Elastic springs | *1.00 group at 30, border density 0.65, peak 2.30* |
-| Cohesion | Fitted attraction | *2.00 groups at 30, border density 0.59, peak 2.30* |
-| Cohesion | Coupling off | *29.25 groups at 30, polarization 0.06 to 0.18* |
-| Coupling | Constant, the default | *Polarization 0.929, 0.940, and 0.941 from the densest launch to the sparsest* |
-| Coupling | Anisotropic | *Polarization 0.914, 0.918, and 0.935* |
-| Coupling | Metric | *Polarization 0.655, 0.316, and 0.133* |
-| Coupling | Weighted by distance | *Polarization 0.772, 0.764, and 0.337* |
-| Heading | Overdamped, the default | *The farthest drones turning through 0.82 of a 20° turn and 0.21 of a 90° one, polarization 0.940* |
-| Heading | Consensus | *0.78 and 0.23, polarization 0.873* |
-| Heading | Delayed | *0.34 and 0.10, polarization 0.969* |
-| Noise | White, the default | *Polarization 0.973, 0.940, and 0.928 at 30, 100, and 200 drones, 0.21 spontaneous turns a second at 100* |
-| Noise | Intrinsic | *Polarization 0.975, 0.951, and 0.931, 0.19 turns a second* |
-| Noise | Persistent | *Polarization 0.973, 0.880, and 0.867, 0.11 turns a second* |
-| Noise | Vectorial | *Polarization 0.973, 0.947, and 0.928, 0.18 turns a second* |
+| Cohesion | Morse, the default | *4.00 groups at 30 drones and 15.0 at 100, border density 0.64 of the center's, $`g(r)`$ peak 3.50 times its mean* |
+| Cohesion | Centroid spring | *2.00 groups at 30, border density 0.76, peak 3.25* |
+| Cohesion | Elastic springs | *1.75 groups at 30, border density 0.68, peak 1.80* |
+| Cohesion | Fitted attraction | *1.75 groups at 30, border density 0.38, peak 1.35* |
+| Cohesion | Coupling off | *29.00 groups at 30, polarization 0.08 to 0.17* |
+| Coupling | Constant, the default | *Polarization 0.681, 0.662, and 0.773 from the densest launch to the sparsest* |
+| Coupling | Anisotropic | *Polarization 0.629, 0.605, and 0.798* |
+| Coupling | Metric | *Polarization 0.152, 0.178, and 0.113* |
+| Coupling | Weighted by distance | *Polarization 0.548, 0.591, and 0.415* |
+| Heading | Inertial spin, the default | *The farthest drones turning through 3.83 of a 20° turn and 1.06 of a 90° one, polarization 0.662* |
+| Heading | Consensus | *5.00 and 0.84, polarization 0.090* |
+| Heading | Delayed | *0.37 and 0.08, polarization 0.968* |
+| Heading | Nonmutual | *2.33 and 0.62, polarization 0.497* |
+| Heading | Overdamped | *0.68 and 0.16, polarization 0.927* |
+| Heading | Quartic | *5.89 and 1.08, polarization 0.457* |
+| Noise | White, the default | *Polarization 0.796, 0.662, and 0.672 at 30, 100, and 200 drones, 0.07 spontaneous turns a second at 100* |
+| Noise | Intrinsic | *Polarization 0.609, 0.659, and 0.626, 0.06 turns a second* |
+| Noise | Persistent | *Polarization 0.337, 0.178, and 0.118, 0.04 turns a second* |
+| Noise | Vectorial | *Polarization 0.800, 0.558, and 0.608, 0.03 turns a second* |
 
-The default flock does not hold together, splitting into 9.5 groups at 100 drones with its drones 22 m from their nearest neighbors against a launch spacing of 15 m, and it is less dense at its border than at its center, where starling flocks are denser at the border[^ballerini2008b]. The elastic springs and the centroid spring each keep a small flock nearly whole and raise the border's density, but each lowers the peak of $`g(r)`$, so neither passes. A constant coupling keeps the polarization flat as the density changes, as a topological rule does, while the metric and weighted rules lose order as the flock thins. Under every heading rule the speed of a large turn reads zero, since in all but one flight fewer than three of the five shells of drones around the turning drone turned through half of a 90° turn, and in that one, under the consensus rule, the two farthest of the three shells that did turned before the nearer one, so the fit through their times gives no outward speed. On every replayed flight, the composite that flew it ranks first by one-step log-likelihood or ties for first. Its margin over the default reaches 1.6 to 1.8 where a spring pulls toward the neighbors and 2.3 under the persistent force, both of which the drift carries, though the three springs stay within 0.002 of one another. Between rules whose drifts differ less it stays under 0.2, since at one 0.02 s step per frame the Brownian increment dominates each step's residual. The noises that enter through the increment alone tie, because the replay reads only the drift.
+The default flock does not hold together, splitting into 15 groups at 100 drones with its drones 26 m from their nearest neighbors against a launch spacing of 15 m, and it is less dense at its border than at its center, where starling flocks are denser at the border[^ballerini2008b]. Its polarization of 0.66 at 100 drones sits below the 0.93 of the overdamped limit flown in the same trial, because a friction low enough to hold the bound on a turn's reach leaves the spin's transients ringing, and noiseless flights lose order once the friction falls below about 0.07 of $`\sqrt{J n_c \chi}`$, where the bound at 200 drones reads 0.058 of it. The centroid spring keeps a small flock nearer whole than the default and raises the border's density without lowering the peak of $`g(r)`$ by more than its error, and the metric rule passes on the flatness of its polarization across the spacings, which it holds near zero at every one. Every slot keeps its default all the same, since this flock's trials were flown under a heading default whose friction no flight has yet settled. The speed of a large turn reads zero under the default, the delayed, and the overdamped rules, where fewer than three of the five shells of drones around the turning drone turned through half of a 90° turn, and under 2 m/s under the two variants of the spin, against 114 m/s under the consensus rule, whose flock holds a polarization of 0.11 through the turn. On every replayed flight, the composite that flew it ranks first by one-step log-likelihood or ties for first within 0.0001. Its margin over the default reaches 14.1 to 14.5 where a spring pulls toward the neighbors and 2.2 under the persistent force, both of which the drift carries, whereas between heading rules it stays under 0.06, since at one 0.02 s step per frame the Brownian increment dominates each step's residual. The noises that enter through the increment alone tie, because the replay reads only the drift.
 
 [^ballerini2008a]: Ballerini et al. 2008. "Interaction ruling animal collective behavior depends on topological rather than metric distance: Evidence from a field study." *Proceedings of the National Academy of Sciences* 105(4): 1232–1237. <https://doi.org/10.1073/pnas.0711437105>
 
@@ -178,9 +206,23 @@ The default flock does not hold together, splitting into 9.5 groups at 100 drone
 
 [^cavagna2015]: Cavagna et al. 2015. "Flocking and Turning: a New Model for Self-organized Collective Motion." *Journal of Statistical Physics* 158(3): 601–627. <https://doi.org/10.1007/s10955-014-1119-3>
 
+[^attanasi2014]: Attanasi et al. 2014. "Information transfer and behavioural inertia in starling flocks." *Nature Physics* 10(9): 691–696. <https://doi.org/10.1038/nphys3035>
+
+[^carruitero2024]: Carruitero et al. 2024. "Inertial spin model of flocking with position-dependent forces." *Physical Review E* 110(1): 014408. <https://doi.org/10.1103/PhysRevE.110.014408>
+
 [^lizarraga2026]: Lizárraga and de Aguiar 2026. "Collective turns in spinless flocks." *Physical Review E* 114(3): 035401. <https://doi.org/10.1103/6976-lcw7>
 
 [^geiss2022]: Geiß et al. 2022. "Signal propagation and linear response in the delay Vicsek model." *Physical Review E* 106(5): 054612. <https://doi.org/10.1103/PhysRevE.106.054612>
+
+[^cavagna2026]: Cavagna et al. 2026. "Spin Waves without Spin Waves: A Case for Soliton Propagation in Starling Flocks." *Physical Review Letters* 137(9): 098301. <https://doi.org/10.1103/sppm-qsnb>
+
+[^dadhichi2020]: Dadhichi et al. 2020. "Nonmutual torques and the unimportance of motility for long-range order in two-dimensional flocks." *Physical Review E* 101(5): 052601. <https://doi.org/10.1103/PhysRevE.101.052601>
+
+[^bialek2014]: Bialek et al. 2014. "Social interactions dominate speed control in poising natural flocks near criticality." *Proceedings of the National Academy of Sciences* 111(20): 7212–7217. <https://doi.org/10.1073/pnas.1324045111>
+
+[^cavagna2022]: Cavagna et al. 2022. "Marginal speed confinement resolves the conflict between correlation and control in collective behaviour." *Nature Communications* 13(1): 2315. <https://doi.org/10.1038/s41467-022-29883-4>
+
+[^cavagna2010]: Cavagna et al. 2010. "Scale-free correlations in starling flocks." *Proceedings of the National Academy of Sciences* 107(26): 11865–11870. <https://doi.org/10.1073/pnas.1005766107>
 
 [^bialek2012]: Bialek et al. 2012. "Statistical mechanics for natural flocks of birds." *Proceedings of the National Academy of Sciences* 109(13): 4786–4791. <https://doi.org/10.1073/pnas.1118633109>
 
@@ -189,8 +231,6 @@ The default flock does not hold together, splitting into 9.5 groups at 100 drone
 [^evangelista2017]: Evangelista et al. 2017. "Three-dimensional trajectories and network analyses of group behaviour within chimney swift flocks during approaches to the roost." *Proceedings of the Royal Society B: Biological Sciences* 284(1849): 20162602. <https://doi.org/10.1098/rspb.2016.2602>
 
 [^ling2019c]: Ling et al. 2019. "Local interactions and their group-level consequences in flocking jackdaws." *Proceedings of the Royal Society B: Biological Sciences* 286(1906): 20190865. <https://doi.org/10.1098/rspb.2019.0865>
-
-[^cavagna2010]: Cavagna et al. 2010. "Scale-free correlations in starling flocks." *Proceedings of the National Academy of Sciences* 107(26): 11865–11870. <https://doi.org/10.1073/pnas.1005766107>
 
 [^caprini2021]: Caprini and Marini Bettolo Marconi 2021. "Inertial self-propelled particles." *The Journal of Chemical Physics* 154(2): 024902. <https://doi.org/10.1063/5.0030940>
 

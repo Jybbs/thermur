@@ -26,7 +26,8 @@ const idle = (): void => {}
  * through the angle the farthest fifth of the flock turns while the first
  * drone turns through the angle picked on the stops at the dial's rim, each
  * ring a moment after the one outside it, with its standard error drawn as a
- * band along its edge. Each rule's angle, its share of the turn, and that
+ * band along its edge, the ring, the band, and the bar each stopping at the
+ * first drone's turn. Each rule's angle, its share of the turn, and that
  * share's bar are read beside the dial, and a pointer over a ring or its
  * reading lifts that rule. `destroy` releases every listener, observer, and
  * frame it holds.
@@ -163,8 +164,10 @@ export class Reach {
       const error  = this.#rules[row]!.points[this.#index]!.error
       const radius = layout.radii[row]!
       const edge   = radius + layout.ring / 2 + 3
-      chart.set(ring.arc, { d: dial.arc(layout, radius, 0, shown) })
-      chart.set(ring.band, { d: dial.arc(layout, edge, Math.max(0, shown - spread), shown + spread) })
+      chart.set(ring.arc, { d: dial.arc(layout, radius, 0, Math.min(shown, turned)) })
+      chart.set(ring.band, {
+        d: dial.arc(layout, edge, Math.min(Math.max(0, shown - spread), turned), Math.min(shown + spread, turned))
+      })
       chart.set(ring.bar, { width: Math.max(0, ring.width * Math.min(1, share)) })
       chart.set(ring.whisker, {
         x1 : x0 + ring.width * Math.max(0, share - spread / turned),

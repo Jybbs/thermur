@@ -76,6 +76,33 @@ def test_a_component_outside_its_bound_fails(installed: Checkout):
     ]
 
 
+def test_a_confinement_too_stiff_for_the_step_fails(installed: Checkout):
+    """
+    Asserts that a speed slot whose curvature at some speed of the range the
+    plan names, times the step, exceeds two fails validation.
+    """
+    with raises(ValidationError, match="exceeds two within 6.9 to 15.2 m/s"):
+        Tuned(speed={"confinement_per_s": 1.0})
+
+
+@mark.parametrize(
+    "speed",
+    [
+        param({"confinement_per_s": 0.2}, id="stable"),
+        param({"confinement_per_s": 1.0, "fixed": True}, id="fixed")
+    ]
+)
+def test_a_confinement_inside_the_step_s_bound_or_a_fixed_speed_holds(
+    installed : Checkout,
+    speed     : dict[str, object]
+):
+    """
+    Asserts that a speed slot stable under the step, or one holding the
+    speed fixed, which leaves the curvature unread, passes validation.
+    """
+    assert Tuned(speed=speed).speed.confinement_per_s == speed["confinement_per_s"]
+
+
 def test_a_key_no_field_declares_fails(installed: Checkout):
     """
     Asserts that a `[tool.thermur]` key no field declares fails validation

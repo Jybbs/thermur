@@ -6,8 +6,8 @@ flock per seed, beside each statistic its frames give, which the `flight`,
 
 from diffrax    import ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
 from equinox    import Module, field, tree_at
-from jax        import Array, ShapeDtypeStruct, jit, lax, tree, vmap
-from jax.numpy  import roll, where
+from jax        import Array, jit, lax, tree, vmap
+from jax.numpy  import cross, roll, where
 from jax.random import key as seeded, split
 from numpy         import (
     angle,
@@ -403,36 +403,28 @@ class Flight(Module):
             The drift, `(n_seeds, n_frames - 1, n_drones, 3)`, in meters per
             second squared.
         """
-        velocities = asarray(self.frames.velocities)
-        lag        = self.plan.framed(composite.heading.lag_s)
-        times      = self.plan.times[:-1]
+        lag   = self.plan.framed(composite.heading.lag_s)
+        times = self.plan.times[:-1]
 
-        def drift(  # prose: ignore[unsorted-positionals]
-            forces    : Array,
-            positions : Array,
-            past      : Array,
-            moving    : Array,
-            t         : Array
-        ) -> Array:
+        def drift(flock: Flock, past: Array, t: Array) -> Array:
             """
             Computes the drift across each velocity of one flock at `t`.
             """
             sensed = Observation.sensed(
-                Flock(forces=forces, positions=positions, velocities=moving),
+                flock,
                 past,
                 air,
                 t,
-                self.plan.neighbors
+                self.plan.neighbors,
+                self.plan.cruise_m_s
             )
-            return across(vmap(composite)(sensed), moving)
+            return across(vmap(composite)(sensed)[0], flock.velocities)
 
         return jit(
-            vmap(vmap(drift), in_axes=(0, 0, 0, 0, None))
+            vmap(vmap(drift), in_axes=(0, 0, None))
         )(
-            asarray(self.frames.forces)[:, :-1],
-            asarray(self.frames.positions)[:, :-1],
-            velocities[:, clip(arange(times.size) - lag, 0, None)],
-            velocities[:, :-1],
+            tree.map(lambda frames: asarray(frames)[:, :-1], self.frames),
+            asarray(self.frames.velocities)[:, clip(arange(times.size) - lag, 0, None)],
             times
         )
 
@@ -512,8 +504,12 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     """
     Flies one flock, an outer `lax.scan` keeping every `frame_every`-th step
     of an inner one, each inner step sensing once, advancing through one
-    `Euler().step`, then applying the discrete updates, meaning the cruise
-    speed where the heading holds it and the first drone's turn.
+    `Euler().step`, then applying the discrete updates:
+
+    - The turn of each velocity at the change in spin the step reaches
+    - The speed, the cruise speed where the speed slot holds it and
+      otherwise the stepped velocity's part along the drone's heading
+    - The first drone's turn
 
     Args:
         air       : The channels each drone reads.
@@ -530,7 +526,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         0.0,
         plan.duration_s + plan.step_s,
         key   = path_key,
-        shape = tree.map(lambda leaf: ShapeDtypeStruct(leaf.shape, leaf.dtype), launch),
+        shape = launch.shapes,
         tol   = plan.resolution_s
     )
     terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
@@ -546,10 +542,24 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         """
         flock, past = state
         t           = step * plan.step_s
-        sensed      = Observation.sensed(flock, past[0], air, t, plan.neighbors)
-        moved, *_   = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
-        if composite.heading.confined:
-            moved = moved.cruising(plan.cruise_m_s)
+        sensed      = Observation.sensed(
+            flock,
+            past[0],
+            air,
+            t,
+            plan.neighbors,
+            plan.cruise_m_s
+        )
+        stepped, *_ = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
+        moved       = tree_at(
+            lambda held: held.velocities,
+            stepped,
+            stepped.velocities
+            + plan.step_s * cross(stepped.spins - flock.spins, flock.velocities)
+        ).cruising(
+            plan.cruise_m_s if composite.speed.fixed
+            else (stepped.velocities * flock.headings).sum(-1, keepdims=True)
+        )
 
         turned = tree_at(
             lambda held: held.velocities,

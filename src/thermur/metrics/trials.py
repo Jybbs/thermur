@@ -23,7 +23,10 @@ from thermur.controller.components import (
     Fitted,
     Intrinsic,
     Metric,
+    Nonmutual,
+    Overdamped,
     Persistent,
+    Quartic,
     Vectorial,
     Weighted
 )
@@ -264,7 +267,13 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
                 slot = "coupling"
             ),
             cls(
-                candidates = {"consensus": Consensus(), "delayed": Delayed()},
+                candidates = {
+                    "consensus"  : Consensus(),
+                    "delayed"    : Delayed(),
+                    "nonmutual"  : Nonmutual(),
+                    "overdamped" : Overdamped(),
+                    "quartic"    : Quartic()
+                },
                 conditions = {
                     "large"       : {"frame_every": 5, "turn_deg": 90.0},
                     "small"       : {"frame_every": 5, "turn_deg": 20.0},

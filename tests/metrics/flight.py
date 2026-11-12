@@ -42,14 +42,14 @@ from pytest        import fixture, mark, param
 
 from thermur.controller.components import (
     Centroid,
-    Consensus,
     Constant,
     Delayed,
+    Marginal,
     Overdamped,
     SoftCore,
     White
 )
-from thermur.controller.schemas import Composite, Heading, across
+from thermur.controller.schemas import Composite, across
 from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response
 from thermur.pipeline.settings  import Settings
 
@@ -60,7 +60,8 @@ STILL = Composite(
     contact  = SoftCore(stiffness_m_s2=0.0),
     coupling = Constant(coupling_per_s=0.0),
     heading  = Overdamped(),
-    noise    = White()
+    noise    = White(),
+    speed    = Marginal(fixed=True)
 )
 """
 The composite whose drift is zero on every flock.
@@ -350,29 +351,31 @@ def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
 
 
 @mark.parametrize(
-    ("heading", "held"),
-    [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
+    ("fixed", "held"),
+    [param(True, True, id="fixed"), param(False, False, id="free")]
 )
-def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
+def test_a_fixed_speed_keeps_every_drone_at_the_cruise(
     composite : Composite,
-    heading   : Heading,
+    fixed     : bool,
     held      : bool
 ):
     """
     Asserts that every drone flies every kept frame at `cruise_m_s` under a
-    heading holding the speed, and that the speeds spread under one leaving
-    it free.
+    speed slot holding the speed fixed, and that the speeds spread under one
+    leaving it free, inside the range the confinement holds.
     """
+    plan   = short()
     speeds = linalg.norm(
         Flight.flown(
-            replace(composite, heading=heading),
+            replace(composite, speed=Marginal(fixed=fixed)),
             AIR,
-            short()
+            plan
         ).frames.velocities,
         axis = -1
     )
 
-    assert allclose(speeds, 10.0, rtol=1e-4) == held
+    assert allclose(speeds, plan.cruise_m_s, rtol=1e-4) == held
+    assert plan.airspeeds_m_s[0] < speeds.min() <= speeds.max() < plan.airspeeds_m_s[1]
 
 
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
