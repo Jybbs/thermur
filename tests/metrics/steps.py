@@ -4,10 +4,7 @@ its frames and statistics as tables, and one trial step per open slot.
 """
 
 from common.drones import short, still_air
-from contextlib    import closing
-from gc            import collect
 from numpy.testing import assert_array_equal
-from threading     import Thread
 
 from thermur.controller.components import Elastic
 from thermur.controller.schemas    import Composite
@@ -18,19 +15,6 @@ from thermur.metrics.trials        import Measure, Trial
 from thermur.pipeline.graph        import Graph
 from thermur.pipeline.settings     import Settings
 from thermur.repo.checkout         import Checkout
-
-
-def test_a_run_leaves_no_connection_for_a_collection_on_another_thread(clone: Checkout):
-    """
-    Asserts that a computed graph leaves no SQLite connection open, so
-    a collection on a thread other than the one that ran it, such as the
-    thread a trial step's host callback runs on, frees the graph without the
-    `ResourceWarning` an unclosed connection raises.
-    """
-    Graph(checkout=clone).compute("composite")
-    collector = Thread(target=collect)
-    collector.start()
-    collector.join()
 
 
 def test_a_trial_step_flies_its_trial_against_the_settings_composite():
@@ -63,8 +47,7 @@ def test_each_open_slot_is_tried_by_a_step_of_its_own(clone: Checkout):
     """
     Asserts that the graph declares one trial step for each listed trial.
     """
-    with closing(Graph(checkout=clone)) as graph:
-        nodes = graph.driver.graph.nodes
+    nodes = Graph(checkout=clone).driver.graph.nodes
 
     assert {trial.name for trial in Trial.listed()} <= set(nodes)
 

@@ -11,12 +11,12 @@ from collections.abc import Callable
 from common.cached   import Pitch
 from common.runs     import computed
 from common.settings import Tuned
-from contextlib      import closing
 from dataclasses     import make_dataclass
 from decimal         import Decimal
 from enum            import IntEnum, StrEnum
 from equinox         import Module
 from functools       import partial
+from gc              import collect
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
 from importlib      import import_module
 from jax            import Array, numpy
@@ -25,6 +25,7 @@ from numpy          import float32, int32, int64, ones, zeros
 from pathlib        import Path
 from pydantic       import BaseModel, HttpUrl, create_model
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
+from threading      import Thread
 from unittest.mock  import Mock
 from uuid           import UUID
 from xarray         import DataArray, DataTree, Dataset, open_dataset
@@ -413,6 +414,25 @@ def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
         assert_identical(saved, results["table"])
 
 
+def test_a_run_leaves_no_connection_for_a_collection_on_another_thread(
+    graphed: Callable[..., Graph]
+):
+    """
+    Asserts that a collection on another thread, such as the thread a
+    trial step's host callback runs on, frees a computed graph without
+    an unraisable exception, the graph held in a reference cycle so that
+    collection alone frees it.
+    """
+    graph = graphed()
+    graph.compute("table")
+    cycle = [graph]
+    cycle.append(cycle)
+    del cycle, graph
+    collector = Thread(target=collect)
+    collector.start()
+    collector.join()
+
+
 def test_a_tagged_handler_fingerprints_each_type_its_annotation_names():
     """
     Asserts that a handler `tagged` registers reads each member of the union
@@ -618,10 +638,12 @@ def test_the_cache_keeps_nothing_of_a_saver(
     graph = graphed(recorded=True)
     graph.compute("table")
     cache = graph.driver.cache
-    with closing(graph):
-        rows = cache.metadata_store.get_run(cache.last_run_id)
 
-    assert {row["node_name"] for row in rows} == {"pipeline_digest", "table"}
+    assert {row["node_name"] for row in cache.metadata_store.get_run(
+        cache.last_run_id
+    )} == {
+        "pipeline_digest", "table"
+    }
     assert not list((clone.root / ".cache/hamilton").glob("table_saved*"))
 
 
@@ -636,12 +658,11 @@ def test_the_recorder_writes_no_record_for_an_execution_it_never_opened(
     graph  = graphed(recorded=True)
     failed = partial(graph.driver.materialize, additional_vars=["tabel"])
 
-    with closing(graph):
-        with raises(ValueError, match="Unknown nodes"):
-            failed()
-        graph.compute("table")
-        record = graph.recorder.cache.read(graph.recorder.run_id)
-        with raises(ValueError, match="Unknown nodes"):
-            failed()
+    with raises(ValueError, match="Unknown nodes"):
+        failed()
+    graph.compute("table")
+    record = graph.recorder.cache.read(graph.recorder.run_id)
+    with raises(ValueError, match="Unknown nodes"):
+        failed()
 
     assert graph.recorder.cache.read(graph.recorder.run_id) == record

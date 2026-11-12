@@ -3,7 +3,6 @@ Pins the digest steps the pipeline declares, meaning one per subpackage,
 each computing that subpackage's digest and computed again on every run.
 """
 
-from contextlib               import closing
 from hamilton.caching.adapter import CachingBehavior
 from hamilton.driver          import Builder
 from pathlib import Path
@@ -43,8 +42,7 @@ def test_each_subpackage_declares_one_digest_step(
         checkout = Checkout(root=tmp_path),
         modules  = ("thermur.pipeline.steps",)
     )
-    with closing(graph):
-        graph.driver.execute(["pipeline_digest"], inputs={"lock_digest": "lock"})
+    graph.driver.execute(["pipeline_digest"], inputs={"lock_digest": "lock"})
     cache   = graph.driver.cache
     folders = (pytestconfig.rootpath / "src/thermur").glob("*/")
 
