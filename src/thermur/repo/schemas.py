@@ -52,11 +52,14 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re           import MULTILINE, escape, findall, fullmatch, match, search, sub, subn
-from tomllib      import loads
+from re          import MULTILINE, escape, findall, fullmatch, match, search, sub, subn
+from ruamel.yaml import YAML
+from ruamel.yaml.constructor import SafeConstructor
+from ruamel.yaml.error       import MarkedYAMLError
+from ruamel.yaml.reader      import ReaderError
+from tomllib                 import loads
 from typing       import Annotated, Self
 from urllib.parse import urlsplit
-from yaml_rs      import loads as from_yaml
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type FrozenJson = frozendict[str, FrozenJson] | list[FrozenJson] | Scalar | None
@@ -152,6 +155,38 @@ def repeated[T](values: Iterable[T]) -> list[T]:
     return [value for value, count in Counter(values).items() if count > 1]
 
 
+def read_yaml(text: str) -> object:
+    """
+    Reads `text` as YAML 1.2, keeping a timestamp as its text.
+
+    Raises:
+        ValueError: Naming the problem the parser reports, where `text`
+                    fails to parse or a mapping names a key more than once.
+    """
+    yaml             = YAML(pure=True, typ="safe")
+    yaml.Constructor = TextConstructor
+
+    try:
+        return yaml.load(text)
+    except MarkedYAMLError as error:
+        raise ValueError(
+            ", ".join(filter(None, (error.context, error.problem)))
+        ) from error
+    except ReaderError as error:
+        raise ValueError(str(error).partition("\n")[0]) from error
+
+
+class TextConstructor(SafeConstructor):
+    """
+    Builds each YAML value as `SafeConstructor` does, keeping a timestamp as
+    the text it is written as.
+    """
+
+    yaml_constructors = SafeConstructor.yaml_constructors | {
+        "tag:yaml.org,2002:timestamp": SafeConstructor.construct_yaml_str
+    }
+
+
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
     """
     Maps each package `uv.lock` resolves to the version it resolves.
@@ -196,10 +231,10 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
 
         Raises:
             ValueError: Where the TOML, the JSON, or the YAML fails to
-                        parse, where a JSON object names a key more than
-                        once, or where a Markdown file opens on no front
-                        matter, which validation reports against the whole
-                        document.
+                        parse, where a JSON object or a YAML mapping names
+                        a key more than once, or where a Markdown file opens
+                        on no front matter, which validation reports against
+                        the whole document.
         """
         if suffix in (".lock", ".toml"):
             return loads(text)
@@ -209,11 +244,11 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
 
         if suffix == ".md":
             if front := search(r"(?ms)\A---\n(.*?)^---$", text):
-                return from_yaml(front[1], parse_datetime=False)
+                return read_yaml(front[1])
 
             raise ValueError("opens on no front matter")
 
-        return from_yaml(text, parse_datetime=False)
+        return read_yaml(text)
 
     @model_validator(mode="before")
     @classmethod
