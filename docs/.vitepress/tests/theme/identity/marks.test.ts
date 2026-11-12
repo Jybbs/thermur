@@ -17,8 +17,8 @@ describe('IdentityMarks', () => {
     expect(sides.map(side => side.attributes('download'))).toEqual(files)
     expect(sides.map(side => side.attributes('href'))).toEqual(files.map(file => `/base/${file}`))
     expect((sides[1]!.element as HTMLElement).style.backgroundColor).toBe(shadeOf('ground', 'dark'))
-    expect((mount(IdentityMarks).get('.identity-side-light').element as HTMLElement).style.color)
-      .toBe(shadeOf('ink', 'light'))
+    expect(sides.map(side => (side.element as HTMLElement).style.color))
+      .toEqual(Object.values(source.marks).flatMap(() => [shadeOf('ink', 'light'), shadeOf('ink', 'dark')]))
   })
 
   it('sets dusk across every card from its slider, opening at the middle', async () => {

@@ -2,8 +2,13 @@ import fs from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { styled } from '../../common/sheets.ts'
+import { computed, styled } from '../../common/sheets.ts'
 
+/**
+ * A chart series' switch, turned off.
+ */
+const OFF = '<button class="identity-switch" role="switch" aria-checked="false">'
+          + '<span class="identity-caps">Chart 1</span><svg class="identity-spark"></svg></button>'
 /**
  * The sheets the identity's widgets are drawn in.
  */
@@ -25,4 +30,9 @@ describe.for(SHEETS)('%s', sheet => {
     const drawn = styled(sheet).filter(rule => /\ba(?![\w-])|\bcode\b/u.test(rule.selectorText))
     expect(drawn.map(rule => rule.style.background)).toEqual(drawn.map(() => ''))
   })
+})
+
+it('dims only the spark of a series switched off, leaving its label at full strength', () => {
+  expect(computed(OFF, 'opacity', '.identity-switch', 'identity/palette.css')).toBe('')
+  expect(computed(OFF, 'opacity', '.identity-spark', 'identity/palette.css')).toBe('0.45')
 })

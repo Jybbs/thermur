@@ -1,6 +1,6 @@
 import type { DefaultTheme } from 'vitepress'
 
-import { wordmarkImage }    from './head.ts'
+import { wordmarkImage }     from './head.ts'
 import type { Identity }     from './identity.ts'
 import type { ProjectFacts } from './manifest.ts'
 import { navOf, sidebarOf }  from './navigation.ts'
