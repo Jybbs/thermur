@@ -8,8 +8,41 @@
 .vp-doc td:first-child code { overflow-wrap: normal; }
 
 @media (width < 40rem) {
-  .vp-doc th,
-  .vp-doc td { padding-inline: 0.5rem; }
+  .vp-doc :is(table, tbody, tr, td) { display: block; }
 
-  .vp-doc td:first-child code { overflow-wrap: anywhere; }
+  .vp-doc thead {
+    position    : absolute;
+    width       : 1px;
+    height      : 1px;
+    overflow    : hidden;
+    clip-path   : inset(50%);
+    white-space : nowrap;
+  }
+
+  .vp-doc tr {
+    padding       : 0.625rem 0.75rem;
+    border        : 1px solid var(--vp-c-divider);
+    border-radius : 0.5rem;
+  }
+
+  .vp-doc tr + tr { margin-top: 0.625rem; }
+
+  .vp-doc td {
+    padding : 0;
+    border  : 0;
+  }
+
+  .vp-doc td:first-child { margin-bottom: 0.375rem; }
+
+  .vp-doc td:not(:first-child, :last-child) { display: inline; }
+
+  .vp-doc td:not(:first-child, :last-child, :empty) + td:not(:last-child, :empty)::before {
+    content : ' · ' / '';
+    color   : var(--vp-c-text-3);
+  }
+
+  .vp-doc td:last-child {
+    margin-top : 0.25rem;
+    color      : var(--vp-c-text-2);
+  }
 }
