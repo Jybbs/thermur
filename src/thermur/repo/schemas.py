@@ -161,9 +161,10 @@ def read_yaml(text: str) -> object:
     NEL as a line break, as YAML 1.1 does.
 
     Raises:
-        ValueError: Naming the problem the parser reports, where `text`
-                    fails to parse, nests past the recursion limit, or names
-                    a key more than once in a mapping.
+        ValueError: Naming the problem the parser or the interpreter
+                    reports, where `text` fails to parse, nests past the
+                    recursion limit, or names a key more than once in
+                    a mapping.
     """
     yaml             = YAML(pure=True, typ="safe")
     yaml.Constructor = TextConstructor
