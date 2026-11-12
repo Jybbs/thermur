@@ -1,17 +1,23 @@
 """
 Holds the records the fire data is read through, meaning `Crop`, `Grid`,
-`ParametricThreat`, `Ranges`, and `Sample`, beside the constants WRF and the
-wrf-python diagnostics share.
+`ParametricThreat`, `Ranges`, and `Sample`, beside the constants WRF and
+the wrf-python diagnostics share, the bounds a record's field takes, and
+`documented`, which gives each field of an `equinox.Module` its docstring.
 """
 
+from ast                import AnnAssign, Constant, Expr, parse
+from dataclasses        import fields
+from equinox            import Module
 from hashlib            import file_digest
 from importlib.metadata import version
+from inspect            import cleandoc, getsource
 from numpy              import arange, tanh, zeros
 from pathlib            import Path
 from pydantic           import BaseModel, Field, model_validator
 from shutil             import copyfileobj
 from tarfile            import TarFile
 from tempfile           import TemporaryFile
+from textwrap           import dedent
 from typing             import Annotated, Self
 from urllib.request     import Request, urlopen
 from xarray             import DataArray, Dataset
@@ -459,3 +465,28 @@ class ParametricThreat(
             )
 
         return self
+
+
+def documented[Kind: type[Module]](kind: Kind) -> Kind:
+    """
+    Sets the `doc` of each field `kind` declares to the docstring beneath
+    it, which cyclopts renders as the field's flag help and Pydantic as
+    its description.
+
+    The docstring is read from the class's source with its indentation
+    removed, since docstring_parser 0.18.0, which cyclopts reads a
+    dataclass's attribute docstrings through, keeps each one's leading
+    newline and indentation, which the help then renders as a code block.
+    """
+    body = parse(dedent(getsource(kind))).body[0].body
+    docs = {
+        line.target.id: cleandoc(after.value.value)
+        for line, after in zip(body, body[1:], strict=False)
+        if isinstance(line, AnnAssign)
+        and isinstance(after, Expr)
+        and isinstance(after.value, Constant)
+    }
+    for declared in fields(kind):
+        declared.doc = docs.get(declared.name, declared.doc)
+
+    return kind

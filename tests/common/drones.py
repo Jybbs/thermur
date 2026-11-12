@@ -1,22 +1,26 @@
 """
 Holds the stand-ins the controller's and the flight's cases share, meaning
-one drone's view, a flock laid out by hand, a still parcel of air, and a
-short plan.
+one drone's view, a flock laid out by hand, a parcel of air holding one
+wind, and a short plan.
 """
 
 from jax.numpy import array, asarray, full, ones, zeros
 from xarray    import Dataset
 
-from thermur.controller.schemas import Flock, Observation
-from thermur.environment.air    import Air
-from thermur.metrics.schemas    import Plan
+from thermur.controller.components import Roost
+from thermur.controller.schemas    import Flock, Observation
+from thermur.environment.air       import Air
+from thermur.metrics.schemas       import Plan
 
 
-def flock_of(positions: object, velocities: object) -> Flock:
+def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
     """
-    Builds a flock at `positions` and `velocities`, holding no force.
+    Builds a flock at `positions` and `velocities`, holding no force, each
+    drone commanding `commands`, or its own velocity where `commands` is
+    `None`.
     """
     return Flock(
+        commands   = asarray(velocities if commands is None else commands),
         forces     = zeros(asarray(positions).shape),
         positions  = asarray(positions),
         velocities = asarray(velocities)
@@ -41,16 +45,25 @@ def short(**changes: object) -> Plan:
     )
 
 
-def still_air(excess: float = 0.0) -> Air:
+def still_air(
+    excess : float = 0.0,
+    wind   : tuple[float, float, float] = (0.0, 0.0, 0.0)
+) -> Air:
     """
-    Builds air holding one `excess` at every point of a small grid.
+    Builds air holding one `excess` and one `wind`, east, north, and up, at
+    every point of a small grid.
     """
     return Air.from_dataset(
         Dataset(
             {
-                "excess": (
+                name: (
                     ("Time", "height", "south_north", "west_east"),
-                    full((2, 2, 2, 2), excess)
+                    full((2, 2, 2, 2), value)
+                )
+                for name, value in zip(
+                    ("excess", "u", "v", "w"),
+                    (excess, *wind),
+                    strict = True
                 )
             },
             coords = {
@@ -70,20 +83,22 @@ def viewed(  # prose: ignore[unsorted-positionals]
     **fields : object
 ) -> Observation:
     """
-    Builds one drone's view of neighbors at `offsets`, each flying as
-    the drone does and aligning at a rate of one, unless `fields` says
-    otherwise.
+    Builds one drone's view of neighbors at `offsets`, each flying as the
+    drone does and aligning at a rate of one, the drone at the default
+    roost's center and height, unless `fields` says otherwise.
     """
     spots = array(offsets)
     own   = array(velocity)
+    roost = Roost()
     return Observation(
         **{
-            "air"       : {"excess": asarray(excess)},
+            "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
             "delayed"   : own * ones((len(offsets), 3)),
             "distances" : (spots**2).sum(-1) ** 0.5,
             "force"     : zeros(3),
             "neighbors" : own * ones((len(offsets), 3)),
             "offsets"   : spots,
+            "position"  : array([*roost.center_m, roost.height_m]),
             "velocity"  : own,
             "weights"   : ones(len(offsets)),
             **fields

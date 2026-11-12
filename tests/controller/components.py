@@ -26,12 +26,13 @@ from thermur.controller.components import (
     Morse,
     Overdamped,
     Persistent,
+    Roost,
     SoftCore,
     Vectorial,
     Weighted,
     White
 )
-from thermur.controller.schemas import Component, Composite, Noise, Observation, nearest
+from thermur.controller.schemas import Component, Composite, Inbox, Noise, Observation, nearest
 from thermur.environment.air    import Air
 from thermur.metrics.schemas    import Plan
 from thermur.metrics.trials     import Trial
@@ -58,16 +59,19 @@ def acted(
     velocities : Array
 ) -> Array:
     """
-    Computes the last drone's acceleration followed by the amplitude of its
-    velocity's noise, each drone sensing as many nearest neighbors in `air`
-    as a flight does.
+    Computes the last drone's command rate followed by the amplitude of its
+    command's noise, each drone sensing as many nearest neighbors in `air`
+    within the radio's range as a flight does, having heard each one's state
+    at once.
     """
+    flock  = flock_of(positions, velocities)
     sensed = Observation.sensed(
-        flock_of(positions, velocities),
-        velocities,
+        flock,
+        Inbox.from_broadcast(flock, flock),
         air,
         0.0,
-        NEIGHBORS
+        NEIGHBORS,
+        composite.radio.range_m
     )
     return append(
         vmap(composite)(sensed)[-1],
@@ -332,3 +336,40 @@ def test_a_persistent_force_enters_the_acceleration_and_decays():
     assert_allclose(Persistent(persistence_s=2.0).relaxation(view), -force / 2.0)
     assert_allclose(White()(view), 0.0)
     assert_allclose(White().relaxation(view), 0.0)
+
+
+@mark.parametrize(
+    ("position", "velocity", "expected"),
+    [
+        param((0.0, 0.0, 10.0), (-10.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="inside"),
+        param((-120.0, 0.0, 10.0), (-10.0, 0.0, 0.0), (0.0, -2.0, 0.0), id="outward"),
+        param((-120.0, 0.0, 10.0), (0.0, 10.0, 0.0), (1.0, 0.0, 0.0), id="along"),
+        param((-120.0, 0.0, 10.0), (10.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="inward"),
+        param((0.0, 0.0, 30.0), (10.0, 0.0, 2.0), (0.0, 0.0, -1.5), id="above")
+    ]
+)
+def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
+    expected : tuple[float, float, float],
+    position : tuple[float, float, float],
+    velocity : tuple[float, float, float]
+):
+    """
+    Asserts that the roost turns a drone outside its cylinder across its
+    heading toward the roost, at the full acceleration headed straight out,
+    half of it headed along the edge, and none headed in, leaves one inside
+    alone, and pulls one above the height down through its damped spring.
+    """
+    roost = Roost(
+        center_m         = (0.0, 0.0),
+        damping_per_s    = 0.25,
+        height_m         = 10.0,
+        radius_m         = 100.0,
+        stiffness_per_s2 = 0.05,
+        turning_m_s2     = 2.0
+    )
+
+    assert_allclose(
+        roost(viewed([[1.0, 0.0, 0.0]], velocity, position=array(position))),
+        expected,
+        atol = 1e-6
+    )

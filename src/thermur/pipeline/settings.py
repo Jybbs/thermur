@@ -10,7 +10,9 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
 from typing import Annotated
 
-from thermur.controller.components import Constant, Morse, Overdamped, SoftCore, White
+from thermur.controller.components import Constant, Morse, Overdamped, Roost, SoftCore, White
+from thermur.controller.schemas    import Radio
+from thermur.environment.plant     import Plant
 from thermur.environment.schemas   import Crop, ParametricThreat
 from thermur.metrics.schemas       import Plan
 from thermur.repo.checkout         import Checkout
@@ -66,13 +68,28 @@ class Settings(
 
     noise: White = White()
     """
-    The random increments driving each drone's velocity and force.
+    The random increments driving each drone's command and force.
     """
 
     plan: Plan = Plan()
     """
     The flock's size, its launch, the flight's length and step, and the seeds
     it flies.
+    """
+
+    plant: Plant = Plant()
+    """
+    The lag and the bounds carrying a drone's velocity toward its command.
+    """
+
+    radio: Radio = Radio()
+    """
+    The link carrying each drone's state to the others.
+    """
+
+    roost: Roost = Roost()
+    """
+    The acceleration holding a drone over the roost and near its height.
     """
 
     simulation: Path | None = None

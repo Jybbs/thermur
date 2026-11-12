@@ -90,6 +90,55 @@ Flies the flock, or computes the steps of the graph named.
 │   FLOAT                       or a drone's heading is read for a turn, in    │
 │                               seconds, longer than a step's noise on either. │
 │                               [default: 5.0]                                 │
+│ --plant.climb-m-s FLOAT       The fastest climb a command holds, in meters   │
+│                               per second, PX4's MPC_Z_VEL_MAX_UP. [default:  │
+│                               3.0]                                           │
+│ --plant.climbing-m-s2 FLOAT   The largest upward acceleration, in meters per │
+│                               second squared, PX4's MPC_ACC_UP_MAX.          │
+│                               [default: 4.0]                                 │
+│ --plant.descending-m-s2       The largest downward acceleration, in meters   │
+│   FLOAT                       per second squared, PX4's MPC_ACC_DOWN_MAX.    │
+│                               [default: 3.0]                                 │
+│ --plant.descent-m-s FLOAT     The fastest descent a command holds, in meters │
+│                               per second, PX4's MPC_Z_VEL_MAX_DN. [default:  │
+│                               1.5]                                           │
+│ --plant.lag-s FLOAT           The time constant over which a drone's         │
+│                               velocity relaxes toward its command, in        │
+│                               seconds. [default: 1.0]                        │
+│ --plant.level-m-s FLOAT       The fastest horizontal speed a command holds,  │
+│                               in meters per second, within the 0 to 20 PX4   │
+│                               allows its MPC_XY_VEL_MAX. [default: 15.2]     │
+│ --plant.level-m-s2 FLOAT      The largest horizontal acceleration, in meters │
+│                               per second squared, PX4's MPC_ACC_HOR_MAX.     │
+│                               [default: 5.0]                                 │
+│ --radio.delay-s FLOAT         The age of a broadcast as it arrives, in       │
+│                               seconds. [default: 1.0]                        │
+│ --radio.loss FLOAT            The share of the packets between two drones    │
+│                               the link loses, each loss drawn apart from     │
+│                               every other. [default: 0.4]                    │
+│ --radio.range-m FLOAT         The distance past which no drone hears         │
+│                               another, in meters. [default: 80.0]            │
+│ --radio.rate-hz FLOAT         The number of packets each drone sends each    │
+│                               second. [default: 5.0]                         │
+│ --roost.center-m FLOAT FLOAT  The roost's east and north, in meters, by      │
+│   --roost.empty-center-m      default on the parametric threat's course from │
+│                               the launch to the domain's western edge.       │
+│                               [default: (600.0, 1000.0)]                     │
+│ --roost.damping-per-s FLOAT   The rate at which the pull toward the height   │
+│                               damps the drone's commanded climb, in          │
+│                               reciprocal seconds. [default: 0.2]             │
+│ --roost.height-m FLOAT        The height the drone is pulled toward, in      │
+│                               meters above the ground. [default: 100.0]      │
+│ --roost.radius-m FLOAT        The radius of the cylinder, in meters.         │
+│                               [default: 600.0]                               │
+│ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
+│   FLOAT                       away from it, in reciprocal square seconds.    │
+│                               [default: 0.004]                               │
+│ --roost.turning-m-s2 FLOAT    The acceleration turning a drone headed        │
+│                               straight out of the cylinder, in meters per    │
+│                               second squared, half of it for a drone headed  │
+│                               along the cylinder's edge, by default PX4's    │
+│                               MPC_ACC_HOR_MAX. [default: 5.0]                │
 │ --simulation PATH             The WRF-SFIRE output the graph reads, relative │
 │                               to the clone, such as the                      │
 │                               data/samples/wrf_sample.nc the thermur fetch   │

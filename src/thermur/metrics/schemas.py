@@ -202,7 +202,7 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         Draws a flock in the thin horizontal cloud `axes` shapes, as
         Gaussian offsets whose ellipsoid at one standard deviation
         holds `spacing_m` cubed for each drone, flying the course within
-        `scatter_deg`.
+        `scatter_deg`, each commanding the velocity it launches at.
         """
         where_key, heading_key = split(key)
         lengths                = array(self.axes) / cbrt(array(self.axes).prod())
@@ -212,12 +212,14 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         basis  = stack(
             [course, horizontal(self.course_deg + 90), array([0.0, 0.0, 1.0])]
         )
-        offsets = normal(where_key, shape) * lengths * scale @ basis
-        scatter = normal(heading_key, shape) * deg2rad(array(self.scatter_deg))
+        offsets    = normal(where_key, shape) * lengths * scale @ basis
+        scatter    = normal(heading_key, shape) * deg2rad(array(self.scatter_deg))
+        velocities = self.cruise_m_s * unit(course + scatter)
         return Flock(
+            commands   = velocities,
             forces     = zeros_like(offsets),
             positions  = array(self.center_m) + offsets,
-            velocities = self.cruise_m_s * unit(course + scatter)
+            velocities = velocities
         )
 
     @model_validator(mode="after")

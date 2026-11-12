@@ -1,12 +1,13 @@
 """
 Holds the components filling each slot of the controller, each borrowed from
 another physical system and cited on the page that explains the choice among
-them, meaning the headings, the couplings, the noises, the cohesions, and
-the one contact.
+them, meaning the headings, the couplings, the noises, the cohesions, the
+one contact, and the one roost.
 """
 
 from jax        import Array
 from jax.numpy  import (
+    append,
     asarray,
     exp,
     full,
@@ -19,8 +20,8 @@ from jax.numpy  import (
 )
 from typing   import ClassVar
 
-from thermur.controller.schemas  import Component, Heading, Noise, Observation, documented, unit
-from thermur.environment.schemas import NonNegative, Positive
+from thermur.controller.schemas  import Component, Heading, Noise, Observation, unit
+from thermur.environment.schemas import NonNegative, Positive, documented
 
 
 @documented
@@ -239,10 +240,10 @@ class Intrinsic(Noise):
         spontaneous variance, leaving the force undriven.
         """
         disagreement = square(observation.neighbors - observation.velocity).sum(-1)
-        velocity     = sqrt(
+        command      = sqrt(
             square(self.spontaneous) + self.copying_per_s * disagreement.mean() / 3
         )
-        return velocity, zeros_like(velocity)
+        return command, zeros_like(command)
 
 
 @documented
@@ -404,6 +405,72 @@ class Persistent(Noise):
 
 
 @documented
+class Roost(Component):
+    """
+    The roost term of a starling flock model at drone scale, turning a
+    drone that has left a vertical cylinder about the roost, the harder the
+    further its heading points away from the roost, and pulling it toward
+    the roost's height through a damped spring.
+    """
+
+    center_m: tuple[float, float] = (600.0, 1000.0)
+    """
+    The roost's east and north, in meters, by default on the parametric
+    threat's course from the launch to the domain's western edge.
+    """
+
+    damping_per_s: NonNegative = 0.2
+    """
+    The rate at which the pull toward the height damps the drone's commanded
+    climb, in reciprocal seconds.
+    """
+
+    height_m: float = 100.0
+    """
+    The height the drone is pulled toward, in meters above the ground.
+    """
+
+    radius_m: Positive = 600.0
+    """
+    The radius of the cylinder, in meters.
+    """
+
+    stiffness_per_s2: NonNegative = 0.004
+    """
+    The acceleration toward the height per meter away from it, in
+    reciprocal square seconds.
+    """
+
+    turning_m_s2: NonNegative = 5.0
+    """
+    The acceleration turning a drone headed straight out of the cylinder, in
+    meters per second squared, half of it for a drone headed along the
+    cylinder's edge, by default PX4's `MPC_ACC_HOR_MAX`.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Sums the horizontal turn across the drone's heading, toward the
+        side that points it back at the roost, and the vertical pull toward
+        `height_m`.
+        """
+        away    = observation.position[:2] - asarray(self.center_m)
+        outward = unit(away)
+        heading = unit(observation.velocity[:2])
+        left    = asarray([-heading[1], heading[0]])
+        turn    = where(
+            linalg.norm(away) > self.radius_m,
+            self.turning_m_s2 * (1 + outward @ heading) / 2,
+            0.0
+        )
+        climbing = (
+            -self.stiffness_per_s2 * (observation.position[2] - self.height_m)
+            - self.damping_per_s * observation.velocity[2]
+        )
+        return append(turn * where(outward @ left > 0, -left, left), climbing)
+
+
+@documented
 class SoftCore(Component):
     """
     The harmonic soft-sphere contact, whose force grows linearly with
@@ -453,9 +520,9 @@ class Vectorial(Noise):
         Divides the amplitude by the length of the mean neighbor heading,
         leaving the force undriven.
         """
-        order    = linalg.norm(unit(observation.neighbors).mean(0))
-        velocity = self.amplitude / maximum(order, self.floor)
-        return velocity, zeros_like(velocity)
+        order   = linalg.norm(unit(observation.neighbors).mean(0))
+        command = self.amplitude / maximum(order, self.floor)
+        return command, zeros_like(command)
 
 
 @documented
@@ -487,7 +554,7 @@ class Weighted(Component):
 class White(Noise):
     """
     One amplitude for every drone, entering as a Brownian increment on the
-    velocity.
+    command.
     """
 
     amplitude: NonNegative = 4.2
@@ -497,7 +564,7 @@ class White(Noise):
 
     def amplitudes(self, observation: Observation) -> tuple[Array, Array]:
         """
-        Drives every velocity at one amplitude, leaving the force undriven.
+        Drives every command at one amplitude, leaving the force undriven.
         """
-        velocity = asarray(self.amplitude)
-        return velocity, zeros_like(velocity)
+        command = asarray(self.amplitude)
+        return command, zeros_like(command)

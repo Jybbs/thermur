@@ -46,10 +46,12 @@ from thermur.controller.components import (
     Constant,
     Delayed,
     Overdamped,
+    Roost,
     SoftCore,
     White
 )
-from thermur.controller.schemas import Composite, Heading, across
+from thermur.controller.schemas import Composite, Heading, Radio, across
+from thermur.environment.plant  import Plant
 from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response
 from thermur.pipeline.settings  import Settings
 
@@ -60,10 +62,14 @@ STILL = Composite(
     contact  = SoftCore(stiffness_m_s2=0.0),
     coupling = Constant(coupling_per_s=0.0),
     heading  = Overdamped(),
-    noise    = White()
+    noise    = White(),
+    plant    = Plant(),
+    radio    = Radio(delay_s=0.0, loss=0.0),
+    roost    = Roost(damping_per_s=0.0, stiffness_per_s2=0.0, turning_m_s2=0.0)
 )
 """
-The composite whose drift is zero on every flock.
+The composite whose command rate is zero on every flock, every drone hearing
+each other at once.
 """
 
 
@@ -83,11 +89,18 @@ def flight(composite: Composite) -> Flight:
     return Flight.flown(composite, AIR, short())
 
 
-def laid(positions: object, velocities: object, **changes: object) -> Flight:
+def laid(
+    positions  : object,
+    velocities : object,
+    commands   : object = None,
+    **changes  : object
+) -> Flight:
     """
     Lays a flight out by hand under the default composite, broadcasting
-    `positions` and `velocities`, each per drone or per frame and drone,
-    across every seed and frame of the short plan carrying `changes`.
+    `positions`, `velocities`, and `commands`, each per drone or per frame
+    and drone, across every seed and frame of the short plan carrying
+    `changes`, each drone commanding its velocity where `commands` is
+    `None`.
     """
     plan  = short(**changes)
     shape = (plan.seeds, plan.frames, asarray(positions).shape[-2], 3)
@@ -95,7 +108,8 @@ def laid(positions: object, velocities: object, **changes: object) -> Flight:
         composite = Composite.from_settings(Settings()),
         frames    = flock_of(
             broadcast_to(positions, shape),
-            broadcast_to(velocities, shape)
+            broadcast_to(velocities, shape),
+            None if commands is None else broadcast_to(commands, shape)
         ),
         plan = plan
     )
@@ -251,24 +265,41 @@ def test_a_replay_ranks_every_composite_it_is_given(
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
 
 
-def test_a_replay_reads_a_delayed_heading_s_neighbors_lag_s_back():
+@mark.parametrize(
+    ("delay_s", "lag_s"),
+    [
+        param(0.0, 0.2, id="lag"),
+        param(0.2, 0.0, id="delay"),
+        param(0.1, 0.1, id="both")
+    ]
+)
+def test_a_replay_reads_each_neighbor_the_radio_s_delay_and_the_lag_back(
+    delay_s : float,
+    lag_s   : float
+):
     """
     Asserts that replaying a flock whose drones all gain one meter per
-    second across the course each frame through the delayed heading at a
-    lag of two frames turns each drone toward the velocity two frames back,
-    the first frames reading the first, while the overdamped heading, every
-    neighbor flying as the drone does, turns none.
+    second across the course each frame, through the delayed heading under
+    a radio delay and a lag summing to two frames, turns each drone toward
+    the velocity two frames back, the first frames reading the first, while
+    the overdamped heading with no delay, every neighbor flying as the drone
+    does, turns none.
     """
     velocities = stack([full(20, 10.0), arange(20.0), zeros(20)], -1)
     flight     = laid(
         positions  = stack([zeros(12), 10.0 * arange(12), zeros(12)], -1),
         velocities = velocities[:, None]
     )
-    delayed = replace(STILL, coupling=Constant(), heading=Delayed(lag_s=0.2))
-    behind  = velocities[clip(arange(19) - 2, 0, None)] - velocities[:-1]
+    delayed = replace(
+        STILL,
+        coupling = Constant(),
+        heading  = Delayed(lag_s=lag_s) if lag_s else Overdamped(),
+        radio    = Radio(delay_s=delay_s, loss=0.0)
+    )
+    behind = velocities[clip(arange(19) - 2, 0, None)] - velocities[:-1]
 
     assert_allclose(
-        flight.drifts(replace(delayed, heading=Overdamped()), AIR),
+        flight.drifts(replace(STILL, coupling=Constant()), AIR),
         0.0,
         atol = 1e-5
     )
@@ -303,19 +334,24 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
-def test_a_replay_reads_the_likelihood_of_its_residual_across_each_velocity():
+def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     """
-    Asserts that a flight whose drones swing one meter per second across the
-    course and back each frame, replayed through a composite whose drift is
-    zero, reads the log-likelihood of a Gaussian in the plane across each
-    velocity, its variance per axis half the mean squared residual.
+    Asserts that a flight whose drones command a swing of one meter per
+    second across the course and back each frame, replayed through a
+    composite whose drift is zero, reads the log-likelihood of a Gaussian
+    in the plane across each command, its variance per axis half the mean
+    squared residual, whatever the velocities the drones reach.
     """
     swing  = 10.0 * stack([ones(20), arange(20) % 2 / 10.0, zeros(20)], -1)[:, None]
-    flight = laid(stack([10.0 * arange(12), zeros(12), zeros(12)], -1), swing)
-    rates  = asarray(
+    flight = laid(
+        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
+        commands   = swing,
+        velocities = [10.0, 0.0, 0.0]
+    )
+    rates = asarray(
         across(
-            diff(flight.frames.velocities, axis=1) / 0.1,
-            flight.frames.velocities[:, :-1]
+            diff(flight.frames.commands, axis=1) / 0.1,
+            flight.frames.commands[:, :-1]
         )
     )
 
@@ -359,16 +395,16 @@ def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
     held      : bool
 ):
     """
-    Asserts that every drone flies every kept frame at `cruise_m_s` under a
-    heading holding the speed, and that the speeds spread under one leaving
-    it free.
+    Asserts that every drone commands `cruise_m_s` at every kept frame under
+    a heading holding the speed, and that the commanded speeds spread under
+    one leaving it free.
     """
     speeds = linalg.norm(
         Flight.flown(
             replace(composite, heading=heading),
             AIR,
             short()
-        ).frames.velocities,
+        ).frames.commands,
         axis = -1
     )
 
@@ -462,7 +498,7 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
     composite: Composite
 ):
     """
-    Asserts that from `turn_at_s` on, the first drone flies the turned
+    Asserts that from `turn_at_s` on, the first drone commands the turned
     velocity, and the turn's speed and reach read as finite values.
     """
     plan  = short(duration_s=4.0, turn_at_s=1.0, turn_deg=90.0)
@@ -471,7 +507,7 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
     speed, reach = flown.turn_response
 
     assert_allclose(
-        flown.frames.velocities[:, 10:, 0],
+        flown.frames.commands[:, 10:, 0],
         full((2, 30, 3), plan.turned),
         atol = 1e-5
     )
