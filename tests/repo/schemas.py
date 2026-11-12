@@ -759,6 +759,11 @@ def test_a_document_reads_the_value_its_suffix_names(
             'a: "x\n',
             "while scanning a quoted scalar, found unexpected end of stream",
             id = "unclosed-quote"
+        ),
+        param(
+            "[" * 1000 + "]" * 1000,
+            "maximum recursion depth exceeded",
+            id = "past-the-recursion-limit"
         )
     ]
 )

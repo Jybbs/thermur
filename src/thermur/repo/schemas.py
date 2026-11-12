@@ -157,11 +157,13 @@ def repeated[T](values: Iterable[T]) -> list[T]:
 
 def read_yaml(text: str) -> object:
     """
-    Reads `text` as YAML 1.2, keeping a timestamp as its text.
+    Reads `text` as YAML 1.2, keeping a timestamp as its text and reading a
+    NEL as a line break, as YAML 1.1 does.
 
     Raises:
         ValueError: Naming the problem the parser reports, where `text`
-                    fails to parse or a mapping names a key more than once.
+                    fails to parse, nests past the recursion limit, or names
+                    a key more than once in a mapping.
     """
     yaml             = YAML(pure=True, typ="safe")
     yaml.Constructor = TextConstructor
@@ -172,7 +174,7 @@ def read_yaml(text: str) -> object:
         raise ValueError(
             ", ".join(filter(None, (error.context, error.problem)))
         ) from error
-    except ReaderError as error:
+    except (ReaderError, RecursionError) as error:
         raise ValueError(str(error).partition("\n")[0]) from error
 
 
