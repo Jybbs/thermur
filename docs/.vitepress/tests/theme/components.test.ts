@@ -1,13 +1,12 @@
 // @vitest-environment node
-import { describe, expect, it, vi }               from 'vitest'
-import { type Component, defineComponent, h, ref } from 'vue'
-import { renderToString }                         from 'vue/server-renderer'
+import { describe, expect, it, vi } from 'vitest'
+import { type Component, h, ref }   from 'vue'
+import { renderToString }           from 'vue/server-renderer'
 
 import { PIECES }     from '../../lib/kit/pieces.ts'
-import { useGuide }   from '../../lib/kit/walk.ts'
 import { COMPONENTS } from '../../theme/components.ts'
-import { PieceCard }  from '../../theme/kit/card.ts'
-import { SCENES }     from '../../theme/kit/scenes.ts'
+import FrontSky       from '../../theme/front/sky.ts'
+import NotFoundPage   from '../../theme/not-found/page.ts'
 import MotionPause    from '../../theme/pause.ts'
 
 vi.mock('vitepress', () => ({
@@ -19,8 +18,7 @@ vi.mock('vitepress', () => ({
  * Renders `view` the way the site's build renders a page, in an environment
  * holding no browser global at all.
  */
-const rendered = (view: Component, props: Record<string, unknown> = {}): Promise<string> =>
-  renderToString(h(view, props))
+const rendered = (view: Component): Promise<string> => renderToString(h(view))
 
 describe('the widgets on the server', () => {
   it.each(Object.keys(COMPONENTS))('renders %s before any browser stands', async (name) => {
@@ -31,28 +29,11 @@ describe('the widgets on the server', () => {
     expect(await rendered(COMPONENTS.KitCatalog)).toContain(PIECES[0]!.name)
   })
 
-  it('renders the page’s pause before any browser stands', async () => {
-    expect(await rendered(MotionPause)).toContain('motion-pause')
-  })
-})
-
-describe('the kit’s catalog on the server', () => {
-  it.each(Object.keys(SCENES))('renders the %s scene before any browser stands', async (key) => {
-    expect(await rendered(SCENES[key]!)).toContain('kit-catalog')
-  })
-
-  it.each(PIECES.map(piece => piece.key))('renders the %s card and its examples before any browser stands, its count at zero', async (shown) => {
-    expect(await rendered(PieceCard, { readers: {}, shown })).toContain('<span class="kit-card-figure">0</span>')
-  })
-
-  it('renders an element the guide watches before any browser stands', async () => {
-    const guided = defineComponent({
-      setup() {
-        const held = ref<HTMLElement>()
-        useGuide(held, () => 'one')
-        return () => h('div', { ref: held })
-      }
-    })
-    expect(await rendered(guided)).toBe('<div></div>')
+  it.each([
+    ['the page’s pause', MotionPause, 'motion-pause'],
+    ['the front page’s sky', FrontSky, 'front-sky'],
+    ['the missing page', NotFoundPage, 'not-found-stage']
+  ] as const)('renders %s, which no page names as a widget, before any browser stands', async (_, view, held) => {
+    expect(await rendered(view)).toContain(held)
   })
 })

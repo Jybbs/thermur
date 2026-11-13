@@ -201,7 +201,8 @@ const Motion = defineComponent({
     onBeforeUnmount(() => stop())
     return () => h('div', { class: 'kit-catalog-scene' }, [
       h('div', { class: 'kit-catalog-plate', ref: host }),
-      part('gate', [playing('Fly the flock', loop.running.value, loop.run), h(Gate)], true),
+      part('loop', playing('Fly the flock', loop.running.value, loop.run)),
+      part('gate', h(Gate)),
       part('timing', h('div', { class: 'kit-catalog-row' }, [
         turn(gathered.value ? 'Let it loose' : 'Gather the flock', gather)
       ]), true)

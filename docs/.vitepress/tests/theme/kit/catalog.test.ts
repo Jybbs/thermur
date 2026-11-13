@@ -94,6 +94,14 @@ describe('KitCatalog’s guide and card', () => {
     expect(widget.findAll('.kit-catalog-corner')).toHaveLength(4)
   })
 
+  it.for(PIECES.map(piece => piece.key))('sets the piece %s out on the stage and brackets it once the walk reaches it', async (key) => {
+    const { widget } = mounted()
+    await widget.getComponent(Radios).vm.$emit('change', key)
+    await widget.vm.$nextTick()
+    expect(widget.find(`.kit-catalog-stage [data-piece="${key}"]`).exists()).toBe(true)
+    expect(widget.get('.kit-catalog-guide').attributes('data-placed')).toBe('')
+  })
+
   it('counts the modules reading the shown piece, and reads none where the page sets no readers', async () => {
     const { widget } = mounted()
     await widget.getComponent(Radios).vm.$emit('change', 'slider')

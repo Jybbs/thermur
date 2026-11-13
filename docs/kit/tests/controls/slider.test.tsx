@@ -72,6 +72,18 @@ describe('Slider’s keys', () => {
   })
 
   it.for([
+    { key: 'ArrowRight', to: 40 },
+    { key: 'ArrowUp', to: 40 },
+    { key: 'ArrowLeft', to: 20 },
+    { key: 'ArrowDown', to: 20 }
+  ])('takes $key under Shift to $to, ten steps at once along or across the track', async ({ key, to }) => {
+    const widget = slider(30)
+    await widget.get('[role=slider]').trigger('keydown', { key, shiftKey: true })
+    expect(widget.emitted('change')).toEqual([[to]])
+    expect(widget.emitted('commit')).toEqual([[to]])
+  })
+
+  it.for([
     { key: 'ArrowRight', to: 60 },
     { key: 'ArrowUp', to: 60 },
     { key: 'ArrowLeft', to: 45 },

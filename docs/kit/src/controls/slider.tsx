@@ -7,10 +7,10 @@ import { type PropType, computed, defineComponent, useId } from 'vue'
  */
 const ARROWS: Readonly<Record<string, -1 | 1>> = { ArrowDown: -1, ArrowLeft: -1, ArrowRight: 1, ArrowUp: 1 }
 /**
- * The machine's step each arrow key across the track takes, since the
+ * The machine's event each arrow key across the track sends, since the
  * `slider` machine handles neither Up nor Down on a level slider.
  */
-const ACROSS: Readonly<Record<string, 'decrement' | 'increment'>> = { ArrowDown: 'decrement', ArrowUp: 'increment' }
+const ACROSS: Readonly<Record<string, 'DECREMENT' | 'INCREMENT'>> = { ArrowDown: 'DECREMENT', ArrowUp: 'INCREMENT' }
 /**
  * How far past a stop a value may sit and still read as standing on it.
  */
@@ -80,7 +80,7 @@ export const Slider = defineComponent({
         emit('commit', stepped(props.stops, props.value, direction))
       } else if (across !== undefined) {
         event.preventDefault()
-        api.value[across](0)
+        service.send({ index: 0, step: service.prop(event.shiftKey ? 'largeStep' : 'step'), type: across })
       }
     }
     return () => (

@@ -163,12 +163,15 @@ function canvas(): Pick<Browser, 'built' | 'context' | 'pen' | 'resize' | 'wrote
 }
 
 /**
- * Installs animation frames a case runs by hand on a clock of its own.
+ * Installs animation frames a case runs by hand on a clock of its own, which
+ * `performance.now` reads as well, as a browser's frames and its clock share
+ * one timeline.
  */
 function frames(): Frames & { pending: Map<number, FrameRequestCallback> } {
   const pending = new Map<number, FrameRequestCallback>()
   let   next    = 0
   let   clock   = 0
+  vi.spyOn(performance, 'now').mockImplementation(() => clock)
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     pending.set(++next, callback)
     return next

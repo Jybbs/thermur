@@ -55,6 +55,19 @@ async function play(chart: Charted): Promise<void> {
   await chart.widget.vm.$nextTick()
 }
 
+/**
+ * Plays the sweep on a chart of its own, runs one frame coming `late`
+ * milliseconds after the sweep starts, and reads where the handle stands.
+ */
+async function swept(late: number): Promise<string | null> {
+  const chart = charted(RulesSpacing, 672)
+  await play(chart)
+  chart.stand.frames.run(1, late)
+  const at = chart.host.querySelector('.rules-handle')!.getAttribute('cx')
+  chart.widget.unmount()
+  return at
+}
+
 enableAutoUnmount(afterEach)
 
 afterEach(() => {
@@ -166,6 +179,12 @@ describe('the sweep', () => {
     expect(parts(chart).player.getAttribute('aria-pressed')).toBe('false')
     expect(['10 m', '15 m', '25 m']).toContain(parts(chart).readout)
     expect(chart.stand.held().frames).toBe(0)
+  })
+
+  it('moves on by a tenth of a second at most, however late a frame comes', async () => {
+    const tenth = await swept(100)
+    expect(tenth).not.toBe(await swept(50))
+    expect(await swept(2000)).toBe(tenth)
   })
 
   it('names its toggle for what it plays', async () => {

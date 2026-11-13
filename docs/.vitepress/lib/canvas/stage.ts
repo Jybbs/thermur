@@ -1,17 +1,15 @@
-import { onMotion, still } from '@thermur/kit'
+import { Frames, still } from '@thermur/kit'
 
 import type { Scheme }                from '../identity.ts'
 import type { Geometry, Mount, Part } from './part.ts'
 
 /**
  * The observers a stage holds: one watching its canvas come on and off the
- * screen, one watching the root element's scheme, one watching its canvas and
- * the page's body change size, and the release of the kit's watch on the
- * page's pause and the reduced-motion preference.
+ * screen, one watching the root element's scheme, and one watching its canvas
+ * and the page's body change size.
  */
 interface Observers {
   intersection : IntersectionObserver
-  motion       : () => void
   mutation     : MutationObserver
   resize       : ResizeObserver
 }
@@ -22,8 +20,8 @@ interface Observers {
 const STALL = 0.05
 
 /**
- * A canvas, which fits its parts to the page, steps them on the browser's
- * frames while the canvas is on screen and motion runs, paints them in the
+ * A canvas, which fits its parts to the page, steps them on the kit's frame
+ * loop while the canvas is on screen and motion runs, paints them in the
  * order given, and hands each a click on the canvas. Motion stands still for a
  * reader who prefers reduced motion and while the page's pause is on, where the
  * stage paints one frame and then again only on a scroll, a pointer, a click, a
@@ -36,14 +34,12 @@ export class Stage {
   readonly #client   : [number, number] = [0, 0]
   readonly #context  : CanvasRenderingContext2D
   #dpr               = 1
-  #frame             = 0
   readonly #g        : Geometry
-  #last              = 0
+  readonly #loop     : Frames
   readonly #observed : Observers
   readonly #parts    : readonly Part[]
   readonly #pinned   : boolean
   readonly #pointer  : [number, number] = [0, 0]
-  #running           = false
   #size              = { h: 0, page: 0, w: 0 }
   #visible           = false
 
@@ -65,9 +61,9 @@ export class Stage {
       w       : 0
     }
     host.append(this.#canvas)
+    this.#loop     = new Frames(seconds => this.#step(Math.min(STALL, seconds)), this.#onRoot)
     this.#observed = {
       intersection : new IntersectionObserver(this.#onSeen),
-      motion       : onMotion(this.#onRoot),
       mutation     : new MutationObserver(this.#onRoot),
       resize       : new ResizeObserver(this.#onResize)
     }
@@ -117,14 +113,11 @@ export class Stage {
   }
 
   /**
-   * Starts the frames where the canvas is on screen, motion runs, and none is
-   * already scheduled.
+   * Runs the frame loop where the canvas is on screen and motion runs, and
+   * otherwise stops it.
    */
   #kick(): void {
-    if (this.#running || !this.#visible || still()) return
-    this.#running = true
-    this.#last    = 0
-    this.#frame   = requestAnimationFrame(this.#tick)
+    this.#loop.run(this.#visible)
   }
 
   /**
@@ -241,22 +234,13 @@ export class Stage {
   }
 
   /**
-   * Steps and paints the parts on one frame and schedules the next, a stalled
-   * frame counting as `STALL` seconds at most, or stops where the canvas left
-   * the screen or motion stood still.
+   * Steps the parts on by `dt` seconds and paints them.
    */
-  readonly #tick = (now: number): void => {
-    if (!this.#visible || still()) {
-      this.#running = false
-      return
-    }
-    const dt   = this.#last === 0 ? 1 / 60 : Math.min(STALL, (now - this.#last) / 1000)
-    this.#last = now
+  #step(dt: number): void {
     this.#g.t += dt
     const g    = this.#geometry()
     for (const part of this.#parts) part.step?.(dt, g)
     this.#paint()
-    this.#frame = requestAnimationFrame(this.#tick)
   }
 
   /**
@@ -264,9 +248,8 @@ export class Stage {
    * canvas.
    */
   destroy(): void {
-    cancelAnimationFrame(this.#frame)
+    this.#loop.destroy()
     this.#observed.intersection.disconnect()
-    this.#observed.motion()
     this.#observed.mutation.disconnect()
     this.#observed.resize.disconnect()
     this.#abort.abort()

@@ -18,7 +18,7 @@ The catalog below walks the kit one piece at a time, its stage setting out each 
 | Toggle | `Toggle` | `toggle` | A reader turns a state on and off with one button, as the page's pause and the coupling chart's play knob do | The button the page's pause set its own pressed state on and the knob the coupling chart drew to play its sweep |
 | Markup | `markup` | None | A chart writes its SVG, setting its colors and faces from the identity's custom properties, and draws again at each width it takes | The SVG helpers of the charts' own module and the width watch of their motion helpers |
 | The Gate | `onMotion`, `pause`, `paused`, `still` | None | A drawing moves on its own and stands still while the page's pause is on or for a reader who prefers reduced motion | The pause helpers under the canvas folder, the reduced-motion query each stage made of its own, and the motion helpers the charts read |
-| The Loop | `Frames`, `useLoop` | None | A drawing moves on its own frame by frame, starting only while the gate lets motion run and stopping as the gate stands motion still | The frame loop the catalog's scenes ran from the site's modules, and the one the coupling chart wrote by hand for its sweep |
+| The Loop | `Frames`, `useLoop` | None | A drawing moves on its own frame by frame, starting only while the gate lets motion run and stopping as the gate stands motion still | The frame loop the coupling chart wrote by hand for its sweep, and the one the front page's canvas ran |
 | Timing | `idle`, `tween` | None | A drawing eases from one state to the next over the theme's settling time, holding idle as what stops it while none runs | The transition the charts' motion helpers ran, and the do-nothing stopper each chart declared for itself |
 
 <!-- /pieces -->
