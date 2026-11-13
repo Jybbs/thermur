@@ -35,4 +35,4 @@ def sample(
     """
     root, pinned = Checkout.installed().root, Sample()
     output       = WrfOutput.from_sample(source, sample=pinned, settings=Settings())
-    print(output.write(root / pinned.path).relative_to(root))
+    print(output.write(root / pinned.path, sample=pinned).relative_to(root))

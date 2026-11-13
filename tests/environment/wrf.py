@@ -223,22 +223,29 @@ def test_a_cut_is_written_compressed_and_reads_back_as_the_output_cut(
     """
     Asserts that a written output reads back through `from_path` as the
     dataset it held, each data variable compressed with zlib, `XTIME`
-    holding each snapshot's time in minutes, and WRF's grid attributes
-    giving the sizes of the levels, the rows, and the columns the crop keeps
-    rather than those of the output it was cut from.
+    holding each snapshot's time in minutes, WRF's grid attributes giving
+    the sizes of the levels, the rows, and the columns the crop keeps rather
+    than those of the output it was cut from, and the sample's license and
+    source.
     """
     data   = threat.dataset
     output = WrfOutput.from_dataset(
         data.assign_attrs({"BOTTOM-TOP_GRID_DIMENSION": data.sizes["bottom_top_stag"]}),
         crop = crop
     )
-    path = output.write(tmp_path / "samples" / "wrf_sample.nc")
+    path = output.write(tmp_path / "samples" / "wrf_sample.nc", sample=Sample())
 
     with open_dataset(path, engine="netcdf4") as written:
         assert all(written[name].encoding["zlib"] for name in written.data_vars)
         assert written.XTIME.values.tolist() == [0.0, 0.25, 0.5]
         assert written.XTIME.attrs["description"] == "minutes since simulation start"
         assert written.attrs["BOTTOM-TOP_GRID_DIMENSION"].dtype == "int32"
+        assert written.attrs["license"] == "CC BY 4.0"
+        assert written.attrs["source"] == (
+            "Cut from wrfout_W5F7R4 of the WRF-SFIRE LES Synthetic Wildfire Plume "
+            "Dataset by Nadya Moisseeva and Roland Stull, "
+            "https://doi.org/10.20383/102.0314"
+        )
 
     assert_identical(
         WrfOutput.from_path(path, crop=crop).dataset.load(),
@@ -253,7 +260,7 @@ def test_a_cut_is_written_compressed_and_reads_back_as_the_output_cut(
                 "WEST-EAST_GRID_DIMENSION"     : 21,
                 "WEST-EAST_PATCH_END_STAG"     : 21,
                 "WEST-EAST_PATCH_END_UNSTAG"   : 20
-            }
+            } | Sample().attributes
         )
     )
 
@@ -270,7 +277,10 @@ def test_a_cut_writes_its_snapshots_at_a_fixed_size(
     """
     source = tmp_path / "wrfout.nc"
     threat.dataset.to_netcdf(source, engine="netcdf4", unlimited_dims=["Time"])
-    path = WrfOutput.from_path(source, crop=crop).write(tmp_path / "wrf_sample.nc")
+    path = WrfOutput.from_path(source, crop=crop).write(
+        tmp_path / "wrf_sample.nc",
+        sample = Sample()
+    )
 
     with open_dataset(path, engine="netcdf4") as written:
         assert not written.encoding["unlimited_dims"]

@@ -131,7 +131,13 @@ def test_a_fetch_moves_nothing_from_a_file_with_another_digest(tmp_path: Path):
     """
     sample = served(b"CDF", tmp_path / "bucket", digest="0" * 64)
 
-    with raises(ValueError, match=f"hashes to `{sha256(b'CDF').hexdigest()}`"):
+    with raises(
+        ValueError,
+        match = (
+            f"hashes to `{sha256(b'CDF').hexdigest()}` rather than the pinned "
+            f"`{'0' * 64}`"
+        )
+    ):
         sample.fetch(tmp_path / "clone")
 
     assert list((tmp_path / "clone/data/samples").iterdir()) == []
@@ -261,7 +267,7 @@ def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():
         param(
             Sample(),
             "https://data.thermur.fyi/samples/"
-            "e046eeddac6576bea4922804fe36a15c585762e19b0681c76898a95e63521946/"
+            "1c5a78ff6997c40b18b8ac80e47f2886c15f4f50f53ee7521fffbf9edbd28126/"
             "wrf_sample.nc",
             id = "the-pinned-sample"
         ),
@@ -282,6 +288,25 @@ def test_a_sample_addresses_its_file_under_a_key_carrying_its_digest(
     digest takes an address of its own.
     """
     assert sample.address == address
+
+
+def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
+    """
+    Asserts that the attributes a written sample carries name its license
+    and, as its source, the simulation and the dataset's DOI the sample
+    holds.
+    """
+    assert Sample(
+        dataset    = "https://doi.org/10.0000/test",
+        license    = "CC0 1.0",
+        simulation = "wrfout_W3F1R0"
+    ).attributes == {
+        "license" : "CC0 1.0",
+        "source"  : (
+            "Cut from wrfout_W3F1R0 of the WRF-SFIRE LES Synthetic Wildfire Plume "
+            "Dataset by Nadya Moisseeva and Roland Stull, https://doi.org/10.0000/test"
+        )
+    }
 
 
 @mark.parametrize(
@@ -409,7 +434,7 @@ def test_a_sample_takes_a_window_holding_its_figures():
 def test_a_second_fetch_replaces_the_file_afresh(tmp_path: Path):
     """
     Asserts that fetching again over an earlier fetch replaces the file, so
-    a file edited since reads as the dataset publishes it.
+    a file edited since reads as the bucket serves it.
     """
     sample = served(b"CDF", tmp_path / "bucket")
     sample.fetch(tmp_path / "clone").write_bytes(b"edited")
@@ -576,4 +601,4 @@ def test_the_bucket_serves_the_pinned_file_at_its_address():
 
     with urlopen(request, timeout=Sample().timeout_s) as response:
         assert response.status == 200
-        assert int(response.headers["Content-Length"]) == 455334207
+        assert int(response.headers["Content-Length"]) == 455334719

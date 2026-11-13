@@ -382,13 +382,14 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         """
         return cls.from_dataset(threat.dataset, crop=crop)
 
-    def write(self, path: Path) -> Path:
+    def write(self, path: Path, *, sample: Sample) -> Path:
         """
         Writes the cropped output to `path` as one NetCDF-4 file through
         netCDF4, each data variable compressed with zlib, `XTIME` restored
-        from the snapshots' times, and WRF's grid attributes giving the
+        from the snapshots' times, WRF's grid attributes giving the
         sizes the crop keeps, so `from_path` reads the file as it reads
-        a simulation.
+        a simulation, and the license and the source `Sample.attributes`
+        composes for `sample`.
 
         Returns:
             `path`, once written.
@@ -409,7 +410,7 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
                     ("PATCH_END_STAG", f"{name}_stag"),
                     ("PATCH_END_UNSTAG", name)
                 )
-            }
+            } | sample.attributes
         )
         written.to_netcdf(
             path,

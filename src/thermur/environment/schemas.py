@@ -246,9 +246,15 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     snapshot and in the last, in square meters.
     """
 
+    dataset: str = "https://doi.org/10.20383/102.0314"
+    """
+    The DOI of the WRF-SFIRE LES Synthetic Wildfire Plume Dataset, which
+    Nadya Moisseeva and Roland Stull publish and the sample is cut from.
+    """
+
     digest: Annotated[str, Field(
         pattern = r"^[0-9a-f]{64}$"
-    )] = "e046eeddac6576bea4922804fe36a15c585762e19b0681c76898a95e63521946"
+    )] = "1c5a78ff6997c40b18b8ac80e47f2886c15f4f50f53ee7521fffbf9edbd28126"
     """
     The SHA-256 digest of the file.
     """
@@ -280,6 +286,12 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The length of the domain the output covers from west to east, in meters.
     """
 
+    license: str = "CC BY 4.0"
+    """
+    The license the dataset is published under, which the sample stays
+    under.
+    """
+
     simulation: str = "wrfout_W5F7R4"
     """
     The output of the plume dataset the sample is cut from.
@@ -307,6 +319,22 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
         `digest`, so each cut of the sample takes an address of its own.
         """
         return f"{self.host}/samples/{self.digest}/{self.file.as_posix()}"
+
+    @property
+    def attributes(self) -> dict[str, str]:
+        """
+        Composes the global attributes a written sample carries, its
+        `license` and its `source`, which names `simulation` and the
+        dataset's creators and DOI.
+        """
+        return {
+            "license" : self.license,
+            "source"  : (
+                f"Cut from {self.simulation} of the WRF-SFIRE LES Synthetic "
+                f"Wildfire Plume Dataset by Nadya Moisseeva and Roland Stull, "
+                f"{self.dataset}"
+            )
+        }
 
     @property
     def path(self) -> Path:
