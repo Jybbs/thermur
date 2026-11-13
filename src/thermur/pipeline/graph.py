@@ -1,13 +1,13 @@
 """
 Holds `Graph`, which runs the Hamilton steps of every subpackage over
 one `Settings` through a driver whose cache keeps each result under
-`.cache/hamilton/`, beside `Recorder`, which records each run of a recorded
-graph under `data/runs/`, and the NetCDF adapters, `NetcdfWriter` saving
-each table a run computes and `NetcdfReader` and `NetcdfTreeReader` opening
-one. The module registers the adapters with Hamilton as it runs, and a
-fingerprint reading the type and the values of each array, xarray object,
-record, component, and path. It runs once a line first reads a name it
-defines.
+`.cache/hamilton/`, each connection to its store a `CacheConnection`, beside
+`Recorder`, which records each run of a recorded graph under `data/runs/`,
+and the NetCDF adapters, `NetcdfWriter` saving each table a run computes
+and `NetcdfReader` and `NetcdfTreeReader` opening one. The module registers
+the adapters with Hamilton as it runs, and a fingerprint reading the type
+and the values of each array, xarray object, record, component, and path. It
+runs once a line first reads a name it defines.
 """
 
 from collections.abc import Callable, Mapping, Sequence, Set
@@ -25,6 +25,7 @@ from hamilton.caching.fingerprinting import (
     hash_set,
     hash_value
 )
+from hamilton.caching.stores.sqlite import SQLiteMetadataStore
 from hamilton.driver                import Builder, Driver
 from hamilton.io.data_adapters      import DataLoader, DataSaver
 from hamilton.io.materialization    import to
@@ -35,12 +36,32 @@ from numpy     import asarray, generic, ndarray
 from os        import chdir
 from pathlib   import PurePath
 from pydantic  import AnyUrl, BaseModel, Field
+from sqlite3   import Connection
 from uuid      import UUID
 from xarray    import DataArray, DataTree, Dataset, open_dataset, open_datatree
 
 from thermur.pipeline.schemas  import Run, Subpackage
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
+
+
+class CacheConnection(Connection):
+    """
+    A connection to the cache's SQLite store that closes itself once freed,
+    on whichever thread frees it.
+
+    Hamilton's store keeps one connection per thread and, once deleted,
+    closes only the connection of the thread deleting it. A collection
+    deleting the store on another thread therefore frees this thread's
+    connection, which closes here rather than raising `ResourceWarning`,
+    since the store opens each connection with `check_same_thread=False`.
+    """
+
+    def __del__(self):
+        """
+        Closes the connection as it is freed.
+        """
+        self.close()
 
 
 @dataclass(frozen=True)
@@ -200,18 +221,24 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     def driver(self) -> Driver:
         """
         Builds the Hamilton driver over the steps `modules` declares, with
-        its cache under `.cache/hamilton/` and the `recorder` where the
+        its cache under `.cache/hamilton/`, whose SQLite store opens each
+        connection as a `CacheConnection`, and the `recorder` where the
         graph records its runs.
 
         The cache runs every saver on every run and stores nothing of it, so
         a recorded run writes each table it saves into its own folder.
         """
+        path = self.checkout.root / ".cache" / "hamilton"
         return (
             Builder()
             .with_modules(*map(import_module, self.modules))
             .with_cache(
                 default_saver_behavior = "disable",
-                path = self.checkout.root / ".cache" / "hamilton"
+                metadata_store         = SQLiteMetadataStore(
+                    path,
+                    connection_kwargs = {"factory": CacheConnection}
+                ),
+                path = path
             )
             .with_adapters(*[self.recorder] if self.recorded else [])
             .build()
