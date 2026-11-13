@@ -23,8 +23,9 @@ export const idle = (): void => {}
 
 /**
  * Runs `step` with the eased share of a transition `scale` times the theme's
- * settling time long, a first frame stamped before it began taking no share
- * at all, once with 1 where that time is zero, and returns what stops it.
+ * settling time long, or once with 1 where that time is zero, and returns
+ * what stops it. A first frame stamped before the transition began takes no
+ * share at all.
  */
 export function tween(step: (share: number) => void, scale = 1): () => void {
   const length = settle() * scale
