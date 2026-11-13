@@ -651,7 +651,8 @@ class Manifest(Document, title="pyproject.toml"):
 class Package(Document, title="docs/package.json"):
     """
     The pins `docs/package.json` declares that restate another pin or that
-    another pin restates, each an exact version, as Bun installs it.
+    another pin restates, each an exact version, as Bun installs it, and the
+    specifier `overrides` gives each package.
     """
 
     coverage: str = Field(
@@ -659,6 +660,13 @@ class Package(Document, title="docs/package.json"):
     )
     """
     The release of Vitest's coverage provider the site's suite runs under.
+    """
+
+    overrides: frozendict[str, str] = frozendict()
+    """
+    The release or range each rule of `overrides` gives, by the key naming
+    its package, so a nested rule fails validation and a scoped key such as
+    `a>b` reads in whole as a name.
     """
 
     types: Major = Field(validation_alias=AliasPath("devDependencies", "@types/node"))
