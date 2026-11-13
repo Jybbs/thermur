@@ -15,11 +15,11 @@ export interface Option {
 
 /**
  * A group of radios on the `radio-group` machine, each a label over a radio
- * input the browser keeps out of sight, so a press picks one, the arrow keys
- * move the choice around the group, and a screen reader hears the group's
- * name from `label`. A thumb the machine measures slides under the radio that
- * is on, and the `item` slot draws what stands before each radio's words. It
- * holds no choice of its own, showing whatever `value` the caller passes back.
+ * input Zag keeps out of sight, so a press picks one, the arrow keys move the
+ * choice along the row, and a screen reader reads the group's name from
+ * `label`. A thumb the machine measures slides under the radio that is on,
+ * and the `item` slot draws what stands before each radio's words. It holds
+ * no choice of its own, showing whatever `value` the caller passes back.
  */
 export const Radios = defineComponent({
   name  : 'Radios',
@@ -35,6 +35,7 @@ export const Radios = defineComponent({
     const service = useMachine(radio.machine, computed(() => ({
       id,
       onValueChange : ({ value }: radio.ValueChangeDetails) => emit('change', value!),
+      orientation   : 'horizontal' as const,
       value         : props.value
     })))
     const api     = computed(() => radio.connect(service, normalizeProps))

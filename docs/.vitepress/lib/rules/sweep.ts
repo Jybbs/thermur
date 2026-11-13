@@ -1,4 +1,4 @@
-import { idle, markup, onMotion, still, tween } from '@thermur/kit'
+import { Frames, idle, markup, tween } from '@thermur/kit'
 
 import * as common   from '../common.ts'
 import * as measured from './measured.ts'
@@ -36,21 +36,19 @@ export function spoken(stops: readonly number[], value: number): string {
  * launch spacing set on a track drawn into the chart. `drag` sets every rule's
  * dot at once on the straight line between the measured spacings, `settle`
  * glides it to the measured spacing nearest a value, and `play` sweeps it from
- * the densest launch to the sparsest and back, each heard through `view`, so
+ * the densest launch to the sparsest and back, each reported through `view`, so
  * the controls standing over the track follow it. Each rule's value is read at
  * the end of its row, a dashed tie runs from each dot to the default's value
  * with the widest gap labeled, and a pointer over a row lifts it. `destroy`
  * releases every listener, observer, and frame it holds.
  */
 export class Sweep {
-  #frame             = 0
   #gap               : SVGElement | undefined
   #guide             : SVGElement | undefined
   readonly #host     : HTMLElement
-  #last              = 0
   #layout            : spacing.Layout | undefined
   #lifted            = -1
-  readonly #moving   : () => void
+  readonly #loop     : Frames
   #phase             = 0
   #rail              : spacing.Rail | undefined
   readonly #released : () => void
@@ -75,8 +73,8 @@ export class Sweep {
     this.#stops    = rules[0]!.points.map(point => point.given)
     this.#spacing  = this.#stops[0]!
     this.#released = markup.widthOf(host, width => this.#draw(width))
-    this.#moving   = onMotion(() => {
-      if (this.#frame && still()) this.settle(this.#spacing)
+    this.#loop     = new Frames(seconds => this.#advance(seconds), (standing) => {
+      if (standing && this.#loop.running) this.settle(this.#spacing)
     })
   }
 
@@ -96,7 +94,7 @@ export class Sweep {
       'width'      : width
     })
     this.#layout   = layout
-    this.#rail     = spacing.drawRail(layout, this.#frame !== 0, plot, this.#spacing, this.#stops)
+    this.#rail     = spacing.drawRail(layout, this.#loop.running, plot, this.#spacing, this.#stops)
     this.#guide    = spacing.drawAxis(layout, plot)
     this.#rows     = this.#rules.map((rule, place) => spacing.drawRow(layout, place, plot, rule))
     this.#gap      = markup.text(markup.FACE.mono, 10.5, '', 0, 0, { ...spacing.MUTED, ...spacing.MIDDLE })
@@ -124,8 +122,7 @@ export class Sweep {
    * Stops the sweep, setting the knob back to play.
    */
   #halt(): void {
-    cancelAnimationFrame(this.#frame)
-    this.#frame = 0
+    this.#loop.run(false)
     this.#rail?.glyph.setAttribute('d', spacing.GLYPH.play)
     this.#view.played(false)
   }
@@ -152,35 +149,26 @@ export class Sweep {
    * nothing for a reader whose motion stands still.
    */
   play(): void {
-    if (this.#frame) {
+    if (this.#loop.running) {
       this.settle(this.#spacing)
       return
     }
-    if (still()) return
     const [lo, hi] = [this.#stops[0]!, this.#stops.at(-1)!]
-    this.#stop()
     this.#phase    = Math.acos(1 - 2 * (this.#spacing - lo) / (hi - lo)) / (Math.PI * 2)
-    this.#last     = 0
-    this.#frame    = requestAnimationFrame(this.#run)
+    if (!this.#loop.run(true)) return
+    this.#stop()
     this.#rail?.glyph.setAttribute('d', spacing.GLYPH.pause)
     this.#view.played(true)
   }
 
   /**
-   * Moves the sweep on to the frame at `now`, settling it where motion has
-   * come to stand still.
+   * Moves the sweep on by `seconds`, at most a tenth of a second, so a frame
+   * that comes late skips no part of the sweep.
    */
-  readonly #run = (now: number): void => {
-    if (still()) {
-      this.settle(this.#spacing)
-      return
-    }
+  #advance(seconds: number): void {
     const [lo, hi] = [this.#stops[0]!, this.#stops.at(-1)!]
-    const dt       = this.#last ? Math.min(0.1, (now - this.#last) / 1000) : 0
-    this.#last     = now
-    this.#phase    = (this.#phase + dt / this.#tuning.sweep) % 1
+    this.#phase    = (this.#phase + Math.min(0.1, seconds) / this.#tuning.sweep) % 1
     this.#show(lo + (hi - lo) * (0.5 - 0.5 * Math.cos(this.#phase * Math.PI * 2)))
-    this.#frame    = requestAnimationFrame(this.#run)
   }
 
   /**
@@ -241,6 +229,6 @@ export class Sweep {
     this.#halt()
     this.#stop()
     this.#released()
-    this.#moving()
+    this.#loop.destroy()
   }
 }

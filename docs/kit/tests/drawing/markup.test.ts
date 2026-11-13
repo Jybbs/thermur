@@ -32,7 +32,7 @@ describe('the helpers that write a drawing’s markup', () => {
     expect(muted.style.getPropertyValue('fill')).toBe('var(--vp-c-text-2)')
   })
 
-  it('calls back with a width only once the box takes one it was not drawn at', () => {
+  it('calls back only once the box takes a nonzero width other than the one last drawn', () => {
     const stand   = browser()
     const host    = box('rules-host')
     const widths  = [0, 640, 640.3, 390]

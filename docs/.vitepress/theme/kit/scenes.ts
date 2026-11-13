@@ -1,10 +1,9 @@
-import { Chip, Radios, Select, Slider, Toggle, idle, markup, onMotion, pause, paused, still, tween }  from '@thermur/kit'
-import { type Component, type Ref, defineComponent, h, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
+import { Chip, Radios, Select, Slider, Toggle, idle, markup, onMotion, pause, paused, still, tween, useLoop } from '@thermur/kit'
+import { type Component, type Ref, defineComponent, h, onBeforeUnmount, onMounted, ref, watchEffect }         from 'vue'
 
 import { lerp }                                                 from '../../lib/common.ts'
 import { FUELS, Front, GROUND, SNAPSHOT, SPAN, WINDS, reachOf } from '../../lib/kit/front.ts'
 import { Flight }                                               from '../../lib/kit/flight.ts'
-import { useLoop }                                              from '../../lib/kit/loop.ts'
 import { STEPS, part, playing, turn, useSteps }                 from './parts.ts'
 
 /**
@@ -171,7 +170,7 @@ export const Gate = defineComponent({
  * The motion a widget passes through the kit: the flock wheeling over the
  * ground while a toggle flies it and the gate lets it, the page's pause
  * beside it, and a press gathering the flock in or letting it loose again
- * over the theme's settling time.
+ * over three times the theme's settling time.
  */
 const Motion = defineComponent({
   name: 'KitMotionScene',

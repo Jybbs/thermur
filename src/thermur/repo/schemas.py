@@ -583,6 +583,12 @@ class Package(Document, title="docs/package.json"):
     The release of Vitest the site's suite runs on.
     """
 
+    workspaces: tuple[str, ...] = ()
+    """
+    The folders under `docs/` each holding a package of the site's
+    workspace, beside a manifest of its own.
+    """
+
     @property
     def folder(self) -> Path:
         """
@@ -590,6 +596,18 @@ class Package(Document, title="docs/package.json"):
         where every Bun command reading the site's packages runs.
         """
         return self.file.parent
+
+    @property
+    def manifests(self) -> tuple[Path, ...]:
+        """
+        Names `docs/package.json` beside the manifest of each package of the
+        site's workspace, relative to the root, every manifest Bun reads to
+        resolve the site's lockfile.
+        """
+        return (
+            self.file,
+            *(self.folder / workspace / "package.json" for workspace in self.workspaces)
+        )
 
 
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):

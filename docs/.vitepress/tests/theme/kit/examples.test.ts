@@ -75,3 +75,19 @@ describe('the controls’ examples', () => {
     expect(stand.held().frames).toBe(0)
   })
 })
+
+describe('the loop’s example', () => {
+  it('counts the seconds its clock runs, and stops counting once pressed again', async () => {
+    const stand  = browser()
+    vi.spyOn(performance, 'now').mockReturnValue(0)
+    const widget = mount(EXAMPLES.loop!['A Running Clock']!, { attachTo: document.body })
+    widget.getComponent(Toggle).vm.$emit('change', true)
+    stand.frames.run(3, 100)
+    await widget.vm.$nextTick()
+    expect(widget.get('.kit-catalog-said').text()).toBe('0.3 s')
+    widget.getComponent(Toggle).vm.$emit('change', false)
+    stand.frames.run(3, 100)
+    await widget.vm.$nextTick()
+    expect([widget.get('.kit-catalog-said').text(), stand.held().frames]).toEqual(['0.3 s', 0])
+  })
+})

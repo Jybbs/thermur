@@ -1,0 +1,16 @@
+{
+  "name": "The Loop",
+  "exports": [
+    "Frames",
+    "useLoop"
+  ],
+  "machine": null,
+  "when": "A drawing moves on its own frame by frame, starting only while the gate lets motion run and stopping as the gate stands motion still",
+  "replaces": "The frame loop the catalog's scenes ran from the site's modules, and the one the coupling chart wrote by hand for its sweep",
+  "examples": [
+    {
+      "name": "A Running Clock",
+      "says": "Playing counts the seconds the loop has run, and the page's pause or a preference for reduced motion stops the count where it stands."
+    }
+  ]
+}

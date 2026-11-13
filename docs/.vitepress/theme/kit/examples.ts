@@ -1,4 +1,4 @@
-import { Chip, Radios, Select, Slider, idle, tween }                                        from '@thermur/kit'
+import { Chip, Radios, Select, Slider, idle, tween, useLoop }                               from '@thermur/kit'
 import { type Component, defineComponent, h, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue'
 
 import { FUELS, GROUND, SPAN, WINDS } from '../../lib/kit/front.ts'
@@ -12,8 +12,8 @@ import { Gate, Width }                from './scenes.ts'
 const READINGS = ['0 m', '18 m', '72 m', '144 m', '300 m'] as const
 
 /**
- * A bar easing from empty to full over the theme's settling time on each
- * press, starting again from empty on a second one.
+ * A bar easing from empty to full over three times the theme's settling time
+ * on each press, starting again from empty on a second one.
  */
 const Ease = defineComponent({
   name: 'KitEase',
@@ -56,6 +56,18 @@ export const EXAMPLES: Readonly<Record<string, Readonly<Record<string, Component
   },
   gate: {
     'The Page\'s Pause': Gate
+  },
+  loop: {
+    'A Running Clock': defineComponent({
+      setup() {
+        const seconds = ref(0)
+        const loop    = useLoop(step => seconds.value += step)
+        return () => h('div', { class: 'kit-catalog-row' }, [
+          playing('Run the clock', loop.running.value, loop.run),
+          h('span', { class: 'kit-catalog-said' }, `${seconds.value.toFixed(1)} s`)
+        ])
+      }
+    })
   },
   markup: {
     'Drawn at Each Width': Width

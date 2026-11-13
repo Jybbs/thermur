@@ -71,8 +71,8 @@ export const text = (
 
 /**
  * Calls `changed` with the host's width, rounded to a pixel, whenever the host
- * changes to a width it has not been drawn at, returning what releases the
- * observer.
+ * takes a nonzero width other than the one it was last drawn at, returning
+ * what releases the observer.
  */
 export function widthOf(host: HTMLElement, changed: (width: number) => void): () => void {
   let drawn      = 0

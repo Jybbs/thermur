@@ -622,7 +622,10 @@ class Site(Manager):
 
         with TemporaryDirectory(prefix="thermur-") as scratch:
             copy = Checkout(root=scratch)
-            self.checkout.copy([package.file, package.folder / "bun.lock"], copy.root)
+            self.checkout.copy(
+                [*package.manifests, package.folder / "bun.lock"],
+                copy.root
+            )
 
             for lag in lags:
                 lag.write(copy.root)

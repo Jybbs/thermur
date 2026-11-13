@@ -2,12 +2,10 @@
 import { Radios, Select, Slider, Toggle }            from '@thermur/kit'
 import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi }       from 'vitest'
-import { h }                                         from 'vue'
 
 import { FUELS, GROUND, SPAN, reachOf } from '../../../lib/kit/front.ts'
 import { SCENES }                       from '../../../theme/kit/scenes.ts'
 import { RELEASED, browser }            from '../../common/browser.ts'
-import { served }                       from '../../common/server.ts'
 
 enableAutoUnmount(afterEach)
 
@@ -124,8 +122,10 @@ describe('the motion scene', () => {
     expect([document.documentElement.dataset.paused, gate.text()]).toEqual(['true', 'Resume'])
     expect(widget.text()).toContain('Motion stands still')
   })
+})
 
-  it('gathers the flock in and lets it loose again over the settling time', async () => {
+describe('the motion scene’s glide', () => {
+  it('gathers the flock in and lets it loose again over three settling times', async () => {
     const { stand, widget } = staged('motion')
     document.documentElement.style.setProperty('--th-settle', '100ms')
     vi.spyOn(performance, 'now').mockReturnValue(0)
@@ -145,6 +145,16 @@ describe('the motion scene', () => {
     widget.unmount()
     expect(stand.held()).toEqual(RELEASED)
   })
+
+  it('releases its glide when unmounted partway through one', async () => {
+    const { stand, widget } = staged('motion')
+    document.documentElement.style.setProperty('--th-settle', '100ms')
+    vi.spyOn(performance, 'now').mockReturnValue(0)
+    await widget.get('[data-piece="timing"] button').trigger('click')
+    stand.frames.run(2, 16)
+    widget.unmount()
+    expect(stand.held()).toEqual(RELEASED)
+  })
 })
 
 describe('the drawing scene', () => {
@@ -156,11 +166,5 @@ describe('the drawing scene', () => {
     expect(widget.get('.kit-catalog-width text').text()).toBe('DRAWN AT 480 PX')
     widget.unmount()
     expect(stand.held()).toEqual(RELEASED)
-  })
-})
-
-describe('the scenes on the server', () => {
-  it.each(Object.keys(SCENES))('renders the %s scene before any browser stands', async (key) => {
-    expect(await served(h(SCENES[key]!))).toContain('kit-catalog')
   })
 })

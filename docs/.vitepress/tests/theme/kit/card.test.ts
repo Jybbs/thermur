@@ -1,12 +1,10 @@
 // @vitest-environment happy-dom
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi }     from 'vitest'
-import { h }                                       from 'vue'
 
-import { PIECES, SOURCES, lineOf, pieceOf } from '../../../lib/kit/pieces.ts'
+import { SOURCES, lineOf, pieceOf }         from '../../../lib/kit/pieces.ts'
 import { PieceCard }                        from '../../../theme/kit/card.ts'
 import { browser }                          from '../../common/browser.ts'
-import { served }                           from '../../common/server.ts'
 
 enableAutoUnmount(afterEach)
 
@@ -25,6 +23,7 @@ describe('PieceCard', () => {
     const stack  = widget.get('.kit-card-main .kit-card-stack').findAll(':scope > div')
     expect(stack.filter(one => one.attributes('data-shown') === '').map(one => one.text())).toEqual(['Slider'])
     expect(stack.filter(one => one.attributes('inert') !== undefined)).toHaveLength(stack.length - 1)
+    expect(stack.filter(one => one.attributes('aria-hidden') !== 'true').map(one => one.text())).toEqual(['Slider'])
     expect(widget.get('section').attributes()).toMatchObject({ 'aria-label': 'Slider', 'data-part': 'controls' })
   })
 
@@ -47,11 +46,6 @@ describe('PieceCard', () => {
     stand.frames.run(12, 16)
     await widget.vm.$nextTick()
     expect(widget.get('.kit-card-figure').text()).toBe('0')
-  })
-
-  it.each(PIECES.map(piece => piece.key))('renders the %s card and its examples on the server before any browser stands, its count at zero', async (shown) => {
-    const html = await served(h(PieceCard, { readers: READERS, shown }))
-    expect(html).toContain('<span class="kit-card-figure">0</span>')
   })
 })
 

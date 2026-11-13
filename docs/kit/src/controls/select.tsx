@@ -4,12 +4,14 @@ import { type PropType, computed, defineComponent, useId } from 'vue'
 
 /**
  * A menu on the `select` machine, a button that opens a list of `choices`
- * below it and picks one, with the keys and the focus the ARIA select-only
- * combobox pattern sets and the name `label` gives it for a screen reader. The
- * button stacks every choice's words in one cell and shows only the one
- * picked, so it stands at its widest choice's width and a pick moves nothing
- * around it. It holds no pick of its own, showing whichever choice `picked`
- * places and reporting each new pick's place through `change`.
+ * below it and picks one, with the role and states of the ARIA select-only
+ * combobox pattern, the keys of a native menu, so a letter, Home, or End on
+ * the closed button picks a choice without opening the list, and the name
+ * `label` gives it for a screen reader. The button stacks every choice's
+ * words in one cell and shows only the one picked, so it stands at its widest
+ * choice's width and a pick moves nothing around it. It holds no pick of its
+ * own, showing whichever choice `picked` places and reporting each new pick's
+ * place through `change`.
  */
 export const Select = defineComponent({
   name  : 'Select',

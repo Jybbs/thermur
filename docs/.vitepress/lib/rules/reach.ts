@@ -10,11 +10,11 @@ import type { Rule } from './measured.ts'
  * drone turns through the angle `go` picks, each ring a moment after the one
  * outside it, with its standard error drawn as a band along its edge. A stop
  * per turn is drawn on the dial's rim, its dot showing while its turn is
- * picked, and `placed` hears where each stop stands at each width, so the
- * radios that pick a turn can stand over them. Each rule's angle, its share of
- * the turn, and that share's bar are read beside the dial, and a pointer over
- * a ring or its reading lifts that rule. `destroy` releases every listener,
- * observer, and frame it holds.
+ * picked, and `placed` is called with where each stop stands at each width,
+ * so the radios that pick a turn can stand over them. Each rule's angle, its
+ * share of the turn, and that share's bar are read beside the dial, and a
+ * pointer over a ring or its reading lifts that rule. `destroy` releases every
+ * listener, observer, and frame it holds.
  */
 export class Reach {
   #errors            : number[]

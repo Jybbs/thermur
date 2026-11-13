@@ -41,6 +41,12 @@ describe('Radios', () => {
     expect((items[2]!.element as HTMLElement).style.left).toBe('4px')
   })
 
+  it('lays its radios along a row, so the thumb slides by its left edge', () => {
+    const widget = radios('a')
+    expect(widget.get('[role=radiogroup]').attributes('aria-orientation')).toBe('horizontal')
+    expect((widget.get('.kit-radios-thumb').element as HTMLElement).style.left).toBe('var(--left)')
+  })
+
   it('reports a pick and shows whatever its caller passes back', async () => {
     const widget = radios('a')
     await widget.findAll('input[type=radio]')[2]!.trigger('click')

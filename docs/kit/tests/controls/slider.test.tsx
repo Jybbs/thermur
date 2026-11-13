@@ -30,7 +30,9 @@ describe('a step between stops', () => {
     { direction: 1, from: 52, name: 'the next stop from between two', to: 60 },
     { direction: -1, from: 52, name: 'the last stop from between two', to: 45 },
     { direction: 1, from: 120, name: 'the end, and no further', to: 120 },
-    { direction: -1, from: 0, name: 'the start, and no further', to: 0 }
+    { direction: -1, from: 0, name: 'the start, and no further', to: 0 },
+    { direction: -1, from: 45 + 1e-9, name: 'the last stop from a hair past one', to: 30 },
+    { direction: 1, from: 45 - 1e-9, name: 'the next stop from a hair short of one', to: 60 }
   ] as const)('lands on $name', ({ direction, from, to }) => {
     expect(stepped(STOPS, from, direction)).toBe(to)
   })
@@ -47,9 +49,19 @@ describe('Slider', () => {
     })
   })
 
+  it('shows whatever value its caller passes back', async () => {
+    const widget = slider(30)
+    await widget.setProps({ value: 90 })
+    expect(widget.get('[role=slider]').attributes('aria-valuenow')).toBe('90')
+  })
+})
+
+describe('Slider’s keys', () => {
   it.for([
     { key: 'ArrowRight', to: 31 },
     { key: 'ArrowLeft', to: 29 },
+    { key: 'ArrowUp', to: 31 },
+    { key: 'ArrowDown', to: 29 },
     { key: 'Home', to: 0 },
     { key: 'End', to: 120 }
   ])('takes $key to $to without stops, reporting the change and its end', async ({ key, to }) => {
@@ -77,11 +89,5 @@ describe('Slider', () => {
     const widget = slider(52, STOPS)
     await widget.get('[role=slider]').trigger('keydown', { key: 'End' })
     expect(widget.emitted('commit')).toEqual([[120]])
-  })
-
-  it('shows whatever value its caller passes back', async () => {
-    const widget = slider(30)
-    await widget.setProps({ value: 90 })
-    expect(widget.get('[role=slider]').attributes('aria-valuenow')).toBe('90')
   })
 })

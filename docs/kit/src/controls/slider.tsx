@@ -7,6 +7,11 @@ import { type PropType, computed, defineComponent, useId } from 'vue'
  */
 const ARROWS: Readonly<Record<string, -1 | 1>> = { ArrowDown: -1, ArrowLeft: -1, ArrowRight: 1, ArrowUp: 1 }
 /**
+ * The machine's step each arrow key across the track takes, since the
+ * `slider` machine handles neither Up nor Down on a level slider.
+ */
+const ACROSS: Readonly<Record<string, 'decrement' | 'increment'>> = { ArrowDown: 'decrement', ArrowUp: 'increment' }
+/**
  * How far past a stop a value may sit and still read as standing on it.
  */
 const ON_STOP = 1e-6
@@ -24,13 +29,14 @@ export function stepped(stops: readonly number[], value: number, direction: -1 |
 
 /**
  * A slider on the `slider` machine, setting one number between `min` and `max`
- * by a drag along its track or by the keys the ARIA slider pattern sets, each
- * value it takes reported through `change` and the release that ends a drag
- * through `commit`. Given `stops`, an arrow key steps to the next stop rather
- * than by `step` and reports through `commit`, so a caller can glide there. It
- * holds no value of its own, showing whatever `value` the caller passes back,
- * and a drawing laid beneath it can draw its own track and thumb, the kit's
- * stylesheet leaving both clear under `kit-slider-over`.
+ * by a drag along its track or by the keys the ARIA slider pattern sets, Up
+ * and Down among them, each value it takes reported through `change` and the
+ * release that ends a drag through `commit`. Given `stops`, an arrow key steps
+ * to the next stop rather than by `step` and reports through `commit`, so a
+ * caller can glide there. It holds no value of its own, showing whatever
+ * `value` the caller passes back, and a drawing laid beneath it can draw its
+ * own track and thumb, the kit's stylesheet leaving both clear under
+ * `kit-slider-over`.
  */
 export const Slider = defineComponent({
   name  : 'Slider',
@@ -68,9 +74,14 @@ export const Slider = defineComponent({
     const api       = computed(() => slider.connect(service, normalizeProps))
     const onKeydown = (event: KeyboardEvent): void => {
       const direction = ARROWS[event.key]
-      if (props.stops.length === 0 || direction === undefined) return
-      event.preventDefault()
-      emit('commit', stepped(props.stops, props.value, direction))
+      const across    = ACROSS[event.key]
+      if (props.stops.length > 0 && direction !== undefined) {
+        event.preventDefault()
+        emit('commit', stepped(props.stops, props.value, direction))
+      } else if (across !== undefined) {
+        event.preventDefault()
+        api.value[across](0)
+      }
     }
     return () => (
       <div {...api.value.getRootProps()} class="kit-slider">

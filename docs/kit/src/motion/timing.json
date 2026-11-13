@@ -10,7 +10,7 @@
   "examples": [
     {
       "name": "Ease Again",
-      "says": "Each press eases the bar from empty over the theme's settling time, which drops to nothing for a reader who prefers reduced motion."
+      "says": "Each press eases the bar from empty over three times the theme's settling time, which drops to nothing for a reader who prefers reduced motion."
     }
   ]
 }

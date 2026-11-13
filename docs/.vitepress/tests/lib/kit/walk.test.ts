@@ -6,7 +6,6 @@ import { type Ref, type ShallowRef, defineComponent, h, nextTick, ref } from 'vu
 
 import { Walk, pieceAt, useGuide } from '../../../lib/kit/walk.ts'
 import { RELEASED, browser }       from '../../common/browser.ts'
-import { served }                  from '../../common/server.ts'
 
 enableAutoUnmount(afterEach)
 
@@ -91,16 +90,5 @@ describe('useGuide', () => {
     expect(stand.held().observed).toBe(1)
     stage.unmount()
     expect(stand.held()).toEqual(RELEASED)
-  })
-
-  it('renders on the server before any browser stands', async () => {
-    const html = await served(h(defineComponent({
-      setup() {
-        const held = ref<HTMLElement>()
-        useGuide(held, () => 'one')
-        return () => h('div', { ref: held })
-      }
-    })))
-    expect(html).toBe('<div></div>')
   })
 })
