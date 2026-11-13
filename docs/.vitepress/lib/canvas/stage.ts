@@ -1,14 +1,17 @@
+import { onMotion, still } from '@thermur/kit'
+
 import type { Scheme }                from '../identity.ts'
 import type { Geometry, Mount, Part } from './part.ts'
-import { paused }                     from './pause.ts'
 
 /**
  * The observers a stage holds: one watching its canvas come on and off the
- * screen, one watching the root element's scheme and pause, and one watching
- * its canvas and the page's body change size.
+ * screen, one watching the root element's scheme, one watching its canvas and
+ * the page's body change size, and the release of the kit's watch on the
+ * page's pause and the reduced-motion preference.
  */
 interface Observers {
   intersection : IntersectionObserver
+  motion       : () => void
   mutation     : MutationObserver
   resize       : ResizeObserver
 }
@@ -36,7 +39,6 @@ export class Stage {
   #frame             = 0
   readonly #g        : Geometry
   #last              = 0
-  readonly #motion   : MediaQueryList
   readonly #observed : Observers
   readonly #parts    : readonly Part[]
   readonly #pinned   : boolean
@@ -50,7 +52,6 @@ export class Stage {
     this.#pinned  = pinned
     this.#canvas  = document.createElement('canvas')
     this.#context = this.#canvas.getContext('2d')!
-    this.#motion  = window.matchMedia('(prefers-reduced-motion: reduce)')
     this.#g       = {
       doc     : null,
       dy      : 0,
@@ -66,17 +67,17 @@ export class Stage {
     host.append(this.#canvas)
     this.#observed = {
       intersection : new IntersectionObserver(this.#onSeen),
+      motion       : onMotion(this.#onRoot),
       mutation     : new MutationObserver(this.#onRoot),
       resize       : new ResizeObserver(this.#onResize)
     }
     this.#observed.intersection.observe(this.#canvas)
-    this.#observed.mutation.observe(document.documentElement, { attributeFilter: ['class', 'data-paused'] })
+    this.#observed.mutation.observe(document.documentElement, { attributeFilter: ['class'] })
     this.#observed.resize.observe(this.#canvas)
     this.#observed.resize.observe(document.body)
     const { signal }                 = this.#abort
     const moves: GlobalEventHandlers = pinned ? window : this.#canvas
     const leaves                     = pinned ? document.documentElement : this.#canvas
-    this.#motion.addEventListener('change', this.#onRoot, { signal })
     window.addEventListener('scroll', this.#onScroll, { passive: true, signal })
     moves.addEventListener('pointermove', this.#onPointer, { passive: true, signal })
     leaves.addEventListener('pointerleave', this.#onLeave, { signal })
@@ -99,14 +100,6 @@ export class Stage {
   }
 
   /**
-   * Reads whether the drawing stands still, for a reader who prefers reduced
-   * motion or while the page's pause is on.
-   */
-  get #still(): boolean {
-    return this.#motion.matches || paused()
-  }
-
-  /**
    * Updates the record the parts read to this frame and returns it, placing the
    * pointer of a pinned stage on the page as it is now scrolled.
    */
@@ -117,7 +110,7 @@ export class Stage {
     g.dy             = window.scrollY
     g.page           = this.#size.page
     g.scheme         = this.#scheme
-    g.still          = this.#still
+    g.still          = still()
     this.#pointer[0] = this.#client[0]
     this.#pointer[1] = this.#client[1] + (this.#pinned ? g.dy : 0)
     return g
@@ -128,7 +121,7 @@ export class Stage {
    * already scheduled.
    */
   #kick(): void {
-    if (this.#running || !this.#visible || this.#still) return
+    if (this.#running || !this.#visible || still()) return
     this.#running = true
     this.#last    = 0
     this.#frame   = requestAnimationFrame(this.#tick)
@@ -159,7 +152,7 @@ export class Stage {
    */
   readonly #onLeave = (): void => {
     this.#g.pointer = null
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -171,7 +164,7 @@ export class Stage {
     this.#client[0] = this.#pinned ? event.clientX : event.offsetX
     this.#client[1] = this.#pinned ? event.clientY : event.offsetY
     this.#g.pointer = this.#pointer
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -181,7 +174,7 @@ export class Stage {
   readonly #onPress = (): void => {
     const g = this.#geometry()
     for (const part of this.#parts) part.press?.(g)
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -210,7 +203,7 @@ export class Stage {
    * Repaints as the page scrolls where the drawing stands still.
    */
   readonly #onScroll = (): void => {
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -253,7 +246,7 @@ export class Stage {
    * the screen or motion stood still.
    */
   readonly #tick = (now: number): void => {
-    if (!this.#visible || this.#still) {
+    if (!this.#visible || still()) {
       this.#running = false
       return
     }
@@ -273,6 +266,7 @@ export class Stage {
   destroy(): void {
     cancelAnimationFrame(this.#frame)
     this.#observed.intersection.disconnect()
+    this.#observed.motion()
     this.#observed.mutation.disconnect()
     this.#observed.resize.disconnect()
     this.#abort.abort()

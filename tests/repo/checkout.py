@@ -415,6 +415,7 @@ def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Che
     "written",
     [
         "docs/.vitepress/.temp/_headers", "docs/.vitepress/dist/_headers",
+        "docs/kit/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs",
         "docs/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs"
     ]
 )

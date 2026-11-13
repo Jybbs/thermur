@@ -1,0 +1,16 @@
+{
+  "name": "Timing",
+  "exports": [
+    "idle",
+    "tween"
+  ],
+  "machine": null,
+  "when": "A drawing eases from one state to the next over the theme's settling time, holding idle as what stops it while none runs",
+  "replaces": "The transition the charts' motion helpers ran, and the do-nothing stopper each chart declared for itself",
+  "examples": [
+    {
+      "name": "Ease Again",
+      "says": "Each press eases the bar from empty over the theme's settling time, which drops to nothing for a reader who prefers reduced motion."
+    }
+  ]
+}

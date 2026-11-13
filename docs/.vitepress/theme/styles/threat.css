@@ -73,44 +73,10 @@
 }
 
 .threat-rail {
-  appearance    : none;
-  background    : transparent;
-  border-radius : 1rem;
-  bottom        : 0;
-  cursor        : ew-resize;
-  height        : 1.875rem;
-  left          : calc(var(--threat-rail-left) - 0.875rem);
-  margin        : 0;
-  position      : absolute;
-  touch-action  : pan-y;
-  width         : calc(100% - var(--threat-rail-left) - var(--threat-rail-right) + 1.75rem);
-}
-
-.threat-rail::-webkit-slider-runnable-track {
-  appearance : none;
-  background : transparent;
-  height     : 100%;
-}
-
-.threat-rail::-webkit-slider-thumb {
-  appearance : none;
-  background : transparent;
-  height     : 1.875rem;
-  width      : 1.75rem;
-}
-
-.threat-rail::-moz-range-track { background: transparent; }
-
-.threat-rail::-moz-range-thumb {
-  background : transparent;
-  border     : 0;
-  height     : 1.875rem;
-  width      : 1.75rem;
-}
-
-.threat-rail:focus-visible {
-  outline        : 2px solid var(--vp-c-brand-1);
-  outline-offset : -2px;
+  bottom   : 0;
+  height   : 1.875rem;
+  left     : calc(var(--threat-rail-left) - 0.875rem);
+  width    : calc(100% - var(--threat-rail-left) - var(--threat-rail-right) + 1.75rem);
 }
 
 .threat-chips {
@@ -119,27 +85,4 @@
   gap             : 0.5rem;
   justify-content : center;
   margin-top      : 0.75rem;
-}
-
-.threat-chip {
-  align-items   : baseline;
-  border        : 1px solid var(--vp-c-divider);
-  border-radius : 999px;
-  display       : inline-flex;
-  gap           : 0.375rem;
-  padding       : 0.25rem 0.6875rem 0.25rem 0.625rem;
-}
-
-.threat-chip-name {
-  color          : var(--vp-c-text-2);
-  font           : 500 0.62rem / 1 var(--vp-font-family-mono);
-  letter-spacing : 0.1em;
-  text-transform : uppercase;
-}
-
-.threat-chip-value {
-  display              : inline-block;
-  font                 : 400 0.82rem / 1.4 var(--vp-font-family-mono);
-  font-variant-numeric : tabular-nums;
-  text-align           : right;
 }

@@ -143,7 +143,7 @@ describe('the stage standing still', () => {
     window.dispatchEvent(new Event('scroll'))
     point(window, { clientX: 40, clientY: 50 })
     document.documentElement.classList.add('dark')
-    stand.mutate()
+    stand.mutate('class')
     window.scrollTo(0, 200)
     window.dispatchEvent(new Event('scroll'))
     document.documentElement.dispatchEvent(new Event('pointerleave'))

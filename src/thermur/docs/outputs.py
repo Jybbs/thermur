@@ -1,9 +1,10 @@
 """
 Holds `Outputs`, the files the `docs:render` task writes into the site
 and every Markdown page git tracks, which `repo:audit` holds the committed
-copies to, beside `tabled`, which lays a record's fields out as the table
-a page's region holds, and `specimens`, which lays out the identity as the
-regions of The Visual Identity.
+copies to, beside `tabled`, which lays a record's fields out as the table a
+page's region holds, `specimens`, which lays out the identity as the regions
+of The Visual Identity, and `pieces`, which lays out the kit's pieces as the
+region of The Kit.
 """
 
 from collections.abc import Collection, Iterable, Iterator, Mapping
@@ -12,7 +13,8 @@ from json            import dumps
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.docs.pages          import Page
+from thermur.docs.kit   import Piece
+from thermur.docs.pages import Page
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -105,13 +107,17 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         page, by the page's path and then by the region's name, meaning the
         fields `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare
         on the Data page, on The Interaction Rules the fields `Plan` and the
-        contact declare beside those of each open slot's default and each of
-        its candidates, every one named for its component, and on The Visual
-        Identity the identity as `specimens` lays it out.
+        contact declare beside those of each open slot's default and each
+        of its candidates, every one named for its component, on The Visual
+        Identity the identity as `specimens` lays it out, and on The Kit the
+        pieces each declaration in the clone records.
         """
         defaults = Settings()
         return {
             Path("docs/pages/reference/identity.md") : specimens(Identity.shipped()),
+            Path("docs/pages/reference/kit.md")      : {
+                "pieces": pieces(Piece.declared(self.checkout.root))
+            },
             Path("docs/pages/data/index.md")         : {
                 "crop"   : tabled(Crop),
                 "ranges" : tabled(Ranges),
@@ -286,6 +292,28 @@ def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> st
             "|---" * len(header) + "|",
             *(f"| {' | '.join(row)} |" for row in rows)
         ]
+    )
+
+
+def pieces(declared: Iterable[Piece]) -> str:
+    """
+    Lays out each of the kit's pieces in `declared` as a row naming the
+    piece, the names a widget imports it by, the Zag.js machine it runs on,
+    when a widget reads it, and what it replaces.
+    """
+    return markdown_table(
+        header = [
+            "Piece", "Imports", "Machine", "A Widget Reads It When", "It Replaces"
+        ],
+        rows = (
+            [
+                piece.name,
+                ", ".join(f"`{name}`" for name in piece.exports),
+                "None" if piece.machine is None else f"`{piece.machine}`",
+                piece.when, piece.replaces
+            ]
+            for piece in declared
+        )
     )
 
 

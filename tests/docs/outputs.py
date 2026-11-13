@@ -20,7 +20,8 @@ from pydantic     import BaseModel, Field
 from typing       import Annotated
 
 from thermur.controller.components import SoftCore
-from thermur.docs.outputs          import Outputs, markdown_table, specimens, tabled
+from thermur.docs.kit              import Piece
+from thermur.docs.outputs          import Outputs, markdown_table, pieces, specimens, tabled
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -36,10 +37,12 @@ from thermur.metrics.trials   import Trial
 from thermur.repo.checkout    import Checkout
 from thermur.repo.schemas     import Finding
 
-# `DATA`, `IDENTITY`, and `RULES` hold the pages whose regions the render
-# writes, from the fire data's records, the identity's, and the flight's.
+# `DATA`, `IDENTITY`, `KIT`, and `RULES` hold the pages whose regions the
+# render writes, from the fire data's records, the identity's, the kit's,
+# and the flight's.
 DATA     = Path("docs/pages/data/index.md")
 IDENTITY = Path("docs/pages/reference/identity.md")
+KIT      = Path("docs/pages/reference/kit.md")
 RULES    = Path("docs/pages/methods/rules.md")
 
 
@@ -296,6 +299,24 @@ def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Chec
         in regions["marks"]
     )
     assert regions["tagline"] == f'> *"{identity.tagline.text}"*'
+
+
+def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkout):
+    """
+    Asserts that The Kit carries a row per piece declared in the clone, each
+    import and machine backticked and a piece no machine covers marked as
+    running on none.
+    """
+    declared = Piece.declared(checkout.root)
+    regions  = Outputs(checkout=checkout).regions[KIT]
+    table    = regions["pieces"]
+    rows     = table.splitlines()[2:]
+
+    assert regions == {"pieces": pieces(declared)}
+    assert len(rows) == len(declared)
+    assert "| Slider | `Slider` | `slider` | " in table
+    assert "| The Gate | `onMotion`, `pause`, `paused`, `still` | None | " in table
+    assert any(" | None | " in row for row in rows)
 
 
 def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):

@@ -87,23 +87,6 @@ describe('a reader’s move on the rail', () => {
     playback.seek(30)
     expect(playback.fading).toBe(0)
   })
-
-})
-
-describe('an arrow key on the rail', () => {
-  it.for([
-    { direction: 1, from: 60, name: 'the next snapshot from one', to: 75 },
-    { direction: -1, from: 60, name: 'the last snapshot from one', to: 45 },
-    { direction: 1, from: 52, name: 'the next snapshot from between two', to: 60 },
-    { direction: -1, from: 52, name: 'the last snapshot from between two', to: 45 },
-    { direction: 1, from: 120, name: 'the end, and no further', to: 120 },
-    { direction: -1, from: 0, name: 'the start, and no further', to: 0 }
-  ] as const)('steps to $name', ({ direction, from, to }) => {
-    const playback = run()
-    playback.seek(from)
-    playback.nudge(direction)
-    expect(playback.target).toBe(to)
-  })
 })
 
 describe('a drawing standing still', () => {

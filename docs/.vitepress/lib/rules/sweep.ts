@@ -1,36 +1,46 @@
-import * as chart    from './chart.ts'
+import { idle, markup, onMotion, still, tween } from '@thermur/kit'
+
+import * as common   from '../common.ts'
 import * as measured from './measured.ts'
-import * as motion   from './motion.ts'
 import * as spacing  from './spacing.ts'
 
 /**
- * What each key does to the track's handle, a step between the measured
- * spacings or a move to either end.
+ * What a sweep tells the controls standing over its track: where the knob that
+ * plays it and the groove its handle runs along stand at each width, each
+ * spacing it shows, and whether it plays.
  */
-const KEYS: Readonly<Record<string, (at: number, last: number) => number>> = {
-  ArrowDown  : at => at - 1,
-  ArrowLeft  : at => at - 1,
-  ArrowRight : at => at + 1,
-  ArrowUp    : at => at + 1,
-  End        : (_, last) => last,
-  Home       : () => 0
+export interface View {
+  moved  : (value: number) => void
+  placed : (rail: Pick<spacing.Rail, 'player' | 'track'>) => void
+  played : (on: boolean) => void
 }
 
 /**
- * Does nothing, standing in for a transition before the first one starts.
+ * Finds whether `value` stands on one of the measured spacings `stops`.
  */
-const idle = (): void => {}
+const onStop = (stops: readonly number[], value: number): boolean =>
+  stops.some(each => Math.abs(each - value) < 0.05)
+
+/**
+ * Words the spacing `value` for a screen reader, beside whether it stands
+ * between two of the measured spacings `stops`.
+ */
+export function spoken(stops: readonly number[], value: number): string {
+  const stopped = onStop(stops, value)
+  const words   = `${value.toFixed(stopped ? 0 : 1)} m`
+  return stopped ? words : `${words}, between measured spacings`
+}
 
 /**
  * The coupling chart: each rule's polarization on a row of its own against the
- * launch spacing set on a track drawn into the chart. Dragging the track's
- * handle glides every rule's dot along the straight line between the measured
- * spacings and a release settles it on the nearest one, the arrow keys and
- * Home and End step it between them, and Play sweeps it from the densest
- * launch to the sparsest and back. Each rule's value is read at the end of its
- * row, a dashed tie runs from each dot to the default's value with the widest
- * gap labeled, and a pointer over a row lifts it. `destroy` releases every
- * listener, observer, and frame it holds.
+ * launch spacing set on a track drawn into the chart. `drag` sets every rule's
+ * dot at once on the straight line between the measured spacings, `settle`
+ * glides it to the measured spacing nearest a value, and `play` sweeps it from
+ * the densest launch to the sparsest and back, each heard through `view`, so
+ * the controls standing over the track follow it. Each rule's value is read at
+ * the end of its row, a dashed tie runs from each dot to the default's value
+ * with the widest gap labeled, and a pointer over a row lifts it. `destroy`
+ * releases every listener, observer, and frame it holds.
  */
 export class Sweep {
   #frame             = 0
@@ -50,27 +60,34 @@ export class Sweep {
   #stop              = idle
   readonly #stops    : readonly number[]
   readonly #tuning   : spacing.Tuning
+  readonly #view     : View
 
-  constructor(host: HTMLElement, rules: readonly measured.Rule[], tuning: spacing.Tuning = spacing.TRACK) {
+  constructor(
+    host   : HTMLElement,
+    rules  : readonly measured.Rule[],
+    view   : View,
+    tuning : spacing.Tuning = spacing.TRACK
+  ) {
     this.#host     = host
+    this.#view     = view
     this.#rules    = rules
     this.#tuning   = tuning
     this.#stops    = rules[0]!.points.map(point => point.given)
     this.#spacing  = this.#stops[0]!
-    this.#released = motion.widthOf(host, width => this.#draw(width))
-    this.#moving   = motion.onMotion(() => {
-      if (this.#frame && motion.still()) this.#settle()
+    this.#released = markup.widthOf(host, width => this.#draw(width))
+    this.#moving   = onMotion(() => {
+      if (this.#frame && still()) this.settle(this.#spacing)
     })
   }
 
   /**
    * Lays the chart out at `width` and draws it whole, the track, the axis, and
-   * a row per rule, then wires the track.
+   * a row per rule, then tells the view where the track stands.
    */
   #draw(width: number): void {
     const [lo, hi] = [this.#stops[0]!, this.#stops.at(-1)!]
     const layout   = spacing.layoutOf(this.#rules.length, hi, lo, this.#tuning, width)
-    const plot     = chart.svg('svg', {
+    const plot     = markup.svg('svg', {
       'aria-label' : 'Polarization of each coupling rule against the launch spacing set on the track',
       'class'      : 'rules-chart',
       'height'     : layout.height,
@@ -82,16 +99,16 @@ export class Sweep {
     this.#rail     = spacing.drawRail(layout, this.#frame !== 0, plot, this.#spacing, this.#stops)
     this.#guide    = spacing.drawAxis(layout, plot)
     this.#rows     = this.#rules.map((rule, place) => spacing.drawRow(layout, place, plot, rule))
-    this.#gap      = chart.text(chart.FACE.mono, 10.5, '', 0, 0, { ...spacing.MUTED, ...spacing.MIDDLE })
+    this.#gap      = markup.text(markup.FACE.mono, 10.5, '', 0, 0, { ...spacing.MUTED, ...spacing.MIDDLE })
     plot.append(this.#gap)
     this.#rows.forEach((row, place) => {
       row.group.addEventListener('pointerenter', () => this.#lift(place))
       row.group.addEventListener('pointerleave', () => this.#lift(-1))
     })
-    this.#wire(plot, this.#rail)
     this.#host.replaceChildren(plot)
     this.#show(this.#spacing)
     this.#lift(this.#lifted)
+    this.#view.placed(this.#rail)
   }
 
   /**
@@ -100,7 +117,7 @@ export class Sweep {
   #glide(to: number): void {
     const from = this.#spacing
     this.#stop()
-    this.#stop = motion.tween(share => this.#show(from + (to - from) * share), 2)
+    this.#stop = tween(share => this.#show(common.lerp(from, to, share)), 2)
   }
 
   /**
@@ -109,8 +126,8 @@ export class Sweep {
   #halt(): void {
     cancelAnimationFrame(this.#frame)
     this.#frame = 0
-    this.#rail?.player.setAttribute('aria-pressed', 'false')
     this.#rail?.glyph.setAttribute('d', spacing.GLYPH.play)
+    this.#view.played(false)
   }
 
   /**
@@ -119,7 +136,7 @@ export class Sweep {
   #lift(row: number): void {
     this.#lifted = row
     this.#rows.forEach((each, place) =>
-      chart.set(each.group, { opacity: row < 0 || place === row ? 1 : 0.35 }))
+      markup.set(each.group, { opacity: row < 0 || place === row ? 1 : 0.35 }))
   }
 
   /**
@@ -134,19 +151,19 @@ export class Sweep {
    * the handle on the nearest measured spacing where it runs, starting
    * nothing for a reader whose motion stands still.
    */
-  #play(): void {
+  play(): void {
     if (this.#frame) {
-      this.#settle()
+      this.settle(this.#spacing)
       return
     }
-    if (motion.still()) return
+    if (still()) return
     const [lo, hi] = [this.#stops[0]!, this.#stops.at(-1)!]
     this.#stop()
     this.#phase    = Math.acos(1 - 2 * (this.#spacing - lo) / (hi - lo)) / (Math.PI * 2)
     this.#last     = 0
     this.#frame    = requestAnimationFrame(this.#run)
-    this.#rail?.player.setAttribute('aria-pressed', 'true')
     this.#rail?.glyph.setAttribute('d', spacing.GLYPH.pause)
+    this.#view.played(true)
   }
 
   /**
@@ -154,8 +171,8 @@ export class Sweep {
    * come to stand still.
    */
   readonly #run = (now: number): void => {
-    if (motion.still()) {
-      this.#settle()
+    if (still()) {
+      this.settle(this.#spacing)
       return
     }
     const [lo, hi] = [this.#stops[0]!, this.#stops.at(-1)!]
@@ -167,11 +184,22 @@ export class Sweep {
   }
 
   /**
-   * Stops the sweep and glides the handle to the nearest measured spacing.
+   * Stops the sweep and glides the handle to the measured spacing nearest
+   * `value`.
    */
-  #settle(): void {
+  settle(value: number): void {
     this.#halt()
-    this.#glide(this.#nearest(this.#spacing))
+    this.#glide(this.#nearest(value))
+  }
+
+  /**
+   * Stops the sweep and any glide and sets the chart to `value` at once, as a
+   * drag along the track does.
+   */
+  drag(value: number): void {
+    this.#halt()
+    this.#stop()
+    this.#show(value)
   }
 
   /**
@@ -181,7 +209,7 @@ export class Sweep {
   #show(value: number): void {
     const { fromS, toX } = this.#layout!
     const rail           = this.#rail!
-    const stopped        = this.#stops.some(each => Math.abs(each - value) < 0.05)
+    const stopped        = onStop(this.#stops, value)
     const points         = this.#rules.map(rule => measured.between(rule, value))
     const base           = points[0]!.mean
     const widest         = points.reduce((best, point, row) =>
@@ -191,68 +219,22 @@ export class Sweep {
     this.#rows.forEach((row, place) => {
       const point = points[place]!
       const x     = toX(point.mean)
-      chart.set(row.dot, { cx: x })
-      chart.set(row.tie, { x1: Math.min(x, toX(base)), x2: Math.max(x, toX(base)) })
-      chart.set(row.value, { opacity: stopped ? 1 : 0.6 })
+      markup.set(row.dot, { cx: x })
+      markup.set(row.tie, { x1: Math.min(x, toX(base)), x2: Math.max(x, toX(base)) })
+      markup.set(row.value, { opacity: stopped ? 1 : 0.6 })
       row.value.textContent = stopped ? measured.reading(point) : `≈ ${point.mean.toFixed(2)}`
     })
-    chart.set(rail.handle, {
-      'aria-valuenow'  : value.toFixed(1),
-      'aria-valuetext' : stopped ? words : `${words}, between measured spacings`,
-      'cx'             : fromS(value)
-    })
-    chart.set(rail.fill, { x2: fromS(value) })
-    chart.set(rail.readout, { x: fromS(value) })
-    chart.set(this.#guide!, { x1: toX(base), x2: toX(base) })
-    chart.set(this.#gap!, {
+    markup.set(rail.handle, { cx: fromS(value) })
+    markup.set(rail.fill, { x2: fromS(value) })
+    markup.set(rail.readout, { x: fromS(value) })
+    markup.set(this.#guide!, { x1: toX(base), x2: toX(base) })
+    markup.set(this.#gap!, {
       x : (toX(base) + toX(points[widest]!.mean)) / 2,
       y : Number(this.#rows[widest]!.tie.getAttribute('y1')) - 7
     })
     rail.readout.textContent = words
     this.#gap!.textContent   = `−${(base - points[widest]!.mean).toFixed(2)}`
-  }
-
-  /**
-   * Wires the track: a press on the strip or the handle holds it and a drag
-   * moves it, a release settles it, the keys step it, and the knob plays the
-   * sweep.
-   */
-  #wire(plot: SVGElement, rail: spacing.Rail): void {
-    const { hit, handle, player } = rail
-    const drag                    = (event: PointerEvent): void => {
-      const [lo, hi] = [this.#stops[0]!, this.#stops.at(-1)!]
-      const x        = event.clientX - plot.getBoundingClientRect().left
-      this.#show(Math.min(hi, Math.max(lo, this.#layout!.toS(x))))
-    }
-    const hold                    = (event: PointerEvent): void => {
-      this.#halt()
-      this.#stop()
-      hit.setPointerCapture(event.pointerId)
-    }
-    hit.addEventListener('pointerdown', event => {
-      hold(event)
-      drag(event)
-    })
-    hit.addEventListener('pointermove', event => {
-      if (hit.hasPointerCapture(event.pointerId)) drag(event)
-    })
-    hit.addEventListener('pointerup', () => this.#glide(this.#nearest(this.#spacing)))
-    handle.addEventListener('pointerdown', hold)
-    handle.addEventListener('keydown', event => {
-      const move = KEYS[event.key]
-      if (move === undefined) return
-      const last = this.#stops.length - 1
-      const at   = move(this.#stops.indexOf(this.#nearest(this.#spacing)), last)
-      event.preventDefault()
-      this.#halt()
-      this.#glide(this.#stops[Math.max(0, Math.min(last, at))]!)
-    })
-    player.addEventListener('click', () => this.#play())
-    player.addEventListener('keydown', event => {
-      if (event.key !== 'Enter' && event.key !== ' ') return
-      event.preventDefault()
-      this.#play()
-    })
+    this.#view.moved(value)
   }
 
   destroy(): void {

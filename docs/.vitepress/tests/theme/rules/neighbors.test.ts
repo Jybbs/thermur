@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { Slider }                              from '@thermur/kit'
 import { enableAutoUnmount }                   from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -52,11 +53,18 @@ const frame = (birds: Drawn[]): Drawn[] => birds.slice(-COUNT)
 const canvas = ({ host }: Charted): HTMLCanvasElement => host.querySelector('canvas')!
 
 /**
- * Picks the mode `value` on the switch.
+ * Picks the mode `value` among the radios.
  */
 function picked({ host }: Charted, value: string): void {
-  host.querySelector<HTMLElement>(`[data-value="${value}"]`)!.click()
+  host.querySelector<HTMLInputElement>(`input[type=radio][value="${value}"]`)!.click()
 }
+
+/**
+ * Reads each radio's words, whether it is on, and its title.
+ */
+const radios = ({ host }: Charted): [string, boolean, string][] =>
+  [...host.querySelectorAll<HTMLElement>('.kit-radios-item')].map(item =>
+    [item.textContent, item.querySelector('input')!.checked, item.title])
 
 enableAutoUnmount(afterEach)
 
@@ -69,30 +77,30 @@ describe('the header', () => {
     const chart    = drawn()
     const { host } = chart
     expect(host.querySelector('.rules-title')!.textContent).toBe('Birds around the marked bird, last 12 s')
-    expect([...host.querySelectorAll('[role="radio"]')].map(radio =>
-      [radio.textContent, radio.getAttribute('aria-checked'), (radio as HTMLElement).title])).toEqual([
-      ['Predator', 'true', 'The pointer is the falcon'],
-      ['Select', 'false', 'Press a bird to mark it']
+    expect(radios(chart)).toEqual([
+      ['Predator', true, 'The pointer is the falcon'],
+      ['Select', false, 'Press a bird to mark it']
     ])
-    expect(host.querySelector('input')!.getAttribute('aria-label')).toBe('Range, in bird lengths')
-    expect(host.querySelector('.rules-chip-name')!.textContent).toBe('Seventh by rank')
-    expect(host.querySelector('.rules-chip-value')!.textContent).toMatch(/^\d+\.\d lengths$/u)
+    expect(host.querySelector('[role=slider]')!.getAttribute('aria-label')).toBe('Range, in bird lengths')
+    expect(host.querySelector('.kit-chip-name')!.textContent).toBe('Seventh by rank')
+    expect(host.querySelector('.kit-chip-value')!.textContent).toMatch(/^\d+\.\d lengths$/u)
     expect(canvas(chart).getAttribute('role')).toBe('img')
     expect(canvas(chart).getAttribute('aria-label')).toContain('over the last 12 seconds')
   })
 
-  it('slides the switch’s thumb to the mode picked, the sky taking the mode too', () => {
+  it('turns on the mode picked, the sky taking the mode too', async () => {
     const chart = drawn()
     picked(chart, 'select')
-    expect(chart.host.querySelector<HTMLElement>('.rules-mode')!.dataset.mode).toBe('select')
+    await chart.widget.vm.$nextTick()
+    expect(radios(chart).map(([, on]) => on)).toEqual([false, true])
     expect(chart.host.querySelector<HTMLElement>('.rules-stage')!.dataset.mode).toBe('select')
   })
 
-  it('widens the ring at the fixed range as the slider moves', async () => {
+  it('widens the ring at the fixed range as the slider moves', () => {
     const chart  = drawn()
     const radii  = (): number[] => chart.stand.context.arc!.mock.calls.map(([, , radius]) => radius as number)
     const before = Math.max(...radii())
-    await chart.widget.get('input').setValue(6)
+    chart.widget.getComponent(Slider).vm.$emit('change', 6)
     expect(Math.max(...radii())).toBeCloseTo(before * 3, 6)
   })
 })

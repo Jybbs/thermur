@@ -1,4 +1,6 @@
+import { Radios }        from '@thermur/kit'
 import { type Mock, vi } from 'vitest'
+import { createApp, h }  from 'vue'
 
 /**
  * The stand-ins a drawing's suite runs on in place of the browser's own, each
@@ -12,7 +14,7 @@ export interface Browser {
   frames  : Frames
   held    : () => Held
   motion  : { listeners: Set<() => void>, matches: boolean }
-  mutate  : () => void
+  mutate  : (attribute?: string) => void
   pen     : CanvasRenderingContext2D
   reflow  : (target?: Element) => void
   resize  : (width: number, height: number) => void
@@ -70,11 +72,13 @@ const METRICS = {
 
 /**
  * An observer stand-in of one `kind`, which counts itself held while it watches
- * any target and holds each target it watches.
+ * any target and holds each target it watches, beside the attributes a
+ * mutation observer's filter names.
  */
 class Watcher {
   static readonly active = new Set<Watcher>()
   readonly callback : (entries: unknown[]) => void
+  filter            : readonly string[] | undefined
   readonly kind     : string
   readonly targets  = new Set<Element>()
 
@@ -88,9 +92,15 @@ class Watcher {
     Watcher.active.delete(this)
   }
 
-  observe(target: Element): void {
+  observe(target: Element, options?: MutationObserverInit): void {
+    this.filter = options?.attributeFilter
     this.targets.add(target)
     Watcher.active.add(this)
+  }
+
+  unobserve(target: Element): void {
+    this.targets.delete(target)
+    if (this.targets.size === 0) Watcher.active.delete(this)
   }
 }
 
@@ -194,12 +204,14 @@ function listeners(): () => number {
 
 /**
  * Calls back each observer stand-in of `kind` that watches, or that watches
- * `target` where one is given, with `entries`.
+ * `target` where one is given, with `entries`, leaving out a mutation observer
+ * whose filter omits `attribute` where one is given.
  */
-function notify(kind: string, entries: unknown[], target?: Element): void {
+function notify(kind: string, entries: unknown[], target?: Element, attribute?: string): void {
   for (const watcher of Watcher.active) {
     const watching = target === undefined || watcher.targets.has(target)
-    if (watcher.kind === kind && watching) watcher.callback(entries)
+    const filtered = attribute === undefined || watcher.filter?.includes(attribute) !== false
+    if (watcher.kind === kind && watching && filtered) watcher.callback(entries)
   }
 }
 
@@ -210,6 +222,18 @@ function notify(kind: string, entries: unknown[], target?: Element): void {
 export function box(name: string, before = ''): HTMLElement {
   document.body.innerHTML = `${before}<div class="${name}"></div>`
   return document.querySelector<HTMLElement>(`.${name}`)!
+}
+
+/**
+ * Mounts and unmounts one kit control, so the focus-modality tracking Zag adds
+ * to the window once per page, and keeps for the page's life, is in place
+ * before the listeners are counted rather than counted against the first
+ * drawing a case mounts.
+ */
+function tracked(): void {
+  const app = createApp({ render: () => h(Radios, { label: 'Tracked', options: [], value: '' }) })
+  app.mount(document.createElement('div'))
+  app.unmount()
 }
 
 /**
@@ -232,6 +256,7 @@ export function browser(reduced = false): Browser {
   }
   const fonts  = { load: vi.fn<(font: string) => Promise<FontFace[]>>(() => Promise.resolve([])) }
   const motion = { listeners: new Set<() => void>(), matches: reduced }
+  tracked()
   const live   = listeners()
   const drawn  = canvas()
   const queued = frames()
@@ -249,8 +274,8 @@ export function browser(reduced = false): Browser {
     fonts  : fonts,
     frames : queued,
     motion : motion,
-    mutate : () => notify('MutationObserver', []),
-    reflow : (target = document.body) => notify('ResizeObserver', [], target),
+    mutate : attribute => notify('MutationObserver', [], undefined, attribute),
+    reflow : target => notify('ResizeObserver', [], target),
     see    : seen => notify('IntersectionObserver', [{ isIntersecting: seen }]),
     held   : () => ({
       canvases  : document.querySelectorAll('canvas').length,

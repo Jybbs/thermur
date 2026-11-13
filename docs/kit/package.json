@@ -1,0 +1,16 @@
+{
+    "name"             : "@thermur/kit",
+    "private"          : true,
+    "type"             : "module",
+    "exports"          : { ".": "./src/index.ts", "./styles.css": "./src/styles/index.css" },
+    "dependencies"     : {
+        "@zag-js/radio-group" : "1.47.0",
+        "@zag-js/select"      : "1.47.0",
+        "@zag-js/slider"      : "1.47.0",
+        "@zag-js/toggle"      : "1.47.0",
+        "@zag-js/vue"         : "1.47.0"
+    },
+    "peerDependencies" : {
+        "vue" : "3.5.43"
+    }
+}
