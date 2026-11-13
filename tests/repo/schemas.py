@@ -755,6 +755,11 @@ def test_a_document_reads_the_value_its_suffix_names(
             id = "sequence-key"
         ),
         param(
+            "? !!seq x\n: 1\n",
+            "while constructing a mapping, found unhashable key",
+            id = "collection-tagged-key"
+        ),
+        param(
             "a: !!map foo\n",
             "expected a mapping node, but found scalar",
             id = "tagged-scalar"

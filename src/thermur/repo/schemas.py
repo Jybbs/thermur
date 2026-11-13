@@ -26,7 +26,7 @@ Holds the records the `repo` tasks read and report:
 """
 
 from collections     import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from datetime        import datetime
 from enum            import StrEnum, auto
 from http            import HTTPMethod
@@ -56,7 +56,7 @@ from re           import MULTILINE, compile as regex, escape, findall, fullmatch
 from tomllib      import loads
 from typing       import Annotated, Self
 from urllib.parse import urlsplit
-from yaml         import MappingNode, MarkedYAMLError, SafeLoader, ScalarNode, load
+from yaml         import MappingNode, MarkedYAMLError, Node, SafeLoader, ScalarNode, load
 from yaml.reader  import ReaderError
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
@@ -197,24 +197,27 @@ class TextLoader(SafeLoader):
         for first, resolvers in SafeLoader.yaml_implicit_resolvers.items()
     }
 
-    def construct_mapping(self, node: MappingNode, deep: bool = False) -> dict:
+    def construct_mapping(self, node: Node, deep: bool = False) -> dict:
         """
         Builds the mapping `node` holds as `SafeLoader` does, merging each
         mapping a `<<` key names.
 
         Raises:
-            ValueError: Naming each scalar key the mapping itself names more
-                        than once, leaving out the keys a merge brings in.
+            ValueError: Naming each hashable scalar key the mapping itself
+                        names more than once, leaving out the keys a merge
+                        brings in.
         """
         if isinstance(node, MappingNode):
             read_pairs(
                 pairs = [
-                    (self.construct_object(key), value)
-                    for key, value in node.value
-                    if isinstance(
-                        key,
-                        ScalarNode
-                    ) and key.tag != "tag:yaml.org,2002:merge"
+                    (key, None)
+                    for key in (
+                        self.construct_object(key)
+                        for key, _ in node.value
+                        if isinstance(key, ScalarNode)
+                        and key.tag != "tag:yaml.org,2002:merge"
+                    )
+                    if isinstance(key, Hashable)
                 ]
             )
 
