@@ -2,10 +2,12 @@
 import { Radios, Select, Slider, Toggle }            from '@thermur/kit'
 import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi }       from 'vitest'
+import { h }                                         from 'vue'
 
 import { FUELS, GROUND, SPAN, reachOf } from '../../../lib/kit/front.ts'
 import { SCENES }                       from '../../../theme/kit/scenes.ts'
 import { RELEASED, browser }            from '../../common/browser.ts'
+import { served }                       from '../../common/server.ts'
 
 enableAutoUnmount(afterEach)
 
@@ -154,5 +156,11 @@ describe('the drawing scene', () => {
     expect(widget.get('.kit-catalog-width text').text()).toBe('DRAWN AT 480 PX')
     widget.unmount()
     expect(stand.held()).toEqual(RELEASED)
+  })
+})
+
+describe('the scenes on the server', () => {
+  it.each(Object.keys(SCENES))('renders the %s scene before any browser stands', async (key) => {
+    expect(await served(h(SCENES[key]!))).toContain('kit-catalog')
   })
 })

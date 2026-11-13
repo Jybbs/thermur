@@ -2,10 +2,12 @@
 import { Radios }                                    from '@thermur/kit'
 import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it }           from 'vitest'
+import { h }                                         from 'vue'
 
 import { PIECES }            from '../../../lib/kit/pieces.ts'
 import KitCatalog            from '../../../theme/kit/catalog.ts'
 import { RELEASED, browser } from '../../common/browser.ts'
+import { served }            from '../../common/server.ts'
 
 enableAutoUnmount(afterEach)
 
@@ -26,6 +28,10 @@ const read = (widget: VueWrapper): string[] =>
   [widget.get('.kit-catalog-head .kit-catalog-caps').text(), widget.get('.kit-card-main [data-shown]').text()]
 
 describe('KitCatalog', () => {
+  it('renders on the server before any browser stands, opening on the first piece', async () => {
+    expect(await served(h(KitCatalog))).toContain(PIECES[0]!.name)
+  })
+
   it('opens on the first piece, its part’s scene on the stage', () => {
     const { widget } = mounted()
     expect(read(widget)).toEqual([`1 of ${PIECES.length} · Chrome`, PIECES[0]!.name])

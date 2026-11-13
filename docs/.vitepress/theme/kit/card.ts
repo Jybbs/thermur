@@ -1,5 +1,5 @@
-import { type Copier, heard, idle, tween, useCopy }                                             from '@thermur/kit'
-import { type PropType, type VNode, defineComponent, h, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { type Copier, heard, idle, tween, useCopy }                                                        from '@thermur/kit'
+import { type PropType, type VNode, defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
 import { lerp }                                                       from '../../lib/common.ts'
 import { PIECES, type Piece, type Readers, SOURCES, lineOf, pieceOf } from '../../lib/kit/pieces.ts'
@@ -76,7 +76,7 @@ function carried(piece: Piece, readers: Readers, copy: Copier['copy'], loaded: M
 /**
  * The card beneath the stage, reading out the piece `shown`: the Zag.js
  * machine it runs on over how many of the site's modules read it, in the hue
- * of its part, beside its name and when a widget reaches for it, and a fold
+ * of its part, beside its name and when a widget uses it, and a fold
  * opening on what it replaces, its examples at work, the modules reading it,
  * and the line a widget writes to take it up, which a press copies, over its
  * source, loaded once a reader opens it.
@@ -93,11 +93,13 @@ export const PieceCard = defineComponent({
     const counted        = ref(0)
     let stop             = idle
     const count          = (): number => props.readers[props.shown]?.length ?? 0
-    watch(count, (to) => {
+    const ease           = (to: number): void => {
       stop()
       const from = counted.value
       stop       = tween(share => counted.value = lerp(from, to, share))
-    }, { immediate: true })
+    }
+    watch(count, ease)
+    onMounted(() => ease(count()))
     onBeforeUnmount(() => stop())
     return () => {
       const piece = pieceOf(props.shown)

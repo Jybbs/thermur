@@ -1,10 +1,12 @@
 // @vitest-environment happy-dom
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi }     from 'vitest'
+import { h }                                       from 'vue'
 
-import { SOURCES, lineOf, pieceOf } from '../../../lib/kit/pieces.ts'
-import { PieceCard }                from '../../../theme/kit/card.ts'
-import { browser }                  from '../../common/browser.ts'
+import { PIECES, SOURCES, lineOf, pieceOf } from '../../../lib/kit/pieces.ts'
+import { PieceCard }                        from '../../../theme/kit/card.ts'
+import { browser }                          from '../../common/browser.ts'
+import { served }                           from '../../common/server.ts'
 
 enableAutoUnmount(afterEach)
 
@@ -45,6 +47,11 @@ describe('PieceCard', () => {
     stand.frames.run(12, 16)
     await widget.vm.$nextTick()
     expect(widget.get('.kit-card-figure').text()).toBe('0')
+  })
+
+  it.each(PIECES.map(piece => piece.key))('renders the %s card and its examples on the server before any browser stands, its count at zero', async (shown) => {
+    const html = await served(h(PieceCard, { readers: READERS, shown }))
+    expect(html).toContain('<span class="kit-card-figure">0</span>')
   })
 })
 

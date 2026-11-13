@@ -30,14 +30,18 @@ function useWidth(host: Ref<HTMLElement | undefined>, changed: (width: number) =
 }
 
 /**
- * Sets a front into the element `host` holds once it mounts and lays it out
- * again at each width the element takes.
+ * Sets a front into the element `host` holds once it mounts, drawn to the
+ * meters `reach` returns whenever they change and laid out again at each width
+ * the element takes, so a page rendered on the server builds no drawing.
  */
-function useFront(host: Ref<HTMLElement | undefined>): Front {
-  const front = new Front()
-  onMounted(() => host.value!.append(front.node))
+function useFront(host: Ref<HTMLElement | undefined>, reach: () => number): void {
+  let front!: Front
+  onMounted(() => {
+    front = new Front()
+    host.value!.append(front.node)
+    watchEffect(() => front.draw(reach()))
+  })
   useWidth(host, width => front.fit(width))
-  return front
 }
 
 /**
@@ -56,7 +60,7 @@ const Controls = defineComponent({
       seconds.value = value
     }
     const host    = ref<HTMLElement>()
-    const front   = useFront(host)
+    useFront(host, () => reachOf(fuel.value, wind.value, seconds.value))
     const loop    = useLoop((step) => {
       seconds.value = Math.min(SPAN, seconds.value + step * PACE)
       if (seconds.value === SPAN) loop.run(false)
@@ -66,7 +70,6 @@ const Controls = defineComponent({
       if (on && loop.standing.value) seconds.value = SPAN
       loop.run(on)
     }
-    watchEffect(() => front.draw(reachOf(fuel.value, wind.value, seconds.value)))
     return () => h('div', { class: 'kit-catalog-scene' }, [
       h('div', { class: 'kit-catalog-plate', ref: host }),
       part('select', h('p', { class: 'kit-catalog-sentence' }, [
@@ -113,13 +116,12 @@ const Chrome = defineComponent({
     const host    = ref<HTMLElement>()
     const time    = ref<HTMLElement>()
     const reach   = ref<HTMLElement>()
-    const front   = useFront(host)
+    const meters  = (): number => reachOf(0, 1, seconds.value)
     const steps   = useSteps()
+    useFront(host, meters)
     onMounted(() => watchEffect(() => {
-      const meters             = reachOf(0, 1, seconds.value)
       time.value!.textContent  = `${seconds.value} s`
-      reach.value!.textContent = `${Math.round(meters)} m`
-      front.draw(meters)
+      reach.value!.textContent = `${Math.round(meters())} m`
     }))
     return () => h('div', { class: 'kit-catalog-scene' }, [
       part('chip', [
@@ -175,7 +177,7 @@ const Motion = defineComponent({
   name: 'KitMotionScene',
   setup() {
     const host     = ref<HTMLElement>()
-    const flight   = new Flight()
+    let flight!: Flight
     const gathered = ref(false)
     let seconds    = 0
     let stop       = idle
@@ -193,7 +195,10 @@ const Motion = defineComponent({
         flight.draw(seconds)
       }, 3)
     }
-    onMounted(() => host.value!.append(flight.node))
+    onMounted(() => {
+      flight = new Flight()
+      host.value!.append(flight.node)
+    })
     onBeforeUnmount(() => stop())
     return () => h('div', { class: 'kit-catalog-scene' }, [
       h('div', { class: 'kit-catalog-plate', ref: host }),

@@ -1,4 +1,4 @@
-import { markup } from '@thermur/kit'
+import { idle, markup } from '@thermur/kit'
 import { type Ref, type ShallowRef, computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 
 /**
@@ -62,7 +62,8 @@ export const pieceAt = (event: Event): string | undefined =>
  * Measures where the piece `key` names stands within the element `stage`
  * holds, as a box from the stage's top left corner, again whenever the key
  * changes or the stage changes size, or nothing until the piece is found. The
- * observer is released once the component unmounts.
+ * observer starts once the component mounts, so a page rendered on the server
+ * constructs none, and is released once it unmounts.
  */
 export function useGuide(stage: Ref<HTMLElement | undefined>, key: () => string): ShallowRef<markup.Spot | undefined> {
   const spot     = shallowRef<markup.Spot>()
@@ -76,11 +77,13 @@ export function useGuide(stage: Ref<HTMLElement | undefined>, key: () => string)
     const box    = piece.getBoundingClientRect()
     spot.value   = { height: box.height, left: box.left - framed.left, top: box.top - framed.top, width: box.width }
   }
-  const observer = new ResizeObserver(measure)
+  let release    = idle
   onMounted(() => {
+    const observer = new ResizeObserver(measure)
     observer.observe(stage.value!)
+    release = () => observer.disconnect()
     watch(key, measure, { flush: 'post', immediate: true })
   })
-  onBeforeUnmount(() => observer.disconnect())
+  onBeforeUnmount(() => release())
   return spot
 }
