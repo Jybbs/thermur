@@ -38,6 +38,17 @@ describe('a transition', () => {
     expect(stand.held().frames).toBe(0)
   })
 
+  it('starts from no share at all on a first frame stamped before it began', () => {
+    const stand = browser()
+    const step  = vi.fn<(share: number) => void>()
+    settling('240ms')
+    vi.mocked(performance.now).mockReturnValueOnce(100)
+    timing.tween(step)
+    stand.frames.run(1, 16)
+    expect(step).toHaveBeenLastCalledWith(0)
+    expect(stand.held().frames).toBe(1)
+  })
+
   it('stops before its end once told to', () => {
     const stand = browser()
     settling('240ms')

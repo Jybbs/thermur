@@ -23,8 +23,8 @@ export const idle = (): void => {}
 
 /**
  * Runs `step` with the eased share of a transition `scale` times the theme's
- * settling time long, once with 1 where that time is zero, and returns what
- * stops it.
+ * settling time long, a first frame stamped before it began taking no share
+ * at all, once with 1 where that time is zero, and returns what stops it.
  */
 export function tween(step: (share: number) => void, scale = 1): () => void {
   const length = settle() * scale
@@ -35,7 +35,7 @@ export function tween(step: (share: number) => void, scale = 1): () => void {
   const start = performance.now()
   let handle  = 0
   const frame = (now: number): void => {
-    const share = Math.min(1, (now - start) / length)
+    const share = Math.min(1, Math.max(0, now - start) / length)
     step(eased(share))
     handle      = share < 1 ? requestAnimationFrame(frame) : 0
   }
