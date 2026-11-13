@@ -412,7 +412,7 @@ class Roost(Component):
     a vertical cylinder about the roost, the harder the further its heading
     points away from the roost, and pulling it toward the roost's height
     through a damped spring whose stiffness `at_spacing` scales from the
-    model's bird spacing to a drone's.
+    model's nearest-neighbor distance to a drone flock's.
     """
 
     center_m: tuple[float, float] = (600.0, 1000.0)
@@ -433,8 +433,8 @@ class Roost(Component):
 
     starling_m: Positive = 0.69
     """
-    The spacing `stiffness_per_s2` holds at, in meters, by default the
-    nearest-neighbor distance of the starling model's flock of 781 birds.
+    The nearest-neighbor distance `stiffness_per_s2` holds at, in meters, by
+    default that of the starling model's flock of 781 birds.
     """
 
     stiffness_per_s2: NonNegative = 2.5
@@ -442,7 +442,8 @@ class Roost(Component):
     The acceleration toward the height per meter away from it, in
     reciprocal square seconds, at a spacing of `starling_m`, by default the
     starling model's vertical weight of 0.2 newtons per meter over its
-    bird's mass of 80 grams.
+    bird's mass of 80 grams, read per meter since the model multiplies it by
+    the height away, although its table of parameters lists it in newtons.
     """
 
     turning_m_s2: NonNegative = 5.0
@@ -479,15 +480,20 @@ class Roost(Component):
     def at_spacing(self, spacing_m: float) -> Self:
         """
         Scales `stiffness_per_s2` from a spacing of `starling_m` to
-        `spacing_m` by the square of their ratio, since under a fixed noise
-        the spread of the heights a spring holds falls as the square root
-        of its stiffness, so the flock's thickness keeps its proportion to
-        its spacing.
+        `spacing_m` by their ratio to the power 4/3, so the flock's
+        thickness keeps its proportion to its spacing.
+
+        Under a noise of fixed strength `sigma`, a spring of stiffness
+        `k` damped at `c = 2 * sqrt(k)` holds the heights to a variance of
+        `sigma ** 2 / (2 * c * k)`, falling as `k ** (-3 / 2)`, and nearly
+        so behind the plant's lag, so their spread falls as `k ** (-3 / 4)`
+        and a spread growing with the spacing takes a stiffness falling as
+        the spacing to the power 4/3.
         """
         return tree_at(
             lambda roost: roost.stiffness_per_s2,
             self,
-            self.stiffness_per_s2 * (self.starling_m / spacing_m) ** 2
+            self.stiffness_per_s2 * (self.starling_m / spacing_m) ** (4 / 3)
         )
 
 

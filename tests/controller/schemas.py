@@ -224,8 +224,9 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
 
 def test_from_settings_reads_each_slot_by_name():
     """
-    Asserts that each slot of the composite is the settings field naming it,
-    and the roost that field scaled to the plan's spacing.
+    Asserts that each slot of the composite is the settings field naming
+    it, and the roost that field scaled to the launch's nearest-neighbor
+    distance.
     """
     settings = Settings(coupling=Constant(coupling_per_s=2.0))
 
@@ -233,7 +234,7 @@ def test_from_settings_reads_each_slot_by_name():
 
     assert built.coupling == settings.coupling
     assert built.cohesion == settings.cohesion
-    assert built.roost == settings.roost.at_spacing(settings.plan.spacing_m)
+    assert built.roost == settings.roost.at_spacing(settings.plan.nearest_m)
 
 
 def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position():
@@ -388,7 +389,7 @@ def test_the_composite_adds_the_roost_to_its_slots():
 
     assert_allclose(
         composite()(view) - still(view),
-        Roost().at_spacing(Settings().plan.spacing_m)(view),
+        Roost().at_spacing(Settings().plan.nearest_m)(view),
         atol = 1e-5
     )
 

@@ -17,12 +17,12 @@ class Plant(Module):
     The first-order lag from a drone's command to its velocity, bounding
     the command by the speeds and the response by the accelerations the PX4
     multicopter defaults set, with the horizontal speed raised within PX4's
-    range to the fastest starling flock measured, the descent bounds raised
-    within PX4's ranges to match the climb's, and no gravity term, since the
+    range to the fastest starling flock measured, the descent speed raised
+    within PX4's range to match the climb's, and no gravity term, since the
     autopilot carries the drone's weight.
 
-    The vertical bounds are even because a clip wider on one side than the
-    other turns noise of zero mean on a vertical command into a mean climb.
+    The vertical speed bounds are even because a clip wider above than below
+    turns noise of zero mean on a vertical command into a mean climb.
     """
 
     climb_m_s: Positive = 3.0
@@ -37,11 +37,10 @@ class Plant(Module):
     `MPC_ACC_UP_MAX`.
     """
 
-    descending_m_s2: Positive = 4.0
+    descending_m_s2: Positive = 3.0
     """
     The largest downward acceleration, in meters per second squared, PX4's
-    `MPC_ACC_DOWN_MAX`, raised from its default of 3 within the 2 to 15 PX4
-    allows to match `climbing_m_s2`.
+    `MPC_ACC_DOWN_MAX`.
     """
 
     descent_m_s: Positive = 3.0

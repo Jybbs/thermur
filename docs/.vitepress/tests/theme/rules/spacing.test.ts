@@ -63,7 +63,7 @@ describe('the coupling chart', () => {
     expect(read.rows.map(row => row.querySelector('text')!.textContent)).toEqual([
       'Constant, the default', 'Anisotropic', 'Distance-weighted', 'Metric'
     ])
-    expect(read.values).toEqual(['0.99 ± 0.00', '0.98 ± 0.00', '0.94 ± 0.01', '0.51 ± 0.05'])
+    expect(read.values).toEqual(['0.99 ± 0.00', '0.98 ± 0.00', '0.94 ± 0.01', '0.56 ± 0.03'])
     expect(read.readout).toBe('10 m')
     expect(read.handle.getAttribute('aria-valuetext')).toBe('10 m')
     expect(chart.host.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 672 236')

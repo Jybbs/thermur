@@ -10,8 +10,10 @@ from hypothesis    import given, strategies
 from jax           import Array, vmap
 from jax.numpy     import append, array, exp, sqrt
 from jax.random    import key, normal
+from numpy         import diag
 from numpy.testing import assert_allclose
 from pytest        import mark, param, raises
+from scipy.linalg  import solve_continuous_lyapunov
 
 from thermur.controller.components import (
     Anisotropic,
@@ -34,6 +36,7 @@ from thermur.controller.components import (
 )
 from thermur.controller.schemas import Component, Composite, Inbox, Noise, Observation, nearest
 from thermur.environment.air    import Air
+from thermur.environment.plant  import Plant
 from thermur.metrics.schemas    import Plan
 from thermur.metrics.trials     import Trial
 from thermur.pipeline.settings  import Settings
@@ -374,16 +377,55 @@ def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
     )
 
 
-def test_the_roost_scales_its_stiffness_by_the_square_of_the_spacings():
+@mark.parametrize("spacing_m", [2.0, 10.0, 25.0])
+def test_the_roost_holds_the_heights_spread_in_proportion_to_its_spacing(
+    spacing_m: float
+):
     """
-    Asserts that the roost carried from its starling spacing to a spacing
-    ten times as wide holds a hundredth of the stiffness and keeps every
-    other field.
+    Asserts that, under a noise of fixed strength on the command's rate,
+    the roost carried to twice a spacing holds the stationary spread of
+    the heights behind the plant's lag to twice the spread at that spacing,
+    within 2%, reading the stiffness and the damping off the roost's pull.
     """
-    roost = Roost(starling_m=0.5, stiffness_per_s2=2.0)
+    lag_s = Plant().lag_s
 
-    scaled = roost.at_spacing(5.0)
+    def spread(roost: Roost) -> float:
+        """
+        Solves the stationary covariance of the height, the velocity, and
+        the command under the roost's pull and the plant's lag.
+        """
+        height    = array([*roost.center_m, roost.height_m + 1.0])
+        stiffness = -float(roost(viewed([[1.0, 0.0, 0.0]], position=height))[2])
+        damping   = -float(roost(viewed([[1.0, 0.0, 0.0]], (10.0, 0.0, 1.0)))[2])
+        drift     = [
+            [0.0, 1.0, 0.0],
+            [0.0, -1 / lag_s, 1 / lag_s],
+            [-stiffness, 0.0, -damping]
+        ]
+        return solve_continuous_lyapunov(drift, -diag([0.0, 0.0, 1.0]))[0, 0] ** 0.5
 
-    assert_allclose(scaled.stiffness_per_s2, 0.02)
-    assert scaled.height_m == roost.height_m
-    assert scaled.starling_m == roost.starling_m
+    assert_allclose(
+        spread(Roost().at_spacing(2 * spacing_m)) / spread(
+            Roost().at_spacing(spacing_m)
+        ),
+        2.0,
+        rtol = 0.02
+    )
+
+
+def test_the_roost_carried_to_a_spacing_keeps_every_other_field():
+    """
+    Asserts that the roost carried to another spacing changes only its
+    stiffness.
+    """
+    roost  = Roost()
+    scaled = roost.at_spacing(20.0)
+
+    assert scaled.stiffness_per_s2 < roost.stiffness_per_s2
+    assert (
+        scaled.center_m, scaled.height_m, scaled.radius_m,
+        scaled.starling_m, scaled.turning_m_s2
+    ) == (
+        roost.center_m, roost.height_m, roost.radius_m,
+        roost.starling_m, roost.turning_m_s2
+    )

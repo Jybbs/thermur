@@ -66,3 +66,29 @@ def test_the_plant_reaches_every_drone_of_a_flock_at_once():
 
     assert_allclose(Plant().tracked(commands, commands), 0.0)
     assert Plant().tracked(commands, commands).shape == (2, 2, 3)
+
+
+@mark.parametrize(
+    ("command", "velocity", "expected"),
+    [
+        param((0.0, 0.0, 9.0), (0.0, 0.0, 0.0), 3.0, id="climb"),
+        param((0.0, 0.0, -9.0), (0.0, 0.0, 0.0), -3.0, id="descent"),
+        param((0.0, 0.0, 3.0), (0.0, 0.0, -2.0), 4.0, id="climbing"),
+        param((0.0, 0.0, -3.0), (0.0, 0.0, 2.0), -3.0, id="descending")
+    ]
+)
+def test_the_default_plant_holds_px4_s_vertical_bounds(
+    command  : tuple[float, float, float],
+    expected : float,
+    velocity : tuple[float, float, float]
+):
+    """
+    Asserts that the default plant holds a climb and a descent to 3 m/s, the
+    descent raised from PX4's 1.5 to match the climb, and an upward and a
+    downward acceleration to PX4's own 4 and 3 m/s².
+    """
+    assert_allclose(
+        Plant().tracked(array(command), array(velocity))[2],
+        expected,
+        atol = 1e-6
+    )

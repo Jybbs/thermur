@@ -9,6 +9,7 @@ from jax.random    import key
 from numpy.testing import assert_allclose
 from pydantic      import ValidationError
 from pytest        import mark, param, raises
+from scipy.spatial import KDTree
 
 from thermur.metrics.schemas import Plan
 
@@ -139,4 +140,26 @@ def test_the_turned_velocity_holds_the_cruise_along_the_course_plus_the_turn():
         short(turn_deg=30.0).turned,
         10.0 * array([cos(angle), sin(angle), 0.0]),
         atol = 1e-6
+    )
+
+
+@mark.parametrize(
+    "axes",
+    [param((5.6, 2.8, 1.0), id="flat"), param((1.0, 1.0, 1.0), id="round")]
+)
+def test_a_launch_keeps_the_nearest_neighbor_distance_its_density_sets(
+    axes: tuple[float, float, float]
+):
+    """
+    Asserts that a launch of 1000 drones holds its drones a mean distance
+    from their nearest neighbors within 3% of `nearest_m`, whatever its
+    shape.
+    """
+    plan  = Plan(axes=axes, drones=1000)
+    cloud = plan.launched(key(0)).positions
+
+    assert_allclose(
+        KDTree(cloud).query(cloud, 2)[0][:, 1].mean(),
+        plan.nearest_m,
+        rtol = 0.03
     )

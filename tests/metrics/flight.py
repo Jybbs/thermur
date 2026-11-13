@@ -38,7 +38,7 @@ from numpy         import (
     zeros
 )
 from numpy.testing import assert_allclose, assert_array_equal
-from pytest        import fixture, mark, param
+from pytest        import FixtureRequest, fixture, mark, param
 
 from thermur.controller.components import (
     Centroid,
@@ -52,6 +52,7 @@ from thermur.controller.components import (
 )
 from thermur.controller.schemas import Composite, Heading, Radio, across
 from thermur.environment.plant  import Plant
+from thermur.environment.wrf    import WrfOutput
 from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response
 from thermur.pipeline.settings  import Settings
 
@@ -81,12 +82,22 @@ def composite() -> Composite:
     return Composite.from_settings(Settings())
 
 
-@fixture(scope="module")
-def default(composite: Composite) -> Flight:
+@fixture(
+    params = [param(120.0, id="two-minutes"), param(300.0, id="five-minutes")],
+    scope  = "module"
+)
+def default(composite: Composite, request: FixtureRequest) -> Flight:
     """
-    Flies the default plan under the default composite through still air.
+    Flies the default plan under the default composite through the
+    parametric threat's air, for the plan's two minutes and for the five the
+    rules page reads.
     """
-    return Flight.flown(composite, AIR, Settings().plan)
+    settings = Settings()
+    return Flight.flown(
+        composite,
+        WrfOutput.from_settings(settings).air,
+        settings.plan.model_copy(update={"duration_s": request.param})
+    )
 
 
 @fixture(scope="module")
@@ -185,26 +196,36 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
 @mark.slow
 def test_a_default_flight_holds_the_roost_s_height(default: Flight):
     """
-    Asserts that the default flight ends within 20 m of the roost's height
+    Asserts that the default flight ends within 10 m of the roost's height
     on the mean, where a plant bounding a descent tighter than a climb lifts
-    it some 60 m above it.
+    it some 60 m above it in two minutes.
     """
     assert_allclose(
         asarray(default.frames.positions)[:, -1, :, 2].mean(),
         Settings().roost.height_m,
-        atol = 20.0
+        atol = 10.0
     )
 
 
 @mark.slow
+@mark.parametrize("default", [param(120.0, id="two-minutes")], indirect=True)
 def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     """
-    Asserts that the largest group of the default flight, averaged over
-    the seeds, stands within 30% of the 1 to 2.8 to 5.6 of starling flocks,
-    where the roost's spring left at a starling's spacing flattens it eight
-    to ten times over.
+    Asserts that the largest group of the default flight after two minutes,
+    averaged over the seeds, stands within the span of the starling flocks
+    the starling model is checked against, its middle axis 1.90 to 3.58
+    times its thinnest and its longest 4.02 to 6.94 times, where the roost's
+    spring left at a starling's spacing flattens it to about 1 to 28 to 45.
+
+    The mean over seeds is what the span bounds, since each seed's shape
+    moves with a change to the stiffness in its fifth decimal place. The
+    five-minute flight is left out, since by then the flock has split where
+    it meets the cylinder and its largest group has rounded off.
     """
-    assert_allclose(default.group_aspect_ratios.mean(0), [1.0, 2.8, 5.6], rtol=0.3)
+    _, middle, longest = default.group_aspect_ratios.mean(0)
+
+    assert 1.90 <= middle <= 3.58
+    assert 4.02 <= longest <= 6.94
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(

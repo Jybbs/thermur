@@ -6,7 +6,7 @@ the seeds of one flight, which the settings nest as `plan`.
 from jax        import Array
 from jax.numpy  import array, cbrt, cos, deg2rad, pi, sin, stack, zeros_like
 from jax.random import normal, split
-from math       import radians
+from math       import gamma, radians
 from numpy      import arange, ndarray
 from pydantic   import BaseModel, Field, model_validator
 from typing     import Annotated, Self
@@ -138,6 +138,26 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         Counts the frames a flight keeps.
         """
         return self.steps // self.frame_every
+
+    @property
+    def nearest_m(self) -> float:
+        """
+        Computes the mean distance from a launched drone to its nearest
+        neighbor, in meters, as the cloud's density sets it.
+
+        Points scattered at random at a density `n` lie a mean `gamma(4 /
+        3) * (4 * pi * n / 3) ** (-1 / 3)` from their nearest neighbor, and
+        averaging that over a Gaussian cloud's drones, each at the density
+        the cloud holds where it sits, leaves `spacing_m` times a constant
+        of about 1.58 whatever the flock's size or `axes`.
+        """
+        return (
+            gamma(4 / 3)
+            * (3 / (4 * pi)) ** (2 / 3)
+            * (3 * pi) ** (3 / 2)
+            / (2 * pi)
+            * self.spacing_m
+        )
 
     @property
     def steps(self) -> int:
