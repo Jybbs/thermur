@@ -5,10 +5,11 @@ import { idle }            from './timing.ts'
 
 /**
  * A loop of frames that passes the kit's gate, calling `frame` with the
- * seconds since the last frame on each frame while it runs, starting only
- * while motion may run and stopping as the page's pause turns on or the
- * reader comes to prefer reduced motion, or on the first frame to find
- * motion standing still. `moved` is called with whether motion stands still
+ * seconds since the last frame on each frame while it runs, a first frame
+ * stamped before the loop started counting as none, starting only while
+ * motion may run and stopping as the page's pause turns on or the reader
+ * comes to prefer reduced motion, or on the first frame to find motion
+ * standing still. `moved` is called with whether motion stands still
  * each time the gate changes, and on that frame, before the loop stops.
  * `destroy` releases its frame and its listeners.
  */
@@ -59,7 +60,7 @@ export class Frames {
       this.#gated()
       return
     }
-    const seconds = (now - this.#last) / 1000
+    const seconds = Math.max(0, now - this.#last) / 1000
     this.#last    = now
     this.#handle  = requestAnimationFrame(this.#tick)
     this.#frame(seconds)

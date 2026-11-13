@@ -6,7 +6,7 @@
   ],
   "machine": null,
   "when": "A drawing moves on its own frame by frame, starting only while the gate lets motion run and stopping as the gate stands motion still",
-  "replaces": "The frame loop the coupling chart wrote by hand for its sweep, and the one the front page's canvas ran",
+  "replaces": "The frame loop the coupling chart wrote by hand for its sweep, and the one the stage behind every canvas drawing ran",
   "examples": [
     {
       "name": "A Running Clock",

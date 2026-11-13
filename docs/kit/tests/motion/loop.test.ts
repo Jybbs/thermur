@@ -86,6 +86,18 @@ describe('Frames', () => {
     expect(stand.held()).toEqual(RELEASED)
   })
 
+  it('counts a first frame stamped before the loop started as no time at all', () => {
+    const stand = browser()
+    const seen  = [] as number[]
+    const loop  = new Frames(seconds => seen.push(seconds))
+    vi.mocked(performance.now).mockReturnValueOnce(100)
+    loop.run(true)
+    stand.frames.run(1, 16)
+    stand.frames.run(1, 50)
+    expect(seen).toEqual([0, 0.05])
+    loop.destroy()
+  })
+
   it('stops on a frame that finds motion standing still, before calling the frame', () => {
     const stand = browser()
     const seen  = [] as number[]
