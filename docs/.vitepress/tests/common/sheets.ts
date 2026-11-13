@@ -3,6 +3,13 @@ import fs from 'node:fs'
 import { Window } from 'happy-dom'
 
 /**
+ * Reads the text of the theme's stylesheet `sheet`.
+ */
+export function source(sheet: string): string {
+  return fs.readFileSync(new URL(`../../theme/styles/${sheet}`, import.meta.url), 'utf8')
+}
+
+/**
  * Opens a page holding the theme's stylesheet `sheet`, for a reader who prefers
  * reduced motion where `reduced` holds.
  */
@@ -10,7 +17,7 @@ function opened(sheet: string, reduced: boolean = false): { document: Document, 
   const motion       = reduced ? 'reduce' : 'no-preference'
   const { document } = new Window({ settings: { device: { prefersReducedMotion: motion } } })
   const style        = document.createElement('style')
-  style.textContent = fs.readFileSync(new URL(`../../theme/styles/${sheet}`, import.meta.url), 'utf8')
+  style.textContent = source(sheet)
   document.head.append(style)
   return { document: document as unknown as Document, style: style as unknown as HTMLStyleElement }
 }
