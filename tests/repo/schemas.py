@@ -17,7 +17,7 @@ Pins the records the `repo` tasks read and report:
   and the packages a `Tree` finds
 """
 
-from datetime  import UTC, datetime
+from datetime  import UTC, date, datetime
 from functools import reduce
 from json      import loads as from_json
 from packaging.requirements import Requirement
@@ -25,6 +25,7 @@ from pathlib                import Path
 from pydantic               import AliasPath, ValidationError
 from pytest                 import Config, mark, param, raises
 from urllib.parse           import unquote
+from yaml import safe_load
 
 from thermur.repo.schemas import (
     Action,
@@ -53,7 +54,8 @@ from thermur.repo.schemas import (
     Tree,
     Trigger,
     Workflow,
-    read_pin
+    read_pin,
+    read_yaml
 )
 
 ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
@@ -214,7 +216,7 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
 @mark.parametrize(
     ("text", "location", "message"),
     [
-        param("name: w\nname: v\n", (), "duplicate mapping key: 'name'", id="unread"),
+        param("name: w\nname: v\n", (), "names `name` more than once", id="unread"),
         param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid")
     ]
 )
@@ -714,6 +716,12 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
             ".cff",
             "date-released: 2026-10-02\n",
             {"date-released": "2026-10-02"},
+            id = "date"
+        ),
+        param(
+            ".yml",
+            "at: 2026-10-02T10:00:00Z\n",
+            {"at": "2026-10-02T10:00:00Z"},
             id = "timestamp"
         )
     ]
@@ -725,11 +733,124 @@ def test_a_document_reads_the_value_its_suffix_names(
 ):
     """
     Asserts that a document's text reads as TOML under `.toml` and `.lock`,
-    as JSON under `.json`, as YAML 1.2 under any other suffix, keeping `on`,
-    a version, and a date as the strings they are written as, and as the
-    front matter alone under `.md`, ending at its first closing `---`.
+    as JSON under `.json`, as YAML under any other suffix, keeping `on`, a
+    version, and a date as the strings they are written as, and as the front
+    matter alone under `.md`, ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
+
+
+@mark.parametrize(
+    ("text", "message"),
+    [
+        param(
+            "a:\n  k: 1\n  k: 2\n",
+            "names `k` more than once",
+            id = "nested-duplicate"
+        ),
+        param("a: b: c\n", "mapping values are not allowed here", id="no-context"),
+        param(
+            "? [a]\n: 1\n",
+            "while constructing a mapping, found unhashable key",
+            id = "sequence-key"
+        ),
+        param(
+            "? !!seq x\n: 1\n",
+            "while constructing a mapping, found unhashable key",
+            id = "collection-tagged-key"
+        ),
+        param(
+            "a: !!map foo\n",
+            "expected a mapping node, but found scalar",
+            id = "tagged-scalar"
+        ),
+        param(
+            "a: !!bool foo\n",
+            "could not read 'foo' as the tag 'tag:yaml.org,2002:bool'",
+            id = "mistyped-scalar"
+        ),
+        param(
+            "a: !!int ''\n",
+            "could not read '' as the tag 'tag:yaml.org,2002:int'",
+            id = "empty-tagged-scalar"
+        ),
+        param(
+            "a: !!map [x]\n",
+            "expected a mapping node, but found sequence",
+            id = "tagged-sequence"
+        ),
+        param(
+            "d: a\x07b\n",
+            "unacceptable character #x0007: special characters are not allowed",
+            id = "control-character"
+        ),
+        param(
+            'a: "x\n',
+            "while scanning a quoted scalar, found unexpected end of stream",
+            id = "unclosed-quote"
+        ),
+        param(
+            "[" * 1000 + "]" * 1000,
+            "maximum recursion depth exceeded",
+            id = "past-the-recursion-limit"
+        )
+    ]
+)
+def test_yaml_failing_to_read_names_its_problem_on_one_line(message: str, text: str):
+    """
+    Asserts that YAML failing to read raises a `ValueError` naming the
+    problem on one line, opening on the context the problem arose in where
+    the parser reports one, and leaving out where in the text it lies.
+    """
+    with raises(ValueError) as error:
+        read_yaml(text)
+
+    assert str(error.value) == message
+
+
+@mark.parametrize(
+    ("text", "value"),
+    [
+        param(
+            "a: on\nb: off\nc: yes\nd: no\n",
+            {
+                "a" : "on",
+                "b" : "off",
+                "c" : "yes",
+                "d" : "no"
+            },
+            id = "text"
+        ),
+        param(
+            "a: true\nb: False\nc: TRUE\n",
+            {"a": True, "b": False, "c": True},
+            id = "boolean"
+        ),
+        param(
+            "a: &a {k: 1, j: 1}\nb: {<<: *a, k: 2}\n",
+            {"a": {"j": 1, "k": 1}, "b": {"j": 1, "k": 2}},
+            id = "merge"
+        ),
+        param(
+            "d: !!timestamp 2026-10-02\n",
+            {"d": "2026-10-02"},
+            id = "tagged-timestamp"
+        ),
+        param(
+            "d: The number\x85  of commits\n",
+            {"d": "The number of commits"},
+            id = "next-line"
+        )
+    ]
+)
+def test_yaml_reads_core_booleans_merges_and_a_next_line(text: str, value: object):
+    """
+    Asserts that YAML reads only the booleans the YAML 1.2 core schema
+    resolves, keeps a timestamp tagged as one as its text, reads a NEL as
+    a line break, and reads a key overriding one a merge brings in as no
+    repeat.
+    """
+    assert read_yaml(text) == value
 
 
 def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
@@ -739,27 +860,6 @@ def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
     """
     with raises(ValueError, match="opens on no front matter"):
         Document.load(".md", "name: Bug\n---\n")
-
-
-@mark.parametrize(
-    ("labels", "names"),
-    [
-        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
-        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
-        param("🐞 bug", ["🐞 bug"], id="one"),
-        param("", [], id="empty")
-    ]
-)
-def test_a_template_reads_its_labels_from_a_list_or_one_string(
-    labels : str | list[str],
-    names  : list[str]
-):
-    """
-    Asserts that a template's labels read from a list as written, and from
-    one string as each name its commas separate with the spaces around it
-    removed, so an empty string names none.
-    """
-    assert Template.model_validate({"labels": labels}).labels == names
 
 
 def test_a_required_check_naming_no_app_sends_no_app():
@@ -786,6 +886,39 @@ def test_a_required_check_naming_no_app_sends_no_app():
     }
 
     assert Ruleset.model_validate(written).request(None).body == written
+
+
+@mark.parametrize(
+    ("labels", "names"),
+    [
+        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
+        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
+        param("🐞 bug", ["🐞 bug"], id="one"),
+        param("", [], id="empty")
+    ]
+)
+def test_a_template_reads_its_labels_from_a_list_or_one_string(
+    labels : str | list[str],
+    names  : list[str]
+):
+    """
+    Asserts that a template's labels read from a list as written, and from
+    one string as each name its commas separate with the spaces around it
+    removed, so an empty string names none.
+    """
+    assert Template.model_validate({"labels": labels}).labels == names
+
+
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+    """
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
+    """
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
+
+    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -858,18 +991,6 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
-    """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
-    """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
-
-    assert step.env == {"RETRIES": 3}
-
-
 def test_a_toggle_turns_its_endpoint_on_or_off():
     """
     Asserts that each toggle reads as the endpoint it names, which `PUT`
@@ -904,6 +1025,45 @@ def test_a_toml_task_declares_no_requirements(tmp_path: Path):
         run    = (),
         source = tmp_path
     ).dependencies == []
+
+
+def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
+    """
+    Asserts that a tree keeps each package it resolves under its normalized
+    name, leaving out the script it is rooted at, and that each reads its
+    earliest upload across its source distribution and wheels, or none.
+    """
+    tree = Tree.model_validate(
+        {
+            "resolution": {
+                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
+                "pydantic-core" : {
+                    "kind"    : "package",
+                    "name"    : "pydantic_core",
+                    "version" : "2.50.1",
+                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
+                    "wheels"  : [
+                        {"upload_time": "2026-10-11T18:33:07.153Z"},
+                        {"upload_time": None}
+                    ]
+                },
+                "script"        : {"kind": "script"}
+            }
+        }
+    )
+
+    assert sorted(tree.packages) == ["bare", "pydantic-core"]
+    assert tree.package("Pydantic.Core").uploaded == datetime(
+        2026,
+        10,
+        11,
+        18,
+        33,
+        7,
+        153000,
+        tzinfo = UTC
+    )
+    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize(
@@ -1026,43 +1186,14 @@ def test_a_request_sends_its_body_on_standard_input(
     assert (call.command, call.payload) == (command, payload)
 
 
-def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
+def test_a_warning_prints_as_a_warning_annotation():
     """
-    Asserts that a tree keeps each package it resolves under its normalized
-    name, leaving out the script it is rooted at, and that each reads its
-    earliest upload across its source distribution and wheels, or none.
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
     """
-    tree = Tree.model_validate(
-        {
-            "resolution": {
-                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
-                "pydantic-core" : {
-                    "kind"    : "package",
-                    "name"    : "pydantic_core",
-                    "version" : "2.50.1",
-                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
-                    "wheels"  : [
-                        {"upload_time": "2026-10-11T18:33:07.153Z"},
-                        {"upload_time": None}
-                    ]
-                },
-                "script"        : {"kind": "script"}
-            }
-        }
-    )
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
 
-    assert sorted(tree.packages) == ["bare", "pydantic-core"]
-    assert tree.package("Pydantic.Core").uploaded == datetime(
-        2026,
-        10,
-        11,
-        18,
-        33,
-        7,
-        153000,
-        tzinfo = UTC
-    )
-    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
+    assert finding.annotation == "::warning file=a.toml::m"
 
 
 @mark.parametrize(
@@ -1111,14 +1242,30 @@ def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
     )
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that a workflow reads the job under the key `gate`, the jobs
+    it waits for, the check run and the task of each row of each job, and
+    whether a step passes a composite action `save: 'true'`.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
+        "        include:\n          - task: py:check\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
 
-    assert finding.annotation == "::warning file=a.toml::m"
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.checks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
+    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize(
@@ -1161,30 +1308,23 @@ def test_a_document_holding_mappings_hashes_alike_across_reads(
     assert hash(kind.read(root, path)) == hash(kind.read(root, path))
 
 
-def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
+def test_an_edit_naming_a_prefix_of_a_longer_release_fails(tmp_path: Path):
     """
-    Asserts that a workflow reads the job under the key `gate`, the jobs
-    it waits for, the check run and the task of each row of each job, and
-    whether a step passes a composite action `save: 'true'`.
+    Asserts that an edit whose release only opens a longer one the file
+    names, `1.2.3` against `1.2.34`, rewrites nothing and fails naming the
+    file, so a lift never lands half a release.
     """
-    text = (
-        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
-        "          - task: lock:check\n    steps:\n"
-        "      - uses: $/a\n        with: { save: 'true' }\n"
-        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
-        "        include:\n          - task: py:check\n"
-        "  gate:\n    runs-on: x\n"
-    )
-    read = workflow(text)
+    (tmp_path / "pyproject.toml").write_text('requires = ["hatchling==1.2.34"]\n')
 
-    assert (
-        read.gate.image,
-        list(read.gated),
-        read.checks,
-        read.saves("$/a"),
-        read.saves("$/b")
-    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
-    assert workflow(WORKFLOW).gate is None
+    with raises(ValueError, match="`pyproject.toml` names no `1.2.3` to lift"):
+        Edit(
+            ahead   = '"hatchling==',
+            current = "1.2.3",
+            file    = Path("pyproject.toml"),
+            newest  = "1.3.0"
+        ).write(tmp_path)
+
+    assert "1.2.34" in (tmp_path / "pyproject.toml").read_text()
 
 
 @mark.parametrize("table", list(GithubSettings.model_fields))
@@ -1284,23 +1424,22 @@ def test_a_lift_is_major_where_it_changes_the_left_most_non_zero_part(
     assert Lag(current=current, newest=newest, pin="p").major is major
 
 
-def test_an_edit_naming_a_prefix_of_a_longer_release_fails(tmp_path: Path):
+def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Path):
     """
-    Asserts that an edit whose release only opens a longer one the file
-    names, `1.2.3` against `1.2.34`, rewrites nothing and fails naming the
-    file, so a lift never lands half a release.
+    Asserts that an edit rewrites the release only on the line whose opening
+    its pattern matches, `^` matching at each line, and leaves every other
+    line naming the same release as it stood.
     """
-    (tmp_path / "pyproject.toml").write_text('requires = ["hatchling==1.2.34"]\n')
+    (tmp_path / "config.toml").write_text('bun  = "1.4.3"\nnode = "1.4.3"\n')
 
-    with raises(ValueError, match="`pyproject.toml` names no `1.2.3` to lift"):
-        Edit(
-            ahead   = '"hatchling==',
-            current = "1.2.3",
-            file    = Path("pyproject.toml"),
-            newest  = "1.3.0"
-        ).write(tmp_path)
+    Edit(
+        ahead   = r'^bun\s*=\s*"',
+        current = "1.4.3",
+        file    = Path("config.toml"),
+        newest  = "1.4.4"
+    ).write(tmp_path)
 
-    assert "1.2.34" in (tmp_path / "pyproject.toml").read_text()
+    assert (tmp_path / "config.toml").read_text() == 'bun  = "1.4.4"\nnode = "1.4.3"\n'
 
 
 @mark.parametrize(
@@ -1335,22 +1474,18 @@ def test_a_lag_writes_its_row_counting_whole_days(published: str | None, row: st
     assert lag.row(datetime(2026, 10, 16, 11, tzinfo=UTC)) == row
 
 
-def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Path):
+def test_reading_yaml_leaves_the_safe_loader_reading_a_date_and_a_boolean():
     """
-    Asserts that an edit rewrites the release only on the line whose opening
-    its pattern matches, `^` matching at each line, and leaves every other
-    line naming the same release as it stood.
+    Asserts that keeping a timestamp and `on` as their text changes no
+    other safe loader, which still reads the timestamp as a date and `on`
+    as `True`.
     """
-    (tmp_path / "config.toml").write_text('bun  = "1.4.3"\nnode = "1.4.3"\n')
+    read_yaml("d: 2026-10-02\non: push\n")
 
-    Edit(
-        ahead   = r'^bun\s*=\s*"',
-        current = "1.4.3",
-        file    = Path("config.toml"),
-        newest  = "1.4.4"
-    ).write(tmp_path)
-
-    assert (tmp_path / "config.toml").read_text() == 'bun  = "1.4.4"\nnode = "1.4.3"\n'
+    assert safe_load("d: 2026-10-02\non: push\n") == {
+        "d"  : date(2026, 10, 2),
+        True : "push"
+    }
 
 
 def test_the_lock_maps_each_package_to_its_version():

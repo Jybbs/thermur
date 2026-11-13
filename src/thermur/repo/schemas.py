@@ -26,7 +26,7 @@ Holds the records the `repo` tasks read and report:
 """
 
 from collections     import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from datetime        import datetime
 from enum            import StrEnum, auto
 from http            import HTTPMethod
@@ -52,11 +52,13 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re           import MULTILINE, escape, findall, fullmatch, match, search, sub, subn
-from tomllib      import loads
-from typing       import Annotated, Self
-from urllib.parse import urlsplit
-from yaml_rs      import loads as from_yaml
+from re               import MULTILINE, compile as regex, escape, findall, fullmatch, match, search, sub, subn
+from tomllib          import loads
+from typing           import Annotated, Self
+from urllib.parse     import urlsplit
+from yaml             import MappingNode, MarkedYAMLError, Node, SafeLoader, load
+from yaml.constructor import ConstructorError
+from yaml.reader      import ReaderError
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type FrozenJson = frozendict[str, FrozenJson] | list[FrozenJson] | Scalar | None
@@ -129,7 +131,7 @@ def read_names(needs: str | list[str]) -> list[str]:
     return [needs] if isinstance(needs, str) else needs
 
 
-def read_pairs[V](pairs: list[tuple[str, V]]) -> dict[str, V]:
+def read_pairs[K: Hashable, V](pairs: list[tuple[K, V]]) -> dict[K, V]:
     """
     Builds one mapping out of key and value pairs, such as the rows of a
     table or the members of a JSON object.
@@ -150,6 +152,93 @@ def repeated[T](values: Iterable[T]) -> list[T]:
     first appearance.
     """
     return [value for value, count in Counter(values).items() if count > 1]
+
+
+def read_yaml(text: str) -> object:
+    """
+    Reads `text` through `TextLoader`, reading a NEL as a line break, as
+    YAML 1.1 does.
+
+    Raises:
+        ValueError: Naming the problem the parser or the interpreter
+                    reports, where `text` fails to parse, nests past the
+                    recursion limit, or names a key more than once in
+                    a mapping.
+    """
+    try:
+        return load(text, TextLoader)
+    except MarkedYAMLError as error:
+        raise ValueError(
+            ", ".join(filter(None, (error.context, error.problem)))
+        ) from error
+    except (ReaderError, RecursionError) as error:
+        raise ValueError(str(error).partition("\n")[0]) from error
+
+
+class TextLoader(SafeLoader):
+    """
+    Reads YAML as `SafeLoader` does, keeping a timestamp as the text it is
+    written as, reading only the booleans the
+    [YAML 1.2 core schema](https://yaml.org/spec/1.2.2/#1032-tag-resolution)
+    resolves, so `on`, `off`, `yes`, and `no` stay strings, and rejecting a
+    mapping that names a key more than once.
+    """
+
+    yaml_constructors = SafeLoader.yaml_constructors | {
+        "tag:yaml.org,2002:timestamp": SafeLoader.construct_yaml_str
+    }
+
+    yaml_implicit_resolvers = {
+        first: [
+            (tag, regex(r"^(?:true|True|TRUE|false|False|FALSE)$"))
+            if tag == "tag:yaml.org,2002:bool"
+            else (tag, expression)
+            for tag, expression in resolvers
+        ]
+        for first, resolvers in SafeLoader.yaml_implicit_resolvers.items()
+    }
+
+    def construct_mapping(self, node: Node, deep: bool = False) -> dict:
+        """
+        Builds the mapping `node` holds as `SafeLoader` does, merging each
+        mapping a `<<` key names.
+
+        Raises:
+            ValueError: Naming each hashable key the mapping itself names
+                        more than once, leaving out the keys a merge brings
+                        in.
+        """
+        if isinstance(node, MappingNode):
+            read_pairs(
+                pairs = [
+                    (key, None)
+                    for key in (
+                        self.construct_object(key)
+                        for key, _ in node.value
+                        if key.tag != "tag:yaml.org,2002:merge"
+                    )
+                    if isinstance(key, Hashable)
+                ]
+            )
+
+        return super().construct_mapping(node, deep=deep)
+
+    def construct_object(self, node: Node, deep: bool = False) -> object:
+        """
+        Builds the object `node` holds as `SafeLoader` does.
+
+        Raises:
+            ConstructorError: Naming the text and the tag of a scalar whose
+                              text the tag's constructor cannot read, such
+                              as `!!bool foo` or an empty `!!int`.
+        """
+        try:
+            return super().construct_object(node, deep=deep)
+        except LookupError as error:
+            raise ConstructorError(
+                problem      = f"could not read {node.value!r} as the tag {node.tag!r}",
+                problem_mark = node.start_mark
+            ) from error
 
 
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
@@ -196,10 +285,10 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
 
         Raises:
             ValueError: Where the TOML, the JSON, or the YAML fails to
-                        parse, where a JSON object names a key more than
-                        once, or where a Markdown file opens on no front
-                        matter, which validation reports against the whole
-                        document.
+                        parse, where a JSON object or a YAML mapping names
+                        a key more than once, or where a Markdown file opens
+                        on no front matter, which validation reports against
+                        the whole document.
         """
         if suffix in (".lock", ".toml"):
             return loads(text)
@@ -209,11 +298,11 @@ class Document(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=
 
         if suffix == ".md":
             if front := search(r"(?ms)\A---\n(.*?)^---$", text):
-                return from_yaml(front[1], parse_datetime=False)
+                return read_yaml(front[1])
 
             raise ValueError("opens on no front matter")
 
-        return from_yaml(text, parse_datetime=False)
+        return read_yaml(text)
 
     @model_validator(mode="before")
     @classmethod
