@@ -22,6 +22,7 @@ dependencies    = [
     "pylatexenc",
     "pyyaml",
     "scipy",
+    "semver",
     "xarray"
 ]
 description     = "Flies a drone flock as a starling murmuration that breaks around a wildfire the way it breaks around a falcon."

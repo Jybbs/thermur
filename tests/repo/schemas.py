@@ -12,6 +12,7 @@ Pins the records the `repo` tasks read and report:
 - The keys and values `GithubSettings` accepts, the calls `Toggles` writes,
   the checks a `Ruleset` requires and the call it writes, and the command
   and body each `Request` sends
+- The release or range each rule a `Package` reads from `overrides` gives
 - The release a requirement pins, whether a `Lag` is major and the row and
   files it names, what an `Edit` writes, the advisories an `Audit` clears,
   and the packages a `Tree` finds
@@ -44,6 +45,7 @@ from thermur.repo.schemas import (
     Level,
     Lock,
     Manifest,
+    Package,
     Parity,
     Request,
     Ruleset,
@@ -862,6 +864,48 @@ def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
         Document.load(".md", "name: Bug\n---\n")
 
 
+def test_a_package_reads_its_overrides_or_none(pytestconfig: Config):
+    """
+    Asserts that `Package` reads the release or range each rule of
+    `overrides` gives, and reads none where `docs/package.json` declares
+    no `overrides`.
+    """
+    file   = Path(Package.model_config["title"])
+    parsed = Package.load(
+        file.suffix,
+        (pytestconfig.rootpath / file).read_text(encoding="utf-8")
+    )
+    declared = {**parsed, "overrides": {"fflate": "0.7.5", "glob": "^14.0.0"}}
+    absent   = {key: value for key, value in parsed.items() if key != "overrides"}
+
+    assert Package.model_validate(declared).overrides == {
+        "fflate" : "0.7.5",
+        "glob"   : "^14.0.0"
+    }
+    assert Package.model_validate(absent).overrides == {}
+
+
+@mark.parametrize(
+    ("labels", "names"),
+    [
+        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
+        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
+        param("🐞 bug", ["🐞 bug"], id="one"),
+        param("", [], id="empty")
+    ]
+)
+def test_a_template_reads_its_labels_from_a_list_or_one_string(
+    labels : str | list[str],
+    names  : list[str]
+):
+    """
+    Asserts that a template's labels read from a list as written, and from
+    one string as each name its commas separate with the spaces around it
+    removed, so an empty string names none.
+    """
+    assert Template.model_validate({"labels": labels}).labels == names
+
+
 def test_a_required_check_naming_no_app_sends_no_app():
     """
     Asserts that a required check naming no `integration_id` is sent without
@@ -886,39 +930,6 @@ def test_a_required_check_naming_no_app_sends_no_app():
     }
 
     assert Ruleset.model_validate(written).request(None).body == written
-
-
-@mark.parametrize(
-    ("labels", "names"),
-    [
-        param(["🐞 bug", "🦜 cli"], ["🐞 bug", "🦜 cli"], id="list"),
-        param("🐞 bug, 🦜 cli", ["🐞 bug", "🦜 cli"], id="comma-delimited"),
-        param("🐞 bug", ["🐞 bug"], id="one"),
-        param("", [], id="empty")
-    ]
-)
-def test_a_template_reads_its_labels_from_a_list_or_one_string(
-    labels : str | list[str],
-    names  : list[str]
-):
-    """
-    Asserts that a template's labels read from a list as written, and from
-    one string as each name its commas separate with the spaces around it
-    removed, so an empty string names none.
-    """
-    assert Template.model_validate({"labels": labels}).labels == names
-
-
-def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
-    """
-    Asserts that a step's `env` holding a number, which YAML reads as an
-    integer, validates as that integer.
-    """
-    step = workflow(
-        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
-    ).jobs["a"].steps[0]
-
-    assert step.env == {"RETRIES": 3}
 
 
 @mark.parametrize(
@@ -991,6 +1002,18 @@ def test_a_task_runs_by_its_first_alias_or_by_its_name(
     ).command == command
 
 
+def test_a_step_setting_a_number_in_its_env_reads_it_as_a_number():
+    """
+    Asserts that a step's `env` holding a number, which YAML reads as an
+    integer, validates as that integer.
+    """
+    step = workflow(
+        text = f"{WORKFLOW}    steps:\n      - env: {{ RETRIES: 3 }}\n"
+    ).jobs["a"].steps[0]
+
+    assert step.env == {"RETRIES": 3}
+
+
 def test_a_toggle_turns_its_endpoint_on_or_off():
     """
     Asserts that each toggle reads as the endpoint it names, which `PUT`
@@ -1025,45 +1048,6 @@ def test_a_toml_task_declares_no_requirements(tmp_path: Path):
         run    = (),
         source = tmp_path
     ).dependencies == []
-
-
-def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
-    """
-    Asserts that a tree keeps each package it resolves under its normalized
-    name, leaving out the script it is rooted at, and that each reads its
-    earliest upload across its source distribution and wheels, or none.
-    """
-    tree = Tree.model_validate(
-        {
-            "resolution": {
-                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
-                "pydantic-core" : {
-                    "kind"    : "package",
-                    "name"    : "pydantic_core",
-                    "version" : "2.50.1",
-                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
-                    "wheels"  : [
-                        {"upload_time": "2026-10-11T18:33:07.153Z"},
-                        {"upload_time": None}
-                    ]
-                },
-                "script"        : {"kind": "script"}
-            }
-        }
-    )
-
-    assert sorted(tree.packages) == ["bare", "pydantic-core"]
-    assert tree.package("Pydantic.Core").uploaded == datetime(
-        2026,
-        10,
-        11,
-        18,
-        33,
-        7,
-        153000,
-        tzinfo = UTC
-    )
-    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize(
@@ -1186,14 +1170,43 @@ def test_a_request_sends_its_body_on_standard_input(
     assert (call.command, call.payload) == (command, payload)
 
 
-def test_a_warning_prints_as_a_warning_annotation():
+def test_a_tree_finds_each_package_under_any_spelling_with_its_first_upload():
     """
-    Asserts that a finding at the warning level prints as the `warning`
-    workflow command, which annotates the file without failing the run.
+    Asserts that a tree keeps each package it resolves under its normalized
+    name, leaving out the script it is rooted at, and that each reads its
+    earliest upload across its source distribution and wheels, or none.
     """
-    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
+    tree = Tree.model_validate(
+        {
+            "resolution": {
+                "bare"          : {"kind": "package", "name": "bare", "version": "1.0"},
+                "pydantic-core" : {
+                    "kind"    : "package",
+                    "name"    : "pydantic_core",
+                    "version" : "2.50.1",
+                    "sdist"   : {"upload_time": "2026-10-11T18:40:00Z"},
+                    "wheels"  : [
+                        {"upload_time": "2026-10-11T18:33:07.153Z"},
+                        {"upload_time": None}
+                    ]
+                },
+                "script"        : {"kind": "script"}
+            }
+        }
+    )
 
-    assert finding.annotation == "::warning file=a.toml::m"
+    assert sorted(tree.packages) == ["bare", "pydantic-core"]
+    assert tree.package("Pydantic.Core").uploaded == datetime(
+        2026,
+        10,
+        11,
+        18,
+        33,
+        7,
+        153000,
+        tzinfo = UTC
+    )
+    assert (tree.package("bare").uploaded, tree.package("absent")) == (None, None)
 
 
 @mark.parametrize(
@@ -1242,30 +1255,14 @@ def test_a_ruleset_updates_its_live_ruleset_or_creates_one(
     )
 
 
-def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
+def test_a_warning_prints_as_a_warning_annotation():
     """
-    Asserts that a workflow reads the job under the key `gate`, the jobs
-    it waits for, the check run and the task of each row of each job, and
-    whether a step passes a composite action `save: 'true'`.
+    Asserts that a finding at the warning level prints as the `warning`
+    workflow command, which annotates the file without failing the run.
     """
-    text = (
-        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
-        "          - task: lock:check\n    steps:\n"
-        "      - uses: $/a\n        with: { save: 'true' }\n"
-        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
-        "        include:\n          - task: py:check\n"
-        "  gate:\n    runs-on: x\n"
-    )
-    read = workflow(text)
+    finding = Finding(file=Path("a.toml"), level=Level.WARNING, message="m")
 
-    assert (
-        read.gate.image,
-        list(read.gated),
-        read.checks,
-        read.saves("$/a"),
-        read.saves("$/b")
-    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
-    assert workflow(WORKFLOW).gate is None
+    assert finding.annotation == "::warning file=a.toml::m"
 
 
 @mark.parametrize(
@@ -1308,23 +1305,30 @@ def test_a_document_holding_mappings_hashes_alike_across_reads(
     assert hash(kind.read(root, path)) == hash(kind.read(root, path))
 
 
-def test_an_edit_naming_a_prefix_of_a_longer_release_fails(tmp_path: Path):
+def test_a_workflow_reads_its_gate_its_rows_and_what_it_saves():
     """
-    Asserts that an edit whose release only opens a longer one the file
-    names, `1.2.3` against `1.2.34`, rewrites nothing and fails naming the
-    file, so a lift never lands half a release.
+    Asserts that a workflow reads the job under the key `gate`, the jobs
+    it waits for, the check run and the task of each row of each job, and
+    whether a step passes a composite action `save: 'true'`.
     """
-    (tmp_path / "pyproject.toml").write_text('requires = ["hatchling==1.2.34"]\n')
+    text = (
+        f"{WORKFLOW}    strategy:\n      matrix:\n        include:\n"
+        "          - task: lock:check\n    steps:\n"
+        "      - uses: $/a\n        with: { save: 'true' }\n"
+        "  b:\n    name: B\n    runs-on: x\n    strategy:\n      matrix:\n"
+        "        include:\n          - task: py:check\n"
+        "  gate:\n    runs-on: x\n"
+    )
+    read = workflow(text)
 
-    with raises(ValueError, match="`pyproject.toml` names no `1.2.3` to lift"):
-        Edit(
-            ahead   = '"hatchling==',
-            current = "1.2.3",
-            file    = Path("pyproject.toml"),
-            newest  = "1.3.0"
-        ).write(tmp_path)
-
-    assert "1.2.34" in (tmp_path / "pyproject.toml").read_text()
+    assert (
+        read.gate.image,
+        list(read.gated),
+        read.checks,
+        read.saves("$/a"),
+        read.saves("$/b")
+    ) == ("x", ["a", "b"], [("", "lock:check"), ("B", "py:check")], True, False)
+    assert workflow(WORKFLOW).gate is None
 
 
 @mark.parametrize("table", list(GithubSettings.model_fields))
@@ -1424,22 +1428,23 @@ def test_a_lift_is_major_where_it_changes_the_left_most_non_zero_part(
     assert Lag(current=current, newest=newest, pin="p").major is major
 
 
-def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Path):
+def test_an_edit_naming_a_prefix_of_a_longer_release_fails(tmp_path: Path):
     """
-    Asserts that an edit rewrites the release only on the line whose opening
-    its pattern matches, `^` matching at each line, and leaves every other
-    line naming the same release as it stood.
+    Asserts that an edit whose release only opens a longer one the file
+    names, `1.2.3` against `1.2.34`, rewrites nothing and fails naming the
+    file, so a lift never lands half a release.
     """
-    (tmp_path / "config.toml").write_text('bun  = "1.4.3"\nnode = "1.4.3"\n')
+    (tmp_path / "pyproject.toml").write_text('requires = ["hatchling==1.2.34"]\n')
 
-    Edit(
-        ahead   = r'^bun\s*=\s*"',
-        current = "1.4.3",
-        file    = Path("config.toml"),
-        newest  = "1.4.4"
-    ).write(tmp_path)
+    with raises(ValueError, match="`pyproject.toml` names no `1.2.3` to lift"):
+        Edit(
+            ahead   = '"hatchling==',
+            current = "1.2.3",
+            file    = Path("pyproject.toml"),
+            newest  = "1.3.0"
+        ).write(tmp_path)
 
-    assert (tmp_path / "config.toml").read_text() == 'bun  = "1.4.4"\nnode = "1.4.3"\n'
+    assert "1.2.34" in (tmp_path / "pyproject.toml").read_text()
 
 
 @mark.parametrize(
@@ -1474,6 +1479,24 @@ def test_a_lag_writes_its_row_counting_whole_days(published: str | None, row: st
     assert lag.row(datetime(2026, 10, 16, 11, tzinfo=UTC)) == row
 
 
+def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Path):
+    """
+    Asserts that an edit rewrites the release only on the line whose opening
+    its pattern matches, `^` matching at each line, and leaves every other
+    line naming the same release as it stood.
+    """
+    (tmp_path / "config.toml").write_text('bun  = "1.4.3"\nnode = "1.4.3"\n')
+
+    Edit(
+        ahead   = r'^bun\s*=\s*"',
+        current = "1.4.3",
+        file    = Path("config.toml"),
+        newest  = "1.4.4"
+    ).write(tmp_path)
+
+    assert (tmp_path / "config.toml").read_text() == 'bun  = "1.4.4"\nnode = "1.4.3"\n'
+
+
 def test_reading_yaml_leaves_the_safe_loader_reading_a_date_and_a_boolean():
     """
     Asserts that keeping a timestamp and `on` as their text changes no
@@ -1486,18 +1509,6 @@ def test_reading_yaml_leaves_the_safe_loader_reading_a_date_and_a_boolean():
         "d"  : date(2026, 10, 2),
         True : "push"
     }
-
-
-def test_the_lock_maps_each_package_to_its_version():
-    """
-    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
-    name mapped to the version it resolves.
-    """
-    rows = {
-        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
-    }
-
-    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
 
 
 @mark.parametrize(
@@ -1542,6 +1553,18 @@ def test_an_audit_clears_each_advisory_a_release_up_to_the_newest_fixes(
     )
 
     assert audit.clears(current, name, newest) == cleared
+
+
+def test_the_lock_maps_each_package_to_its_version():
+    """
+    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
+    name mapped to the version it resolves.
+    """
+    rows = {
+        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
+    }
+
+    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
 
 
 def workflow(text: str) -> Workflow:
