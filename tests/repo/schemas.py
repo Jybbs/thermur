@@ -24,8 +24,8 @@ from packaging.requirements import Requirement
 from pathlib                import Path
 from pydantic               import AliasPath, ValidationError
 from pytest                 import Config, mark, param, raises
-from ruamel.yaml            import YAML
 from urllib.parse           import unquote
+from yaml import safe_load
 
 from thermur.repo.schemas import (
     Action,
@@ -216,7 +216,7 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
 @mark.parametrize(
     ("text", "location", "message"),
     [
-        param("name: w\nname: v\n", (), 'found duplicate key "name"', id="unread"),
+        param("name: w\nname: v\n", (), "names `name` more than once", id="unread"),
         param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid")
     ]
 )
@@ -733,9 +733,9 @@ def test_a_document_reads_the_value_its_suffix_names(
 ):
     """
     Asserts that a document's text reads as TOML under `.toml` and `.lock`,
-    as JSON under `.json`, as YAML 1.2 under any other suffix, keeping `on`,
-    a version, and a date as the strings they are written as, and as the
-    front matter alone under `.md`, ending at its first closing `---`.
+    as JSON under `.json`, as YAML under any other suffix, keeping `on`, a
+    version, and a date as the strings they are written as, and as the front
+    matter alone under `.md`, ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
 
@@ -745,11 +745,25 @@ def test_a_document_reads_the_value_its_suffix_names(
     [
         param(
             "a:\n  k: 1\n  k: 2\n",
-            'while constructing a mapping, found duplicate key "k" with value "2" '
-            '(original value: "1")',
+            "names `k` more than once",
             id = "nested-duplicate"
         ),
         param("a: b: c\n", "mapping values are not allowed here", id="no-context"),
+        param(
+            "? [a]\n: 1\n",
+            "while constructing a mapping, found unhashable key",
+            id = "sequence-key"
+        ),
+        param(
+            "a: !!map foo\n",
+            "expected a mapping node, but found scalar",
+            id = "tagged-scalar"
+        ),
+        param(
+            "a: !!map [x]\n",
+            "expected a mapping node, but found sequence",
+            id = "tagged-sequence"
+        ),
         param(
             "d: a\x07b\n",
             "unacceptable character #x0007: special characters are not allowed",
@@ -777,6 +791,51 @@ def test_yaml_failing_to_read_names_its_problem_on_one_line(message: str, text: 
         read_yaml(text)
 
     assert str(error.value) == message
+
+
+@mark.parametrize(
+    ("text", "value"),
+    [
+        param(
+            "a: on\nb: off\nc: yes\nd: no\n",
+            {
+                "a" : "on",
+                "b" : "off",
+                "c" : "yes",
+                "d" : "no"
+            },
+            id = "text"
+        ),
+        param(
+            "a: true\nb: False\nc: TRUE\n",
+            {"a": True, "b": False, "c": True},
+            id = "boolean"
+        ),
+        param(
+            "a: &a {k: 1, j: 1}\nb: {<<: *a, k: 2}\n",
+            {"a": {"j": 1, "k": 1}, "b": {"j": 1, "k": 2}},
+            id = "merge"
+        ),
+        param(
+            "d: !!timestamp 2026-10-02\n",
+            {"d": "2026-10-02"},
+            id = "tagged-timestamp"
+        ),
+        param(
+            "d: The number\x85  of commits\n",
+            {"d": "The number of commits"},
+            id = "next-line"
+        )
+    ]
+)
+def test_yaml_reads_core_booleans_merges_and_a_next_line(text: str, value: object):
+    """
+    Asserts that YAML reads only the booleans the YAML 1.2 core schema
+    resolves, keeps a timestamp tagged as one as its text, reads a NEL as
+    a line break, and reads a key overriding one a merge brings in as no
+    repeat.
+    """
+    assert read_yaml(text) == value
 
 
 def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
@@ -1400,15 +1459,17 @@ def test_a_lag_writes_its_row_counting_whole_days(published: str | None, row: st
     assert lag.row(datetime(2026, 10, 16, 11, tzinfo=UTC)) == row
 
 
-def test_reading_a_timestamp_as_text_leaves_other_safe_loaders_reading_a_date():
+def test_reading_yaml_leaves_the_safe_loader_reading_a_date_and_a_boolean():
     """
-    Asserts that keeping a timestamp as its text changes no other safe
-    loader, which still reads the timestamp as a date.
+    Asserts that keeping a timestamp and `on` as their text changes no
+    other safe loader, which still reads the timestamp as a date and `on`
+    as `True`.
     """
-    read_yaml("d: 2026-10-02\n")
+    read_yaml("d: 2026-10-02\non: push\n")
 
-    assert YAML(pure=True, typ="safe").load("d: 2026-10-02\n") == {
-        "d": date(2026, 10, 2)
+    assert safe_load("d: 2026-10-02\non: push\n") == {
+        "d"  : date(2026, 10, 2),
+        True : "push"
     }
 
 

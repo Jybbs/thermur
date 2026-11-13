@@ -21,7 +21,6 @@ dependencies    = [
     "pydantic-settings",
     "pylatexenc",
     "pyyaml",
-    "ruamel-yaml",
     "scipy",
     "xarray"
 ]

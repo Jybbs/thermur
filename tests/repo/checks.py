@@ -573,7 +573,7 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
     [
         param(
             "\x85",
-            f"PyYAML cannot parse `{ACTION}`: "
+            f"`{ACTION}`: Value error, "
             "while scanning a simple key, could not find expected ':'",
             id = "next-line"
         ),
@@ -585,16 +585,15 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
         )
     ]
 )
-def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(
+def test_a_manifest_failing_to_read_is_named_for_its_problem(
     character : str,
     checkout  : Checkout,
     message   : str
 ):
     """
-    Asserts that a manifest PyYAML cannot parse is named for its problem
-    rather than raising, the one PyYAML reports where a description holds
-    the NEL that only YAML 1.1 reads as a line break, and the one its read
-    reports where a description holds a control character YAML 1.2 rejects.
+    Asserts that a manifest failing to read is named for the problem its
+    read reports rather than raising, where a description holds a NEL, which
+    YAML 1.1 reads as a line break, or a control character YAML rejects.
     """
     edit(
         checkout,
@@ -1864,8 +1863,7 @@ def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
     assert GateCheck(checkout=checkout).findings == [
         Finding(
             file    = Path(CI),
-            message = f"`{CI}`: Value error, while constructing a mapping, "
-            'found duplicate key "name" with value "two" (original value: "one")'
+            message = f"`{CI}`: Value error, names `name` more than once"
         )
     ]
 
