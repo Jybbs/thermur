@@ -2,90 +2,90 @@
   "coupling": {
     "reference": {
       "dense": {
-        "error": 0.0079,
-        "mean": 0.968
+        "error": 0.0031,
+        "mean": 0.9506
       },
       "middle": {
-        "error": 0.0033,
-        "mean": 0.9796
+        "error": 0.0039,
+        "mean": 0.9743
       },
       "sparse": {
-        "error": 0.0034,
-        "mean": 0.9605
+        "error": 0.0037,
+        "mean": 0.9772
       }
     },
     "anisotropic": {
       "dense": {
-        "error": 0.0046,
-        "mean": 0.967
+        "error": 0.0109,
+        "mean": 0.9287
       },
       "middle": {
-        "error": 0.0035,
-        "mean": 0.9727
+        "error": 0.004,
+        "mean": 0.9609
       },
       "sparse": {
-        "error": 0.0043,
-        "mean": 0.9508
+        "error": 0.0035,
+        "mean": 0.9632
       }
     },
     "metric": {
       "dense": {
-        "error": 0.0294,
-        "mean": 0.3906
+        "error": 0.0295,
+        "mean": 0.4107
       },
       "middle": {
-        "error": 0.0218,
-        "mean": 0.3844
+        "error": 0.0385,
+        "mean": 0.3836
       },
       "sparse": {
-        "error": 0.0085,
-        "mean": 0.1991
+        "error": 0.0077,
+        "mean": 0.2269
       }
     },
     "weighted": {
       "dense": {
-        "error": 0.0112,
-        "mean": 0.9101
+        "error": 0.0144,
+        "mean": 0.7859
       },
       "middle": {
-        "error": 0.0079,
-        "mean": 0.9105
+        "error": 0.0121,
+        "mean": 0.7949
       },
       "sparse": {
-        "error": 0.0068,
-        "mean": 0.7825
+        "error": 0.0228,
+        "mean": 0.7271
       }
     }
   },
   "heading": {
     "reference": {
       "large": {
-        "error": 0.0081,
-        "mean": 0.0268
+        "error": 0.0249,
+        "mean": 0.0777
       },
       "small": {
-        "error": 0.0373,
-        "mean": 0.0965
+        "error": 0.0925,
+        "mean": 0.3417
       }
     },
     "consensus": {
       "large": {
-        "error": 0.043,
-        "mean": 0.0814
+        "error": 0.0274,
+        "mean": 0.0761
       },
       "small": {
-        "error": 0.088,
-        "mean": 0.2313
+        "error": 0.1253,
+        "mean": 0.3143
       }
     },
     "delayed": {
       "large": {
-        "error": 0.0087,
-        "mean": 0.0342
+        "error": 0.0363,
+        "mean": 0.0862
       },
       "small": {
-        "error": 0.0342,
-        "mean": 0.1365
+        "error": 0.1347,
+        "mean": 0.4039
       }
     }
   }

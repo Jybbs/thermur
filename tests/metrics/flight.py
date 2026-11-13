@@ -65,7 +65,7 @@ STILL = Composite(
     noise    = White(),
     plant    = Plant(),
     radio    = Radio(delay_s=0.0, loss=0.0),
-    roost    = Roost(damping_per_s=0.0, stiffness_per_s2=0.0, turning_m_s2=0.0)
+    roost    = Roost(stiffness_per_s2=0.0, turning_m_s2=0.0)
 )
 """
 The composite whose command rate is zero on every flock, every drone hearing
@@ -174,6 +174,26 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
     )
 
 
+def test_a_default_flight_holds_the_roost_s_height():
+    """
+    Asserts that a flock flying the default composite for a minute ends
+    within two meters of the roost's height on the mean, however unevenly
+    the plant bounds a climb and a descent.
+    """
+    settings = Settings()
+    flown    = Flight.flown(
+        Composite.from_settings(settings),
+        AIR,
+        settings.plan.model_copy(update={"drones": 30, "duration_s": 60.0, "seeds": 2})
+    )
+
+    assert_allclose(
+        asarray(flown.frames.positions)[:, -1, :, 2].mean(),
+        settings.roost.height_m,
+        atol = 2.0
+    )
+
+
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     composite : Composite,
     flight    : Flight
@@ -249,22 +269,6 @@ def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     )
 
 
-def test_a_replay_ranks_every_composite_it_is_given(
-    composite : Composite,
-    flight    : Flight
-):
-    """
-    Asserts that replaying the frames gives one drift a frame but the last,
-    and one log-likelihood and one coefficient for each composite named.
-    """
-    ranked = flight.likelihoods({"one": composite, "two": composite}, AIR)
-
-    assert flight.drifts(composite, AIR).shape == (2, 19, 12, 3)
-    assert list(ranked.model.values) == ["one", "two"]
-    assert isfinite(ranked.log_likelihood).all()
-    assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
-
-
 @mark.parametrize(
     ("delay_s", "lag_s"),
     [
@@ -334,6 +338,22 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
+def test_a_replay_ranks_every_composite_it_is_given(
+    composite : Composite,
+    flight    : Flight
+):
+    """
+    Asserts that replaying the frames gives one drift a frame but the last,
+    and one log-likelihood and one coefficient for each composite named.
+    """
+    ranked = flight.likelihoods({"one": composite, "two": composite}, AIR)
+
+    assert flight.drifts(composite, AIR).shape == (2, 19, 12, 3)
+    assert list(ranked.model.values) == ["one", "two"]
+    assert isfinite(ranked.log_likelihood).all()
+    assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
+
+
 def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     """
     Asserts that a flight whose drones command a swing of one meter per
@@ -362,29 +382,6 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     )
 
 
-def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
-    """
-    Asserts that shells of drones turning at times proportional to their
-    distance from the first drone read the speed of that spread, and a reach
-    of one where the farthest shell ends the flight turned through the whole
-    turn.
-    """
-    plan      = short(turn_deg=90.0, turning_window_s=0.1)
-    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
-
-    speed, reach = response(
-        distances = distances,
-        plan      = plan,
-        rotation  = exp(
-            1j * pi / 2 * (arange(
-                60
-            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
-        )
-    )
-
-    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
-
-
 @mark.parametrize(
     ("heading", "held"),
     [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
@@ -409,6 +406,29 @@ def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
     )
 
     assert allclose(speeds, 10.0, rtol=1e-4) == held
+
+
+def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
+    """
+    Asserts that shells of drones turning at times proportional to their
+    distance from the first drone read the speed of that spread, and a reach
+    of one where the farthest shell ends the flight turned through the whole
+    turn.
+    """
+    plan      = short(turn_deg=90.0, turning_window_s=0.1)
+    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
+
+    speed, reach = response(
+        distances = distances,
+        plan      = plan,
+        rotation  = exp(
+            1j * pi / 2 * (arange(
+                60
+            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
+        )
+    )
+
+    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
 
 
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
@@ -453,6 +473,25 @@ def test_each_seed_of_the_batch_flies_as_it_does_alone(
     assert_allclose(flight.frames.velocities[1], alone.velocities, atol=1e-4)
 
 
+@mark.parametrize(
+    ("curve", "expected"),
+    [
+        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
+        param([1.0, 0.0], 1, id="zero"),
+        param([1.0, 0.5], 2, id="none")
+    ]
+)
+def test_the_first_zero_is_the_first_value_at_or_below_zero(
+    curve    : list[float],
+    expected : int
+):
+    """
+    Asserts that `first_zero` finds the first value at or below zero, or the
+    curve's length where none is.
+    """
+    assert first_zero(array(curve)) == expected
+
+
 def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
     """
     Asserts that four lines of three drones 10 m apart, each line far from
@@ -473,25 +512,6 @@ def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
         ([centers[5]] * 2, [32 * near / (near + 4 / centers[10] ** 2)] * 2),
         rtol = 1e-5
     )
-
-
-@mark.parametrize(
-    ("curve", "expected"),
-    [
-        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
-        param([1.0, 0.0], 1, id="zero"),
-        param([1.0, 0.5], 2, id="none")
-    ]
-)
-def test_the_first_zero_is_the_first_value_at_or_below_zero(
-    curve    : list[float],
-    expected : int
-):
-    """
-    Asserts that `first_zero` finds the first value at or below zero, or the
-    curve's length where none is.
-    """
-    assert first_zero(array(curve)) == expected
 
 
 def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
@@ -526,6 +546,38 @@ def test_the_frames_table_holds_each_kept_frame_at_its_time(flight: Flight):
     assert table.positions.dims == ("seed", "time", "drone", "axis")
     assert table.positions.shape == (2, 20, 12, 3)
     assert_allclose(table.time, 0.1 * arange(1, 21))
+
+
+def test_the_radio_s_range_reaches_the_replay_and_the_flight():
+    """
+    Asserts that two strings of drones 100 m apart replay otherwise under a
+    range shorter than the gap than under one spanning it, and that a short
+    flight flies otherwise under a range shorter than its launch spacing.
+    """
+    string = stack([10.0 * arange(6), zeros(6), zeros(6)], -1)
+    flight = laid(concat([string, string + [0.0, 100.0, 0.0]]), [10.0, 0.0, 0.0])
+    reach  = {
+        range_m: replace(
+            STILL,
+            cohesion = Centroid(),
+            radio    = Radio(delay_s=0.0, loss=0.0, range_m=range_m)
+        )
+        for range_m in (50.0, 1e4)
+    }
+
+    assert not allclose(flight.drifts(reach[50.0], AIR), flight.drifts(reach[1e4], AIR))
+    assert not allclose(
+        Flight.flown(
+            Composite.from_settings(Settings(radio=Radio(range_m=10.0))),
+            AIR,
+            short()
+        ).frames.positions,
+        Flight.flown(
+            Composite.from_settings(Settings(radio=Radio(range_m=1e4))),
+            AIR,
+            short()
+        ).frames.positions
+    )
 
 
 def test_the_statistics_table_holds_each_statistic_by_seed(flight: Flight):

@@ -396,9 +396,10 @@ class Flight(Module):
     def drifts(self, composite: Composite, air: Air) -> Array:  # prose: ignore[unsorted-positionals]
         """
         Replays each frame but the last through `composite` at the frame's
-        own time, every drone hearing each other's frame `delay_s` old with
-        no packet lost, keeping each command's rate across the command, so
-        the speed a flight holds enters no residual.
+        own time, every drone hearing the frame each other drone sent
+        `delay_s` earlier from within the radio's `range_m` of it, with no
+        packet lost, keeping each command's rate across the command, so the
+        speed a flight holds enters no residual.
 
         Returns:
             The drift, `(n_seeds, n_frames - 1, n_drones, 3)`, in meters per
@@ -413,11 +414,10 @@ class Flight(Module):
             """
             sensed = Observation.sensed(
                 flock,
-                Inbox.from_broadcast(earlier, sent),
+                Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
                 air,
                 t,
-                self.plan.neighbors,
-                composite.radio.range_m
+                self.plan.neighbors
             )
             return across(vmap(composite)(sensed), flock.commands)
 
@@ -561,7 +561,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
             lag,
             plan.step_s
         )
-        sensed = Observation.sensed(flock, heard, air, t, plan.neighbors, radio.range_m)
+        sensed    = Observation.sensed(flock, heard, air, t, plan.neighbors)
         moved, *_ = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
         if composite.heading.confined:
             moved = moved.cruising(plan.cruise_m_s)

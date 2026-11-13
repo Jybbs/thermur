@@ -410,19 +410,13 @@ class Roost(Component):
     The roost term of a starling flock model at drone scale, turning a
     drone that has left a vertical cylinder about the roost, the harder the
     further its heading points away from the roost, and pulling it toward
-    the roost's height through a damped spring.
+    the roost's height through a critically damped spring.
     """
 
     center_m: tuple[float, float] = (600.0, 1000.0)
     """
     The roost's east and north, in meters, by default on the parametric
     threat's course from the launch to the domain's western edge.
-    """
-
-    damping_per_s: NonNegative = 0.2
-    """
-    The rate at which the pull toward the height damps the drone's commanded
-    climb, in reciprocal seconds.
     """
 
     height_m: float = 100.0
@@ -435,24 +429,27 @@ class Roost(Component):
     The radius of the cylinder, in meters.
     """
 
-    stiffness_per_s2: NonNegative = 0.004
+    stiffness_per_s2: NonNegative = 2.5
     """
     The acceleration toward the height per meter away from it, in
-    reciprocal square seconds.
+    reciprocal square seconds, by default the starling model's vertical
+    weight of 0.2 newtons per meter over its bird's mass of 80 grams.
     """
 
     turning_m_s2: NonNegative = 5.0
     """
     The acceleration turning a drone headed straight out of the cylinder, in
     meters per second squared, half of it for a drone headed along the
-    cylinder's edge, by default PX4's `MPC_ACC_HOR_MAX`.
+    cylinder's edge, by default the ceiling PX4's `MPC_ACC_HOR_MAX` sets in
+    its direct-velocity mode.
     """
 
     def __call__(self, observation: Observation) -> Array:
         """
         Sums the horizontal turn across the drone's heading, toward the
         side that points it back at the roost, and the vertical pull toward
-        `height_m`.
+        `height_m`, damped at `2 * sqrt(stiffness_per_s2)` on the drone's
+        commanded climb.
         """
         away    = observation.position[:2] - asarray(self.center_m)
         outward = unit(away)
@@ -465,7 +462,7 @@ class Roost(Component):
         )
         climbing = (
             -self.stiffness_per_s2 * (observation.position[2] - self.height_m)
-            - self.damping_per_s * observation.velocity[2]
+            - 2 * sqrt(self.stiffness_per_s2) * observation.velocity[2]
         )
         return append(turn * where(outward @ left > 0, -left, left), climbing)
 

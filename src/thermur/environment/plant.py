@@ -60,7 +60,7 @@ class Plant(Module):
     level_m_s2: Positive = 5.0
     """
     The largest horizontal acceleration, in meters per second squared,
-    PX4's `MPC_ACC_HOR_MAX`.
+    the ceiling PX4's `MPC_ACC_HOR_MAX` sets in its direct-velocity mode.
     """
 
     def tracked(self, commands: Array, velocities: Array) -> Array:

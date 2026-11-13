@@ -67,11 +67,10 @@ def acted(
     flock  = flock_of(positions, velocities)
     sensed = Observation.sensed(
         flock,
-        Inbox.from_broadcast(flock, flock),
+        Inbox.from_broadcast(flock, composite.radio.range_m, flock),
         air,
         0.0,
-        NEIGHBORS,
-        composite.radio.range_m
+        NEIGHBORS
     )
     return append(
         vmap(composite)(sensed)[-1],
@@ -345,7 +344,7 @@ def test_a_persistent_force_enters_the_acceleration_and_decays():
         param((-120.0, 0.0, 10.0), (-10.0, 0.0, 0.0), (0.0, -2.0, 0.0), id="outward"),
         param((-120.0, 0.0, 10.0), (0.0, 10.0, 0.0), (1.0, 0.0, 0.0), id="along"),
         param((-120.0, 0.0, 10.0), (10.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="inward"),
-        param((0.0, 0.0, 30.0), (10.0, 0.0, 2.0), (0.0, 0.0, -1.5), id="above")
+        param((0.0, 0.0, 30.0), (10.0, 0.0, 2.0), (0.0, 0.0, -1.6), id="above")
     ]
 )
 def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
@@ -357,14 +356,14 @@ def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
     Asserts that the roost turns a drone outside its cylinder across its
     heading toward the roost, at the full acceleration headed straight out,
     half of it headed along the edge, and none headed in, leaves one inside
-    alone, and pulls one above the height down through its damped spring.
+    alone, and pulls one above the height down through its critically damped
+    spring.
     """
     roost = Roost(
         center_m         = (0.0, 0.0),
-        damping_per_s    = 0.25,
         height_m         = 10.0,
         radius_m         = 100.0,
-        stiffness_per_s2 = 0.05,
+        stiffness_per_s2 = 0.04,
         turning_m_s2     = 2.0
     )
 

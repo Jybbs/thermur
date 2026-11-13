@@ -6,10 +6,23 @@ keeps, the `Observation` that is the one input a slot reads, the abstract
 settings nest by name.
 """
 
-from dataclasses   import fields
-from equinox       import Module, field, tree_at
-from jax           import Array, ShapeDtypeStruct, pure_callback, tree, vmap
-from jax.numpy     import broadcast_to, einsum, finfo, linalg, maximum, sqrt, stack, where, zeros_like
+from dataclasses import fields
+from equinox     import Module, field, tree_at
+from jax         import Array, lax, tree, vmap
+from jax.numpy     import (
+    broadcast_to,
+    einsum,
+    expand_dims,
+    eye,
+    finfo,
+    isfinite,
+    linalg,
+    maximum,
+    sqrt,
+    stack,
+    where,
+    zeros_like
+)
 from jax.random    import bernoulli, fold_in
 from lineax        import DiagonalLinearOperator
 from math          import inf
@@ -100,13 +113,18 @@ class Flock(Module):
 class Inbox(Module):
     """
     The state of each drone as each other drone last heard it over the
-    radio, each array laid out as `(n_receivers, n_senders, 3)`.
+    radio, each array laid out as `(n_receivers, n_senders, ...)`.
     """
 
     delayed: Array
     """
     Each sender's velocity `Heading.lag_s` before the broadcast each receiver
     last heard, in meters per second.
+    """
+
+    heard: Array
+    """
+    Whether each receiver holds any broadcast of each sender.
     """
 
     positions: Array
@@ -122,16 +140,21 @@ class Inbox(Module):
     """
 
     @classmethod
-    def from_broadcast(cls, earlier: Flock, sent: Flock) -> Self:
+    def from_broadcast(cls, earlier: Flock, range_m: float, sent: Flock) -> Self:
         """
         Builds the inbox in which every drone last heard the broadcast
         `sent`, each sender's velocity `Heading.lag_s` before it read from
-        `earlier`.
+        `earlier`, each receiver hearing only the senders within `range_m`
+        of it as `sent` went out.
         """
         drones = sent.positions.shape[-2]
         shape  = (drones, drones, 3)
         return cls(
-            delayed    = broadcast_to(earlier.velocities, shape),
+            delayed = broadcast_to(earlier.velocities, shape),
+            heard   = linalg.norm(
+                sent.positions[:, newaxis] - sent.positions,
+                axis = -1
+            ) <= range_m,
             positions  = broadcast_to(sent.positions, shape),
             velocities = broadcast_to(sent.velocities, shape)
         )
@@ -142,8 +165,8 @@ class Radio(Module):
     """
     The link each drone broadcasts its position and velocity over, each
     packet reaching another drone within range late, at a fixed rate, and
-    only where the link does not lose it, after the radios of an outdoor
-    drone flock.
+    only where the link does not lose it, after the simulated radios of an
+    outdoor drone flock.
     """
 
     delay_s: NonNegative = field(default=1.0, static=True)
@@ -159,7 +182,8 @@ class Radio(Module):
 
     range_m: Positive = field(default=80.0, static=True)
     """
-    The distance past which no drone hears another, in meters.
+    The distance between two drones, as a packet is sent, past which the
+    packet never arrives, in meters.
     """
 
     rate_hz: Positive = field(default=5.0, static=True)
@@ -186,8 +210,9 @@ class Radio(Module):
         """
         Keeps the broadcast `flock` sends at `step`, then, where a packet
         falls at `step`, delivers to each drone the broadcast each other
-        drone sent `delay_s` earlier, each drone holding what it last heard
-        of a sender whose packet the link loses.
+        drone sent `delay_s` earlier from within `range_m` of it, each drone
+        holding what it last heard of a sender whose packet the link loses
+        or whose distance kept it from arriving.
 
         Args:
             inbox  : What each drone heard by the step before.
@@ -210,34 +235,39 @@ class Radio(Module):
             sent,
             flock
         )
-        late    = step - self.delay_steps(step_s)
-        carried = bernoulli(
-            fold_in(key, step),
-            1 - self.loss,
-            inbox.positions.shape[:2]
-        ) & (step % self.period_steps(step_s) == 0)
+        late  = step - self.delay_steps(step_s)
         fresh = Inbox.from_broadcast(
             earlier = tree.map(lambda history: history[(late - lag) % kept], sent),
+            range_m = self.range_m,
             sent    = tree.map(lambda history: history[late % kept], sent)
         )
+        carried = fresh.heard & bernoulli(
+            fold_in(key, step),
+            1 - self.loss,
+            fresh.heard.shape
+        ) & (step % self.period_steps(step_s) == 0)
         return tree.map(
-            lambda new, old: where(carried[..., newaxis], new, old),
+            lambda new, old: where(
+                expand_dims(carried, tuple(range(carried.ndim, new.ndim))),
+                new,
+                old
+            ),
             fresh,
             inbox
         ), sent
 
     def opened(self, flock: Flock, lag: int, step_s: float) -> tuple[Inbox, Flock]:
         """
-        Builds what the radio holds at launch, every drone having heard
-        each other's launch state, and every broadcast it keeps being the
-        launch's, enough of them to deliver one `delay_s` late and its
-        velocity `lag` steps before that.
+        Builds what the radio holds at launch, every drone having heard the
+        launch state of each other drone within `range_m` of it, and every
+        broadcast it keeps being the launch's, enough of them to deliver one
+        `delay_s` late and its velocity `lag` steps before that.
 
         Returns:
             What each drone heard at launch, and the broadcasts kept.
         """
         kept = self.delay_steps(step_s) + lag + 1
-        return Inbox.from_broadcast(flock, flock), tree.map(
+        return Inbox.from_broadcast(flock, self.range_m, flock), tree.map(
             lambda leaf: broadcast_to(leaf, (kept, *leaf.shape)),
             flock
         )
@@ -338,51 +368,51 @@ class Observation(Module):
     @classmethod
     def sensed(  # prose: ignore[unsorted-positionals]
         cls,
-        flock   : Flock,
-        inbox   : Inbox,
-        air     : Air,
-        t       : Array,
-        count   : int,
-        range_m : float
+        flock : Flock,
+        inbox : Inbox,
+        air   : Air,
+        t     : Array,
+        count : int
     ) -> Self:
         """
-        Builds what every drone senses from its `count` nearest neighbors
-        within `range_m`, queried on the host through `jax.pure_callback`,
-        whose `vmap_method="expand_dims"` sends a batch of seeds in one
-        call.
+        Builds what every drone senses from its `count` nearest neighbors,
+        ranked by the positions it heard among the senders `inbox` holds a
+        broadcast of, the radio's range having acted on the true distance as
+        each packet was sent.
 
-        A neighbor the query leaves out past `range_m` reads as one sitting
-        on the drone and flying its command, so it adds nothing to a sum
-        over the neighbors.
+        A rank no heard sender fills reads as a neighbor sitting on the
+        drone and flying its command, so it adds nothing to a sum of offsets
+        or of differences from the command, though it still counts toward a
+        mean over the neighbors.
 
         Args:
-            flock   : The state each drone senses.
-            inbox   : The states each drone last heard of every other.
-            air     : The channels each drone reads at its position.
-            t       : The time, in seconds since the simulation started.
-            count   : The number of neighbors each drone senses.
-            range_m : The distance past which no drone hears another, in
-                      meters.
+            flock : The state each drone senses.
+            inbox : The states each drone last heard of every other.
+            air   : The channels each drone reads at its position.
+            t     : The time, in seconds since the simulation started.
+            count : The number of neighbors each drone senses.
 
         Returns:
             The observation of the flock, one row per drone.
         """
-        positions = flock.positions
-        drones    = positions.shape[0]
-        indices   = pure_callback(
-            lambda points: nearest(points, count, range_m),
-            ShapeDtypeStruct((drones, count), "int32"),
-            positions,
-            vmap_method = "expand_dims"
+        positions       = flock.positions
+        drones          = positions.shape[0]
+        nearer, indices = lax.top_k(
+            -where(
+                inbox.heard & ~eye(drones, dtype=bool),
+                linalg.norm(inbox.positions - positions[:, newaxis], axis=-1),
+                inf
+            ),
+            count
         )
         rows    = arange(drones)[:, newaxis]
-        found   = (indices < drones)[..., newaxis]
+        found   = isfinite(nearer)[..., newaxis]
         senders = where(found[..., 0], indices, rows)
 
         def told(held: Array, own: Array) -> Array:
             """
             Reads what each drone heard of each neighbor in `held`, or `own`
-            where the query found none.
+            where no heard sender fills the rank.
             """
             return where(found, held[rows, senders], own[:, newaxis])
 
@@ -586,30 +616,27 @@ def across(accelerations: Array, velocities: Array) -> Array:
 
 
 def nearest(  # prose: ignore[unsorted-positionals]
-    points  : Array,
-    count   : int,
-    range_m : float = inf
+    points : Array,
+    count  : int
 ) -> ndarray:
     """
-    Queries each drone's `count` nearest other drones within `range_m` on
-    the host, leaving a drone out of its own row even where others sit at
-    its exact position, which `KDTree.query` may order ahead of it.
+    Queries each drone's `count` nearest other drones on the host, leaving
+    a drone out of its own row even where others sit at its exact position,
+    which `KDTree.query` may order ahead of it.
 
     Args:
-        points  : The positions, `(..., n_drones, 3)`.
-        count   : The number of neighbors per drone.
-        range_m : The `distance_upper_bound` of the query, in meters.
+        points : The positions, `(..., n_drones, 3)`.
+        count  : The number of neighbors per drone.
 
     Returns:
         The indices of each drone's neighbors in the order of their distance,
-        `(..., n_drones, count)`, `n_drones` standing for a neighbor
-        `KDTree.query` finds none for within `range_m`.
+        `(..., n_drones, count)`.
     """
     clouds = asarray(points)
     drones = clouds.shape[-2]
     own    = arange(drones)[:, newaxis]
     found  = [
-        KDTree(cloud).query(cloud, distance_upper_bound=range_m, k=count + 1)[1]
+        KDTree(cloud).query(cloud, k=count + 1)[1]
         for cloud in clouds.reshape(-1, drones, 3)
     ]
     return asarray(
