@@ -97,6 +97,13 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     The launch cloud's cube root of the volume per drone, in meters.
     """
 
+    starling_m: Positive = 0.69
+    """
+    The nearest-neighbor distance of the starling flock the controller's
+    values are taken at, in meters, by default that of the starling model's
+    flock of 781 birds.
+    """
+
     step_s: Positive = 0.02
     """
     The step of the integrator, in seconds.
@@ -158,6 +165,14 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
             / (2 * pi)
             * self.spacing_m
         )
+
+    @property
+    def similarity(self) -> float:
+        """
+        Divides `nearest_m` by `starling_m`, the factor by which the launch
+        magnifies the starling flock at the same speed.
+        """
+        return self.nearest_m / self.starling_m
 
     @property
     def steps(self) -> int:

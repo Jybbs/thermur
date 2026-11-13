@@ -6,7 +6,7 @@ keeps, the `Observation` that is the one input a slot reads, the abstract
 settings nest by name.
 """
 
-from dataclasses import fields
+from dataclasses import fields, replace
 from equinox     import Module, field, tree_at
 from jax         import Array, lax, tree, vmap
 from jax.numpy     import (
@@ -180,10 +180,11 @@ class Radio(Module):
     drawn apart from every other.
     """
 
-    range_m: Positive = field(default=80.0, static=True)
+    range_m: Positive = field(default=100.0, static=True)
     """
     The distance between two drones, as a packet is sent, past which the
-    packet never arrives, in meters.
+    packet never arrives, in meters, at a starling's scale, by default the
+    starling flock model's farthest perception.
     """
 
     rate_hz: Positive = field(default=5.0, static=True)
@@ -277,6 +278,13 @@ class Radio(Module):
         Counts the steps of `step_s` between two packets, at least one.
         """
         return max(round(1 / (self.rate_hz * step_s)), 1)
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Multiplies the range by `factor`, leaving the delay, the rate, and
+        the loss a drone's radio sets.
+        """
+        return replace(self, range_m=self.range_m * factor)
 
 
 class Observation(Module):
@@ -444,6 +452,14 @@ class Component(Module):
         """
         raise NotImplementedError
 
+    def scaled(self, factor: float) -> Self:
+        """
+        Carries the slot from a starling flock to one magnified by `factor`
+        at the same speed, leaving a slot whose values are a drone flock's
+        own as it stands.
+        """
+        return self
+
 
 class Heading(Component):
     """
@@ -601,12 +617,14 @@ class Composite(Module):
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
         """
-        Reads each slot from the settings field naming it, the roost scaled
-        to the nearest-neighbor distance of the plan's launch.
+        Reads each slot from the settings field naming it, scaled from a
+        starling flock to the plan's launch by `Plan.similarity`.
         """
         return cls(
-            **{slot.name: getattr(settings, slot.name) for slot in fields(cls)}
-            | {"roost": settings.roost.at_spacing(settings.plan.nearest_m)}
+            **{
+                slot.name: getattr(settings, slot.name).scaled(settings.plan.similarity)
+                for slot in fields(cls)
+            }
         )
 
 

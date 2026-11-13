@@ -73,7 +73,7 @@
     pages    = {4786--4791},
     doi      = {10.1073/pnas.1118633109},
     priority = {prio2},
-    annote   = {Bialek and colleagues fit a maximum-entropy model to the flight directions of 21 starling flocks of 122 to 4,268 birds over Rome, with polarizations of 0.844 to 0.995, finding the least structured model consistent with the measured correlations between neighbors. The model couples each bird with one constant strength to each of its nearest topological neighbors, and with no parameter left free it predicts the correlations across the whole flock, a correlation length growing with the flock's size among them. The fit gives about 21 neighbors, which the authors attribute to a static model counting neighbors that change during the measurement, and a calibration on simulated flocks brings it near 7.8, close to the count measured directly. The model reads directions alone, assumes a stationary state, and fixes the birds on the border. Thermur's coupling takes this form, one constant over a fixed count of topological neighbors, while the count of seven comes from the direct measurement, so the study shapes the coupling slot moderately, as its form and as evidence that so simple a coupling accounts for the measured correlations.}
+    annote   = {Bialek and colleagues fit a maximum-entropy model to the flight directions of 21 starling flocks of 122 to 4,268 birds over Rome, with polarizations of 0.844 to 0.995, finding the least structured model consistent with the measured correlations between neighbors. The model couples each bird with one constant strength to each of its nearest topological neighbors, and with no parameter left free it predicts the correlations across the whole flock, a correlation length growing with the flock's size among them. The fit gives about 21 neighbors, which the authors attribute to a static model counting neighbors that change during the measurement, and a calibration on simulated flocks brings it near 7.8, close to the count measured directly. The model reads directions alone, assumes a stationary state, and fixes the birds on the border. Thermur's coupling takes this form, one constant over a fixed count of topological neighbors, while the count of seven comes from the direct measurement, so the study shapes the coupling and noise slots moderately, as the coupling's form, as evidence that so simple a coupling accounts for the measured correlations, and through the product of coupling and interaction range fitted on one flock, 503, which sets the default noise's amplitude.}
 }
 
 @article{bialek2014,
@@ -228,8 +228,8 @@
     number   = {10},
     pages    = {104302},
     doi      = {10.1103/PhysRevLett.96.104302},
-    priority = {prio2},
-    annote   = {D'Orsogna and colleagues study self-propelled particles under a soft-core Morse potential, a short-range repulsion against a longer-range attraction each decaying exponentially, summed over every pair. With the ratio of the repulsion's strength to the attraction's and the ratio of their ranges as the two parameters, they map in two dimensions which swarms are H-stable, holding their spacing as they grow, and which are catastrophic, collapsing as particles join, the boundary falling where the strength ratio times the square of the range ratio equals one, and they find flocks, rings, vortices, and clumps across the regions. The simulations are deterministic and two-dimensional, with up to about 600 particles. Thermur's cohesion slot takes a generalized Morse potential over the topological neighbors alone, with parameters chosen outside the collapse region, so the study shapes the composite moderately, although its stability map is drawn for a sum over all pairs in two dimensions rather than over seven neighbors in three.}
+    priority = {prio3},
+    annote   = {D'Orsogna and colleagues study self-propelled particles under a soft-core Morse potential, a short-range repulsion against a longer-range attraction each decaying exponentially, summed over every pair. With the ratio of the repulsion's strength to the attraction's and the ratio of their ranges as the two parameters, they map in two dimensions which swarms are H-stable, holding their spacing as they grow, and which are catastrophic, collapsing as particles join, the boundary falling where the strength ratio times the square of the range ratio equals one, and they find flocks, rings, vortices, and clumps across the regions. The simulations are deterministic and two-dimensional, with up to about 600 particles. Thermur's cohesion slot takes the starling model's pull toward the neighbors rather than a pair potential, so the study shapes the composite little, as a map of where a cohesion summed over pairs holds a swarm's spacing.}
 }
 
 @article{evangelista2017,
@@ -371,8 +371,8 @@
     number   = {6},
     pages    = {1349--1359},
     doi      = {10.1093/beheco/arq149},
-    priority = {prio2},
-    annote   = {Hildenbrandt, Carere, and Hemelrijk build StarDisplay, a model of thousands of starlings flying with lift, drag, and banked turns around a cruise speed of 10 m/s, each bird interacting with about 6.5 topological neighbors through separation, alignment, and a cohesion weighted toward the flock's edge. A roost term holds flocks over a roost, a horizontal force turning a bird back once it strays outside a cylinder of 150 m radius, stronger the more it heads outward, and a vertical force pulling it toward a preferred height, which the authors call arbitrary and which flattens the flock. The model flocks match the Rome measurements in 10 of 18 statistical tests, though they come out thinner, smaller, and more level than real ones, and no predator flies in the model. Thermur takes the roost term as the component holding its flock over a band near the fire and keeping it flat, so the study shapes the composite moderately, as that one component, while the shape it serves is measured on starlings.}
+    priority = {prio1},
+    annote   = {Hildenbrandt, Carere, and Hemelrijk build StarDisplay, a model of thousands of starlings flying with lift, drag, and banked turns around a cruise speed of 10 m/s, each bird interacting with about 6.5 topological neighbors through separation, alignment, and a cohesion weighted toward the flock's edge. A roost term holds flocks over a roost, a horizontal force turning a bird back once it strays outside a cylinder of 150 m radius, stronger the more it heads outward, and a vertical force pulling it toward a preferred height, which the authors call arbitrary and which flattens the flock. The model flocks match the Rome measurements in 10 of 18 statistical tests, though they come out thinner, smaller, and more level than real ones, and no predator flies in the model. Thermur takes the model's separation as its contact, its centrality-weighted cohesion read over the seven neighbors alone, and its roost term, each at the model's own values, together with the nearest-neighbor distance of its flock of 781 birds as the length every value is scaled from, and checks its flock's shape against the span of the starling flocks the model is checked against, so the study shapes the composite strongly.}
 }
 
 @article{jhawar2020,
@@ -474,8 +474,8 @@
     number   = {1},
     pages    = {011306},
     doi      = {10.1103/PhysRevE.68.011306},
-    priority = {prio2},
-    annote   = {O'Hern, Silbert, Liu, and Nagel study frictionless soft spheres at zero temperature in two and three dimensions, with a repulsion that acts only on overlap and grows as a power of the overlap, harmonic at power two. Packings of 4 to 4,096 particles made by minimizing their energy jam at a packing fraction of 0.639, plus or minus 0.001, in three dimensions, matching random close packing, each particle touching twice as many others as the dimension at the threshold, while the pressure and the elastic moduli scale as powers of the excess packing fraction the potential sets. The study concerns static packings and no motion. Thermur's contact slot takes the harmonic soft-sphere core, whose force grows linearly with the overlap and stays bounded however far two drones overlap, so the study shapes the composite moderately, as the form of that one component.}
+    priority = {prio3},
+    annote   = {O'Hern, Silbert, Liu, and Nagel study frictionless soft spheres at zero temperature in two and three dimensions, with a repulsion that acts only on overlap and grows as a power of the overlap, harmonic at power two. Packings of 4 to 4,096 particles made by minimizing their energy jam at a packing fraction of 0.639, plus or minus 0.001, in three dimensions, matching random close packing, each particle touching twice as many others as the dimension at the threshold, while the pressure and the elastic moduli scale as powers of the excess packing fraction the potential sets. The study concerns static packings and no motion. Thermur's contact slot takes the starling model's Gaussian separation outside a hard sphere rather than this harmonic core, so the study shapes the composite little, as a bounded contact the slot could take.}
 }
 
 @article{papadopoulou2026,
@@ -489,6 +489,19 @@
     doi      = {10.1038/s42003-026-10173-4},
     priority = {prio1},
     annote   = {Papadopoulou and colleagues filmed 19 starling flocks chased by RobotFalcon, a remote-controlled robotic falcon, and build StarEscape, a three-dimensional model of 20 to 5,000 birds each coordinating with its 7 nearest neighbors. Each bird moves among normal coordination, alarmed coordination, escape, and a refractory state through a Markov chain of its own whose probabilities depend on its alertness. A stimulus only the predator produces raises that alertness by an amount falling off exponentially with the square root of the distance to the predator, with no cutoff, and the alertness relaxes at a rate of 1 per second, while an alarmed bird may copy a neighbor's escape, a level turn of about 180 degrees or a dive. The model reproduces the collective escape patterns of the footage, the authors grant that other rules could produce the same patterns, and waves appear only in the largest flock and go unmodeled. A preprint first posted to bioRxiv in 2024 as \textit{Starling murmurations under predation} carries the earlier versions, the latest titled \textit{Towards a mechanistic understanding of collective escape in starlings}. Thermur's escape slot runs the same structure of states on its neighbor graph, its alertness built from the fire's excess over ambient air, so the study shapes that slot strongly, as the closest published model of an escape spreading through a murmuration.}
+}
+
+@article{pearce2014,
+    author   = {Pearce, Daniel J. G. and Miller, Adam M. and Rowlands, George and Turner, Matthew S.},
+    title    = {Role of projection in the control of bird flocks},
+    journal  = {Proceedings of the National Academy of Sciences},
+    year     = {2014},
+    volume   = {111},
+    number   = {29},
+    pages    = {10422--10426},
+    doi      = {10.1073/pnas.1402202111},
+    priority = {prio3},
+    annote   = {Pearce and colleagues argue that local interactions alone cannot set the density of a large flock, and propose a model in which each bird steers toward the projection of the flock it sees against the sky, combined with alignment to its nearest neighbors and noise, each weighted at every step of a bird flying its own size a step. The model's flocks hold together and settle at marginal opacity, the densest a flock can be while a bird inside still sees out in many directions, which the authors compare with experimental data on starling flocks. The model is two weights and a noise on a discrete step, with no measured interaction behind its projection. Thermur takes its alignment weight of 0.8 a step, the step read as the time a starling takes to fly its wingspan, as the default coupling's rate at a starling's scale, so the study shapes the composite little, as the source of one value.}
 }
 
 @article{procaccini2011,

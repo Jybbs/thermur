@@ -10,6 +10,8 @@ from jax     import Array
 from jax.numpy  import (
     append,
     asarray,
+    cos,
+    deg2rad,
     exp,
     full,
     linalg,
@@ -19,10 +21,11 @@ from jax.numpy  import (
     where,
     zeros_like
 )
-from typing   import ClassVar, Self
+from pydantic import Field
+from typing   import Annotated, ClassVar, Self
 
 from thermur.controller.schemas  import Component, Heading, Noise, Observation, unit
-from thermur.environment.schemas import NonNegative, Positive, documented
+from thermur.environment.schemas import GRAVITY_M_S2, NonNegative, Positive, documented
 
 
 @documented
@@ -114,10 +117,13 @@ class Constant(Component):
     The coupling holding one rate over every topological neighbor.
     """
 
-    coupling_per_s: NonNegative = 0.6
+    coupling_per_s: NonNegative = 2.857
     """
     The rate at which a drone aligns with each neighbor, in reciprocal
-    seconds.
+    seconds, at a starling's scale, by default the projection model's
+    alignment weight of 0.8 per step spread over 7 neighbors, its step the
+    time a starling at 10 meters per second takes to fly its wingspan of
+    0.4 meters.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -125,6 +131,17 @@ class Constant(Component):
         Gives each neighbor the same weight.
         """
         return full(observation.distances.shape, self.coupling_per_s)
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Divides the rate by `factor`, since a flock magnified by `factor` at
+        the same speed takes `factor` times as long over each length.
+        """
+        return tree_at(
+            lambda coupling: coupling.coupling_per_s,
+            self,
+            self.coupling_per_s / factor
+        )
 
 
 @documented
@@ -217,6 +234,62 @@ class Fitted(Component):
 
 
 @documented
+class HardSphere(Component):
+    """
+    The separation of a starling flock model, pushing a drone from each
+    topological neighbor at full strength inside a hard sphere the width
+    of a wingspan and along a halved Gaussian past it, averaged over the
+    neighbors.
+    """
+
+    sphere_m: Positive = 0.2
+    """
+    The radius of the hard sphere, in meters, at a starling's scale, by
+    default half a starling's wingspan.
+    """
+
+    spread_m: Positive = 1.37
+    """
+    The standard deviation of the Gaussian past the hard sphere, in meters,
+    at a starling's scale, by default the model's, which leaves the push at
+    about a fiftieth of its strength at the model's separation radius of 4
+    meters.
+    """
+
+    weight_m_s2: NonNegative = 12.5
+    """
+    The push at full strength, in meters per second squared, at a
+    starling's scale, by default the model's separation weight of 1 newton
+    over its bird's mass of 80 grams.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Averages over the heard neighbors the push against each bearing,
+        `exp(-(d - sphere_m)**2 / (2 * spread_m**2))` past the hard sphere
+        and one inside it.
+        """
+        heard = observation.distances > 0
+        past  = maximum(observation.distances - self.sphere_m, 0.0)
+        push  = where(heard, exp(-square(past / self.spread_m) / 2), 0.0)
+        return -self.weight_m_s2 * (push @ observation.bearings) / maximum(
+            heard.sum(),
+            1
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Multiplies the lengths by `factor` and divides the push by it, as a
+        flock magnified by `factor` at the same speed takes.
+        """
+        return tree_at(
+            lambda hard: (hard.spread_m, hard.sphere_m, hard.weight_m_s2),
+            self,
+            (self.spread_m * factor, self.sphere_m * factor, self.weight_m_s2 / factor)
+        )
+
+
+@documented
 class Intrinsic(Noise):
     """
     The noise of finite numbers, which a drone copying one neighbor at a
@@ -286,72 +359,6 @@ class Metric(Component):
 
 
 @documented
-class Morse(Component):
-    """
-    The generalized Morse cohesion over the topological neighbors,
-    a repulsion against a longer-range attraction, each decaying
-    exponentially.
-
-    Its parameters stay where the potential summed over every pair
-    gives a swarm that keeps its spacing as it grows, which holds where
-    `repulsion_m2_s2 * repulsion_m**3` exceeds `attraction_m2_s2 *
-    attraction_m**3`.
-    """
-
-    attraction_m: Positive = 12.0
-    """
-    The decay length of the attraction, in meters.
-    """
-
-    attraction_m2_s2: NonNegative = 80.0
-    """
-    The strength of the attraction, in square meters per square second.
-    """
-
-    repulsion_m: Positive = 2.4
-    """
-    The decay length of the repulsion, in meters.
-    """
-
-    repulsion_m2_s2: NonNegative = 10400.0
-    """
-    The strength of the repulsion, in square meters per square second.
-    """
-
-    def __call__(self, observation: Observation) -> Array:
-        """
-        Sums the force of the potential's gradient along each bearing.
-        """
-        distances = observation.distances
-        pull      = (
-            self.attraction_m2_s2 / self.attraction_m * exp(
-                -distances / self.attraction_m
-            )
-            - self.repulsion_m2_s2 / self.repulsion_m * exp(
-                -distances / self.repulsion_m
-            )
-        )
-        return pull @ observation.bearings
-
-    def __check_init__(self):
-        """
-        Refuses parameters whose repulsion, times the cube of its length,
-        does not exceed the attraction's.
-
-        Raises:
-            ValueError: Where the parameters sit in the region where a swarm
-                        summing the potential over every pair collapses.
-        """
-        repelling  = self.repulsion_m2_s2 * self.repulsion_m**3
-        attracting = self.attraction_m2_s2 * self.attraction_m**3
-        if repelling <= attracting:
-            raise ValueError(
-                f"The repulsion's {repelling:g} m^5/s^2 does not exceed the "
-                f"attraction's {attracting:g} m^5/s^2, where a swarm collapses"
-            )
-
-
-@documented
 class Overdamped(Heading):
     """
     The overdamped limit of the inertial spin model at a constant speed, in
@@ -364,6 +371,68 @@ class Overdamped(Heading):
         the drone's own.
         """
         return observation.weights @ (observation.neighbors - observation.velocity)
+
+
+@documented
+class Peripheral(Component):
+    """
+    The cohesion of a starling flock model, pulling a drone toward its
+    topological neighbors outside its rear blind angle and its hard sphere,
+    weighted by how near the flock's border the drone sits, so a drone
+    deep inside the flock feels almost none and the flock keeps its spacing
+    rather than drawing in.
+
+    The drone's centrality is the length of the mean bearing of its heard
+    neighbors, near zero inside the flock and above a half at its border.
+    """
+
+    blind_deg: Annotated[float, Field(ge=0, lt=360)] = 90.0
+    """
+    The angle behind the drone within which a neighbor is left out, in
+    degrees, by default the model's 45 degrees to either side.
+    """
+
+    sphere_m: Positive = 0.2
+    """
+    The radius of the hard sphere within which a neighbor pulls nothing,
+    in meters, at a starling's scale, by default half a starling's
+    wingspan.
+    """
+
+    weight_m_s2: NonNegative = 12.5
+    """
+    The pull of a drone at a centrality of one, in meters per second
+    squared, at a starling's scale, by default the model's cohesion weight
+    of 1 newton over its bird's mass of 80 grams.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Multiplies the drone's centrality, the weight, and the mean bearing
+        of the neighbors it sees past the hard sphere.
+        """
+        seen = (
+            (observation.distances > self.sphere_m)
+            & (observation.ahead > -cos(deg2rad(self.blind_deg / 2)))
+        )
+        return (
+            linalg.norm(observation.bearings.sum(0))
+            / maximum((observation.distances > 0).sum(), 1)
+            * self.weight_m_s2
+            * where(seen[:, None], observation.bearings, 0.0).sum(0)
+            / maximum(seen.sum(), 1)
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Multiplies the hard sphere by `factor` and divides the pull by it,
+        as a flock magnified by `factor` at the same speed takes.
+        """
+        return tree_at(
+            lambda peripheral: (peripheral.sphere_m, peripheral.weight_m_s2),
+            self,
+            (self.sphere_m * factor, self.weight_m_s2 / factor)
+        )
 
 
 @documented
@@ -409,10 +478,10 @@ class Persistent(Noise):
 class Roost(Component):
     """
     The roost term of a starling flock model, turning a drone that has left
-    a vertical cylinder about the roost, the harder the further its heading
-    points away from the roost, and pulling it toward the roost's height
-    through a damped spring whose stiffness `at_spacing` scales from the
-    model's nearest-neighbor distance to a drone flock's.
+    a vertical cylinder about the roost across its heading, the harder the
+    further its heading points away from the roost, toward the side that
+    points it back, and pulling it toward the roost's height through a
+    damped spring.
     """
 
     center_m: tuple[float, float] = (600.0, 1000.0)
@@ -428,30 +497,27 @@ class Roost(Component):
 
     radius_m: Positive = 600.0
     """
-    The radius of the cylinder, in meters.
-    """
-
-    starling_m: Positive = 0.69
-    """
-    The nearest-neighbor distance `stiffness_per_s2` holds at, in meters, by
-    default that of the starling model's flock of 781 birds.
+    The radius of the cylinder, in meters, by default the widest the
+    parametric threat's domain holds about `center_m`.
     """
 
     stiffness_per_s2: NonNegative = 2.5
     """
     The acceleration toward the height per meter away from it, in
-    reciprocal square seconds, at a spacing of `starling_m`, by default the
+    reciprocal square seconds, at a starling's scale, by default the
     starling model's vertical weight of 0.2 newtons per meter over its
     bird's mass of 80 grams, read per meter since the model multiplies it by
     the height away, although its table of parameters lists it in newtons.
     """
 
-    turning_m_s2: NonNegative = 5.0
+    turning_m_s2: NonNegative = GRAVITY_M_S2
     """
     The acceleration turning a drone headed straight out of the cylinder, in
     meters per second squared, half of it for a drone headed along the
-    cylinder's edge, by default the ceiling PX4's `MPC_ACC_HOR_MAX` sets in
-    its direct-velocity mode.
+    cylinder's edge, at a starling's scale, by default the acceleration of
+    gravity, since the model's roost term rolls a starling past the bank its
+    roll-out balances, so the bird turns on the whole of a lift equal to its
+    weight.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -459,8 +525,7 @@ class Roost(Component):
         Sums the horizontal turn across the drone's heading, toward the
         side that points it back at the roost, and the vertical pull toward
         `height_m`, damped at `2 * sqrt(stiffness_per_s2)` on the drone's
-        commanded climb, the damping that holds a spring critically damped
-        without the plant's lag.
+        commanded climb.
         """
         away    = observation.position[:2] - asarray(self.center_m)
         outward = unit(away)
@@ -477,50 +542,17 @@ class Roost(Component):
         )
         return append(turn * where(outward @ left > 0, -left, left), climbing)
 
-    def at_spacing(self, spacing_m: float) -> Self:
+    def scaled(self, factor: float) -> Self:
         """
-        Scales `stiffness_per_s2` from a spacing of `starling_m` to
-        `spacing_m` by their ratio to the power 4/3, so the flock's
-        thickness keeps its proportion to its spacing.
-
-        Under a noise of fixed strength `sigma`, a spring of stiffness
-        `k` damped at `c = 2 * sqrt(k)` holds the heights to a variance of
-        `sigma ** 2 / (2 * c * k)`, falling as `k ** (-3 / 2)`, and nearly
-        so behind the plant's lag, so their spread falls as `k ** (-3 / 4)`
-        and a spread growing with the spacing takes a stiffness falling as
-        the spacing to the power 4/3.
+        Divides the turn by `factor` and the stiffness by its square, as
+        a flock magnified by `factor` at the same speed takes, leaving the
+        roost's place and size, which the domain sets.
         """
         return tree_at(
-            lambda roost: roost.stiffness_per_s2,
+            lambda roost: (roost.stiffness_per_s2, roost.turning_m_s2),
             self,
-            self.stiffness_per_s2 * (self.starling_m / spacing_m) ** (4 / 3)
+            (self.stiffness_per_s2 / factor**2, self.turning_m_s2 / factor)
         )
-
-
-@documented
-class SoftCore(Component):
-    """
-    The harmonic soft-sphere contact, whose force grows linearly with
-    overlap and stays bounded by `stiffness_m_s2` however far two drones
-    overlap.
-    """
-
-    diameter_m: Positive = 6.0
-    """
-    The distance within which two drones push apart, in meters.
-    """
-
-    stiffness_m_s2: NonNegative = 8.0
-    """
-    The acceleration at full overlap, in meters per second squared.
-    """
-
-    def __call__(self, observation: Observation) -> Array:
-        """
-        Sums the push from each overlapping neighbor against its bearing.
-        """
-        overlap = maximum(1 - observation.distances / self.diameter_m, 0.0)
-        return -self.stiffness_m_s2 * overlap @ observation.bearings
 
 
 @documented
@@ -584,9 +616,13 @@ class White(Noise):
     command.
     """
 
-    amplitude: NonNegative = 4.2
+    amplitude: NonNegative = 2.82
     """
-    The amplitude, in meters per second per root second.
+    The amplitude, in meters per second per root second, at a starling's
+    scale, by default the noise that leaves a flock aligning at
+    `Constant`'s default rate over 7 neighbors at the product of coupling
+    and interaction range of 503 inferred from starling flocks,
+    `10 * sqrt(2 * 7 * 2.857 / 503)` at 10 meters per second.
     """
 
     def amplitudes(self, observation: Observation) -> tuple[Array, Array]:
@@ -595,3 +631,15 @@ class White(Noise):
         """
         command = asarray(self.amplitude)
         return command, zeros_like(command)
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Divides the amplitude by the square root of `factor`, holding the
+        flock's alignment against its noise as the coupling's rate falls
+        by `factor`.
+        """
+        return tree_at(
+            lambda white: white.amplitude,
+            self,
+            self.amplitude / sqrt(factor)
+        )

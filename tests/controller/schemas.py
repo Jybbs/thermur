@@ -5,7 +5,7 @@ Pins the core's records, meaning the properties of a `Flock`, what the
 """
 
 from common.drones import flock_of, still_air, viewed
-from dataclasses   import replace
+from dataclasses   import fields, replace
 from jax           import vmap
 from jax.numpy     import array, eye, full, ones, zeros
 from jax.random    import key
@@ -15,13 +15,13 @@ from numpy.testing import assert_allclose, assert_array_equal
 from pytest        import mark, raises
 
 from thermur.controller.components import (
+    Centroid,
     Consensus,
     Constant,
-    Morse,
+    HardSphere,
     Overdamped,
     Persistent,
     Roost,
-    SoftCore,
     White
 )
 from thermur.controller.schemas import (
@@ -65,9 +65,9 @@ def test_a_confined_heading_accelerates_only_across_the_velocity():
     """
     ahead = viewed([[20.0, 0.0, 0.0]] * 7)
     slots = {
-        "cohesion" : SoftCore(diameter_m=30.0),
+        "cohesion" : Centroid(),
         "noise"    : White(),
-        "contact"  : Morse()
+        "contact"  : HardSphere(sphere_m=30.0)
     }
 
     assert_allclose(composite(heading=Overdamped(), **slots)(ahead)[0], 0.0, atol=1e-4)
@@ -222,19 +222,19 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
     assert_allclose(rates.velocities, [[0.0, 2.0, 0.0]] * 8, rtol=1e-6)
 
 
-def test_from_settings_reads_each_slot_by_name():
+def test_from_settings_reads_each_slot_by_name_scaled_to_the_launch():
     """
-    Asserts that each slot of the composite is the settings field naming
-    it, and the roost that field scaled to the launch's nearest-neighbor
-    distance.
+    Asserts that each slot of the composite is the settings field naming it,
+    carried from a starling flock to the launch by the plan's similarity.
     """
     settings = Settings(coupling=Constant(coupling_per_s=2.0))
 
     built = Composite.from_settings(settings)
 
-    assert built.coupling == settings.coupling
-    assert built.cohesion == settings.cohesion
-    assert built.roost == settings.roost.at_spacing(settings.plan.nearest_m)
+    assert {slot.name: getattr(built, slot.name) for slot in fields(Composite)} == {
+        slot.name: getattr(settings, slot.name).scaled(settings.plan.similarity)
+        for slot in fields(Composite)
+    }
 
 
 def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position():
@@ -389,8 +389,29 @@ def test_the_composite_adds_the_roost_to_its_slots():
 
     assert_allclose(
         composite()(view) - still(view),
-        Roost().at_spacing(Settings().plan.nearest_m)(view),
+        Roost().scaled(Settings().plan.similarity)(view),
         atol = 1e-5
+    )
+
+
+def test_the_radio_carried_to_a_larger_flock_scales_only_its_range():
+    """
+    Asserts that the radio carried to a flock four times a starling flock's
+    size multiplies its range by four and keeps the delay, the rate, and the
+    loss a drone's radio sets.
+    """
+    radio = Radio(
+        delay_s = 0.5,
+        loss    = 0.2,
+        range_m = 100.0,
+        rate_hz = 10.0
+    )
+
+    assert radio.scaled(4.0) == Radio(
+        delay_s = 0.5,
+        loss    = 0.2,
+        range_m = 400.0,
+        rate_hz = 10.0
     )
 
 

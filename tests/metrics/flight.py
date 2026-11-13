@@ -45,9 +45,9 @@ from thermur.controller.components import (
     Consensus,
     Constant,
     Delayed,
+    HardSphere,
     Overdamped,
     Roost,
-    SoftCore,
     White
 )
 from thermur.controller.schemas import Composite, Heading, Radio, across
@@ -60,7 +60,7 @@ AIR = still_air()
 
 STILL = Composite(
     cohesion = Centroid(stiffness_per_s2=0.0),
-    contact  = SoftCore(stiffness_m_s2=0.0),
+    contact  = HardSphere(weight_m_s2=0.0),
     coupling = Constant(coupling_per_s=0.0),
     heading  = Overdamped(),
     noise    = White(),
@@ -178,17 +178,22 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
     reads each neighbor's velocity that many steps old, so its flight
     leaves the one flown from the same seed at a lag one step shorter, the
     overdamped heading standing for a lag of none.
+
+    Each flight couples at the starling's rate rather than the slower one
+    the launch scales it to, so the step of lag between them shows within
+    the short flight.
     """
-    plan    = short()
-    shorter = Delayed(lag_s=(steps - 1) * plan.step_s) if steps > 1 else Overdamped()
+    plan     = short()
+    shorter  = Delayed(lag_s=(steps - 1) * plan.step_s) if steps > 1 else Overdamped()
+    starling = replace(composite, coupling=Constant())
 
     assert not allclose(
         Flight.flown(
-            replace(composite, heading=Delayed(lag_s=steps * plan.step_s)),
+            replace(starling, heading=Delayed(lag_s=steps * plan.step_s)),
             AIR,
             plan
         ).frames.velocities,
-        Flight.flown(replace(composite, heading=shorter), AIR, plan).frames.velocities,
+        Flight.flown(replace(starling, heading=shorter), AIR, plan).frames.velocities,
         atol = 1e-3
     )
 
@@ -208,24 +213,30 @@ def test_a_default_flight_holds_the_roost_s_height(default: Flight):
 
 
 @mark.slow
-@mark.parametrize("default", [param(120.0, id="two-minutes")], indirect=True)
 def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     """
-    Asserts that the largest group of the default flight after two minutes,
-    averaged over the seeds, stands within the span of the starling flocks
-    the starling model is checked against, its middle axis 1.90 to 3.58
-    times its thinnest and its longest 4.02 to 6.94 times, where the roost's
-    spring left at a starling's spacing flattens it to about 1 to 28 to 45.
+    Asserts that the largest group of the default flight after two minutes
+    and after five, averaged over the seeds, stands within the span of the
+    starling flocks the starling model is checked against, its middle axis
+    1.90 to 3.58 times its thinnest and its longest 4.02 to 6.94 times.
 
     The mean over seeds is what the span bounds, since each seed's shape
-    moves with a change to the stiffness in its fifth decimal place. The
-    five-minute flight is left out, since by then the flock has split where
-    it meets the cylinder and its largest group has rounded off.
+    moves with a change in the fifth decimal place of any value.
     """
     _, middle, longest = default.group_aspect_ratios.mean(0)
 
     assert 1.90 <= middle <= 3.58
     assert 4.02 <= longest <= 6.94
+
+
+@mark.slow
+def test_a_default_flight_keeps_the_outdoor_drone_flock_s_spacing(default: Flight):
+    """
+    Asserts that the default flight after two minutes and after five keeps
+    its drones 12 to 30 m from their nearest neighbors on the mean, the
+    spacing the outdoor drone flock kept.
+    """
+    assert 12.0 <= float(default.spacing_m.mean()) <= 30.0
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
@@ -344,7 +355,9 @@ def test_a_replay_reads_each_neighbor_the_radio_s_delay_and_the_lag_back(
     assert_allclose(
         flight.drifts(delayed, AIR),
         broadcast_to(
-            asarray(across(7 * 0.6 * behind, velocities[:-1]))[None, :, None],
+            asarray(
+                across(7 * Constant().coupling_per_s * behind, velocities[:-1])
+            )[None, :, None],
             (2, 19, 12, 3)
         ),
         atol = 1e-4
@@ -607,7 +620,8 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
     """
     Asserts that two strings of drones 100 m apart replay otherwise under a
     range shorter than the gap than under one spanning it, and that a short
-    flight flies otherwise under a range shorter than its launch spacing.
+    flight flies otherwise under a range the launch scales to shorter than
+    its spacing.
     """
     string = stack([10.0 * arange(6), zeros(6), zeros(6)], -1)
     flight = laid(concat([string, string + [0.0, 100.0, 0.0]]), [10.0, 0.0, 0.0])
@@ -623,7 +637,7 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
     assert not allclose(flight.drifts(reach[50.0], AIR), flight.drifts(reach[1e4], AIR))
     assert not allclose(
         Flight.flown(
-            Composite.from_settings(Settings(radio=Radio(range_m=10.0))),
+            Composite.from_settings(Settings(radio=Radio(range_m=0.2))),
             AIR,
             short()
         ).frames.positions,

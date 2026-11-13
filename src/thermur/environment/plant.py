@@ -7,6 +7,7 @@ a multicopter, which the composite nests and a flight steps.
 from equinox   import Module
 from jax       import Array
 from jax.numpy import clip, concatenate, finfo, linalg, maximum, minimum
+from typing    import Self
 
 from thermur.environment.schemas import Positive, documented
 
@@ -67,6 +68,13 @@ class Plant(Module):
     The largest horizontal acceleration, in meters per second squared,
     the ceiling PX4's `MPC_ACC_HOR_MAX` sets in its direct-velocity mode.
     """
+
+    def scaled(self, _: float) -> Self:
+        """
+        Leaves the plant as it stands, since its bounds are a drone's own at
+        any spacing.
+        """
+        return self
 
     def tracked(self, commands: Array, velocities: Array) -> Array:
         """

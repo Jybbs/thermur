@@ -19,7 +19,7 @@ from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
 
-from thermur.controller.components import Roost, SoftCore
+from thermur.controller.components import HardSphere, Roost
 from thermur.controller.schemas    import Radio
 from thermur.docs.outputs          import Outputs, markdown_table, specimens, tabled
 from thermur.environment.plant     import Plant
@@ -374,7 +374,7 @@ def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
     regions = Outputs(checkout=checkout).regions[RULES]
     rows    = regions["cohesion"].splitlines()[2:]
 
-    assert regions["contact"] == tabled(SoftCore)
+    assert regions["contact"] == tabled(HardSphere)
     assert regions["plan"] == tabled(Plan)
     assert regions["plant"] == tabled(Plant)
     assert regions["radio"] == tabled(Radio)
@@ -388,7 +388,7 @@ def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
         *(trial.slot for trial in Trial.listed())
     }
     assert [row.split("`")[1].partition(".")[0] for row in rows] == [
-        *["morse"] * 4,
+        *["peripheral"] * 3,
         "centroid",
         *["elastic"] * 2,
         *["fitted"] * 4

@@ -10,7 +10,7 @@ from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
 from typing import Annotated
 
-from thermur.controller.components import Constant, Morse, Overdamped, Roost, SoftCore, White
+from thermur.controller.components import Constant, HardSphere, Overdamped, Peripheral, Roost, White
 from thermur.controller.schemas    import Radio
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas   import Crop, ParametricThreat
@@ -38,12 +38,12 @@ class Settings(
     another node has already read.
     """
 
-    cohesion: Morse = Morse()
+    cohesion: Peripheral = Peripheral()
     """
     The acceleration holding a drone at a spacing from its neighbors.
     """
 
-    contact: SoftCore = SoftCore()
+    contact: HardSphere = HardSphere()
     """
     The acceleration pushing apart two drones that overlap.
     """

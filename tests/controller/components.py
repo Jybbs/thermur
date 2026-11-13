@@ -7,12 +7,12 @@ the second drone's action as it stands.
 from common.drones import flock_of, still_air, viewed
 from equinox       import filter_jit
 from hypothesis    import given, strategies
-from jax           import Array, vmap
+from jax           import Array, tree, vmap
 from jax.numpy     import append, array, exp, sqrt
 from jax.random    import key, normal
 from numpy         import diag
 from numpy.testing import assert_allclose
-from pytest        import mark, param, raises
+from pytest        import mark, param
 from scipy.linalg  import solve_continuous_lyapunov
 
 from thermur.controller.components import (
@@ -23,13 +23,13 @@ from thermur.controller.components import (
     Delayed,
     Elastic,
     Fitted,
+    HardSphere,
     Intrinsic,
     Metric,
-    Morse,
     Overdamped,
+    Peripheral,
     Persistent,
     Roost,
-    SoftCore,
     Vectorial,
     Weighted,
     White
@@ -229,14 +229,10 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             id = "fitted"
         ),
         param(
-            Morse(),
-            viewed([[0.0, 12.0, 0.0]]),
-            [
-                0.0,
-                80.0 / 12.0 * exp(-1.0) - 10400.0 / 2.4 * exp(-12.0 / 2.4),
-                0.0
-            ],
-            id = "morse"
+            HardSphere(sphere_m=1.0, spread_m=2.0, weight_m_s2=8.0),
+            viewed([[3.0, 0.0, 0.0], [0.0, 0.5, 0.0]]),
+            [-4.0 * exp(-0.5), -4.0, 0.0],
+            id = "hard-sphere"
         ),
         param(
             Overdamped(),
@@ -245,10 +241,29 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             id = "overdamped"
         ),
         param(
-            SoftCore(diameter_m=6.0, stiffness_m_s2=8.0),
-            viewed([[3.0, 0.0, 0.0], [10.0, 0.0, 0.0]]),
-            [-4.0, 0.0, 0.0],
-            id = "soft-core"
+            Peripheral(blind_deg=90.0, sphere_m=0.2, weight_m_s2=12.0),
+            viewed([[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0], [0.0, 10.0, 0.0]]),
+            [2.0, 2.0, 0.0],
+            id = "peripheral-at-the-border"
+        ),
+        param(
+            Peripheral(blind_deg=90.0, sphere_m=0.2, weight_m_s2=12.0),
+            viewed(
+                [
+                    [10.0, 0.0, 0.0],
+                    [-10.0, 0.0, 0.0],
+                    [0.0, 10.0, 0.0],
+                    [0.0, -10.0, 0.0]
+                ]
+            ),
+            [0.0, 0.0, 0.0],
+            id = "peripheral-inside"
+        ),
+        param(
+            Peripheral(blind_deg=90.0, sphere_m=5.0, weight_m_s2=12.0),
+            viewed([[10.0, 0.0, 0.0], [0.0, 2.0, 0.0]]),
+            [12.0 * 2**0.5 / 2, 0.0, 0.0],
+            id = "peripheral-past-the-hard-sphere"
         )
     ]
 )
@@ -316,15 +331,6 @@ def test_each_noise_scales_its_increments_by_its_source_s_form(
     assert_allclose(noise.amplitudes(observation), expected, rtol=1e-6)
 
 
-def test_a_morse_cohesion_inside_the_collapse_region_is_refused():
-    """
-    Asserts that a Morse cohesion whose repulsion, times the cube of its
-    length, falls short of the attraction's is refused, naming both.
-    """
-    with raises(ValueError, match="does not exceed the attraction's"):
-        Morse(repulsion_m2_s2=100.0)
-
-
 def test_a_persistent_force_enters_the_acceleration_and_decays():
     """
     Asserts that the persistent noise adds the force a drone holds to its
@@ -377,23 +383,24 @@ def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
     )
 
 
-@mark.parametrize("spacing_m", [2.0, 10.0, 25.0])
-def test_the_roost_holds_the_heights_spread_in_proportion_to_its_spacing(
-    spacing_m: float
+@mark.parametrize("factor", [2.0, 10.0, 30.0])
+def test_the_roost_holds_the_heights_spread_in_proportion_to_the_flock_s_size(
+    factor: float
 ):
     """
-    Asserts that, under a noise of fixed strength on the command's rate,
-    the roost carried to twice a spacing holds the stationary spread of
-    the heights behind the plant's lag to twice the spread at that spacing,
-    within 2%, reading the stiffness and the damping off the roost's pull.
+    Asserts that the roost and the white noise carried to twice a factor
+    hold the stationary spread of the heights behind the plant's lag to
+    twice the spread at that factor, within 10%, reading the stiffness and
+    the damping off the roost's pull.
     """
     lag_s = Plant().lag_s
 
-    def spread(roost: Roost) -> float:
+    def spread(scale: float) -> float:
         """
         Solves the stationary covariance of the height, the velocity, and
-        the command under the roost's pull and the plant's lag.
+        the command under the roost's pull, the plant's lag, and the noise.
         """
+        roost     = Roost().scaled(scale)
         height    = array([*roost.center_m, roost.height_m + 1.0])
         stiffness = -float(roost(viewed([[1.0, 0.0, 0.0]], position=height))[2])
         damping   = -float(roost(viewed([[1.0, 0.0, 0.0]], (10.0, 0.0, 1.0)))[2])
@@ -402,30 +409,50 @@ def test_the_roost_holds_the_heights_spread_in_proportion_to_its_spacing(
             [0.0, -1 / lag_s, 1 / lag_s],
             [-stiffness, 0.0, -damping]
         ]
-        return solve_continuous_lyapunov(drift, -diag([0.0, 0.0, 1.0]))[0, 0] ** 0.5
+        return solve_continuous_lyapunov(
+            drift,
+            -diag([0.0, 0.0, White().scaled(scale).amplitude ** 2])
+        )[0, 0] ** 0.5
 
-    assert_allclose(
-        spread(Roost().at_spacing(2 * spacing_m)) / spread(
-            Roost().at_spacing(spacing_m)
+    assert_allclose(spread(2 * factor) / spread(factor), 2.0, rtol=0.1)
+
+
+@mark.parametrize(
+    ("component", "expected"),
+    [
+        param(
+            Constant(coupling_per_s=2.0),
+            Constant(coupling_per_s=0.5),
+            id = "constant"
         ),
-        2.0,
-        rtol = 0.02
-    )
-
-
-def test_the_roost_carried_to_a_spacing_keeps_every_other_field():
+        param(
+            HardSphere(sphere_m=0.5, spread_m=1.0, weight_m_s2=8.0),
+            HardSphere(sphere_m=2.0, spread_m=4.0, weight_m_s2=2.0),
+            id = "hard-sphere"
+        ),
+        param(
+            Peripheral(blind_deg=90.0, sphere_m=0.5, weight_m_s2=8.0),
+            Peripheral(blind_deg=90.0, sphere_m=2.0, weight_m_s2=2.0),
+            id = "peripheral"
+        ),
+        param(
+            Roost(stiffness_per_s2=32.0, turning_m_s2=8.0),
+            Roost(stiffness_per_s2=2.0, turning_m_s2=2.0),
+            id = "roost"
+        ),
+        param(White(amplitude=4.0), White(amplitude=2.0), id="white"),
+        param(Overdamped(), Overdamped(), id="overdamped"),
+        param(Centroid(), Centroid(), id="centroid")
+    ]
+)
+def test_each_slot_carried_to_a_flock_four_times_the_size_scales_its_values(
+    component : Component,
+    expected  : Component
+):
     """
-    Asserts that the roost carried to another spacing changes only its
-    stiffness.
+    Asserts that each slot holding a starling flock's values multiplies its
+    lengths by the factor, divides its accelerations and rates by it, its
+    stiffness by its square, and its noise by its square root, leaving the
+    roost's place and every slot holding a drone flock's own values.
     """
-    roost  = Roost()
-    scaled = roost.at_spacing(20.0)
-
-    assert scaled.stiffness_per_s2 < roost.stiffness_per_s2
-    assert (
-        scaled.center_m, scaled.height_m, scaled.radius_m,
-        scaled.starling_m, scaled.turning_m_s2
-    ) == (
-        roost.center_m, roost.height_m, roost.radius_m,
-        roost.starling_m, roost.turning_m_s2
-    )
+    assert_allclose(tree.leaves(component.scaled(4.0)), tree.leaves(expected))
