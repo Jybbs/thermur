@@ -1,0 +1,15 @@
+{
+  "name": "Slider",
+  "exports": [
+    "Slider"
+  ],
+  "machine": "slider",
+  "when": "A reader sets one number along a range, on its own track or over a track a drawing draws, stepping between stops where a drawing has them",
+  "replaces": "The native range inputs of the threat's rail, the neighbors' range, the marks' dusk, and the faces' time, beside the handle the coupling chart drew into its track",
+  "examples": [
+    {
+      "name": "Between Stops",
+      "says": "A drag follows the pointer, and an arrow key lands on the next stop past the value."
+    }
+  ]
+}

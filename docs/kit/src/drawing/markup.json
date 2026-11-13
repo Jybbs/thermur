@@ -1,0 +1,15 @@
+{
+  "name": "Markup",
+  "exports": [
+    "markup"
+  ],
+  "machine": null,
+  "when": "A chart writes its SVG, setting its colors and faces from the identity's custom properties, and draws again at each width it takes",
+  "replaces": "The SVG helpers of the charts' own module and the width watch of their motion helpers",
+  "examples": [
+    {
+      "name": "Drawn at Each Width",
+      "says": "The drawing writes its SVG again each time the column changes width, in the colors the site's appearance switch sets."
+    }
+  ]
+}

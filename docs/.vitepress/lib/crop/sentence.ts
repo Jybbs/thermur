@@ -1,6 +1,3 @@
-import { type Ref, onBeforeUnmount, onMounted, ref } from 'vue'
-
-import source                from '../rendered/identity.json' with { type: 'json' }
 import { type Kept, MOST_M } from './kept.ts'
 
 /**
@@ -32,34 +29,9 @@ export const DEFAULTS = 'These are the defaults, so there is nothing to set.'
 const LOWEST_M = 200
 
 /**
- * Sets the sentence's height to what its widest wording takes at the width it
- * has, leaving each menu at the pick it held.
- */
-function hold(sentence: HTMLElement): void {
-  const selects = [...sentence.querySelectorAll('select')]
-  const picks   = selects.map(({ selectedIndex }) => selectedIndex)
-  sentence.style.minHeight = ''
-  for (const select of selects) select.selectedIndex = widest(select)
-  sentence.style.minHeight = `${sentence.getBoundingClientRect().height}px`
-  for (const [index, select] of selects.entries()) select.selectedIndex = picks[index]!
-}
-
-/**
  * Writes a height as the sentence reads it.
  */
 const meters = (height: number): string => `${height.toLocaleString('en-US')} m`
-
-/**
- * Finds the place of the option of `select` that lays out widest, each option
- * standing in the menu in turn.
- */
-function widest(select: HTMLSelectElement): number {
-  const widths = Array.from(select.options, ({ index }) => {
-    select.selectedIndex = index
-    return select.getBoundingClientRect().width
-  })
-  return widths.indexOf(Math.max(...widths))
-}
 
 /**
  * Writes the lines the picks set under the table's name, or nothing where every
@@ -123,29 +95,4 @@ export function menusOf(kept: Kept): readonly Menu[] {
       ]
     }
   ]
-}
-
-/**
- * Builds the sentence's element and holds it at the height its widest wording
- * takes, measured once it mounts, again whenever its width changes, and again
- * once the face it reads in has loaded, so no pick moves the page. The observer
- * disconnects once the component unmounts.
- */
-export function useHeldHeight(): Ref<HTMLElement | undefined> {
-  const sentence = ref<HTMLElement>()
-  let observer   : ResizeObserver | undefined
-  onMounted(() => {
-    const element = sentence.value!
-    let width     = 0
-    observer      = new ResizeObserver(() => {
-      const now = element.getBoundingClientRect().width
-      if (now === width) return
-      width = now
-      hold(element)
-    })
-    observer.observe(element)
-    void document.fonts.load(`400 1em '${source.faces.body.family}'`).then(() => hold(element))
-  })
-  onBeforeUnmount(() => observer?.disconnect())
-  return sentence
 }

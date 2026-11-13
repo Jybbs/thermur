@@ -1,11 +1,12 @@
+import { Frames, still } from '@thermur/kit'
+
 import type { Scheme }                from '../identity.ts'
 import type { Geometry, Mount, Part } from './part.ts'
-import { paused }                     from './pause.ts'
 
 /**
  * The observers a stage holds: one watching its canvas come on and off the
- * screen, one watching the root element's scheme and pause, and one watching
- * its canvas and the page's body change size.
+ * screen, one watching the root element's scheme, and one watching its canvas
+ * and the page's body change size.
  */
 interface Observers {
   intersection : IntersectionObserver
@@ -19,8 +20,8 @@ interface Observers {
 const STALL = 0.05
 
 /**
- * A canvas, which fits its parts to the page, steps them on the browser's
- * frames while the canvas is on screen and motion runs, paints them in the
+ * A canvas, which fits its parts to the page, steps them on the kit's frame
+ * loop while the canvas is on screen and motion runs, paints them in the
  * order given, and hands each a click on the canvas. Motion stands still for a
  * reader who prefers reduced motion and while the page's pause is on, where the
  * stage paints one frame and then again only on a scroll, a pointer, a click, a
@@ -33,15 +34,12 @@ export class Stage {
   readonly #client   : [number, number] = [0, 0]
   readonly #context  : CanvasRenderingContext2D
   #dpr               = 1
-  #frame             = 0
   readonly #g        : Geometry
-  #last              = 0
-  readonly #motion   : MediaQueryList
+  readonly #loop     : Frames
   readonly #observed : Observers
   readonly #parts    : readonly Part[]
   readonly #pinned   : boolean
   readonly #pointer  : [number, number] = [0, 0]
-  #running           = false
   #size              = { h: 0, page: 0, w: 0 }
   #visible           = false
 
@@ -50,7 +48,6 @@ export class Stage {
     this.#pinned  = pinned
     this.#canvas  = document.createElement('canvas')
     this.#context = this.#canvas.getContext('2d')!
-    this.#motion  = window.matchMedia('(prefers-reduced-motion: reduce)')
     this.#g       = {
       doc     : null,
       dy      : 0,
@@ -64,19 +61,19 @@ export class Stage {
       w       : 0
     }
     host.append(this.#canvas)
+    this.#loop     = new Frames(seconds => this.#step(Math.min(STALL, seconds)), this.#onRoot)
     this.#observed = {
       intersection : new IntersectionObserver(this.#onSeen),
       mutation     : new MutationObserver(this.#onRoot),
       resize       : new ResizeObserver(this.#onResize)
     }
     this.#observed.intersection.observe(this.#canvas)
-    this.#observed.mutation.observe(document.documentElement, { attributeFilter: ['class', 'data-paused'] })
+    this.#observed.mutation.observe(document.documentElement, { attributeFilter: ['class'] })
     this.#observed.resize.observe(this.#canvas)
     this.#observed.resize.observe(document.body)
     const { signal }                 = this.#abort
     const moves: GlobalEventHandlers = pinned ? window : this.#canvas
     const leaves                     = pinned ? document.documentElement : this.#canvas
-    this.#motion.addEventListener('change', this.#onRoot, { signal })
     window.addEventListener('scroll', this.#onScroll, { passive: true, signal })
     moves.addEventListener('pointermove', this.#onPointer, { passive: true, signal })
     leaves.addEventListener('pointerleave', this.#onLeave, { signal })
@@ -99,14 +96,6 @@ export class Stage {
   }
 
   /**
-   * Reads whether the drawing stands still, for a reader who prefers reduced
-   * motion or while the page's pause is on.
-   */
-  get #still(): boolean {
-    return this.#motion.matches || paused()
-  }
-
-  /**
    * Updates the record the parts read to this frame and returns it, placing the
    * pointer of a pinned stage on the page as it is now scrolled.
    */
@@ -117,21 +106,18 @@ export class Stage {
     g.dy             = window.scrollY
     g.page           = this.#size.page
     g.scheme         = this.#scheme
-    g.still          = this.#still
+    g.still          = still()
     this.#pointer[0] = this.#client[0]
     this.#pointer[1] = this.#client[1] + (this.#pinned ? g.dy : 0)
     return g
   }
 
   /**
-   * Starts the frames where the canvas is on screen, motion runs, and none is
-   * already scheduled.
+   * Runs the frame loop where the canvas is on screen and motion runs, and
+   * otherwise stops it.
    */
   #kick(): void {
-    if (this.#running || !this.#visible || this.#still) return
-    this.#running = true
-    this.#last    = 0
-    this.#frame   = requestAnimationFrame(this.#tick)
+    this.#loop.run(this.#visible)
   }
 
   /**
@@ -159,7 +145,7 @@ export class Stage {
    */
   readonly #onLeave = (): void => {
     this.#g.pointer = null
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -171,7 +157,7 @@ export class Stage {
     this.#client[0] = this.#pinned ? event.clientX : event.offsetX
     this.#client[1] = this.#pinned ? event.clientY : event.offsetY
     this.#g.pointer = this.#pointer
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -181,7 +167,7 @@ export class Stage {
   readonly #onPress = (): void => {
     const g = this.#geometry()
     for (const part of this.#parts) part.press?.(g)
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -210,7 +196,7 @@ export class Stage {
    * Repaints as the page scrolls where the drawing stands still.
    */
   readonly #onScroll = (): void => {
-    if (this.#still) this.#paint()
+    if (still()) this.#paint()
   }
 
   /**
@@ -248,22 +234,13 @@ export class Stage {
   }
 
   /**
-   * Steps and paints the parts on one frame and schedules the next, a stalled
-   * frame counting as `STALL` seconds at most, or stops where the canvas left
-   * the screen or motion stood still.
+   * Steps the parts on by `dt` seconds and paints them.
    */
-  readonly #tick = (now: number): void => {
-    if (!this.#visible || this.#still) {
-      this.#running = false
-      return
-    }
-    const dt   = this.#last === 0 ? 1 / 60 : Math.min(STALL, (now - this.#last) / 1000)
-    this.#last = now
+  #step(dt: number): void {
     this.#g.t += dt
     const g    = this.#geometry()
     for (const part of this.#parts) part.step?.(dt, g)
     this.#paint()
-    this.#frame = requestAnimationFrame(this.#tick)
   }
 
   /**
@@ -271,7 +248,7 @@ export class Stage {
    * canvas.
    */
   destroy(): void {
-    cancelAnimationFrame(this.#frame)
+    this.#loop.destroy()
     this.#observed.intersection.disconnect()
     this.#observed.mutation.disconnect()
     this.#observed.resize.disconnect()

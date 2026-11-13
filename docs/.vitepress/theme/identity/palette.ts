@@ -1,11 +1,11 @@
+import { type Copier, heard, useCopy }                   from '@thermur/kit'
 import { useData }                                       from 'vitepress'
 import { type Ref, type VNode, defineComponent, h, ref } from 'vue'
 
-import * as identity            from '../../lib/identity.ts'
-import source                   from '../../lib/rendered/identity.json' with { type: 'json' }
-import { type Copier, useCopy } from '../../lib/specimen/copy.ts'
-import * as sketch              from '../../lib/specimen/sketch.ts'
-import * as parts               from './parts.ts'
+import * as identity from '../../lib/identity.ts'
+import source        from '../../lib/rendered/identity.json' with { type: 'json' }
+import * as sketch   from '../../lib/specimen/sketch.ts'
+import * as parts    from './parts.ts'
 
 /**
  * What a press runs to copy the hex `pair` takes in the scheme on display.
@@ -99,7 +99,7 @@ function frame(): VNode[] {
  * matches every scheme.
  */
 const hexOf = (pair: Schemed): VNode =>
-  h('span', { class: 'identity-hex' }, [
+  h('span', { class: 'identity-hex kit-fuse' }, [
     h('span', { class: 'identity-on-light' }, identity.colorOf(pair.light)),
     h('span', { class: 'identity-on-dark' }, identity.colorOf(pair.dark))
   ])
@@ -183,7 +183,7 @@ export default defineComponent({
       h('div', { class: 'identity-series-list' },
         shown.value.map((_, place) => seriesCard(copied, place, shown))),
       h('div', { class: 'identity-keys' }, identity.roles.map(role => roleKey(copied, role))),
-      parts.heard(said)
+      heard(said)
     ])
   }
 })

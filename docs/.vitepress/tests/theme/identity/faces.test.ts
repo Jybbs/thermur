@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-import { enableAutoUnmount, mount }            from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as kit                                      from '@thermur/kit'
+import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi }       from 'vitest'
 
 import { fontStack } from '../../../lib/identity.ts'
 import source        from '../../../lib/rendered/identity.json' with { type: 'json' }
-import * as motion   from '../../../lib/rules/motion.ts'
 import * as sketch   from '../../../lib/specimen/sketch.ts'
 import IdentityFaces from '../../../theme/identity/faces.ts'
 
@@ -43,6 +43,15 @@ describe('the rows', () => {
   })
 })
 
+/**
+ * Presses `key` on the time slider's thumb, its focus set first.
+ */
+async function pressed(widget: VueWrapper, key: string): Promise<void> {
+  const thumb = widget.get<HTMLElement>('[role=slider]')
+  thumb.element.focus()
+  await thumb.trigger('keydown', { key })
+}
+
 describe('the panel', () => {
   it('picks out a face’s parts of the panel while its row is held, and lets go on leaving', async () => {
     const widget = mount(IdentityFaces)
@@ -66,28 +75,26 @@ describe('the panel', () => {
     expect(widget.findAll('.identity-dim')).toEqual([])
   })
 
-  it('moves the log and settles each gauge to the second the scrubber reaches', async () => {
-    vi.spyOn(motion, 'tween').mockImplementation(step => {
+  it('moves the log and settles each gauge to the second the slider reaches', async () => {
+    vi.spyOn(kit, 'tween').mockImplementation(step => {
       step(1)
       return () => {}
     })
-    const widget = mount(IdentityFaces)
-    const scrub  = widget.get('input')
-    scrub.element.value = '120'
-    await scrub.trigger('input')
-    const reading = sketch.readingsAt(120)
+    const widget = mount(IdentityFaces, { attachTo: document.body })
+    await pressed(widget, 'End')
+    const reading = sketch.readingsAt(sketch.SPAN)
     expect(widget.findAll('.identity-gauge .identity-reading').map(gauge => gauge.text()))
       .toEqual([reading.altitude, reading.air, reading.split].map(value => String(Math.round(value))))
-    expect(widget.get('.identity-log').text()).toBe(sketch.LOG[2]!.slice(1).join(''))
-    expect(widget.get('.identity-scrub .identity-reading').text()).toBe('120 s')
+    expect(widget.get('.identity-log').text()).toBe(sketch.entryAt(sketch.SPAN).slice(1).join(''))
+    expect(widget.get('.identity-scrub .identity-reading').text()).toBe(`${sketch.SPAN} s`)
   })
 
   it('stops a gauge still settling as it unmounts', async () => {
     const stop   = vi.fn<() => void>()
-    vi.spyOn(motion, 'tween').mockReturnValue(stop)
-    const widget = mount(IdentityFaces)
-    await widget.get('input').trigger('input')
-    await widget.get('input').trigger('input')
+    vi.spyOn(kit, 'tween').mockReturnValue(stop)
+    const widget = mount(IdentityFaces, { attachTo: document.body })
+    await pressed(widget, 'End')
+    await pressed(widget, 'Home')
     widget.unmount()
     expect(stop).toHaveBeenCalledTimes(2)
   })

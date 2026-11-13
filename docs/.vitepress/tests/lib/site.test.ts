@@ -29,6 +29,7 @@ describe('themeConfig', () => {
     expect(config.nav).toEqual(navOf())
     expect(config.sidebar).toEqual(sidebarOf(pagesDir(import.meta.url)))
     expect(config.sidebar).toHaveProperty(['/reference/', 0, 'items'], [
+      { link: '/reference/kit', text: 'The Kit' },
       { link: '/reference/identity', text: 'The Visual Identity' }
     ])
   })

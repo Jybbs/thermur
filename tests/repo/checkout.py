@@ -412,6 +412,7 @@ def test_tracked_leaves_out_the_file_mise_lock_writes_and_keeps_the_lock(
     "written",
     [
         "docs/.vitepress/.temp/_headers", "docs/.vitepress/dist/_headers",
+        "docs/kit/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs",
         "docs/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs"
     ]
 )

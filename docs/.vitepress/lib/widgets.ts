@@ -17,6 +17,7 @@ const MARKERS: Readonly<Record<string, string>> = {
   '/heat'        : SHUT,
   '/marks'       : SHUT,
   '/palette'     : SHUT,
+  '/pieces'      : SHUT,
   '/threat'      : SHUT,
   'crop'         : FOLD,
   'faces'        : `<IdentityFaces />\n${FOLD}`,
@@ -25,6 +26,7 @@ const MARKERS: Readonly<Record<string, string>> = {
   'marks'        : `<IdentityMarks />\n${FOLD}`,
   'neighbors'    : '<RulesNeighbors />\n',
   'palette'      : `<IdentityPalette />\n${FOLD}`,
+  'pieces'       : `<KitCatalog :readers="$frontmatter.kit" />\n${FOLD}`,
   'polarization' : '<RulesSpacing />\n',
   'reach'        : '<RulesReach />\n',
   'threat'       : `<ThreatFront />\n${FOLD}`

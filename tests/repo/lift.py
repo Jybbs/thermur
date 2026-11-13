@@ -608,12 +608,13 @@ def test_site_reads_each_package_bun_outdated_lists(
     cleared  : tuple[str, ...]
 ):
     """
-    Asserts that `Site` reports each package `bun outdated` lists, with or
-    without its `(dev)` mark, beside the date `bun info` gives its newest
-    release, and clears an advisory `bun audit` reports on one only where
-    the audit of a copy of `docs/` with the lift written reports it no
-    longer, a copy it resolves only where an advisory names a row, so an
-    advisory the lift leaves standing clears nothing.
+    Asserts that `Site` reports each package `bun outdated` lists, with
+    or without its `(dev)` mark, beside the date `bun info` gives its
+    newest release, and clears an advisory `bun audit` reports on one only
+    where the audit of a copy of `docs/` with the lift written reports it
+    no longer, a copy holding each workspace package's manifest that it
+    resolves only where an advisory names a row, so an advisory the lift
+    leaves standing clears nothing.
     """
     pins  = override(checkout, {})["devDependencies"]
     table = (
@@ -630,7 +631,8 @@ def test_site_reads_each_package_bun_outdated_lists(
             "outdated"       : printed(table),
             '"info "*'       : printed(times),
             '"audit --json"' : f'case "$PWD" in */thermur-*) {lifted} && '
-            f"{printed(after)} || {printed(audited)} ;; *) {printed(audited)} ;; esac"
+            f"{printed(after)} || {printed(audited)} ;; *) {printed(audited)} ;; esac",
+            '"install --lockfile-only"': "test -f kit/package.json"
         }
     )
 

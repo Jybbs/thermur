@@ -1,0 +1,15 @@
+{
+  "name": "Toggle",
+  "exports": [
+    "Toggle"
+  ],
+  "machine": "toggle",
+  "when": "A reader turns a state on and off with one button, as the page's pause and the coupling chart's play knob do",
+  "replaces": "The button the page's pause set its own pressed state on and the knob the coupling chart drew to play its sweep",
+  "examples": [
+    {
+      "name": "Play and Hold",
+      "says": "A press flips the button's state, which a screen reader hears as pressed or not."
+    }
+  ]
+}

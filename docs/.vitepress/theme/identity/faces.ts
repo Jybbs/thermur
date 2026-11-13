@@ -1,11 +1,11 @@
+import { type Copier, Slider, heard, idle, tween, useCopy }                         from '@thermur/kit'
 import { type Ref, type VNode, defineComponent, h, onBeforeUnmount, reactive, ref } from 'vue'
 
+import { lerp }                     from '../../lib/common.ts'
 import { type Identity, fontStack } from '../../lib/identity.ts'
 import source                       from '../../lib/rendered/identity.json' with { type: 'json' }
-import { tween }                    from '../../lib/rules/motion.ts'
-import { type Copier, useCopy }     from '../../lib/specimen/copy.ts'
 import * as sketch                  from '../../lib/specimen/sketch.ts'
-import { heard, madeUp }            from './parts.ts'
+import { madeUp }                   from './parts.ts'
 
 /**
  * A face the identity sets, beside the kind of text it is set for.
@@ -61,18 +61,18 @@ function row(copy: Copier['copy'], [kind, face]: Face, held: Ref<TextKind | null
       ...face.weights.map(weight => h('span', { style: { fontWeight: weight } }, weight)),
       face.italic ? h('i', 'Italic') : null
     ]),
-    h('span', { class: 'identity-hex' }, stack)
+    h('span', { class: 'identity-hex kit-fuse' }, stack)
   ])
 }
 
 /**
  * Lays out the flight's panel at `second`, its gauges at `shown`, each part
  * dimmed while `held` holds a face other than the one it is set in, and its
- * scrubber running `moved` on each move.
+ * scrubber running `moved` with each second it moves to.
  */
 function panel(
   held   : Ref<TextKind | null>,
-  moved  : (event: Event) => void,
+  moved  : (second: number) => void,
   second : number,
   shown  : sketch.PanelReadings
 ): VNode {
@@ -94,16 +94,14 @@ function panel(
         h('span', { class: 'identity-unit' }, unit)
       ]))),
     h('p', part('identity-log', 'body'), [plain, h('em', quoted), end]),
-    h('label', part('identity-scrub', 'mono'), [
-      h('span', { class: 'identity-caps' }, 'Time'),
-      h('input', {
-        'aria-label' : 'Time into the flight',
-        'max'        : sketch.SPAN,
-        'min'        : 0,
-        'onInput'    : moved,
-        'step'       : 1,
-        'type'       : 'range',
-        'value'      : second
+    h('div', part('identity-scrub', 'mono'), [
+      h('span', { 'aria-hidden': 'true', 'class': 'identity-caps' }, 'Time'),
+      h(Slider, {
+        label    : 'Time into the flight',
+        max      : sketch.SPAN,
+        min      : 0,
+        value    : second,
+        onChange : moved
       }),
       h('span', { class: 'identity-reading' }, `${second} s`)
     ])
@@ -126,16 +124,16 @@ export default defineComponent({
     const second         = ref(OPENING_SECOND)
     const shown          = reactive(sketch.readingsAt(OPENING_SECOND))
     const faces          = Object.entries(source.faces) as Face[]
-    let settling: (() => void) | undefined
-    onBeforeUnmount(() => settling?.())
-    const moved          = (event: Event): void => {
+    let settling         = idle
+    onBeforeUnmount(() => settling())
+    const moved          = (at: number): void => {
       const from   = { ...shown }
-      second.value = (event.target as HTMLInputElement).valueAsNumber
+      second.value = at
       const to     = sketch.readingsAt(second.value)
-      settling?.()
+      settling()
       settling     = tween(share => {
         for (const { reading } of GAUGES)
-          shown[reading] = from[reading] + (to[reading] - from[reading]) * share
+          shown[reading] = lerp(from[reading], to[reading], share)
       }, 2)
     }
     return () => h('figure', { class: 'identity-faces' }, [
