@@ -391,24 +391,21 @@ def test_the_root_resolves_through_a_symlink(
     assert Checkout(root=link).root == checkout.root
 
 
-def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
+def test_tracked_leaves_out_the_file_mise_lock_writes_and_keeps_the_lock(
+    checkout: Checkout
+):
     """
-    Asserts that the files a checkout tracks take in an untracked file
-    and one whose name git quotes, in path order, and leave out one its
-    `.gitignore` covers and a tracked one removed from the disk.
+    Asserts that the files a checkout tracks take in `.mise/mise.lock` and
+    leave out the temporary file `mise lock` writes beside it, so a reader
+    listing them while `lock:check` runs names no file `mise lock` may
+    remove before the reader opens it.
     """
-    append(clone, "notes.md", "An untracked note.\n")
-    append(clone, "café.md", "A note whose name git quotes.\n")
-    append(clone, ".env", "IGNORED=1\n")
-    (clone.root / "LICENSE").unlink()
+    written = Path(".mise/.mise.lock.jQXMo2")
+    (checkout.root / written).touch()
+    files = checkout.tracked()
 
-    files = clone.tracked()
-
-    assert files == sorted(files)
-    assert Path("notes.md") in files
-    assert Path("café.md") in files
-    assert Path(".env") not in files
-    assert Path("LICENSE") not in files
+    assert written not in files
+    assert Path(".mise/mise.lock") in files
 
 
 @mark.parametrize(
@@ -433,6 +430,26 @@ def test_tracked_leaves_out_a_file_from_each_folder_the_site_build_writes(
     path.touch()
 
     assert Path(written) not in checkout.tracked()
+
+
+def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
+    """
+    Asserts that the files a checkout tracks take in an untracked file
+    and one whose name git quotes, in path order, and leave out one its
+    `.gitignore` covers and a tracked one removed from the disk.
+    """
+    append(clone, "notes.md", "An untracked note.\n")
+    append(clone, "café.md", "A note whose name git quotes.\n")
+    append(clone, ".env", "IGNORED=1\n")
+    (clone.root / "LICENSE").unlink()
+
+    files = clone.tracked()
+
+    assert files == sorted(files)
+    assert Path("notes.md") in files
+    assert Path("café.md") in files
+    assert Path(".env") not in files
+    assert Path("LICENSE") not in files
 
 
 def test_unwrap_blanks_a_comment_and_keeps_the_blank_line_above_it():
