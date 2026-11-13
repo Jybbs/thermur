@@ -82,6 +82,14 @@ def composite() -> Composite:
 
 
 @fixture(scope="module")
+def default(composite: Composite) -> Flight:
+    """
+    Flies the default plan under the default composite through still air.
+    """
+    return Flight.flown(composite, AIR, Settings().plan)
+
+
+@fixture(scope="module")
 def flight(composite: Composite) -> Flight:
     """
     Flies the short plan under the default composite through still air.
@@ -174,24 +182,29 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
     )
 
 
-def test_a_default_flight_holds_the_roost_s_height():
+@mark.slow
+def test_a_default_flight_holds_the_roost_s_height(default: Flight):
     """
-    Asserts that a flock flying the default composite for a minute ends
-    within two meters of the roost's height on the mean, however unevenly
-    the plant bounds a climb and a descent.
+    Asserts that the default flight ends within 20 m of the roost's height
+    on the mean, where a plant bounding a descent tighter than a climb lifts
+    it some 60 m above it.
     """
-    settings = Settings()
-    flown    = Flight.flown(
-        Composite.from_settings(settings),
-        AIR,
-        settings.plan.model_copy(update={"drones": 30, "duration_s": 60.0, "seeds": 2})
+    assert_allclose(
+        asarray(default.frames.positions)[:, -1, :, 2].mean(),
+        Settings().roost.height_m,
+        atol = 20.0
     )
 
-    assert_allclose(
-        asarray(flown.frames.positions)[:, -1, :, 2].mean(),
-        settings.roost.height_m,
-        atol = 2.0
-    )
+
+@mark.slow
+def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
+    """
+    Asserts that the largest group of the default flight, averaged over
+    the seeds, stands within 30% of the 1 to 2.8 to 5.6 of starling flocks,
+    where the roost's spring left at a starling's spacing flattens it eight
+    to ten times over.
+    """
+    assert_allclose(default.group_aspect_ratios.mean(0), [1.0, 2.8, 5.6], rtol=0.3)
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
@@ -382,6 +395,29 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     )
 
 
+def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
+    """
+    Asserts that shells of drones turning at times proportional to their
+    distance from the first drone read the speed of that spread, and a reach
+    of one where the farthest shell ends the flight turned through the whole
+    turn.
+    """
+    plan      = short(turn_deg=90.0, turning_window_s=0.1)
+    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
+
+    speed, reach = response(
+        distances = distances,
+        plan      = plan,
+        rotation  = exp(
+            1j * pi / 2 * (arange(
+                60
+            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
+        )
+    )
+
+    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
+
+
 @mark.parametrize(
     ("heading", "held"),
     [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
@@ -406,29 +442,6 @@ def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
     )
 
     assert allclose(speeds, 10.0, rtol=1e-4) == held
-
-
-def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
-    """
-    Asserts that shells of drones turning at times proportional to their
-    distance from the first drone read the speed of that spread, and a reach
-    of one where the farthest shell ends the flight turned through the whole
-    turn.
-    """
-    plan      = short(turn_deg=90.0, turning_window_s=0.1)
-    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
-
-    speed, reach = response(
-        distances = distances,
-        plan      = plan,
-        rotation  = exp(
-            1j * pi / 2 * (arange(
-                60
-            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
-        )
-    )
-
-    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
 
 
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
@@ -473,25 +486,6 @@ def test_each_seed_of_the_batch_flies_as_it_does_alone(
     assert_allclose(flight.frames.velocities[1], alone.velocities, atol=1e-4)
 
 
-@mark.parametrize(
-    ("curve", "expected"),
-    [
-        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
-        param([1.0, 0.0], 1, id="zero"),
-        param([1.0, 0.5], 2, id="none")
-    ]
-)
-def test_the_first_zero_is_the_first_value_at_or_below_zero(
-    curve    : list[float],
-    expected : int
-):
-    """
-    Asserts that `first_zero` finds the first value at or below zero, or the
-    curve's length where none is.
-    """
-    assert first_zero(array(curve)) == expected
-
-
 def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
     """
     Asserts that four lines of three drones 10 m apart, each line far from
@@ -512,6 +506,25 @@ def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
         ([centers[5]] * 2, [32 * near / (near + 4 / centers[10] ** 2)] * 2),
         rtol = 1e-5
     )
+
+
+@mark.parametrize(
+    ("curve", "expected"),
+    [
+        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
+        param([1.0, 0.0], 1, id="zero"),
+        param([1.0, 0.5], 2, id="none")
+    ]
+)
+def test_the_first_zero_is_the_first_value_at_or_below_zero(
+    curve    : list[float],
+    expected : int
+):
+    """
+    Asserts that `first_zero` finds the first value at or below zero, or the
+    curve's length where none is.
+    """
+    assert first_zero(array(curve)) == expected
 
 
 def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
@@ -546,6 +559,27 @@ def test_the_frames_table_holds_each_kept_frame_at_its_time(flight: Flight):
     assert table.positions.dims == ("seed", "time", "drone", "axis")
     assert table.positions.shape == (2, 20, 12, 3)
     assert_allclose(table.time, 0.1 * arange(1, 21))
+
+
+def test_the_largest_group_reads_its_own_shape_apart_from_a_stray_pair():
+    """
+    Asserts that drones in pairs on each axis at 30, 20, and 10 m from the
+    center read axes of 1 to 2 to 3 as the largest group, beside a pair of
+    drones 500 m off that the hop of three launch spacings leaves apart.
+    """
+    spots = concat(
+        [
+            diag([30.0, 20.0, 10.0]),
+            -diag([30.0, 20.0, 10.0]),
+            [[500.0, 0.0, 0.0], [510.0, 0.0, 0.0]]
+        ]
+    )
+
+    assert_allclose(
+        laid(spots, [10.0, 0.0, 0.0]).group_aspect_ratios,
+        [[1.0, 2.0, 3.0]] * 2,
+        rtol = 1e-5
+    )
 
 
 def test_the_radio_s_range_reaches_the_replay_and_the_flight():

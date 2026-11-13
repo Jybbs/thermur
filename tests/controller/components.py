@@ -356,8 +356,8 @@ def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
     Asserts that the roost turns a drone outside its cylinder across its
     heading toward the roost, at the full acceleration headed straight out,
     half of it headed along the edge, and none headed in, leaves one inside
-    alone, and pulls one above the height down through its critically damped
-    spring.
+    alone, and pulls one above the height down through its spring, damped at
+    twice the square root of its stiffness.
     """
     roost = Roost(
         center_m         = (0.0, 0.0),
@@ -372,3 +372,18 @@ def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
         expected,
         atol = 1e-6
     )
+
+
+def test_the_roost_scales_its_stiffness_by_the_square_of_the_spacings():
+    """
+    Asserts that the roost carried from its starling spacing to a spacing
+    ten times as wide holds a hundredth of the stiffness and keeps every
+    other field.
+    """
+    roost = Roost(starling_m=0.5, stiffness_per_s2=2.0)
+
+    scaled = roost.at_spacing(5.0)
+
+    assert_allclose(scaled.stiffness_per_s2, 0.02)
+    assert scaled.height_m == roost.height_m
+    assert scaled.starling_m == roost.starling_m

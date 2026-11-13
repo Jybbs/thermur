@@ -601,9 +601,13 @@ class Composite(Module):
     @classmethod
     def from_settings(cls, settings: Settings) -> Self:
         """
-        Reads each slot from the settings field naming it.
+        Reads each slot from the settings field naming it, the roost scaled
+        to the plan's spacing.
         """
-        return cls(**{slot.name: getattr(settings, slot.name) for slot in fields(cls)})
+        return cls(
+            **{slot.name: getattr(settings, slot.name) for slot in fields(cls)}
+            | {"roost": settings.roost.at_spacing(settings.plan.spacing_m)}
+        )
 
 
 def across(accelerations: Array, velocities: Array) -> Array:

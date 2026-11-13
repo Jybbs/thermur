@@ -18,6 +18,7 @@ from numpy         import (
     array,
     array_split,
     asarray,
+    bincount,
     clip,
     diff,
     einsum,
@@ -186,23 +187,45 @@ class Flight(Module):
     @property
     def fragments(self) -> ndarray:
         """
-        Counts the groups the last frame splits into, two drones sharing
-        a group where a chain of hops under three times `spacing_m` joins
-        them.
+        Counts the groups the last frame splits into.
+        """
+        return asarray([labels.max() + 1 for labels in self.groups], dtype=float)
+
+    @property
+    def group_aspect_ratios(self) -> ndarray:
+        """
+        Reads the shape of the largest group the last frame splits into,
+        `(n_seeds, 3)`, as the length of each axis over the thinnest's.
         """
         return asarray(
             [
-                connected_components(
-                    (tree := KDTree(cloud)).sparse_distance_matrix(
-                        tree,
-                        3 * self.plan.spacing_m
-                    ),
-                    directed = False
-                )[0]
-                for cloud in asarray(self.frames.positions)[:, -1]
-            ],
-            dtype = float
+                tree.map(
+                    lambda frames: frames[seed, -1, labels == bincount(
+                        labels
+                    ).argmax()],
+                    self.frames
+                ).aspect_ratios
+                for seed, labels in enumerate(self.groups)
+            ]
         )
+
+    @property
+    def groups(self) -> list[ndarray]:
+        """
+        Labels the group each drone of the last frame flies in, one row per
+        seed, two drones sharing a group where a chain of hops under three
+        times `spacing_m` joins them.
+        """
+        return [
+            connected_components(
+                (tree := KDTree(cloud)).sparse_distance_matrix(
+                    tree,
+                    3 * self.plan.spacing_m
+                ),
+                directed = False
+            )[1]
+            for cloud in asarray(self.frames.positions)[:, -1]
+        ]
 
     @property
     def last(self) -> Flock:

@@ -97,11 +97,14 @@ Flies the flock, or computes the steps of the graph named.
 │                               second squared, PX4's MPC_ACC_UP_MAX.          │
 │                               [default: 4.0]                                 │
 │ --plant.descending-m-s2       The largest downward acceleration, in meters   │
-│   FLOAT                       per second squared, PX4's MPC_ACC_DOWN_MAX.    │
-│                               [default: 3.0]                                 │
+│   FLOAT                       per second squared, PX4's MPC_ACC_DOWN_MAX,    │
+│                               raised from its default of 3 within the 2 to   │
+│                               15 PX4 allows to match climbing_m_s2.          │
+│                               [default: 4.0]                                 │
 │ --plant.descent-m-s FLOAT     The fastest descent a command holds, in meters │
-│                               per second, PX4's MPC_Z_VEL_MAX_DN. [default:  │
-│                               1.5]                                           │
+│                               per second, PX4's MPC_Z_VEL_MAX_DN, raised     │
+│                               from its default of 1.5 within the 0.5 to 4    │
+│                               PX4 allows to match climb_m_s. [default: 3.0]  │
 │ --plant.lag-s FLOAT           The time constant over which a drone's         │
 │                               velocity relaxes toward its command, in        │
 │                               seconds. [default: 1.0]                        │
@@ -130,11 +133,16 @@ Flies the flock, or computes the steps of the graph named.
 │                               meters above the ground. [default: 100.0]      │
 │ --roost.radius-m FLOAT        The radius of the cylinder, in meters.         │
 │                               [default: 600.0]                               │
+│ --roost.starling-m FLOAT      The spacing stiffness_per_s2 holds at, in      │
+│                               meters, by default the nearest-neighbor        │
+│                               distance of the starling model's flock of 781  │
+│                               birds. [default: 0.69]                         │
 │ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
-│   FLOAT                       away from it, in reciprocal square seconds, by │
-│                               default the starling model's vertical weight   │
-│                               of 0.2 newtons per meter over its bird's mass  │
-│                               of 80 grams. [default: 2.5]                    │
+│   FLOAT                       away from it, in reciprocal square seconds, at │
+│                               a spacing of starling_m, by default the        │
+│                               starling model's vertical weight of 0.2        │
+│                               newtons per meter over its bird's mass of 80   │
+│                               grams. [default: 2.5]                          │
 │ --roost.turning-m-s2 FLOAT    The acceleration turning a drone headed        │
 │                               straight out of the cylinder, in meters per    │
 │                               second squared, half of it for a drone headed  │

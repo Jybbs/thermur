@@ -5,7 +5,8 @@ them, meaning the headings, the couplings, the noises, the cohesions, the
 one contact, and the one roost.
 """
 
-from jax        import Array
+from equinox import tree_at
+from jax     import Array
 from jax.numpy  import (
     append,
     asarray,
@@ -18,7 +19,7 @@ from jax.numpy  import (
     where,
     zeros_like
 )
-from typing   import ClassVar
+from typing   import ClassVar, Self
 
 from thermur.controller.schemas  import Component, Heading, Noise, Observation, unit
 from thermur.environment.schemas import NonNegative, Positive, documented
@@ -407,10 +408,11 @@ class Persistent(Noise):
 @documented
 class Roost(Component):
     """
-    The roost term of a starling flock model at drone scale, turning a
-    drone that has left a vertical cylinder about the roost, the harder the
-    further its heading points away from the roost, and pulling it toward
-    the roost's height through a critically damped spring.
+    The roost term of a starling flock model, turning a drone that has left
+    a vertical cylinder about the roost, the harder the further its heading
+    points away from the roost, and pulling it toward the roost's height
+    through a damped spring whose stiffness `at_spacing` scales from the
+    model's bird spacing to a drone's.
     """
 
     center_m: tuple[float, float] = (600.0, 1000.0)
@@ -429,11 +431,18 @@ class Roost(Component):
     The radius of the cylinder, in meters.
     """
 
+    starling_m: Positive = 0.69
+    """
+    The spacing `stiffness_per_s2` holds at, in meters, by default the
+    nearest-neighbor distance of the starling model's flock of 781 birds.
+    """
+
     stiffness_per_s2: NonNegative = 2.5
     """
     The acceleration toward the height per meter away from it, in
-    reciprocal square seconds, by default the starling model's vertical
-    weight of 0.2 newtons per meter over its bird's mass of 80 grams.
+    reciprocal square seconds, at a spacing of `starling_m`, by default the
+    starling model's vertical weight of 0.2 newtons per meter over its
+    bird's mass of 80 grams.
     """
 
     turning_m_s2: NonNegative = 5.0
@@ -449,7 +458,8 @@ class Roost(Component):
         Sums the horizontal turn across the drone's heading, toward the
         side that points it back at the roost, and the vertical pull toward
         `height_m`, damped at `2 * sqrt(stiffness_per_s2)` on the drone's
-        commanded climb.
+        commanded climb, the damping that holds a spring critically damped
+        without the plant's lag.
         """
         away    = observation.position[:2] - asarray(self.center_m)
         outward = unit(away)
@@ -465,6 +475,20 @@ class Roost(Component):
             - 2 * sqrt(self.stiffness_per_s2) * observation.velocity[2]
         )
         return append(turn * where(outward @ left > 0, -left, left), climbing)
+
+    def at_spacing(self, spacing_m: float) -> Self:
+        """
+        Scales `stiffness_per_s2` from a spacing of `starling_m` to
+        `spacing_m` by the square of their ratio, since under a fixed noise
+        the spread of the heights a spring holds falls as the square root
+        of its stiffness, so the flock's thickness keeps its proportion to
+        its spacing.
+        """
+        return tree_at(
+            lambda roost: roost.stiffness_per_s2,
+            self,
+            self.stiffness_per_s2 * (self.starling_m / spacing_m) ** 2
+        )
 
 
 @documented
