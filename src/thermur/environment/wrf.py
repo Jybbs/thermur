@@ -385,11 +385,11 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
     def write(self, path: Path, *, sample: Sample) -> Path:
         """
         Writes the cropped output to `path` as one NetCDF-4 file through
-        netCDF4, each data variable compressed with zlib, `XTIME` restored
-        from the snapshots' times, WRF's grid attributes giving the
-        sizes the crop keeps, so `from_path` reads the file as it reads
-        a simulation, and the license and the source `Sample.attributes`
-        composes for `sample`.
+        netCDF4, each data variable compressed with zlib, `XTIME`
+        restored from the snapshots' times, the license and the source
+        `Sample.attributes` composes for `sample`, and WRF's grid attributes
+        giving the sizes the crop keeps, so `from_path` reads the file as it
+        reads a simulation.
 
         Returns:
             `path`, once written.

@@ -7,6 +7,7 @@ file's path relative to it.
 
 from pathlib import Path
 from pytest  import CaptureFixture, MonkeyPatch, raises
+from xarray  import open_dataset
 
 from thermur.cli                 import app
 from thermur.environment.schemas import Crop, Grid, ParametricThreat, Sample
@@ -69,7 +70,8 @@ def test_the_sample_is_cut_into_the_clone_and_named_relative_to_it(
     Asserts that the command cuts the pinned sample from the output it
     is given under the default settings, writes it under the root of the
     clone `Checkout.installed` resolves, and prints the written file's path
-    relative to that root.
+    relative to that root, the file carrying the pinned sample's license
+    and source.
     """
     cuts: list[tuple[Path, Sample, Settings]] = []
     output = WrfOutput.from_threat(
@@ -97,5 +99,7 @@ def test_the_sample_is_cut_into_the_clone_and_named_relative_to_it(
     app(["cut", "sample", "wrfout_W5F7R4"], result_action="return_value")
 
     assert cuts == [(Path("wrfout_W5F7R4"), Sample(), Settings())]
-    assert (tmp_path / Sample().path).is_file()
     assert capsys.readouterr().out == "data/samples/wrf_sample.nc\n"
+
+    with open_dataset(tmp_path / Sample().path, engine="netcdf4") as written:
+        assert Sample().attributes.items() <= written.attrs.items()

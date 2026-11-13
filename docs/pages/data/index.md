@@ -24,21 +24,21 @@ The sample is `wrfout_W5F7R4`, the output of one simulation 3,000 m deep running
 
 The table below pins the snapshots the window holds, the area of the cells whose ground heat flux shows burning in its first snapshot and its last, and the hottest air on the fixed heights. In every snapshot, the hottest air above the burning cells exceeds the median at its height by more than any air the smoke has not reached exceeds it in any snapshot, since only the ambient convection warms that air.
 
-`mise fetch` runs `thermur fetch sample`, which downloads the file the table names from `host`, under a key carrying its digest, checks it against that digest, moves it into `data/samples/`, and prints its path. A later cut takes a key and an address of its own rather than replacing this one. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file, each data variable compressed with zlib and its `license` and `source` global attributes naming the `license` and the `dataset` the record pins, and it refuses the cut where the file is not the one `simulation` names or the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
+`mise fetch` runs `thermur fetch sample`, which downloads the file the table names from `host`, under a key carrying its digest, checks it against that digest, moves it into `data/samples/`, and prints its path. A later cut takes a key and an address of its own rather than replacing this one. `thermur cut sample` writes the same file from the full `wrfout_W5F7R4` the dataset publishes, cropping it to the snapshots `times_s` pins under the crop below and writing it as one NetCDF-4 file whose data variables are each compressed with zlib and whose `license` and `source` global attributes carry the `license`, the `simulation`, and the `dataset` the record pins, and it refuses the cut where the file is not the one `simulation` names or the window misses any figure the table pins. The table is written from the record the package pins the sample in, and `mise render` rewrites it.
 
 <!-- sample -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
 | `burning_m2` | `[1272000.0, 1443200.0]` |  | The area of the cells whose ground heat flux shows burning, in the first snapshot and in the last, in square meters |
-| `dataset` | `https://doi.org/10.20383/102.0314` |  | The DOI of the WRF-SFIRE LES Synthetic Wildfire Plume Dataset, which Nadya Moisseeva and Roland Stull publish and the sample is cut from |
-| `digest` | `1c5a78ff6997c40b18b8ac80e47f2886c15f4f50f53ee7521fffbf9edbd28126` |  | The SHA-256 digest of the file |
+| `dataset` | `WRF-SFIRE LES Synthetic Wildfire Plume Dataset by Nadya Moisseeva and Roland Stull, https://doi.org/10.20383/102.0314` |  | The credit of the dataset the sample is cut from, naming its title, its creators, and its DOI |
+| `digest` | `620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09` |  | The SHA-256 digest of the file |
 | `file` | `wrf_sample.nc` |  | The file the bucket serves the sample as, under the name the fetch writes it by |
 | `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
 | `host` | `https://data.thermur.fyi` |  | The address of the public Cloudflare R2 bucket serving the file, on its custom domain |
 | `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |
 | `length_m` | `20000.0` | above 0 | The length of the domain the output covers from west to east, in meters |
-| `license` | `CC BY 4.0` |  | The license the dataset is published under, which the sample stays under |
+| `license` | `CC BY 4.0, https://creativecommons.org/licenses/by/4.0/` |  | The license the dataset is published under, which the sample stays under |
 | `simulation` | `wrfout_W5F7R4` |  | The output of the plume dataset the sample is cut from |
 | `timeout_s` | `60.0` | above 0 | The longest the download waits on the connection or on one read, in seconds |
 | `times_s` | `[4680.0, 4695.0, 4710.0, 4725.0, 4740.0, 4755.0, 4770.0, 4785.0, 4800.0]` |  | The time of each snapshot the output holds, in seconds since the simulation started |

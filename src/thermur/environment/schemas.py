@@ -246,15 +246,18 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     snapshot and in the last, in square meters.
     """
 
-    dataset: str = "https://doi.org/10.20383/102.0314"
+    dataset: str = (
+        "WRF-SFIRE LES Synthetic Wildfire Plume Dataset by Nadya Moisseeva and "
+        "Roland Stull, https://doi.org/10.20383/102.0314"
+    )
     """
-    The DOI of the WRF-SFIRE LES Synthetic Wildfire Plume Dataset, which
-    Nadya Moisseeva and Roland Stull publish and the sample is cut from.
+    The credit of the dataset the sample is cut from, naming its title, its
+    creators, and its DOI.
     """
 
     digest: Annotated[str, Field(
         pattern = r"^[0-9a-f]{64}$"
-    )] = "1c5a78ff6997c40b18b8ac80e47f2886c15f4f50f53ee7521fffbf9edbd28126"
+    )] = "620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09"
     """
     The SHA-256 digest of the file.
     """
@@ -286,7 +289,7 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The length of the domain the output covers from west to east, in meters.
     """
 
-    license: str = "CC BY 4.0"
+    license: str = "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/"
     """
     The license the dataset is published under, which the sample stays
     under.
@@ -324,16 +327,12 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     def attributes(self) -> dict[str, str]:
         """
         Composes the global attributes a written sample carries, its
-        `license` and its `source`, which names `simulation` and the
-        dataset's creators and DOI.
+        `license` and its `source`, which names `simulation` and credits
+        `dataset`.
         """
         return {
             "license" : self.license,
-            "source"  : (
-                f"Cut from {self.simulation} of the WRF-SFIRE LES Synthetic "
-                f"Wildfire Plume Dataset by Nadya Moisseeva and Roland Stull, "
-                f"{self.dataset}"
-            )
+            "source"  : f"Cut from {self.simulation} of the {self.dataset}"
         }
 
     @property

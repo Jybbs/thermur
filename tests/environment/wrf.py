@@ -240,7 +240,9 @@ def test_a_cut_is_written_compressed_and_reads_back_as_the_output_cut(
         assert written.XTIME.values.tolist() == [0.0, 0.25, 0.5]
         assert written.XTIME.attrs["description"] == "minutes since simulation start"
         assert written.attrs["BOTTOM-TOP_GRID_DIMENSION"].dtype == "int32"
-        assert written.attrs["license"] == "CC BY 4.0"
+        assert written.attrs["license"] == (
+            "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/"
+        )
         assert written.attrs["source"] == (
             "Cut from wrfout_W5F7R4 of the WRF-SFIRE LES Synthetic Wildfire Plume "
             "Dataset by Nadya Moisseeva and Roland Stull, "

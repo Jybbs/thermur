@@ -267,7 +267,7 @@ def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():
         param(
             Sample(),
             "https://data.thermur.fyi/samples/"
-            "1c5a78ff6997c40b18b8ac80e47f2886c15f4f50f53ee7521fffbf9edbd28126/"
+            "620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09/"
             "wrf_sample.nc",
             id = "the-pinned-sample"
         ),
@@ -293,18 +293,18 @@ def test_a_sample_addresses_its_file_under_a_key_carrying_its_digest(
 def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
     """
     Asserts that the attributes a written sample carries name its license
-    and, as its source, the simulation and the dataset's DOI the sample
-    holds.
+    and, as its source, the simulation and the credit of the dataset the
+    sample holds, crediting no creator the dataset does not name.
     """
     assert Sample(
-        dataset    = "https://doi.org/10.0000/test",
+        dataset    = "Test Dataset by A. Author, https://doi.org/10.0000/test",
         license    = "CC0 1.0",
         simulation = "wrfout_W3F1R0"
     ).attributes == {
         "license" : "CC0 1.0",
         "source"  : (
-            "Cut from wrfout_W3F1R0 of the WRF-SFIRE LES Synthetic Wildfire Plume "
-            "Dataset by Nadya Moisseeva and Roland Stull, https://doi.org/10.0000/test"
+            "Cut from wrfout_W3F1R0 of the Test Dataset by A. Author, "
+            "https://doi.org/10.0000/test"
         )
     }
 
