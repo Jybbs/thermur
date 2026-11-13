@@ -765,6 +765,16 @@ def test_a_document_reads_the_value_its_suffix_names(
             id = "tagged-scalar"
         ),
         param(
+            "a: !!bool foo\n",
+            "could not read 'foo' as the tag 'tag:yaml.org,2002:bool'",
+            id = "mistyped-scalar"
+        ),
+        param(
+            "a: !!int ''\n",
+            "could not read '' as the tag 'tag:yaml.org,2002:int'",
+            id = "empty-tagged-scalar"
+        ),
+        param(
             "a: !!map [x]\n",
             "expected a mapping node, but found sequence",
             id = "tagged-sequence"

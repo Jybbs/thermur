@@ -52,12 +52,13 @@ from pydantic               import (
     field_validator,
     model_validator
 )
-from re           import MULTILINE, compile as regex, escape, findall, fullmatch, match, search, sub, subn
-from tomllib      import loads
-from typing       import Annotated, Self
-from urllib.parse import urlsplit
-from yaml         import MappingNode, MarkedYAMLError, Node, SafeLoader, ScalarNode, load
-from yaml.reader  import ReaderError
+from re               import MULTILINE, compile as regex, escape, findall, fullmatch, match, search, sub, subn
+from tomllib          import loads
+from typing           import Annotated, Self
+from urllib.parse     import urlsplit
+from yaml             import MappingNode, MarkedYAMLError, Node, SafeLoader, load
+from yaml.constructor import ConstructorError
+from yaml.reader      import ReaderError
 
 type Dependency = Annotated[Requirement, PlainValidator(Requirement)]
 type FrozenJson = frozendict[str, FrozenJson] | list[FrozenJson] | Scalar | None
@@ -130,7 +131,7 @@ def read_names(needs: str | list[str]) -> list[str]:
     return [needs] if isinstance(needs, str) else needs
 
 
-def read_pairs[V](pairs: list[tuple[str, V]]) -> dict[str, V]:
+def read_pairs[K: Hashable, V](pairs: list[tuple[K, V]]) -> dict[K, V]:
     """
     Builds one mapping out of key and value pairs, such as the rows of a
     table or the members of a JSON object.
@@ -203,9 +204,9 @@ class TextLoader(SafeLoader):
         mapping a `<<` key names.
 
         Raises:
-            ValueError: Naming each hashable scalar key the mapping itself
-                        names more than once, leaving out the keys a merge
-                        brings in.
+            ValueError: Naming each hashable key the mapping itself names
+                        more than once, leaving out the keys a merge brings
+                        in.
         """
         if isinstance(node, MappingNode):
             read_pairs(
@@ -214,14 +215,30 @@ class TextLoader(SafeLoader):
                     for key in (
                         self.construct_object(key)
                         for key, _ in node.value
-                        if isinstance(key, ScalarNode)
-                        and key.tag != "tag:yaml.org,2002:merge"
+                        if key.tag != "tag:yaml.org,2002:merge"
                     )
                     if isinstance(key, Hashable)
                 ]
             )
 
         return super().construct_mapping(node, deep=deep)
+
+    def construct_object(self, node: Node, deep: bool = False) -> object:
+        """
+        Builds the object `node` holds as `SafeLoader` does.
+
+        Raises:
+            ConstructorError: Naming the text and the tag of a scalar whose
+                              text the tag's constructor cannot read, such
+                              as `!!bool foo` or an empty `!!int`.
+        """
+        try:
+            return super().construct_object(node, deep=deep)
+        except LookupError as error:
+            raise ConstructorError(
+                problem      = f"could not read {node.value!r} as the tag {node.tag!r}",
+                problem_mark = node.start_mark
+            ) from error
 
 
 def read_versions(packages: Iterable[dict]) -> dict[str, str]:
