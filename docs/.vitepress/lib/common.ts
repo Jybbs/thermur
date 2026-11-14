@@ -71,13 +71,18 @@ export function heightAt({ amplitude, base, periods, phases }: Ridge, x: number)
 }
 
 /**
+ * Reads the value `share` of the way from `from` to `to`.
+ */
+export const lerp = (from: number, to: number, share: number): number => from + (to - from) * share
+
+/**
  * Lays `share` of the color `over` across the color `base`, channel by channel
  * in sRGB, the share held between 0 and 1.
  */
 export function mix(base: string, over: string, share: number): string {
   const [from, to] = [channels(base), channels(over)]
   const weight     = clamp(share)
-  const mixed      = from.map((channel, index) => Math.round(channel + (to[index]! - channel) * weight))
+  const mixed      = from.map((channel, index) => Math.round(lerp(channel, to[index]!, weight)))
   return `#${mixed.map(channel => channel.toString(16).padStart(2, '0')).join('')}`
 }
 

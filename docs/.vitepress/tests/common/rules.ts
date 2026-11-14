@@ -18,7 +18,7 @@ export interface Charted {
 /**
  * Mounts `component` into the document at `width` pixels across, its motion
  * running or standing still for a reader who prefers reduced motion, and
- * returns it beside what moves the box to another width and draws it again.
+ * returns it beside what moves every box to another width and draws it again.
  */
 export function charted(component: Component, width: number, reduced = false): Charted {
   const stand = browser(reduced)
@@ -29,7 +29,7 @@ export function charted(component: Component, width: number, reduced = false): C
   const host   = widget.element as HTMLElement
   const widen  = (next: number): void => {
     across = next
-    stand.reflow(host)
+    stand.reflow()
   }
   widen(width)
   return { host, stand, widen, widget }

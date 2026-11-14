@@ -1,3 +1,4 @@
+import { Slider }                              from '@thermur/kit'
 import { withBase }                            from 'vitepress'
 import { type VNode, defineComponent, h, ref } from 'vue'
 
@@ -64,17 +65,16 @@ export default defineComponent({
     return () => h('figure', { class: 'identity-marks', style: { '--th-dusk': `${dusk.value}%` } }, [
       h('div', { class: 'identity-cards' },
         (Object.keys(source.marks) as MarkKind[]).map(kind => markCard(kind))),
-      h('label', { class: 'identity-dusk' }, [
-        h('span', { class: 'identity-caps' }, 'Light'),
-        h('input', {
-          'aria-label' : 'Where dusk falls across the marks',
-          'max'        : 100,
-          'min'        : 0,
-          'onInput'    : (event: Event) => (dusk.value = (event.target as HTMLInputElement).valueAsNumber),
-          'type'       : 'range',
-          'value'      : dusk.value
+      h('div', { class: 'identity-dusk' }, [
+        h('span', { 'aria-hidden': 'true', 'class': 'identity-caps' }, 'Light'),
+        h(Slider, {
+          label    : 'Where dusk falls across the marks',
+          max      : 100,
+          min      : 0,
+          value    : dusk.value,
+          onChange : (share: number) => dusk.value = share
         }),
-        h('span', { class: 'identity-caps' }, 'Dark')
+        h('span', { 'aria-hidden': 'true', 'class': 'identity-caps' }, 'Dark')
       ])
     ])
   }

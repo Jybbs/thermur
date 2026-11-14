@@ -1,0 +1,16 @@
+{
+  "name": "Copy",
+  "exports": [
+    "heard",
+    "useCopy"
+  ],
+  "machine": null,
+  "when": "A press copies a value to the clipboard, as each color, face, and step of the heat ramp on The Visual Identity does",
+  "replaces": "The copier the identity's widgets read from the specimen helpers, the words each of them set out of sight for a screen reader, and the fuse The Visual Identity's sheet burned beneath a copied value",
+  "examples": [
+    {
+      "name": "The Heat Ramp",
+      "says": "A press copies the step's hex and burns a fuse in that color beneath it, and a second press starts the fuse over."
+    }
+  ]
+}

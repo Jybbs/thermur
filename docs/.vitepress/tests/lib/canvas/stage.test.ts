@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { pause }                    from '@thermur/kit'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { Geometry, Part }                         from '../../../lib/canvas/part.ts'
@@ -108,19 +109,31 @@ describe('the stage’s fit', () => {
 })
 
 describe('the stage’s motion', () => {
-  it('steps and paints its parts on each frame while it is seen and motion runs', () => {
+  it('steps and paints its parts on each frame while it is seen and motion runs, a stalled frame counting as a twentieth of a second', () => {
     const { drawn, stage, stand } = staged()
     stand.see(true)
-    stand.frames.run(3, 1000)
+    stand.frames.run(1)
+    stand.frames.run(2, 1000)
     expect(drawn.step).toHaveBeenCalledTimes(3)
     expect(drawn.painted).toHaveLength(4)
-    expect(vi.mocked(drawn.step!).mock.calls.map(([dt]) => dt)).toEqual([1 / 60, 0.05, 0.05])
+    expect(vi.mocked(drawn.step!).mock.calls.map(([dt]) => dt)).toEqual([0.016, 0.05, 0.05])
     const painted = drawn.painted.length
     point(window, { clientX: 40, clientY: 50 })
     document.documentElement.dispatchEvent(new Event('pointerleave'))
     window.dispatchEvent(new Event('scroll'))
     expect(drawn.painted).toHaveLength(painted)
+    stage.destroy()
+  })
+
+  it('holds no frame once its canvas leaves the screen, and runs again once it comes back', () => {
+    const { drawn, stage, stand } = staged()
+    stand.see(true)
+    stand.frames.run(1)
     stand.see(false)
+    expect(stand.held().frames).toBe(0)
+    stand.frames.run(2)
+    expect(drawn.step).toHaveBeenCalledOnce()
+    stand.see(true)
     stand.frames.run(2)
     expect(drawn.step).toHaveBeenCalledTimes(3)
     stage.destroy()
@@ -143,7 +156,7 @@ describe('the stage standing still', () => {
     window.dispatchEvent(new Event('scroll'))
     point(window, { clientX: 40, clientY: 50 })
     document.documentElement.classList.add('dark')
-    stand.mutate()
+    stand.mutate('class')
     window.scrollTo(0, 200)
     window.dispatchEvent(new Event('scroll'))
     document.documentElement.dispatchEvent(new Event('pointerleave'))
@@ -158,6 +171,20 @@ describe('the stage standing still', () => {
 })
 
 describe('the stage standing still and moving again', () => {
+  it('paints one still frame and holds none once the page’s pause turns on while it runs', () => {
+    const { drawn, stage, stand } = staged()
+    stand.see(true)
+    stand.frames.run(1)
+    pause(true)
+    stand.mutate('data-paused')
+    expect(drawn.painted.at(-1)!.still).toBe(true)
+    expect(stand.held().frames).toBe(0)
+    stand.frames.run(2)
+    expect(drawn.step).toHaveBeenCalledOnce()
+    pause(false)
+    stage.destroy()
+  })
+
   it('stands still while the page’s pause is on and runs again once it is off', () => {
     const { drawn, stage, stand } = staged()
     stand.see(true)

@@ -7,4 +7,4 @@
 format=default
 [[ -z "${GITHUB_ACTIONS:-}" ]] || format=github
 
-node_modules/.bin/oxlint --config .vitepress/.oxlintrc.json --format "$format" "$@" .vitepress
+node_modules/.bin/oxlint --config .vitepress/.oxlintrc.json --format "$format" "$@" .vitepress kit

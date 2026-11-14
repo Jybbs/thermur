@@ -22,10 +22,19 @@ interface Mounted {
 const DEFAULTS = 'These are the defaults, so there is nothing to set.'
 
 /**
- * Picks the choice named `name` from menu `index`.
+ * Opens menu `index` and picks the choice named `name` from its list.
  */
-const pick = (widget: VueWrapper, index: number, name: string): Promise<void> =>
-  widget.findAll('select')[index]!.setValue(name)
+async function pick(widget: VueWrapper, index: number, name: string): Promise<void> {
+  const menu = widget.findAll('.kit-select')[index]!
+  await menu.get('[role=combobox]').trigger('click')
+  await menu.findAll('[role=option]').find(option => option.text() === name)!.trigger('click')
+}
+
+/**
+ * Reads the choice each menu shows.
+ */
+const shown = (widget: VueWrapper): string[] =>
+  widget.findAll('.kit-select-words [data-picked]').map(choice => choice.text())
 
 /**
  * Mounts the widget into the document with the frames running, or standing
@@ -48,8 +57,10 @@ afterEach(() => {
 describe('the widget’s markup', () => {
   it('reads as one sentence of three named menus over the record’s floor', () => {
     const { widget } = mounted(true)
-    const labels     = widget.findAll('select').map(menu => menu.attributes('aria-label'))
+    const labels     = widget.findAll('[role=combobox]').map(menu =>
+      document.querySelector(`[id="${menu.attributes('aria-labelledby')!}"]`)?.textContent)
     expect(labels).toEqual(['Where along the ground', 'When', 'How high'])
+    expect(shown(widget)).toEqual(['the whole domain', 'every snapshot', '500 m'])
     expect(widget.get('.crop-sentence').element.childNodes[4]?.textContent).toBe(', from 20 m up to ')
     expect(widget.get('.crop-sentence').text()).toMatch(/^Read .* for .*, from 20 m up to .*\.$/su)
   })
@@ -70,7 +81,7 @@ describe('the widget’s markup', () => {
 
   it('renders its words and menus on the server, with no canvas or observer', async () => {
     const html = await renderToString(createSSRApp(CropKept))
-    expect(html).toContain('aria-label="How high"')
+    expect(html).toContain('How high')
     expect(html).toContain(DEFAULTS)
     expect(html).not.toContain('<canvas')
   })
@@ -113,8 +124,7 @@ describe('a pick', () => {
     const { widget } = mounted(true)
     await pick(widget, 2, '200 m')
     await pick(widget, 0, 'the western half')
-    const picks = widget.findAll('select').map(({ element }) => element.selectedIndex)
-    expect(picks).toEqual([1, 0, 1])
+    expect(shown(widget)).toEqual(['the western half', 'every snapshot', '200 m'])
   })
 })
 

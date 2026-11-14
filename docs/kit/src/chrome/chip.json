@@ -1,0 +1,15 @@
+{
+  "name": "Chip",
+  "exports": [
+    "Chip"
+  ],
+  "machine": null,
+  "when": "A drawing reads a value out beside its name, as the threat's front reads the time and the neighbors read the seventh's distance",
+  "replaces": "The threat's outlined chip and the filled chip the neighbors' header built by hand",
+  "examples": [
+    {
+      "name": "A Reading Over a Front",
+      "says": "Each step writes a new value into the chip, which stands at the width of its longest value, so the row beside it never moves."
+    }
+  ]
+}

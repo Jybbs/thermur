@@ -7,6 +7,12 @@ import * as common from '../../lib/common.ts'
  */
 const draws = (seed: number): number[] => Array.from({ length: 64 }, common.mulberry(seed))
 
+describe('lerp', () => {
+  it.each([[0, 2], [0.25, 3], [1, 6], [1.5, 8]])('reads the value %d of the way from 2 to 6 as %d', (share, value) => {
+    expect(common.lerp(2, 6, share)).toBe(value)
+  })
+})
+
 describe('mix', () => {
   it.for([[0, '#000000'], [0.5, '#808080'], [1, '#ffffff'], [-1, '#000000'], [2, '#ffffff']] as const)(
     'lays a share of %d of white over black as %s',

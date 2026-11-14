@@ -1,0 +1,48 @@
+.kit-fuse {
+  --shown  : color-mix(in oklab, var(--copied, var(--th-lead)) 78%, var(--th-ink));
+  position : relative;
+}
+
+.kit-fuse::after {
+  background       : linear-gradient(90deg, color-mix(in oklab, var(--shown) 30%, transparent), var(--shown));
+  border-radius    : 2px;
+  bottom           : -4px;
+  content          : '';
+  height           : 2px;
+  left             : 0;
+  opacity          : 0;
+  pointer-events   : none;
+  position         : absolute;
+  right            : 0;
+  transform        : scaleX(0);
+  transform-origin : left;
+  transition       : opacity calc(var(--th-settle) * 3) var(--th-settle-curve),
+                     transform 0s linear calc(var(--th-settle) * 3);
+}
+
+[data-copied] .kit-fuse::after {
+  opacity    : 1;
+  transform  : scaleX(1);
+  transition : opacity 0s, transform calc(var(--th-settle) * 3) var(--th-settle-curve);
+}
+
+[data-copied] .kit-fuse::before {
+  animation      : kit-spark calc(var(--th-settle) * 3) var(--th-settle-curve) both;
+  background     : var(--shown);
+  border-radius  : 50%;
+  bottom         : -6px;
+  box-shadow     : 0 0 8px 2px color-mix(in oklab, var(--shown) 60%, transparent);
+  content        : '';
+  height         : 6px;
+  left           : 0;
+  margin-left    : -3px;
+  pointer-events : none;
+  position       : absolute;
+  width          : 6px;
+}
+
+@keyframes kit-spark {
+  from { left: 0; opacity: 1; }
+  85%  { opacity: 1; }
+  to   { left: 100%; opacity: 0; }
+}

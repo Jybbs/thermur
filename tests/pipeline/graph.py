@@ -16,6 +16,7 @@ from decimal         import Decimal
 from enum            import IntEnum, StrEnum
 from equinox         import Module
 from functools       import partial
+from gc              import collect
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
 from importlib      import import_module
 from jax            import Array, numpy
@@ -24,6 +25,8 @@ from numpy          import float32, int32, int64, ones, zeros
 from pathlib        import Path
 from pydantic       import BaseModel, HttpUrl, create_model
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
+from sqlite3        import connect
+from threading      import Thread
 from unittest.mock  import Mock
 from uuid           import UUID
 from xarray         import DataArray, DataTree, Dataset, open_dataset
@@ -31,6 +34,7 @@ from xarray.testing import assert_identical
 
 from thermur.controller.components import Constant
 from thermur.pipeline.graph    import (
+    CacheConnection,
     Graph,
     NetcdfReader,
     NetcdfTreeReader,
@@ -320,6 +324,24 @@ def test_a_failed_save_raises_its_own_error_where_the_run_began(
     assert Path.cwd() == clone.root
 
 
+def test_a_freed_cache_connection_releases_the_lock_it_held(tmp_path: Path):
+    """
+    Asserts that a `CacheConnection` freed by a collection on another thread
+    closes, releasing the lock its open transaction held.
+    """
+    database = tmp_path / "store.db"
+    held     = connect(database, check_same_thread=False, factory=CacheConnection)
+    held.execute("begin exclusive")
+    cycle = [held]
+    cycle.append(cycle)
+    del cycle, held
+    collector = Thread(target=collect)
+    collector.start()
+    collector.join()
+
+    connect(database, factory=CacheConnection, timeout=0).execute("begin exclusive")
+
+
 def test_a_graph_reads_every_subpackage_s_steps_by_default(
     clone        : Checkout,
     pytestconfig : Config
@@ -410,6 +432,25 @@ def test_a_recorded_run_keeps_its_record_beside_each_table_it_computes(
     assert folder.parent == clone.root / "data" / "runs" / "thermur"
     with open_dataset(folder / "table.nc", engine="netcdf4") as saved:
         assert_identical(saved, results["table"])
+
+
+def test_a_run_leaves_no_connection_for_a_collection_on_another_thread(
+    graphed: Callable[..., Graph]
+):
+    """
+    Asserts that a collection on another thread, such as the thread a
+    trial step's host callback runs on, frees a computed graph without
+    an unraisable exception, the graph held in a reference cycle so that
+    collection alone frees it.
+    """
+    graph = graphed()
+    graph.compute("table")
+    cycle = [graph]
+    cycle.append(cycle)
+    del cycle, graph
+    collector = Thread(target=collect)
+    collector.start()
+    collector.join()
 
 
 def test_a_tagged_handler_fingerprints_each_type_its_annotation_names():

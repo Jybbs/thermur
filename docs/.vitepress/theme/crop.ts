@@ -1,3 +1,4 @@
+import { Select }                                        from '@thermur/kit'
 import { type VNode, computed, defineComponent, h, ref } from 'vue'
 
 import { useStage }   from '../lib/canvas/mount.ts'
@@ -9,7 +10,8 @@ import * as sentence  from '../lib/crop/sentence.ts'
 /**
  * How much of an output the graph reads, set through three menus inside one
  * sentence, under a strip sketching the part kept and over the lines the picks
- * write.
+ * write. Each menu stands at the width of its widest choice, so no pick moves
+ * the words around it.
  */
 export default defineComponent({
   name: 'CropKept',
@@ -18,7 +20,6 @@ export default defineComponent({
     const menus = sentence.menusOf(kept)
     const picks = ref(menus.map(() => 0))
     const lines = computed(() => sentence.linesOf(menus, picks.value))
-    const words = sentence.useHeldHeight()
     let stage: Stage | undefined
     const host  = useStage(box => {
       stage = drawKept(box, kept)
@@ -26,17 +27,20 @@ export default defineComponent({
     })
     const menu  = (index: number): VNode => {
       const { choices, label } = menus[index]!
-      const onChange           = (event: Event): void => {
-        const { selectedIndex } = event.target as HTMLSelectElement
-        choices[selectedIndex]!.apply()
-        picks.value[index] = selectedIndex
-        stage?.repaint()
-      }
-      return h('select', { 'aria-label': label, onChange }, choices.map(({ name }) => h('option', name)))
+      return h(Select, {
+        choices  : choices.map(({ name }) => name),
+        label,
+        picked   : picks.value[index]!,
+        onChange : (place: number) => {
+          choices[place]!.apply()
+          picks.value[index] = place
+          stage?.repaint()
+        }
+      })
     }
     return () => h('figure', { class: 'crop-kept' }, [
       h('div', { 'aria-hidden': 'true', 'class': 'crop-canvas', 'ref': host }),
-      h('p', { class: 'crop-sentence', ref: words }, [
+      h('div', { class: 'crop-sentence' }, [
         'Read ', menu(0), ' for ', menu(1), `, from ${kept.model.floor_m} m up to `, menu(2), '.'
       ]),
       h('div', {

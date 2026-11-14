@@ -3,6 +3,7 @@ import IdentityFaces   from './identity/faces.ts'
 import IdentityHeat    from './identity/heat.ts'
 import IdentityMarks   from './identity/marks.ts'
 import IdentityPalette from './identity/palette.ts'
+import KitCatalog      from './kit/catalog.ts'
 import RulesNeighbors  from './rules/neighbors.ts'
 import RulesReach      from './rules/reach.ts'
 import RulesSpacing    from './rules/spacing.ts'
@@ -17,6 +18,7 @@ export const COMPONENTS = {
   IdentityHeat,
   IdentityMarks,
   IdentityPalette,
+  KitCatalog,
   RulesNeighbors,
   RulesReach,
   RulesSpacing,

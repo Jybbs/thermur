@@ -7,7 +7,7 @@ import { shadeOf }                    from '../../../lib/identity.ts'
 import { drawThreat }                 from '../../../lib/threat/drawing.ts'
 import { Front }                      from '../../../lib/threat/front.ts'
 import { Playback }                   from '../../../lib/threat/playback.ts'
-import type { Readout }               from '../../../lib/threat/readings.ts'
+import { type Readout, spoken }       from '../../../lib/threat/readings.ts'
 import { visible }                    from '../../../lib/threat/shades.ts'
 import { type Browser, box, browser } from '../../common/browser.ts'
 
@@ -31,10 +31,11 @@ function drawn(reduced = false, seen = true): Drawn {
   const front    = new Front()
   const playback = new Playback(front)
   const readout  = {
+    aim   : { value: 0 },
     first : document.createElement('span'),
     front : document.createElement('span'),
     last  : document.createElement('span'),
-    rail  : document.createElement('input'),
+    rail  : document.createElement('div'),
     time  : document.createElement('span')
   }
   drawThreat(front, host, playback, readout)
@@ -91,8 +92,11 @@ describe('a plot in motion', () => {
     expect(readout.time.textContent).toBe('50 s')
     expect(readout.front.textContent).toBe('50 m')
     expect(readout.last.textContent).toBe('299.9 K')
-    expect(readout.rail.getAttribute('aria-valuetext')).toBe('50 seconds, the front 50 meters east')
-    expect(readout.rail.value).toBe('50')
+    expect(readout.aim.value).toBe(50)
+  })
+
+  it('words a time for a screen reader beside how far east the front stands', () => {
+    expect(spoken(new Front(), 50)).toBe('50 seconds, the front 50 meters east')
   })
 
   it('writes a chip only as its value changes', () => {

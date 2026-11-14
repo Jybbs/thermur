@@ -1,0 +1,15 @@
+{
+  "name": "Radios",
+  "exports": [
+    "Radios"
+  ],
+  "machine": "radio-group",
+  "when": "A reader picks one of a few choices, as the neighbors pick the pointer's mode and the heading chart picks the first drone's turn on its rim",
+  "replaces": "The radio group the neighbors' header built by hand and the radios the heading chart drew into its dial",
+  "examples": [
+    {
+      "name": "Three Winds",
+      "says": "The arrow keys move the pick around the group and wrap at either end, and the thumb slides beneath the radio that is on."
+    }
+  ]
+}
