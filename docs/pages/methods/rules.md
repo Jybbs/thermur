@@ -1,6 +1,6 @@
 # The Interaction Rules
 
-Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, the roost holding the flock over one place, and the speed control holding it near the cruise speed. Each slot holds a rule borrowed from another physical system, a starling flock, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it. In the flights below the anisotropic and the distance-weighted rates pass that test for the coupling and the delayed and the overdamped rules for the heading, and every slot still holds its default.
+Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, the roost holding the flock over one place, and the speed control holding it near the cruise speed. Each slot holds a rule borrowed from another physical system, a starling flock, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it. In the flights below the elastic springs and the fitted attraction pass that test for the cohesion, the anisotropic and the distance-weighted rates for the coupling, and the delayed and the overdamped rules for the heading, and every slot still holds its default.
 
 ## The Neighbors a Drone Senses
 
@@ -147,7 +147,7 @@ The chart below reads the share of the first drone's turn that the farthest of f
 
 <!-- reach -->
 
-Under every heading rule the farthest drones follow more than half of a 20° turn and under a sixth of a 90° one, the default reaching 0.58 and 0.13, the delayed rule 0.63 and 0.14, and the overdamped rule 0.68 and 0.15. The standard errors run near an eighth of the means, so four seeds leave the three rules within error of one another on either turn.
+Under every heading rule the farthest drones follow more than half of a 20° turn and under a sixth of a 90° one, the default reaching 0.59 and 0.13, the delayed rule 0.69 and 0.15, and the overdamped rule 0.73 and 0.16. The standard errors run between an eighth and a sixth of the means, so four seeds leave the three rules within error of one another on either turn.
 
 ## Coupling
 
@@ -172,7 +172,7 @@ The chart below reads the polarization each coupling rule held at each launch sp
 
 <!-- polarization -->
 
-The constant rule holds the polarization at 0.979 at the densest launch and 0.970 at the middle, falling to 0.935 at the sparsest, below the 0.96 of starling flocks. The anisotropic rule holds 0.999, 0.995, and 0.982 and the distance-weighted rule 0.998, 0.994, and 0.974, whereas the metric rule, dropping every neighbor past 25 m, falls from 0.991 to 0.906 as the flock thins. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
+The constant rule holds the polarization at 0.980 at the densest launch and 0.975 at the middle, falling to 0.947 at the sparsest, below the 0.96 of starling flocks. The anisotropic rule holds 0.9995, 0.998, and 0.986 and the distance-weighted rule 0.999, 0.996, and 0.978, whereas the metric rule, dropping every neighbor past 25 m, falls from 0.996 to 0.933 as the flock thins. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
 
 ## Noise
 
@@ -230,28 +230,28 @@ The figures below are the means across seeds that `thermur fly cohesion_trial co
 
 | **Slot** | **Rule** | **Measured** |
 |---|---|---|
-| Cohesion | Centered, the default | *3.00 groups at 30 drones and 5.75 at 100, border density 0.32 of the center's at 100, $`g(r)`$ peak 1.91 times its mean* |
-| Cohesion | Centroid spring | *3.25 groups at 30 and 6.50 at 100, border density 0.28, peak 2.01* |
-| Cohesion | Elastic springs | *3.00 groups at 30 and 5.50 at 100, border density 0.49, peak 2.88* |
-| Cohesion | Fitted attraction | *4.25 groups at 30 and 5.25 at 100, border density 0.55, peak 3.40* |
-| Cohesion | Coupling off | *25.75 groups at 30, polarization 0.80 to 0.81* |
-| Coupling | Constant, the default | *Polarization 0.979 at the densest launch, 0.970 at the middle, and 0.935 at the sparsest* |
-| Coupling | Anisotropic | *Polarization 0.999, 0.995, and 0.982* |
-| Coupling | Metric | *Polarization 0.991, 0.962, and 0.906* |
-| Coupling | Weighted by distance | *Polarization 0.998, 0.994, and 0.974* |
-| Heading | Consensus, the default | *The farthest drones turning through 0.58 of a 20° turn and 0.13 of a 90° one, polarization 0.970* |
-| Heading | Overdamped | *0.68 and 0.15, polarization 0.965* |
-| Heading | Delayed | *0.63 and 0.14, polarization 0.967* |
+| Cohesion | Centered, the default | *2.25 groups at 30 drones and 3.50 at 100, border density 0.26 of the center's at 100, $`g(r)`$ peak 2.46 times its mean* |
+| Cohesion | Centroid spring | *2.50 groups at 30 and 5.25 at 100, border density 0.40, peak 0.11* |
+| Cohesion | Elastic springs | *2.75 groups at 30 and 4.50 at 100, border density 0.96, peak 3.21* |
+| Cohesion | Fitted attraction | *2.50 groups at 30 and 4.25 at 100, border density 0.81, peak 2.45* |
+| Cohesion | Coupling off | *19.25 groups at 30, polarization 0.80 to 0.82* |
+| Coupling | Constant, the default | *Polarization 0.980 at the densest launch, 0.975 at the middle, and 0.947 at the sparsest* |
+| Coupling | Anisotropic | *Polarization 0.9995, 0.998, and 0.986* |
+| Coupling | Metric | *Polarization 0.996, 0.972, and 0.933* |
+| Coupling | Weighted by distance | *Polarization 0.999, 0.996, and 0.978* |
+| Heading | Consensus, the default | *The farthest drones turning through 0.59 of a 20° turn and 0.13 of a 90° one, polarization 0.975* |
+| Heading | Overdamped | *0.73 and 0.16, polarization 0.971* |
+| Heading | Delayed | *0.69 and 0.15, polarization 0.972* |
 | Noise | Zig, the default | *Polarization 0.976, 0.975, and 0.970 at 30, 100, and 200 drones, no spontaneous turn at 100* |
 | Noise | Intrinsic | *Polarization 0.20, 0.14, and 0.10, turning 0.08 times a second at 100* |
 | Noise | Persistent | *Polarization 0.22, 0.15, and 0.15, turning 0.07 times a second* |
 | Noise | Vectorial | *Polarization 0.18, 0.17, and 0.17, turning 0.11 times a second* |
 
-The default flock does not hold together at 100 drones over 60 s, splitting into 5.75 groups with its drones 16.4 m from their nearest neighbors against a launch spacing of 15 m, and it is less dense at its border than at its center, where starling flocks are denser at the border[^ballerini2008b]. Each candidate flies at the value its table gives, which the starling scale leaves as it is. The centroid spring pulls its drones to 8.4 m from their nearest neighbors at 100 drones and 17.5 m at 30, so its spacing changes with the flock's size by more than the default's, and the elastic springs' spacing does the same between 13.0 m and 21.6 m, so neither passes although the springs raise the peak of $`g(r)`$. The fitted attraction raises the border density and the peak of $`g(r)`$ but leaves the small flock in 4.25 groups against the default's 3.00, so it does not pass either.
+The default flock does not hold together at 100 drones over 60 s, splitting into 3.50 groups with its drones 14.1 m from their nearest neighbors against a launch spacing of 15 m, and it is less dense at its border than at its center, where starling flocks are denser at the border[^ballerini2008b]. Each candidate flies at the value its table gives, which the starling scale leaves as it is. The centroid spring pulls its drones to 7.0 m from their nearest neighbors at 100 drones and 11.6 m at 30 and lowers the peak of $`g(r)`$ to 0.11 times its mean, so it fails. The elastic springs raise the border density to 0.96 of the center's and the fitted attraction to 0.81, each by more than the error, with every other measurement within error of the default, so both pass.
 
-The anisotropic and the distance-weighted rates hold the polarization nearer one than the constant rate as the flock thins, and an alignment flatter across the ranks, so both pass, whereas the metric rule loses order at the sparsest launch and fails. The farthest drones follow each turn within error of the default under either candidate heading rule, and the delayed and the overdamped rules pass on a spontaneous polarization of 0.967 and 0.965, nearer the 0.96 of starling flocks than the default's 0.970. The speed of a turn reads 4.0 m/s under the default on the 20° turn and zero on the 90° one, where in no flight did three of the five shells of drones around the turning drone turn through half of the turn at distinct times, so no fit through their times gives an outward speed. The intrinsic and the vectorial noises and the persistent force each drive the polarization to 0.10 to 0.22 and break the flock into 29 to 180 groups, so no candidate noise passes.
+The anisotropic and the distance-weighted rates hold the polarization nearer one than the constant rate as the flock thins, and an alignment flatter across the ranks, so both pass, whereas the metric rule loses order at the sparsest launch and fails. The farthest drones follow each turn within error of the default under either candidate heading rule, and the delayed and the overdamped rules pass on a spontaneous polarization of 0.972 and 0.971, nearer the 0.96 of starling flocks than the default's 0.975. The speed of a turn reads 4.1 m/s under the default on the 20° turn and zero on the 90° one, where in no flight did three of the five shells of drones around the turning drone turn through half of the turn at distinct times, so no fit through their times gives an outward speed. The intrinsic and the vectorial noises and the persistent force each drive the polarization to 0.10 to 0.22 and break the flock into 29 to 180 groups, so no candidate noise passes.
 
-On every replayed flight the composite that flew it ranks first by one-step log-likelihood or ties for first. The margin over the default reaches 0.04 to 0.06 where a spring pulls toward the neighbors, 0.01 under the fitted attraction and on the flight flown with the coupling off, and 0.03 to 0.07 under a candidate coupling, since at one 0.02 s step per frame the Brownian increment dominates each step's residual. The heading rules tie, and so do the noises, because the replay reads only the drift.
+On every replayed flight the composite that flew it ranks first by one-step log-likelihood or ties for first. The margin over the default reaches 0.04 to 0.06 where a spring pulls toward the neighbors, 0.01 under the fitted attraction and on the flight flown with the coupling off, and 0.03 to 0.07 under a candidate coupling, since at one 0.02 s step per frame the Brownian increment dominates each step's residual. The heading rules tie, and so do the default, intrinsic, and vectorial noises, because the replay reads only the drift, whereas on the flight flown with the persistent force its own composite ranks first by 6.70.
 
 [^ballerini2008a]: Ballerini et al. 2008. "Interaction ruling animal collective behavior depends on topological rather than metric distance: Evidence from a field study." *Proceedings of the National Academy of Sciences* 105(4): 1232–1237. <https://doi.org/10.1073/pnas.0711437105>
 
