@@ -156,6 +156,15 @@ class Grid(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         return DataArray(arange(self.levels + 1) * self.level_m, dims="bottom_top_stag")
 
     @property
+    def extent_m(self) -> tuple[float, float, float]:
+        """
+        Measures the domain east from its western edge, north from its
+        southern one, and up from the ground to its top level's face, in
+        meters.
+        """
+        return (self.length_m, self.rows * self.spacing_m, self.levels * self.level_m)
+
+    @property
     def heights(self) -> DataArray:
         """
         Places each model level's center above the ground, in meters, along

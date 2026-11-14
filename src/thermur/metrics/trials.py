@@ -16,13 +16,13 @@ from xarray      import DataArray, Dataset, concat
 from thermur.controller.components import (
     Anisotropic,
     Centroid,
-    Consensus,
     Constant,
     Delayed,
     Elastic,
     Fitted,
     Intrinsic,
     Metric,
+    Overdamped,
     Persistent,
     Vectorial,
     Weighted
@@ -264,7 +264,7 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
                 slot = "coupling"
             ),
             cls(
-                candidates = {"consensus": Consensus(), "delayed": Delayed()},
+                candidates = {"delayed": Delayed(), "overdamped": Overdamped()},
                 conditions = {
                     "large"       : {"frame_every": 5, "turn_deg": 90.0},
                     "small"       : {"frame_every": 5, "turn_deg": 20.0},

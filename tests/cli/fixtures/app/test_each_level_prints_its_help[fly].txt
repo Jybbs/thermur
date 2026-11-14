@@ -6,6 +6,30 @@ Flies the flock, or computes the steps of the graph named.
 │ STEPS  Each step of the graph to compute.                                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ --arena.braking-m-s2 FLOAT    The acceleration of the braking curve, in      │
+│                               meters per second squared, the model's         │
+│                               optimized wall acceleration for a flock at 8   │
+│                               meters per second. [default: 4.18]             │
+│ --arena.extent-m FLOAT FLOAT  The box's far corner east, north, and above    │
+│   FLOAT                       the ground, in meters, its near corner at the  │
+│   --arena.empty-extent-m      origin, by default the parametric threat's     │
+│                               grid. [default: (4000.0, 2000.0, 600.0)]       │
+│ --arena.gain-per-s FLOAT      The slope of the braking curve's linear part   │
+│                               near the wall, in reciprocal seconds, the      │
+│                               model's optimized wall gain for a flock at 8   │
+│                               meters per second. [default: 8.12]             │
+│ --arena.offset-m FLOAT        The distance inside each face at which the     │
+│                               braking curve stops, in meters, the model's    │
+│                               optimized wall offset for a flock at 8 meters  │
+│                               per second. [default: 0.1]                     │
+│ --arena.relaxation-s FLOAT    The time over which the drone's velocity       │
+│                               relaxes toward the shill's excess, in seconds, │
+│                               the model's velocity relaxation time.          │
+│                               [default: 1.0]                                 │
+│ --arena.shill-m-s FLOAT       The speed of each shill agent into the box, in │
+│                               meters per second, the model's optimized shill │
+│                               speed for a flock at 8 meters per second.      │
+│                               [default: 22.8]                                │
 │ --cohesion.blind-deg FLOAT    The angle behind the drone within which a      │
 │                               neighbor is left out, in degrees, by default   │
 │                               the model's 45 degrees to either side.         │
@@ -59,6 +83,13 @@ Flies the flock, or computes the steps of the graph named.
 │ --crop.y-m FLOAT FLOAT        The southernmost and the northernmost mass     │
 │   --crop.empty-y-m            point kept, in meters from the domain's        │
 │                               southern edge, or None to keep every row.      │
+│ --heading.centering FLOAT     The rate at which a drone's velocity relaxes   │
+│                               toward its neighbors' mean, as a share of the  │
+│                               coupling's mean rate per neighbor, by default  │
+│                               the source's aggregation strength of 0.01 over │
+│                               its alignment strength of 50 per neighbor, so  │
+│                               it carries to any scale the coupling does.     │
+│                               [default: 0.0002]                              │
 │ --noise.amplitude FLOAT       The amplitude, in meters per second per root   │
 │                               second, at a starling's scale, by default the  │
 │                               noise that leaves a flock aligning at          │
@@ -101,6 +132,11 @@ Flies the flock, or computes the steps of the graph named.
 │                               vmap. [default: 4]                             │
 │ --plan.settled-s FLOAT        The start of the flight a statistic leaves     │
 │                               out, in seconds. [default: 20.0]               │
+│ --plan.shape-every-s FLOAT    The time between the frames a flight's shape   │
+│                               is averaged over, in seconds, by default the   │
+│                               second between the measurements a study of the │
+│                               starling model averages a flock's shape over.  │
+│                               [default: 1.0]                                 │
 │ --plan.spacing-m FLOAT        The launch cloud's cube root of the volume per │
 │                               drone, in meters. [default: 15.0]              │
 │ --plan.starling-m FLOAT       The nearest-neighbor distance of the starling  │
@@ -159,22 +195,9 @@ Flies the flock, or computes the steps of the graph named.
 │                               fail. [default: 50.0]                          │
 │ --radio.rate-hz FLOAT         The number of packets each drone sends each    │
 │                               second. [default: 5.0]                         │
-│ --roost.center-m FLOAT FLOAT  The roost's east and north, in meters, by      │
-│   --roost.empty-center-m      default under the launch, 1000 meters from the │
-│                               parametric threat's western, southern, and     │
-│                               northern edges. [default: (1000.0, 1000.0)]    │
 │ --roost.height-m FLOAT        The height the drone is pulled toward, in      │
-│                               meters above the ground. [default: 100.0]      │
-│ --roost.radius-m FLOAT        The radius of the cylinder the drones fly      │
-│                               about, in meters, by default the widest whose  │
-│                               radius and turn radius together fit within the │
-│                               1000 meters from center_m to the parametric    │
-│                               threat's nearest edge, the turn radius kept at │
-│                               the model's ratio to the cylinder's. [default: │
-│                               936.0]                                         │
-│ --roost.roost-m FLOAT         The radius of the model's cylinder, in meters, │
-│                               at a starling's scale, which the turn keeps    │
-│                               its ratio to. [default: 150.0]                 │
+│                               meters above the ground, by default the        │
+│                               launch's. [default: 100.0]                     │
 │ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
 │   FLOAT                       away from it, in reciprocal square seconds, at │
 │                               a starling's scale, by default the starling    │
@@ -183,22 +206,19 @@ Flies the flock, or computes the steps of the graph named.
 │                               per meter since the model multiplies it by the │
 │                               height away, although its table of parameters  │
 │                               lists it in newtons. [default: 2.5]            │
-│ --roost.turning-m-s2 FLOAT    The acceleration turning a drone headed        │
-│                               straight out of the cylinder, in meters per    │
-│                               second squared, half of it for a drone headed  │
-│                               along the cylinder's edge, at a starling's     │
-│                               scale, by default the acceleration of gravity, │
-│                               since the model's roost term rolls a starling  │
-│                               past the bank its roll-out balances, so the    │
-│                               bird turns on the whole of a lift equal to its │
-│                               weight, about 10 meters wide at 10 meters per  │
-│                               second against the model's cylinder of 150.    │
-│                               [default: 9.81]                                │
 │ --simulation PATH             The WRF-SFIRE output the graph reads, relative │
 │                               to the clone, such as the                      │
 │                               data/samples/wrf_sample.nc the thermur fetch   │
 │                               sample command writes, or None to read the     │
 │                               dataset threat builds.                         │
+│ --speed.cruise-m-s FLOAT      The speed the drone relaxes toward, in meters  │
+│                               per second, by default the model's cruise      │
+│                               speed of 10 meters per second, which the plan  │
+│                               launches the flock at. [default: 10.0]         │
+│ --speed.relaxation-s FLOAT    The time over which the drone's speed relaxes  │
+│                               toward cruise_m_s, in seconds, at a starling's │
+│                               scale, by default the model's speed control of │
+│                               1 second. [default: 1.0]                       │
 │ --threat.anomaly-k FLOAT      The potential temperature behind the front in  │
 │                               excess of the air ahead of it, in kelvin.      │
 │                               [default: 20.0]                                │

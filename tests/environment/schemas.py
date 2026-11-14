@@ -241,13 +241,15 @@ def test_a_grid_places_each_point_from_its_spacings():
     """
     Asserts that a grid's mass points sit midway between its staggered ones,
     its staggered levels start at the ground, and its snapshots start at
-    zero, each along the WRF dimension it lies on.
+    zero, each along the WRF dimension it lies on, and that its extent runs
+    to its last staggered column, row, and level.
     """
     grid = Grid(
         columns    = 3,
         interval_s = 10.0,
         level_m    = 4.0,
         levels     = 2,
+        rows       = 5,
         snapshots  = 3,
         spacing_m  = 2.0
     )
@@ -269,6 +271,7 @@ def test_a_grid_places_each_point_from_its_spacings():
         grid.seconds.values.tolist()
     ) == (("Time",), [0.0, 10.0, 20.0])
     assert (grid.length_m, grid.span_s) == (6.0, 20.0)
+    assert grid.extent_m == (6.0, 10.0, 8.0)
 
 
 def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():

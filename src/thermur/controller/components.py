@@ -2,20 +2,23 @@
 Holds the components filling each slot of the controller, each borrowed from
 another physical system and cited on the page that explains the choice among
 them, meaning the headings, the couplings, the noises, the cohesions, the
-one contact, and the one roost.
+one contact, the arena, the roost, and the speed control.
 """
 
 from equinox import tree_at
 from jax     import Array
 from jax.numpy  import (
-    append,
+    absolute,
     asarray,
     cos,
     deg2rad,
     exp,
+    eye,
     full,
     linalg,
     maximum,
+    newaxis,
+    sign,
     sqrt,
     square,
     where,
@@ -25,7 +28,7 @@ from pydantic import Field
 from typing   import Annotated, ClassVar, Self
 
 from thermur.controller.schemas  import Component, Heading, Noise, Observation, unit
-from thermur.environment.schemas import GRAVITY_M_S2, NonNegative, Positive, documented
+from thermur.environment.schemas import Grid, NonNegative, Positive, documented
 
 
 @documented
@@ -56,6 +59,85 @@ class Anisotropic(Component):
 
 
 @documented
+class Arena(Component):
+    """
+    The virtual walls of a drone flocking model, one shill agent on each
+    face of a box nearest the drone, moving straight into the box at
+    `shill_m_s`, whose velocity the drone relaxes toward wherever its
+    velocity differs from the shill's by more than a braking curve allows at
+    its distance from that face.
+    """
+
+    braking_m_s2: Positive = 4.18
+    """
+    The acceleration of the braking curve, in meters per second squared,
+    the model's optimized wall acceleration for a flock at 8 meters per
+    second.
+    """
+
+    extent_m: tuple[Positive, Positive, Positive] = Grid().extent_m
+    """
+    The box's far corner east, north, and above the ground, in meters, its
+    near corner at the origin, by default the parametric threat's grid.
+    """
+
+    gain_per_s: Positive = 8.12
+    """
+    The slope of the braking curve's linear part near the wall, in
+    reciprocal seconds, the model's optimized wall gain for a flock at 8
+    meters per second.
+    """
+
+    offset_m: NonNegative = 0.1
+    """
+    The distance inside each face at which the braking curve stops, in
+    meters, the model's optimized wall offset for a flock at 8 meters per
+    second.
+    """
+
+    relaxation_s: Positive = 1.0
+    """
+    The time over which the drone's velocity relaxes toward the shill's
+    excess, in seconds, the model's velocity relaxation time.
+    """
+
+    shill_m_s: Positive = 22.8
+    """
+    The speed of each shill agent into the box, in meters per second, the
+    model's optimized shill speed for a flock at 8 meters per second.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Sums, over the nearer face on each axis, the velocity difference
+        from that face's shill in excess of the braking curve at the drone's
+        distance inside the face, directed from the drone's velocity toward
+        the shill's, divided by `relaxation_s`.
+        """
+        middle    = asarray(self.extent_m) / 2
+        inward    = middle - observation.position
+        inside    = middle - absolute(inward) - self.offset_m
+        shills    = self.shill_m_s * eye(3) * sign(inward)[:, newaxis]
+        gaps      = shills - observation.velocity
+        lengths   = linalg.norm(gaps, axis=-1)
+        crossover = self.braking_m_s2 / self.gain_per_s
+        allowed   = where(
+            inside * self.gain_per_s < crossover,
+            maximum(inside, 0.0) * self.gain_per_s,
+            sqrt(maximum(2 * self.braking_m_s2 * inside - crossover**2, 0.0))
+        )
+        excess = maximum(lengths - allowed, 0.0)[:, newaxis] * unit(gaps)
+        return excess.sum(0) / self.relaxation_s
+
+    def scaled(self, _: float) -> Self:
+        """
+        Leaves the walls as they stand, since their values are a drone's own
+        at any spacing.
+        """
+        return self
+
+
+@documented
 class Centroid(Component):
     """
     The cohesion pulling a drone toward its neighbors' centroid by a spring
@@ -79,19 +161,21 @@ class Centroid(Component):
 class Consensus(Heading):
     """
     The spinless second-order velocity consensus, its speed left free,
-    which relaxes a drone's velocity toward its neighbors' at the
-    rate the coupling sets and toward the mean of those velocities at
-    `centering_per_s`.
+    which relaxes a drone's velocity toward its neighbors' at the rate the
+    coupling sets and toward the mean of those velocities at `centering`
+    times the coupling's mean rate.
 
     The time derivative of the source's position equation gives the second
     term, whose mean over the neighbors stands in for the source's mean over
     the whole flock.
     """
 
-    centering_per_s: NonNegative = 0.1
+    centering: NonNegative = 2e-4
     """
     The rate at which a drone's velocity relaxes toward its neighbors' mean,
-    in reciprocal seconds.
+    as a share of the coupling's mean rate per neighbor, by default the
+    source's aggregation strength of 0.01 over its alignment strength of 50
+    per neighbor, so it carries to any scale the coupling does.
     """
 
     confined: ClassVar[bool] = False
@@ -105,9 +189,8 @@ class Consensus(Heading):
         the relaxation toward their mean.
         """
         differences = observation.neighbors - observation.velocity
-        return (
-            observation.weights @ differences
-            + self.centering_per_s * differences.mean(0)
+        return observation.weights @ differences + (
+            self.centering * observation.weights.mean() * differences.mean(0)
         )
 
 
@@ -141,6 +224,52 @@ class Constant(Component):
             lambda coupling: coupling.coupling_per_s,
             self,
             self.coupling_per_s / factor
+        )
+
+
+@documented
+class Cruise(Component):
+    """
+    The speed control of a starling flock model, relaxing a drone's speed
+    along its heading toward the cruise speed, so a drone left behind in a
+    turn catches up and one pushed ahead falls back.
+    """
+
+    cruise_m_s: Positive = 10.0
+    """
+    The speed the drone relaxes toward, in meters per second, by default the
+    model's cruise speed of 10 meters per second, which the plan launches
+    the flock at.
+    """
+
+    relaxation_s: Positive = 1.0
+    """
+    The time over which the drone's speed relaxes toward `cruise_m_s`, in
+    seconds, at a starling's scale, by default the model's speed control of
+    1 second.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Divides the drone's shortfall from `cruise_m_s` by `relaxation_s`,
+        directed along its velocity.
+        """
+        return (
+            (self.cruise_m_s - linalg.norm(observation.velocity))
+            * unit(observation.velocity)
+            / self.relaxation_s
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Multiplies the relaxation time by `factor`, since a flock magnified
+        by `factor` at the same speed takes `factor` times as long over
+        each length.
+        """
+        return tree_at(
+            lambda cruise: cruise.relaxation_s,
+            self,
+            self.relaxation_s * factor
         )
 
 
@@ -483,37 +612,15 @@ class Persistent(Noise):
 @documented
 class Roost(Component):
     """
-    The roost term of a starling flock model, turning a drone that has left
-    a vertical cylinder about the roost across its heading, the harder the
-    further its heading points away from the roost, toward the side that
-    points it back, and pulling it toward the roost's height through a
-    damped spring.
-    """
-
-    center_m: tuple[float, float] = (1000.0, 1000.0)
-    """
-    The roost's east and north, in meters, by default under the launch,
-    1000 meters from the parametric threat's western, southern, and
-    northern edges.
+    The vertical part of a starling flock model's roost term, pulling a
+    drone toward the roost's height in proportion to its distance from it,
+    which keeps the flock flat.
     """
 
     height_m: float = 100.0
     """
-    The height the drone is pulled toward, in meters above the ground.
-    """
-
-    radius_m: Positive = 936.0
-    """
-    The radius of the cylinder the drones fly about, in meters, by default
-    the widest whose radius and turn radius together fit within the 1000
-    meters from `center_m` to the parametric threat's nearest edge, the
-    turn radius kept at the model's ratio to the cylinder's.
-    """
-
-    roost_m: Positive = 150.0
-    """
-    The radius of the model's cylinder, in meters, at a starling's scale,
-    which the turn keeps its ratio to.
+    The height the drone is pulled toward, in meters above the ground, by
+    default the launch's.
     """
 
     stiffness_per_s2: NonNegative = 2.5
@@ -525,53 +632,24 @@ class Roost(Component):
     the height away, although its table of parameters lists it in newtons.
     """
 
-    turning_m_s2: NonNegative = GRAVITY_M_S2
-    """
-    The acceleration turning a drone headed straight out of the cylinder, in
-    meters per second squared, half of it for a drone headed along the
-    cylinder's edge, at a starling's scale, by default the acceleration of
-    gravity, since the model's roost term rolls a starling past the bank its
-    roll-out balances, so the bird turns on the whole of a lift equal to its
-    weight, about 10 meters wide at 10 meters per second against the
-    model's cylinder of 150.
-    """
-
     def __call__(self, observation: Observation) -> Array:
         """
-        Sums the horizontal turn across the drone's heading, toward the
-        side that points it back at the roost, and the vertical pull toward
-        `height_m`, damped at `2 * sqrt(stiffness_per_s2)` on the drone's
-        commanded climb.
+        Pulls the drone along the vertical by `stiffness_per_s2` times its
+        height away from `height_m`.
         """
-        away    = observation.position[:2] - asarray(self.center_m)
-        outward = unit(away)
-        heading = unit(observation.velocity[:2])
-        left    = asarray([-heading[1], heading[0]])
-        turn    = where(
-            linalg.norm(away) > self.radius_m,
-            self.turning_m_s2 * (1 + outward @ heading) / 2,
-            0.0
+        return asarray([0.0, 0.0, -self.stiffness_per_s2]) * (
+            observation.position[2] - self.height_m
         )
-        climbing = (
-            -self.stiffness_per_s2 * (observation.position[2] - self.height_m)
-            - 2 * sqrt(self.stiffness_per_s2) * observation.velocity[2]
-        )
-        return append(turn * where(outward @ left > 0, -left, left), climbing)
 
     def scaled(self, factor: float) -> Self:
         """
         Divides the stiffness by the square of `factor`, as a flock
-        magnified by `factor` at the same speed takes, and the turn by the
-        cylinder's own magnification, `radius_m` over `roost_m`, so the turn
-        radius keeps the model's ratio to the cylinder the domain holds.
+        magnified by `factor` at the same speed takes.
         """
         return tree_at(
-            lambda roost: (roost.stiffness_per_s2, roost.turning_m_s2),
+            lambda roost: roost.stiffness_per_s2,
             self,
-            (
-                self.stiffness_per_s2 / factor**2,
-                self.turning_m_s2 * self.roost_m / self.radius_m
-            )
+            self.stiffness_per_s2 / factor**2
         )
 
 

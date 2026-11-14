@@ -21,7 +21,6 @@ from thermur.controller.components import (
     HardSphere,
     Overdamped,
     Persistent,
-    Roost,
     White
 )
 from thermur.controller.schemas import (
@@ -320,12 +319,12 @@ def test_the_heading_turns_a_drone_at_the_rate_its_coupling_sets(rate: float):
     """
     Asserts that the composite hands its heading the rate the coupling sets,
     so a drone whose neighbor flies one meter per second across it turns at
-    that rate times the difference.
+    that rate times the difference under the heading holding the speed.
     """
     view = viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]]))
 
     assert_allclose(
-        composite(coupling=Constant(coupling_per_s=rate))(view),
+        composite(coupling=Constant(coupling_per_s=rate), heading=Overdamped())(view),
         [0.0, rate, 0.0],
         atol = 1e-6
     )
@@ -379,17 +378,23 @@ def test_summing_a_neighbor_on_the_drone_stays_finite():
     assert_allclose(viewed([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]).bearings[0], 0.0)
 
 
-def test_the_composite_adds_the_roost_to_its_slots():
+@mark.parametrize("slot", ["arena", "roost", "speed"])
+def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(slot: str):
     """
-    Asserts that the composite's command rate carries the roost's turn and
-    pull beside every other slot.
+    Asserts that the composite's command rate carries the arena's turn, the
+    roost's pull, and the speed control beside every other slot, for a drone
+    slow, high, and past the box's western face.
     """
-    view  = viewed([[20.0, 0.0, 0.0]] * 7, position=array([0.0, 1700.0, 130.0]))
-    still = composite(roost=Roost(stiffness_per_s2=0.0, turning_m_s2=0.0))
+    view = viewed(
+        [[20.0, 0.0, 0.0]] * 7,
+        (8.0, 0.0, 0.0),
+        position = array([-10.0, 1700.0, 130.0])
+    )
+    settings = Settings()
 
     assert_allclose(
-        composite()(view) - still(view),
-        Roost().scaled(Settings().plan.similarity)(view),
+        composite()(view) - composite(**{slot: Centroid(stiffness_per_s2=0.0)})(view),
+        getattr(settings, slot).scaled(settings.plan.similarity)(view),
         atol = 1e-5
     )
 

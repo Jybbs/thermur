@@ -4,13 +4,11 @@ table of the clone's `pyproject.toml` sets for every run beneath a
 `THERMUR_` variable and a value passed in.
 """
 
-from cyclopts          import Parameter
 from pathlib           import Path
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
-from typing import Annotated
 
-from thermur.controller.components import Constant, HardSphere, Overdamped, Peripheral, Roost, White
+from thermur.controller.components import Arena, Consensus, Constant, Cruise, HardSphere, Peripheral, Roost, White
 from thermur.controller.schemas    import Radio
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas   import Crop, ParametricThreat
@@ -38,6 +36,12 @@ class Settings(
     another node has already read.
     """
 
+    arena: Arena = Arena()
+    """
+    The acceleration turning a drone back from the walls of the box it
+    flies in.
+    """
+
     cohesion: Peripheral = Peripheral()
     """
     The acceleration holding a drone at a spacing from its neighbors.
@@ -59,9 +63,7 @@ class Settings(
     to, and the fixed heights its fields are regridded onto.
     """
 
-    # `Overdamped` declares no field, which cyclopts renders as one flag taking a
-    # value no conversion accepts, so the command line leaves the slot out.
-    heading: Annotated[Overdamped, Parameter(parse=False)] = Overdamped()
+    heading: Consensus = Consensus()
     """
     The acceleration turning a drone toward its neighbors.
     """
@@ -89,7 +91,7 @@ class Settings(
 
     roost: Roost = Roost()
     """
-    The acceleration holding a drone over the roost and near its height.
+    The acceleration pulling a drone toward the roost's height.
     """
 
     simulation: Path | None = None
@@ -97,6 +99,11 @@ class Settings(
     The WRF-SFIRE output the graph reads, relative to the clone, such as the
     `data/samples/wrf_sample.nc` the `thermur fetch sample` command writes,
     or `None` to read the dataset `threat` builds.
+    """
+
+    speed: Cruise = Cruise()
+    """
+    The acceleration relaxing a drone's speed toward the cruise speed.
     """
 
     threat: ParametricThreat = ParametricThreat()

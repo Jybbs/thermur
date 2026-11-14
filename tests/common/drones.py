@@ -7,10 +7,9 @@ wind, and a short plan.
 from jax.numpy import array, asarray, full, ones, zeros
 from xarray    import Dataset
 
-from thermur.controller.components import Roost
-from thermur.controller.schemas    import Flock, Observation
-from thermur.environment.air       import Air
-from thermur.metrics.schemas       import Plan
+from thermur.controller.schemas import Flock, Observation
+from thermur.environment.air    import Air
+from thermur.metrics.schemas    import Plan
 
 
 def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
@@ -84,12 +83,11 @@ def viewed(  # prose: ignore[unsorted-positionals]
 ) -> Observation:
     """
     Builds one drone's view of neighbors at `offsets`, each flying as the
-    drone does and aligning at a rate of one, the drone at the default
-    roost's center and height, unless `fields` says otherwise.
+    drone does and aligning at a rate of one, the drone at the center of the
+    default launch, unless `fields` says otherwise.
     """
     spots = array(offsets)
     own   = array(velocity)
-    roost = Roost()
     return Observation(
         **{
             "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
@@ -98,7 +96,7 @@ def viewed(  # prose: ignore[unsorted-positionals]
             "force"     : zeros(3),
             "neighbors" : own * ones((len(offsets), 3)),
             "offsets"   : spots,
-            "position"  : array([*roost.center_m, roost.height_m]),
+            "position"  : array(Plan().center_m),
             "velocity"  : own,
             "weights"   : ones(len(offsets)),
             **fields

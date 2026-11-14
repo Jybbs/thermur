@@ -515,6 +515,12 @@ class Composite(Module):
     others and the plant carrying each drone's velocity toward its command.
     """
 
+    arena: Component
+    """
+    The acceleration turning a drone back from the walls of the box it
+    flies in.
+    """
+
     cohesion: Component
     """
     The acceleration holding a drone at a spacing from its neighbors.
@@ -552,7 +558,12 @@ class Composite(Module):
 
     roost: Component
     """
-    The acceleration holding a drone over the roost and near its height.
+    The acceleration pulling a drone toward the roost's height.
+    """
+
+    speed: Component
+    """
+    The acceleration relaxing a drone's speed toward the cruise speed.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -571,11 +582,13 @@ class Composite(Module):
         )
         total = sum(
             (
+                self.arena(observation),
                 self.cohesion(observation),
                 self.contact(observation),
                 self.heading(weighted),
                 self.noise(observation),
-                self.roost(observation)
+                self.roost(observation),
+                self.speed(observation)
             )
         )
         return across(total, observation.velocity) if self.heading.confined else total

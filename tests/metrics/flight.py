@@ -47,7 +47,6 @@ from thermur.controller.components import (
     Delayed,
     HardSphere,
     Overdamped,
-    Roost,
     White
 )
 from thermur.controller.schemas import Composite, Heading, Radio, across
@@ -59,6 +58,7 @@ from thermur.pipeline.settings  import Settings
 AIR = still_air()
 
 STILL = Composite(
+    arena    = Centroid(stiffness_per_s2=0.0),
     cohesion = Centroid(stiffness_per_s2=0.0),
     contact  = HardSphere(weight_m_s2=0.0),
     coupling = Constant(coupling_per_s=0.0),
@@ -66,7 +66,8 @@ STILL = Composite(
     noise    = White(),
     plant    = Plant(),
     radio    = Radio(delay_s=0.0, loss=0.0),
-    roost    = Roost(stiffness_per_s2=0.0, turning_m_s2=0.0)
+    roost    = Centroid(stiffness_per_s2=0.0),
+    speed    = Centroid(stiffness_per_s2=0.0)
 )
 """
 The composite whose command rate is zero on every flock, every drone hearing
@@ -201,12 +202,13 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
 @mark.slow
 def test_a_default_flight_holds_the_roost_s_height(default: Flight):
     """
-    Asserts that the default flight ends within 10 m of the roost's height
-    on the mean, where a plant bounding a descent tighter than a climb lifts
-    it some 60 m above it in two minutes.
+    Asserts that the default flight holds its drones within 10 m of the
+    roost's height on the mean over its settled frames and its seeds, where
+    a plant bounding a descent tighter than a climb lifts it some 60 m above
+    it in two minutes.
     """
     assert_allclose(
-        asarray(default.frames.positions)[:, -1, :, 2].mean(),
+        asarray(default.settled.positions)[..., 2].mean(),
         Settings().roost.height_m,
         atol = 10.0
     )
@@ -215,13 +217,15 @@ def test_a_default_flight_holds_the_roost_s_height(default: Flight):
 @mark.slow
 def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     """
-    Asserts that the largest group of the default flight after two minutes
-    and after five, averaged over the seeds, stands within the span of the
-    starling flocks the starling model is checked against, its middle axis
-    1.90 to 3.58 times its thinnest and its longest 4.02 to 6.94 times.
+    Asserts that the largest group of the default flight, averaged over
+    the frames 30 s apart through two minutes and through five and over the
+    seeds, stands within the span of the starling flocks the starling model
+    is checked against, its middle axis 1.90 to 3.58 times its thinnest and
+    its longest 4.02 to 6.94 times.
 
-    The mean over seeds is what the span bounds, since each seed's shape
-    moves with a change in the fifth decimal place of any value.
+    The mean over time and seeds is what the span bounds, since the model's
+    flocks report their shape as a mean over time, and one frame's shape
+    stretches and folds as the flock turns at the walls.
     """
     _, middle, longest = default.group_aspect_ratios.mean(0)
 
@@ -243,13 +247,12 @@ def test_a_default_flight_keeps_the_outdoor_drone_flock_s_spacing(default: Fligh
 def test_a_default_flight_keeps_every_drone_over_the_threat_s_grid(default: Flight):
     """
     Asserts that every drone of the default flight after two minutes and
-    after five sits over the parametric threat's grid, within its length
-    from west to east and its breadth from south to north.
+    after five sits inside the parametric threat's grid, east, north, and
+    above the ground.
     """
-    grid  = Settings().threat.grid
-    spots = asarray(default.frames.positions)[:, -1, :, :2]
+    spots = asarray(default.frames.positions)[:, -1]
 
-    assert ((spots >= 0) & (spots <= [grid.length_m, grid.rows * grid.spacing_m])).all()
+    assert ((spots >= 0) & (spots <= Settings().threat.grid.extent_m)).all()
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
@@ -625,6 +628,23 @@ def test_the_largest_group_reads_its_own_shape_apart_from_a_stray_pair():
     assert_allclose(
         laid(spots, [10.0, 0.0, 0.0]).group_aspect_ratios,
         [[1.0, 2.0, 3.0]] * 2,
+        rtol = 1e-5
+    )
+
+
+def test_the_largest_group_s_shape_averages_the_frames_a_shape_interval_apart():
+    """
+    Asserts that a flock holding axes of 1 to 2 to 3 through the first
+    second and 1 to 1 to 3 through the next reads their mean, 1 to 1.5 to 3,
+    from its settled frames one second apart.
+    """
+    first  = concat([diag([30.0, 20.0, 10.0]), -diag([30.0, 20.0, 10.0])])
+    second = concat([diag([30.0, 10.0, 10.0]), -diag([30.0, 10.0, 10.0])])
+    spots  = where((arange(20) < 10)[:, None, None], first, second)
+
+    assert_allclose(
+        laid(spots, [10.0, 0.0, 0.0]).group_aspect_ratios,
+        [[1.0, 1.5, 3.0]] * 2,
         rtol = 1e-5
     )
 

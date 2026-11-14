@@ -19,7 +19,7 @@ from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
 
-from thermur.controller.components import HardSphere, Roost
+from thermur.controller.components import Arena, Cruise, HardSphere, Roost
 from thermur.controller.schemas    import Radio
 from thermur.docs.outputs          import Outputs, markdown_table, specimens, tabled
 from thermur.environment.plant     import Plant
@@ -366,25 +366,29 @@ def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
     checkout: Checkout
 ):
     """
-    Asserts that The Interaction Rules carries the fields of the plan, the
-    contact, the plant, the radio, and the roost, and for each open slot
-    those of its default and then each candidate, every field named after
-    its component.
+    Asserts that The Interaction Rules carries the fields of the plan,
+    the arena, the contact, the plant, the radio, the roost, and the speed
+    control, and for each open slot those of its default and then each
+    candidate, every field named after its component.
     """
     regions = Outputs(checkout=checkout).regions[RULES]
     rows    = regions["cohesion"].splitlines()[2:]
 
+    assert regions["arena"] == tabled(Arena)
     assert regions["contact"] == tabled(HardSphere)
     assert regions["plan"] == tabled(Plan)
     assert regions["plant"] == tabled(Plant)
     assert regions["radio"] == tabled(Radio)
     assert regions["roost"] == tabled(Roost)
+    assert regions["speed"] == tabled(Cruise)
     assert set(regions) == {
+        "arena",
         "contact",
         "plan",
         "plant",
         "radio",
         "roost",
+        "speed",
         *(trial.slot for trial in Trial.listed())
     }
     assert [row.split("`")[1].partition(".")[0] for row in rows] == [

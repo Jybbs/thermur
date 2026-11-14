@@ -6,6 +6,7 @@ counts it derives from its length and its step, and the launch it draws.
 from common.drones import short
 from jax.numpy     import arccos, array, cos, deg2rad, sin, sqrt
 from jax.random    import key
+from numpy         import arange
 from numpy.testing import assert_allclose
 from pydantic      import ValidationError
 from pytest        import mark, param, raises
@@ -163,6 +164,27 @@ def test_a_launch_keeps_the_nearest_neighbor_distance_its_density_sets(
         plan.nearest_m,
         rtol = 0.03
     )
+
+
+def test_the_shape_frames_sit_a_shape_interval_apart_through_the_settled_flight():
+    """
+    Asserts that a flight of 100 s reads its shape each second from 21 s,
+    the first whole second past `settled_s`, through its last frame.
+    """
+    plan = Plan(duration_s=100.0)
+
+    assert_allclose(plan.times[plan.shape_frames], arange(21.0, 101.0))
+
+
+@mark.parametrize("every_s", [0.1, 0.5])
+def test_a_shape_interval_within_one_frame_reads_every_settled_frame(every_s: float):
+    """
+    Asserts that a shape interval no longer than a kept frame reads every
+    frame from `settled_s` on.
+    """
+    plan = Plan(duration_s=30.0, shape_every_s=every_s)
+
+    assert_allclose(plan.times[plan.shape_frames], arange(20.5, 30.5, 0.5))
 
 
 def test_the_turned_velocity_holds_the_cruise_along_the_course_plus_the_turn():

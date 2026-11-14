@@ -1,6 +1,6 @@
 # The Interaction Rules
 
-Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, and the roost holding the flock over one place. Each slot holds a rule borrowed from another physical system, a starling flock, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it. In the flights below the elastic springs and the fitted attraction pass that test for the cohesion and the anisotropic rate for the coupling, and every slot still holds its default.
+Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, the walls and the roost holding the flock over one place, and the speed control holding it near the cruise speed. Each slot holds a rule borrowed from another physical system, a starling flock, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it. In the flights below the elastic springs and the fitted attraction pass that test for the cohesion and the anisotropic rate for the coupling, and every slot still holds its default.
 
 ## The Neighbors a Drone Senses
 
@@ -14,7 +14,7 @@ The suite checks this with a property test, which moves a drone that another dro
 
 ## The Flight
 
-A flight integrates each drone's command under the sum of the slots, and its velocity and position under the plant and the wind below, through the Euler-Maruyama scheme, one step of diffrax's Euler solver at a time, its noise the Brownian increment a virtual Brownian tree draws, which carries the $`\sqrt{\Delta t}`$ scaling of a stochastic differential equation[^higham2001]. Every draw derives from one seed, and several seeds fly together as one batch. The flock launches in a thin horizontal cloud, its axes in the proportion 5.6 to 2.8 to 1 measured on starling flocks, its thin axis vertical[^ballerini2008b]. Each drone commands a constant cruise speed, so under a heading rule that holds the speed, the part of the acceleration along a drone's command is removed and the command returns to the cruise speed after every step.
+A flight integrates each drone's command under the sum of the slots, and its velocity and position under the plant and the wind below, through the Euler-Maruyama scheme, one step of diffrax's Euler solver at a time, its noise the Brownian increment a virtual Brownian tree draws, which carries the $`\sqrt{\Delta t}`$ scaling of a stochastic differential equation[^higham2001]. Every draw derives from one seed, and several seeds fly together as one batch. The flock launches in a thin horizontal cloud, its axes in the proportion 5.6 to 2.8 to 1 measured on starling flocks, its thin axis vertical[^ballerini2008b]. Under a heading rule that holds the speed, the part of the acceleration along a drone's command is removed, so the command keeps the cruise speed, whereas under the default heading rule the speed is free and the speed slot relaxes it toward the cruise speed.
 
 The table is written from the record each flight reads, set under `[tool.thermur.plan]` or through a `--plan.` flag of `thermur fly`, and `mise render` rewrites it.
 
@@ -35,6 +35,7 @@ The table is written from the record each flight reads, set under `[tool.thermur
 | `seed` | `0` |  | The value every draw of a flight derives from |
 | `seeds` | `4` | at least 1 | The number of launches flown together under `vmap` |
 | `settled_s` | `20.0` | at least 0 | The start of the flight a statistic leaves out, in seconds |
+| `shape_every_s` | `1.0` | above 0 | The time between the frames a flight's shape is averaged over, in seconds, by default the second between the measurements a study of the starling model averages a flock's shape over |
 | `spacing_m` | `15.0` | above 0 | The launch cloud's cube root of the volume per drone, in meters |
 | `starling_m` | `0.69` | above 0 | The nearest-neighbor distance of the starling flock the controller's values are taken at, in meters, by default that of the starling model's flock of 781 birds |
 | `step_s` | `0.02` | above 0 | The step of the integrator, in seconds |
@@ -82,24 +83,50 @@ A drone hears its neighbors only through its radio, which broadcasts each drone'
 
 <!-- /radio -->
 
+## The Arena
+
+The arena slot keeps the flock inside the parametric threat's grid through the virtual walls of the outdoor drone flock's controller[^vasarhelyi2018]. On each axis the face nearer a drone holds a shill agent flying straight into the box at 22.8 m/s, and the drone's velocity relaxes toward the shill's over 1 s wherever the two differ by more than a braking curve allows at the drone's distance inside the face. The curve rises along a line of 8.12 per second near the face and along the square root of a braking acceleration of 4.18 m/s² further in, stopping 0.1 m inside the face, the values the controller's evolutionary search reached for a flock at 8 m/s, the optimized speed nearest the cruise speed of 10 m/s. The walls are a drone flock's own, so the starling scale leaves them as they are, and the box is the grid's 4 km by 2 km by 600 m. The table is written from the slot's record, and `mise render` rewrites it.
+
+<!-- arena -->
+
+| **Field** | **Default** | **Bound** | **Holds** |
+|---|---|---|---|
+| `braking_m_s2` | `4.18` | above 0 | The acceleration of the braking curve, in meters per second squared, the model's optimized wall acceleration for a flock at 8 meters per second |
+| `extent_m` | `[4000.0, 2000.0, 600.0]` |  | The box's far corner east, north, and above the ground, in meters, its near corner at the origin, by default the parametric threat's grid |
+| `gain_per_s` | `8.12` | above 0 | The slope of the braking curve's linear part near the wall, in reciprocal seconds, the model's optimized wall gain for a flock at 8 meters per second |
+| `offset_m` | `0.1` | at least 0 | The distance inside each face at which the braking curve stops, in meters, the model's optimized wall offset for a flock at 8 meters per second |
+| `relaxation_s` | `1.0` | above 0 | The time over which the drone's velocity relaxes toward the shill's excess, in seconds, the model's velocity relaxation time |
+| `shill_m_s` | `22.8` | above 0 | The speed of each shill agent into the box, in meters per second, the model's optimized shill speed for a flock at 8 meters per second |
+
+<!-- /arena -->
+
 ## The Roost
 
-The roost slot holds the flock over a cylinder around a roost through the roost term of a starling flock model[^hildenbrandt2010]. Outside the cylinder its horizontal part turns a drone toward the side nearer the roost, at the full turning acceleration where the drone heads straight out and none where it heads straight in, and its vertical part is a spring toward the roost's height. That model's vertical weight over its bird's mass, 0.2 N per meter over 80 g, reads per meter because the model multiplies it by the height away, although its table of parameters lists it in newtons, and the starling scale carries its 2.5 per square second to 0.0021. The model rolls a bird into a bank by ten times its lateral acceleration in meters per second squared and back out by the sine of the bank, so the roost's lateral pull on a bird headed straight out of the cylinder, 0.01 N over 80 g or 0.125 m/s², which the model's table lists per meter although the model multiplies it by no distance, leaves no bank short of the vertical at which the two balance, and the bird turns on the whole of its lift, which in level flight equals its weight. The turning acceleration is therefore the acceleration of gravity at a starling's scale, 0.285 m/s² at the drones', a turning radius of some 350 m at 10 m/s. The spring's damping of twice the root of its stiffness would hold it critically damped without the plant's lag, and behind the lag the loop is third order, its slowest pair of poles damped at a ratio of 0.98. The cylinder's radius of 600 m is the widest the parametric threat's grid of 4 km by 2 km holds about the roost rather than the model's 150 m, which at the starling scale would come to some 5 km. The roost's center, radius, and height are fields of the slot, which the starling scale leaves as they are, so a flight sets where the roost stands. The table is written from the slot's record, and `mise render` rewrites it.
+The roost slot keeps the flock flat through the vertical part of the starling model's roost term[^hildenbrandt2010], a pull toward the roost's height in proportion to the height away. That model's vertical weight over its bird's mass, 0.2 N per meter over 80 g, reads per meter because the model multiplies it by the height away, although its table of parameters lists it in newtons, and the starling scale carries its 2.5 per square second to 0.0021. The height defaults to the launch's 100 m. The table is written from the slot's record, and `mise render` rewrites it.
 
 <!-- roost -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
-| `center_m` | `[1000.0, 1000.0]` |  | The roost's east and north, in meters, by default under the launch, 1000 meters from the parametric threat's western, southern, and northern edges |
-| `height_m` | `100.0` |  | The height the drone is pulled toward, in meters above the ground |
-| `radius_m` | `936.0` | above 0 | The radius of the cylinder the drones fly about, in meters, by default the widest whose radius and turn radius together fit within the 1000 meters from `center_m` to the parametric threat's nearest edge, the turn radius kept at the model's ratio to the cylinder's |
-| `roost_m` | `150.0` | above 0 | The radius of the model's cylinder, in meters, at a starling's scale, which the turn keeps its ratio to |
+| `height_m` | `100.0` |  | The height the drone is pulled toward, in meters above the ground, by default the launch's |
 | `stiffness_per_s2` | `2.5` | at least 0 | The acceleration toward the height per meter away from it, in reciprocal square seconds, at a starling's scale, by default the starling model's vertical weight of 0.2 newtons per meter over its bird's mass of 80 grams, read per meter since the model multiplies it by the height away, although its table of parameters lists it in newtons |
-| `turning_m_s2` | `9.81` | at least 0 | The acceleration turning a drone headed straight out of the cylinder, in meters per second squared, half of it for a drone headed along the cylinder's edge, at a starling's scale, by default the acceleration of gravity, since the model's roost term rolls a starling past the bank its roll-out balances, so the bird turns on the whole of a lift equal to its weight, about 10 meters wide at 10 meters per second against the model's cylinder of 150 |
 
 <!-- /roost -->
 
-Under the defaults, 100 drones over four seeds keep their nearest neighbors 21.6 m away at 120 s and 19.5 m at 300 s, inside the 12 to 30 m the outdoor flock kept[^vasarhelyi2018], at a polarization of 0.983 and 0.998, and end each flight at a mean height of 99.8 m and 100.4 m. The largest group the flock splits into stands at 1 to 3.23 to 5.46 at 120 s and 1 to 2.19 to 5.13 at 300 s on the mean over the seeds, inside the span of the starling flocks the starling model is checked against[^hildenbrandt2010], 1.90 to 3.58 on the middle axis and 4.02 to 6.94 on the longest. That mean over the seeds is what the span bounds, since one seed's shape moves with a change in the fifth decimal place of any value. Counting two drones in one group where a chain of hops under 45 m joins them, the flock flies in 6.0 groups on the mean at 60 s, 3.5 at 120 s, 2.25 at 180 s, and 3.0 at 300 s, its largest group holding 84 to 100 of the drones. The roost does not hold the flock over the cylinder. The flock crosses the cylinder's edge near 100 s, and on its wide turn it leaves the parametric threat's grid past its western edge, its center 1.3 to 1.5 km outside the cylinder at 300 s and 1.35 to 1.65 km at 420 s. A flight of 720 s returns it to 0.79 to 1.14 km outside the cylinder by its end, its largest group then at 1 to 2.61 to 4.75.
+## The Speed
+
+The speed slot relaxes a drone's speed along its heading toward the cruise speed through the starling model's speed control[^hildenbrandt2010], so a drone left behind in a turn catches up and one pushed ahead falls back. At a starling's scale the speed relaxes over 1 s toward 10 m/s, the model's own values, which a later study of that model flies as well[^hemelrijk2011], and the starling scale carries the second to 34.4 s. The control acts only under a heading rule that leaves the speed free, as the default does, since a rule holding the speed removes every part of the acceleration along the command. The table is written from the slot's record, and `mise render` rewrites it.
+
+<!-- speed -->
+
+| **Field** | **Default** | **Bound** | **Holds** |
+|---|---|---|---|
+| `cruise_m_s` | `10.0` | above 0 | The speed the drone relaxes toward, in meters per second, by default the model's cruise speed of 10 meters per second, which the plan launches the flock at |
+| `relaxation_s` | `1.0` | above 0 | The time over which the drone's speed relaxes toward `cruise_m_s`, in seconds, at a starling's scale, by default the model's speed control of 1 second |
+
+<!-- /speed -->
+
+Under the defaults, 100 drones over four seeds keep their nearest neighbors 13.5 m away at 120 s and 17.9 m at 300 s on the mean, inside the 12 to 30 m the outdoor flock kept[^vasarhelyi2018], at a polarization of 0.83 to 0.92 and 0.90 to 0.95 across the seeds. Every drone stays inside the grid at every frame, at heights from 51 m to 331 m. A flock's shape is averaged over time, as the starling model's flocks are, each property measured once per second over 30 minutes[^hemelrijk2011]. Read each second past the first 20 s, the largest group the flock splits into stands at 1 to 3.06 to 6.26 through 120 s and 1 to 3.08 to 6.90 through 300 s on the mean over the seeds, inside the span of the starling flocks the starling model is checked against[^hildenbrandt2010], 1.90 to 3.58 on the middle axis and 4.02 to 6.94 on the longest. One frame's shape stretches and folds as the flock turns back from a wall, so a single frame can fall outside that span where the mean stays inside it. Counting two drones in one group where a chain of hops under 45 m joins them, the flock flies in 3, 4, 5, and 1 groups across the seeds at 120 s and 3, 5, 6, and 11 at 300 s, its largest group holding 50 to 98 of the drones at 300 s.
 
 ## Contact
 
@@ -117,13 +144,13 @@ Two drones push apart through the separation of the starling model[^hildenbrandt
 
 ## Heading
 
-The default heading rule is the overdamped limit of the inertial spin model at a constant speed[^cavagna2015], in which a drone's velocity relaxes toward each neighbor's at the rate the coupling sets, with no spin carried between steps. The candidates are a spinless second-order consensus, which leaves the speed free and relaxes a drone's velocity toward its neighbors' mean as well, where the source relaxes toward the whole flock's[^lizarraga2026], and alignment on the neighbors' velocities half a second old[^geiss2022]. The trial turns one drone through 20° and through 90° and measures how far the turn reaches across the flock and how fast it crosses, beside the polarization and the frequency at which the spontaneous velocity correlation $`C(k,\omega)`$ peaks. The table is written from each rule's record, the default declaring no parameter, and `mise render` rewrites it.
+The default heading rule is a spinless second-order consensus[^lizarraga2026], which relaxes a drone's velocity toward each neighbor's at the rate the coupling sets and toward the neighbors' mean as well, where the source relaxes toward the whole flock's, and leaves the speed to the speed slot. Its pull toward the mean is the source's aggregation strength over its alignment strength per neighbor, 0.01 to 50, times the coupling's rate, so it carries to the drones' scale as the coupling does. The candidates are the overdamped limit of the inertial spin model at a constant speed[^cavagna2015], which holds the speed and carries no spin between steps, and alignment on the neighbors' velocities half a second old[^geiss2022]. The trial turns one drone through 20° and through 90° and measures how far the turn reaches across the flock and how fast it crosses, beside the polarization and the frequency at which the spontaneous velocity correlation $`C(k,\omega)`$ peaks. The table is written from each rule's record, and `mise render` rewrites it.
 
 <!-- heading -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
-| `consensus.centering_per_s` | `0.1` | at least 0 | The rate at which a drone's velocity relaxes toward its neighbors' mean, in reciprocal seconds |
+| `consensus.centering` | `0.0002` | at least 0 | The rate at which a drone's velocity relaxes toward its neighbors' mean, as a share of the coupling's mean rate per neighbor, by default the source's aggregation strength of 0.01 over its alignment strength of 50 per neighbor, so it carries to any scale the coupling does |
 | `delayed.lag_s` | `0.5` | above 0 | The age of the neighbor states the slot reads, in seconds |
 
 <!-- /heading -->
@@ -241,9 +268,11 @@ The default flock does not hold together at 100 drones over 60 s, splitting into
 
 [^vasarhelyi2018]: Vásárhelyi et al. 2018. "Optimized flocking of autonomous drones in confined environments." *Science Robotics* 3(20): eaat3536. <https://doi.org/10.1126/scirobotics.aat3536>
 
-[^cavagna2015]: Cavagna et al. 2015. "Flocking and Turning: a New Model for Self-organized Collective Motion." *Journal of Statistical Physics* 158(3): 601–627. <https://doi.org/10.1007/s10955-014-1119-3>
+[^hemelrijk2011]: Hemelrijk and Hildenbrandt 2011. "Some causes of the variable shape of flocks of birds." *PLoS ONE* 6(8): e22479. <https://doi.org/10.1371/journal.pone.0022479>
 
 [^lizarraga2026]: Lizárraga and de Aguiar 2026. "Collective turns in spinless flocks." *Physical Review E* 114(3): 035401. <https://doi.org/10.1103/6976-lcw7>
+
+[^cavagna2015]: Cavagna et al. 2015. "Flocking and Turning: a New Model for Self-organized Collective Motion." *Journal of Statistical Physics* 158(3): 601–627. <https://doi.org/10.1007/s10955-014-1119-3>
 
 [^geiss2022]: Geiß et al. 2022. "Signal propagation and linear response in the delay Vicsek model." *Physical Review E* 106(5): 054612. <https://doi.org/10.1103/PhysRevE.106.054612>
 

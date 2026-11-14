@@ -323,6 +323,19 @@
     annote   = {Greenberg and Hastings study discrete models of an excitable medium, one with a globally stable resting state and a threshold past which a disturbance sets off a large but temporary response, and show that spatial inhomogeneities organize into patterns that repeat in time. No open copy of the paper is available, so this entry rests on its abstract alone. The models measure nothing of birds or drones, yet Thermur's escape slot runs the excitable structure the abstract describes on its neighbor graph, each drone resting, alarmed, firing a turn or a climb its neighbors copy, then refractory. The study therefore shapes that slot's structure moderately, while the norms the slot answers to come from starlings.}
 }
 
+@article{hemelrijk2011,
+    author   = {Hemelrijk, Charlotte K. and Hildenbrandt, Hanno},
+    title    = {Some causes of the variable shape of flocks of birds},
+    journal  = {PLoS ONE},
+    year     = {2011},
+    volume   = {6},
+    number   = {8},
+    pages    = {e22479},
+    doi      = {10.1371/journal.pone.0022479},
+    priority = {prio1},
+    annote   = {Hemelrijk and Hildenbrandt fly StarDisplay, the starling model with banked turns and a speed control relaxing each bird toward its cruise speed over 1 s, to trace why a flock's shape varies. A flock turning with little variation in speed changes shape against its heading, a wide flock becoming oblong after a turn of 90 degrees, and flocks whose speeds vary more grow longer in their direction of motion, as fish schools do. A flock of a given size is characterized by each property averaged over its members and over 30 minutes, measured once per second. The findings come from simulation, and the authors offer the low variability of a bird's speed as a hypothesis. Thermur takes the speed control as its speed slot and averages its flock's shape over time each second, as the study does, so the study shapes the composite strongly.}
+}
+
 @article{hemelrijk2015,
     author   = {Hemelrijk, Charlotte K. and van Zuidam, Lars and Hildenbrandt, Hanno},
     title    = {What underlies waves of agitation in starling flocks},
@@ -372,7 +385,7 @@
     pages    = {1349--1359},
     doi      = {10.1093/beheco/arq149},
     priority = {prio1},
-    annote   = {Hildenbrandt, Carere, and Hemelrijk build StarDisplay, a model of thousands of starlings flying with lift, drag, and banked turns around a cruise speed of 10 m/s, each bird interacting with about 6.5 topological neighbors through separation, alignment, and a cohesion weighted toward the flock's edge. A roost term holds flocks over a roost, a horizontal force turning a bird back once it strays outside a cylinder of 150 m radius, stronger the more it heads outward, and a vertical force pulling it toward a preferred height, which the authors call arbitrary and which flattens the flock. The model flocks match the Rome measurements in 10 of 18 statistical tests, though they come out thinner, smaller, and more level than real ones, and no predator flies in the model. Thermur takes the model's separation as its contact, its centrality-weighted cohesion read over the seven neighbors alone, and its roost term, each at the model's own values, the roost's cylinder magnified to fit the domain with its turn kept in proportion, together with the nearest-neighbor distance of its flock of 781 birds as the length every value is scaled from, and checks its flock's shape against the span of the starling flocks the model is checked against, so the study shapes the composite strongly.}
+    annote   = {Hildenbrandt, Carere, and Hemelrijk build StarDisplay, a model of thousands of starlings flying with lift, drag, and banked turns around a cruise speed of 10 m/s, each bird interacting with about 6.5 topological neighbors through separation, alignment, and a cohesion weighted toward the flock's edge. A roost term holds flocks over a roost, a horizontal force turning a bird back once it strays outside a cylinder of 150 m radius, stronger the more it heads outward, and a vertical force pulling it toward a preferred height, which the authors call arbitrary and which flattens the flock. The model flocks match the Rome measurements in 10 of 18 statistical tests, though they come out thinner, smaller, and more level than real ones, and no predator flies in the model. Thermur takes the model's separation as its contact, its centrality-weighted cohesion read over the seven neighbors alone, the vertical part of its roost term, and its speed control, each at the model's own values, together with the nearest-neighbor distance of its flock of 781 birds as the length every value is scaled from, and checks its flock's shape against the span of the starling flocks the model is checked against, so the study shapes the composite strongly.}
 }
 
 @article{jhawar2020,
@@ -424,7 +437,7 @@
     pages    = {035401},
     doi      = {10.1103/6976-lcw7},
     priority = {prio2},
-    annote   = {Lizárraga and de Aguiar show in a minimal model of aggregation that a turn started by one individual crosses the collective mostly at a constant speed with no spin variable, and trace the propagating waves in the continuum limit to the nonreciprocity of the interactions alone, beside spectral anomalies a perturbative analysis explains. The entry rests on the study's abstract. Thermur's heading slot borrows a spinless second-order consensus as one candidate against the overdamped reference, measured by single-initiator turns, so the study shapes the composite only where that candidate is favored.}
+    annote   = {Lizárraga and de Aguiar show in a minimal model of aggregation that a turn started by one individual crosses the collective mostly at a constant speed with no spin variable, and trace the propagating waves in the continuum limit to the nonreciprocity of the interactions alone, beside spectral anomalies a perturbative analysis explains. Thermur's heading slot takes a spinless second-order consensus as its default, its speed left to the speed control, its pull toward the neighbors' mean set by the study's ratio of aggregation to alignment, 0.01 to 50, so the study shapes the composite strongly.}
 }
 
 @misc{metz2021,
@@ -579,7 +592,7 @@
     pages    = {eaat3536},
     doi      = {10.1126/scirobotics.aat3536},
     priority = {prio1},
-    annote   = {Vásárhelyi and colleagues fly 30 autonomous quadcopters as a flock outdoors, at 4 to 8 m/s in arenas 200 to 260 m across at one altitude, under a decentralized controller whose 11 parameters an evolutionary search tuned in simulations of 100 agents carrying a 1 s delay, a 0.2 s sensor period, and an 80 m communication range. The search's fitness multiplies scores for speed, collisions closer than 3 m, disconnected agents, cluster size, wall contact, and velocity correlation. In flight the drones keep an average closest-neighbor distance of 12 to 30 m, their radios delivering 40 to 80 percent of packets from close peers, nearly every one from peers within 20 m, with long outages starting past 50 m, a loss the simulations leave out. The authors note pressure building against the walls as the flock grows and the need to tune the parameters again for each vehicle. The study sets the bar a credible drone flock clears and the nearest-neighbor distance Thermur's calibration fits, so it shapes the composite strongly, as a measure and as the source of the radio's delay, its period, and its range, the 50 m past which outages began, rather than as a controller to adopt.}
+    annote   = {Vásárhelyi and colleagues fly 30 autonomous quadcopters as a flock outdoors, at 4 to 8 m/s in arenas 200 to 260 m across at one altitude, under a decentralized controller whose 11 parameters an evolutionary search tuned in simulations of 100 agents carrying a 1 s delay, a 0.2 s sensor period, and an 80 m communication range. The search's fitness multiplies scores for speed, collisions closer than 3 m, disconnected agents, cluster size, wall contact, and velocity correlation. In flight the drones keep an average closest-neighbor distance of 12 to 30 m, their radios delivering 40 to 80 percent of packets from close peers, nearly every one from peers within 20 m, with long outages starting past 50 m, a loss the simulations leave out. The authors note pressure building against the walls as the flock grows and the need to tune the parameters again for each vehicle. The study sets the bar a credible drone flock clears and the nearest-neighbor distance Thermur's calibration fits, so it shapes the composite strongly, as a measure, as the source of the radio's delay, its period, and its range, the 50 m past which outages began, and as the source of the virtual walls that turn the flock back inside the domain, rather than as a controller to adopt.}
 }
 
 @article{viragh2014,

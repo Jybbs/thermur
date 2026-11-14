@@ -92,6 +92,13 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     The start of the flight a statistic leaves out, in seconds.
     """
 
+    shape_every_s: Positive = 1.0
+    """
+    The time between the frames a flight's shape is averaged over, in
+    seconds, by default the second between the measurements a study of the
+    starling model averages a flock's shape over.
+    """
+
     spacing_m: Positive = 15.0
     """
     The launch cloud's cube root of the volume per drone, in meters.
@@ -165,6 +172,15 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
             / (2 * pi)
             * self.spacing_m
         )
+
+    @property
+    def shape_frames(self) -> ndarray:
+        """
+        Indexes the settled frames `shape_every_s` apart, back from the
+        last, every frame where `shape_every_s` is shorter than `frame_s`.
+        """
+        step = max(self.framed(self.shape_every_s), 1)
+        return arange(self.frames - 1, self.framed(self.settled_s) - 1, -step)[::-1]
 
     @property
     def similarity(self) -> float:

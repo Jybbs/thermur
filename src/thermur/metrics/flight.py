@@ -194,38 +194,27 @@ class Flight(Module):
     @property
     def group_aspect_ratios(self) -> ndarray:
         """
-        Reads the shape of the largest group the last frame splits into,
-        `(n_seeds, 3)`, as the length of each axis over the thinnest's.
+        Averages the shape of the largest group each frame splits into over
+        the frames `Plan.shape_frames` picks, `(n_seeds, 3)`, as the length
+        of each axis over the thinnest's.
         """
         return asarray(
             [
-                tree.map(
-                    lambda frames: frames[seed, -1, labels == bincount(
-                        labels
-                    ).argmax()],
-                    self.frames
-                ).aspect_ratios
-                for seed, labels in enumerate(self.groups)
+                [
+                    self.largest(frame, seed).aspect_ratios
+                    for frame in self.plan.shape_frames
+                ]
+                for seed in range(self.plan.seeds)
             ]
-        )
+        ).mean(1)
 
     @property
     def groups(self) -> list[ndarray]:
         """
-        Labels the group each drone of the last frame flies in, one row per
-        seed, two drones sharing a group where a chain of hops under three
-        times `spacing_m` joins them.
+        Labels the group each drone of the last frame flies in, one row
+        per seed.
         """
-        return [
-            connected_components(
-                (tree := KDTree(cloud)).sparse_distance_matrix(
-                    tree,
-                    3 * self.plan.spacing_m
-                ),
-                directed = False
-            )[1]
-            for cloud in asarray(self.frames.positions)[:, -1]
-        ]
+        return [self.grouped(cloud) for cloud in asarray(self.frames.positions)[:, -1]]
 
     @property
     def last(self) -> Flock:
@@ -483,6 +472,30 @@ class Flight(Module):
                 )(split(seeded(plan.seed), plan.seeds))
             ),
             plan = plan
+        )
+
+    def grouped(self, cloud: ndarray) -> ndarray:
+        """
+        Labels the group each drone of `cloud` flies in, two drones sharing
+        a group where a chain of hops under three times `spacing_m` joins
+        them.
+        """
+        return connected_components(
+            (tree := KDTree(cloud)).sparse_distance_matrix(
+                tree,
+                3 * self.plan.spacing_m
+            ),
+            directed = False
+        )[1]
+
+    def largest(self, frame: int, seed: int) -> Flock:
+        """
+        Keeps the largest group one seed's frame splits into.
+        """
+        labels = self.grouped(asarray(self.frames.positions)[seed, frame])
+        return tree.map(
+            lambda frames: frames[seed, frame, labels == bincount(labels).argmax()],
+            self.frames
         )
 
     def likelihoods(self, composites: dict[str, Composite], air: Air) -> Dataset:  # prose: ignore[unsorted-positionals]

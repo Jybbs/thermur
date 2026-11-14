@@ -10,16 +10,16 @@ from hypothesis    import given, strategies
 from jax           import Array, tree, vmap
 from jax.numpy     import append, array, exp, sqrt
 from jax.random    import key, normal
-from numpy         import diag
 from numpy.testing import assert_allclose
 from pytest        import mark, param
-from scipy.linalg  import solve_continuous_lyapunov
 
 from thermur.controller.components import (
     Anisotropic,
+    Arena,
     Centroid,
     Consensus,
     Constant,
+    Cruise,
     Delayed,
     Elastic,
     Fitted,
@@ -36,7 +36,6 @@ from thermur.controller.components import (
 )
 from thermur.controller.schemas import Component, Composite, Inbox, Noise, Observation, nearest
 from thermur.environment.air    import Air
-from thermur.environment.plant  import Plant
 from thermur.metrics.schemas    import Plan
 from thermur.metrics.trials     import Trial
 from thermur.pipeline.settings  import Settings
@@ -200,16 +199,28 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             id = "centroid"
         ),
         param(
-            Consensus(centering_per_s=0.1),
+            Consensus(centering=0.5),
             viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]])),
-            [0.0, 1.1, 0.0],
+            [0.0, 1.5, 0.0],
             id = "consensus"
+        ),
+        param(
+            Cruise(cruise_m_s=10.0, relaxation_s=2.0),
+            viewed([[10.0, 0.0, 0.0]], (0.0, 6.0, 0.0)),
+            [0.0, 2.0, 0.0],
+            id = "cruise"
         ),
         param(
             Delayed(),
             viewed([[10.0, 0.0, 0.0]], delayed=array([[10.0, -1.0, 0.0]])),
             [0.0, -1.0, 0.0],
             id = "delayed"
+        ),
+        param(
+            Roost(height_m=100.0, stiffness_per_s2=0.5),
+            viewed([[10.0, 0.0, 0.0]], position=array([0.0, 0.0, 130.0])),
+            [0.0, 0.0, -15.0],
+            id = "roost"
         ),
         param(
             Elastic(rest_m=18.0, stiffness_per_s2=0.024),
@@ -368,72 +379,37 @@ def test_a_persistent_force_enters_the_acceleration_and_decays():
 @mark.parametrize(
     ("position", "velocity", "expected"),
     [
-        param((0.0, 0.0, 10.0), (-10.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="inside"),
-        param((-120.0, 0.0, 10.0), (-10.0, 0.0, 0.0), (0.0, -2.0, 0.0), id="outward"),
-        param((-120.0, 0.0, 10.0), (0.0, 10.0, 0.0), (1.0, 0.0, 0.0), id="along"),
-        param((-120.0, 0.0, 10.0), (10.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="inward"),
-        param((0.0, 0.0, 30.0), (10.0, 0.0, 2.0), (0.0, 0.0, -1.6), id="above")
+        param((100.0, 100.0, 100.0), (10.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="middle"),
+        param((5.0, 100.0, 100.0), (-10.0, 0.0, 0.0), (17.0, 0.0, 0.0), id="curve"),
+        param((0.5, 100.0, 100.0), (0.0, 0.0, 0.0), (9.5, 0.0, 0.0), id="linear"),
+        param((-5.0, 100.0, 100.0), (0.0, 0.0, 0.0), (10.0, 0.0, 0.0), id="outside"),
+        param((100.0, 100.0, 199.5), (0.0, 0.0, 0.0), (0.0, 0.0, -9.5), id="ceiling")
     ]
 )
-def test_the_roost_turns_a_drone_out_of_its_cylinder_back_and_pulls_it_level(
+def test_the_arena_relaxes_a_drone_toward_the_shill_past_the_braking_curve(
     expected : tuple[float, float, float],
     position : tuple[float, float, float],
     velocity : tuple[float, float, float]
 ):
     """
-    Asserts that the roost turns a drone outside its cylinder across its
-    heading toward the roost, at the full acceleration headed straight out,
-    half of it headed along the edge, and none headed in, leaves one inside
-    alone, and pulls one above the height down through its spring, damped at
-    twice the square root of its stiffness.
+    Asserts that the arena returns the velocity difference from the nearer
+    face's shill beyond the braking curve, the curve's square root past the
+    crossover, its line below it, and nothing outside the box, leaving a
+    drone in the middle alone.
     """
-    roost = Roost(
-        center_m         = (0.0, 0.0),
-        height_m         = 10.0,
-        radius_m         = 100.0,
-        stiffness_per_s2 = 0.04,
-        turning_m_s2     = 2.0
+    arena = Arena(
+        braking_m_s2 = 1.0,
+        extent_m     = (200.0, 200.0, 200.0),
+        gain_per_s   = 1.0,
+        offset_m     = 0.0,
+        shill_m_s    = 10.0
     )
 
     assert_allclose(
-        roost(viewed([[1.0, 0.0, 0.0]], velocity, position=array(position))),
+        arena(viewed([[1.0, 0.0, 0.0]], velocity, position=array(position))),
         expected,
         atol = 1e-6
     )
-
-
-@mark.parametrize("factor", [2.0, 10.0, 30.0])
-def test_the_roost_holds_the_heights_spread_in_proportion_to_the_flock_s_size(
-    factor: float
-):
-    """
-    Asserts that the roost and the white noise carried to twice a factor
-    hold the stationary spread of the heights behind the plant's lag to
-    twice the spread at that factor, within 10%, reading the stiffness and
-    the damping off the roost's pull.
-    """
-    lag_s = Plant().lag_s
-
-    def spread(scale: float) -> float:
-        """
-        Solves the stationary covariance of the height, the velocity, and
-        the command under the roost's pull, the plant's lag, and the noise.
-        """
-        roost     = Roost().scaled(scale)
-        height    = array([*roost.center_m, roost.height_m + 1.0])
-        stiffness = -float(roost(viewed([[1.0, 0.0, 0.0]], position=height))[2])
-        damping   = -float(roost(viewed([[1.0, 0.0, 0.0]], (10.0, 0.0, 1.0)))[2])
-        drift     = [
-            [0.0, 1.0, 0.0],
-            [0.0, -1 / lag_s, 1 / lag_s],
-            [-stiffness, 0.0, -damping]
-        ]
-        return solve_continuous_lyapunov(
-            drift,
-            -diag([0.0, 0.0, White().scaled(scale).amplitude ** 2])
-        )[0, 0] ** 0.5
-
-    assert_allclose(spread(2 * factor) / spread(factor), 2.0, rtol=0.1)
 
 
 @mark.parametrize(
@@ -454,11 +430,10 @@ def test_the_roost_holds_the_heights_spread_in_proportion_to_the_flock_s_size(
             Peripheral(blind_deg=90.0, sphere_m=2.0, weight_m_s2=2.0),
             id = "peripheral"
         ),
-        param(
-            Roost(radius_m=600.0, stiffness_per_s2=32.0, turning_m_s2=8.0),
-            Roost(radius_m=600.0, stiffness_per_s2=2.0, turning_m_s2=2.0),
-            id = "roost"
-        ),
+        param(Arena(), Arena(), id="arena"),
+        param(Consensus(), Consensus(), id="consensus"),
+        param(Cruise(relaxation_s=1.0), Cruise(relaxation_s=4.0), id="cruise"),
+        param(Roost(stiffness_per_s2=8.0), Roost(stiffness_per_s2=0.5), id="roost"),
         param(White(amplitude=4.0), White(amplitude=2.0), id="white"),
         param(Overdamped(), Overdamped(), id="overdamped"),
         param(Centroid(), Centroid(), id="centroid")
@@ -471,8 +446,7 @@ def test_each_slot_carried_to_a_flock_four_times_the_size_scales_its_values(
     """
     Asserts that each slot holding a starling flock's values multiplies its
     lengths by the factor, divides its accelerations and rates by it, its
-    stiffness by its square, and its noise by its square root, turning the
-    roost by the magnification from the model's cylinder to its own, and
-    leaving every slot holding a drone flock's own values.
+    stiffness by its square, and its noise by its square root, leaving every
+    slot holding a drone flock's own values.
     """
     assert_allclose(tree.leaves(component.scaled(4.0)), tree.leaves(expected))

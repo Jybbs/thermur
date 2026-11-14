@@ -103,14 +103,14 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     @cached_property
     def regions(self) -> dict[Path, dict[str, str]]:
         """
-        Renders the body of each region the render task writes into a
-        page, by the page's path and then by the region's name, meaning the
-        fields `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare
-        on the Data page, on The Interaction Rules the fields `Plan`, the
-        contact, the plant, the radio, and the roost declare beside those
-        of each open slot's default and each of its candidates, every one
-        named for its component, and on The Visual Identity the identity as
-        `specimens` lays it out.
+        Renders the body of each region the render task writes into a page,
+        by the page's path and then by the region's name, meaning the fields
+        `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
+        Data page, on The Interaction Rules the fields `Plan`, the arena,
+        the contact, the plant, the radio, the roost, and the speed control
+        declare beside those of each open slot's default and each of its
+        candidates, every one named for its component, and on The Visual
+        Identity the identity as `specimens` lays it out.
         """
         defaults = Settings()
         return {
