@@ -21,7 +21,8 @@ from thermur.controller.components import (
     HardSphere,
     Overdamped,
     Persistent,
-    White
+    White,
+    Zig
 )
 from thermur.controller.schemas import (
     Component,
@@ -232,6 +233,59 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
     assert_allclose(rates.forces, 0.0)
     assert_allclose(rates.commands, vmap(slots)(sensed))
     assert_allclose(rates.velocities, [[0.0, 2.0, 0.0]] * 8, rtol=1e-6)
+
+
+def test_exciting_the_flock_copies_a_zig_sooner_by_the_radio_s_delay():
+    """
+    Asserts that a resting drone hearing two zigging neighbors, under
+    a branching that sets it off for certain, starts its zig after its
+    reaction time and the cue's less the radio's delay, while each zigging
+    neighbor counts down by the step.
+    """
+    built = composite(
+        noise = Zig(
+            accel_m_s2   = 2.0,
+            back_s       = 1.0,
+            branching    = 2.0,
+            cue_s        = 0.5,
+            reaction_s   = 1.5,
+            refractory_s = 3.0,
+            side_s       = 1.0
+        ),
+        radio = replace(Composite.from_settings(Settings()).radio, delay_s=0.5)
+    )
+    flock = replace(
+        flock_of(
+            array(
+                [
+                    [1000.0, 1000.0, 100.0],
+                    [1000.0, 1005.0, 100.0],
+                    [1000.0, 995.0, 100.0]
+                ]
+            ),
+            array([[10.0, 0.0, 0.0]] * 3)
+        ),
+        forces = array([[0.0, 0.0, 0.0], [4.5, 1.0, 0.0], [4.5, 1.0, 0.0]])
+    )
+
+    excited = built.excited(
+        flock,
+        key(0),
+        Observation.sensed(
+            flock,
+            Inbox.from_broadcast(flock, built.radio.range_m, flock),
+            still_air(),
+            0.0,
+            2
+        ),
+        0.1
+    )
+
+    assert_allclose(
+        excited.forces,
+        [[3.0 + 2.0 + 1.5 + 0.5 - 0.5, 1.0, 0.0], [4.4, 1.0, 0.0], [4.4, 1.0, 0.0]],
+        rtol = 1e-6
+    )
 
 
 def test_exciting_the_flock_counts_down_and_starts_a_zig_at_the_rim():

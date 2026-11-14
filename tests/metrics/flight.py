@@ -7,7 +7,7 @@ statistic reads.
 
 from common.drones import flock_of, short, still_air
 from dataclasses   import replace
-from jax           import jit
+from jax           import Array, jit
 from jax.numpy     import array
 from jax.random    import key, split
 from numpy         import (
@@ -47,6 +47,7 @@ from thermur.controller.components import (
     Delayed,
     HardSphere,
     Overdamped,
+    Persistent,
     White
 )
 from thermur.controller.schemas import Composite, Heading, Radio, across
@@ -106,6 +107,18 @@ def flight(composite: Composite) -> Flight:
     Flies the short plan under the default composite through still air.
     """
     return Flight.flown(composite, AIR, short())
+
+
+class Drawn(White):
+    """
+    White noise holding as its force the uniform draw each step reads.
+    """
+
+    def excited(self, draw: Array, **_: object) -> Array:
+        """
+        Holds `draw` east as the force.
+        """
+        return array([1.0, 0.0, 0.0]) * draw
 
 
 def laid(
@@ -216,11 +229,11 @@ def test_a_default_flight_holds_the_roost_s_height(default: Flight):
 @mark.slow
 def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     """
-    Asserts that the largest group of the default flight, averaged over
-    the frames 30 s apart through two minutes and through five and over the
-    seeds, stands within the span of the starling flocks the starling model
-    is checked against, its middle axis 1.90 to 3.58 times its thinnest and
-    its longest 4.02 to 6.94 times.
+    Asserts that the largest group of the default flight, averaged over the
+    frames `Plan.shape_every_s` apart through two minutes and through five
+    and over the seeds, stands within the span of the starling flocks the
+    starling model is checked against, its middle axis 1.90 to 3.58 times
+    its thinnest and its longest 4.02 to 6.94 times.
 
     The mean over time and seeds is what the span bounds, since the model's
     flocks report their shape as a mean over time, and one frame's shape
@@ -414,6 +427,23 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
+def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
+    """
+    Asserts that a flight under the persistent force holds a nonzero force
+    on some drone at some kept frame, so each step advances the force the
+    step before it left rather than the one it started from.
+    """
+    assert (
+        asarray(
+            Flight.flown(
+                replace(composite, noise=Persistent()),
+                AIR,
+                short()
+            ).frames.forces
+        ) != 0
+    ).any()
+
+
 def test_a_replay_ranks_every_composite_it_is_given(
     composite : Composite,
     flight    : Flight
@@ -458,29 +488,6 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     )
 
 
-def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
-    """
-    Asserts that shells of drones turning at times proportional to their
-    distance from the first drone read the speed of that spread, and a reach
-    of one where the farthest shell ends the flight turned through the whole
-    turn.
-    """
-    plan      = short(turn_deg=90.0, turning_window_s=0.1)
-    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
-
-    speed, reach = response(
-        distances = distances,
-        plan      = plan,
-        rotation  = exp(
-            1j * pi / 2 * (arange(
-                60
-            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
-        )
-    )
-
-    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
-
-
 @mark.parametrize(
     ("heading", "held"),
     [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
@@ -505,6 +512,29 @@ def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
     )
 
     assert allclose(speeds, 10.0, rtol=1e-4) == held
+
+
+def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
+    """
+    Asserts that shells of drones turning at times proportional to their
+    distance from the first drone read the speed of that spread, and a reach
+    of one where the farthest shell ends the flight turned through the whole
+    turn.
+    """
+    plan      = short(turn_deg=90.0, turning_window_s=0.1)
+    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
+
+    speed, reach = response(
+        distances = distances,
+        plan      = plan,
+        rotation  = exp(
+            1j * pi / 2 * (arange(
+                60
+            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
+        )
+    )
+
+    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
 
 
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
@@ -549,6 +579,37 @@ def test_each_seed_of_the_batch_flies_as_it_does_alone(
     assert_allclose(flight.frames.velocities[1], alone.velocities, atol=1e-4)
 
 
+@mark.parametrize(
+    ("curve", "expected"),
+    [
+        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
+        param([1.0, 0.0], 1, id="zero"),
+        param([1.0, 0.5], 2, id="none")
+    ]
+)
+def test_the_first_zero_is_the_first_value_at_or_below_zero(
+    curve    : list[float],
+    expected : int
+):
+    """
+    Asserts that `first_zero` finds the first value at or below zero, or the
+    curve's length where none is.
+    """
+    assert first_zero(array(curve)) == expected
+
+
+def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
+    """
+    Asserts that a noise slot holding each step's draw as its force holds
+    another force at every kept frame, so no two steps read one draw.
+    """
+    forces = asarray(
+        Flight.flown(replace(composite, noise=Drawn()), AIR, short()).frames.forces
+    )
+
+    assert (diff(forces[..., 0], axis=1) != 0).all()
+
+
 def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
     """
     Asserts that four lines of three drones 10 m apart, each line far from
@@ -569,25 +630,6 @@ def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
         ([centers[5]] * 2, [32 * near / (near + 4 / centers[10] ** 2)] * 2),
         rtol = 1e-5
     )
-
-
-@mark.parametrize(
-    ("curve", "expected"),
-    [
-        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
-        param([1.0, 0.0], 1, id="zero"),
-        param([1.0, 0.5], 2, id="none")
-    ]
-)
-def test_the_first_zero_is_the_first_value_at_or_below_zero(
-    curve    : list[float],
-    expected : int
-):
-    """
-    Asserts that `first_zero` finds the first value at or below zero, or the
-    curve's length where none is.
-    """
-    assert first_zero(array(curve)) == expected
 
 
 def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(

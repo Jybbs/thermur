@@ -5,9 +5,9 @@ the second drone's action as it stands.
 """
 
 from common.drones import flock_of, still_air, viewed
-from equinox       import filter_jit
+from equinox       import filter_jit, tree_at
 from hypothesis    import assume, given, strategies
-from jax           import Array, tree, vmap
+from jax           import Array, lax, tree, vmap
 from jax.numpy     import append, array, exp, sqrt
 from jax.random    import key, normal
 from numpy.testing import assert_allclose
@@ -399,6 +399,21 @@ def test_a_copied_zig_starts_at_once_where_the_radio_s_delay_outlasts_the_cue():
     )
 
 
+def test_a_persistent_force_enters_the_acceleration_and_decays():
+    """
+    Asserts that the persistent noise adds the force a drone holds to its
+    acceleration and relaxes that force over its persistence time, where
+    every other noise adds and relaxes nothing.
+    """
+    force = array([1.0, -2.0, 0.5])
+    view  = viewed([[10.0, 0.0, 0.0]], force=force)
+
+    assert_allclose(Persistent(persistence_s=2.0)(view), force)
+    assert_allclose(Persistent(persistence_s=2.0).relaxation(view), -force / 2.0)
+    assert_allclose(White()(view), 0.0)
+    assert_allclose(White().relaxation(view), 0.0)
+
+
 ZIG = Zig(
     accel_m_s2   = 2.0,
     back_s       = 1.0,
@@ -475,7 +490,7 @@ def test_a_zig_pushes_to_its_side_and_back_across_the_heading(
         param(
             (0.0, 0.0, 0.0),
             [[4.5, -1.0, 0.0], [0.0, 0.0, 0.0]],
-            (0.0, 1.9, 0.0),
+            (0.0, 1.9, 1.0),
             0.999,
             (0.0, 0.0, 0.0),
             id = "turned-short-of-the-zig"
@@ -529,19 +544,27 @@ def test_a_zig_starts_at_the_rim_or_from_a_zigging_neighbor(
     )
 
 
-def test_a_persistent_force_enters_the_acceleration_and_decays():
+def test_a_zig_s_chance_of_spreading_grows_with_each_zigging_neighbor():
     """
-    Asserts that the persistent noise adds the force a drone holds to its
-    acceleration and relaxes that force over its persistence time, where
-    every other noise adds and relaxes nothing.
+    Asserts that a resting drone hearing two of its seven neighbors zig
+    through one whole zig copies them where the draw of 0.2 falls below the
+    chance of 1 - (6/7)**2, about 0.265, which one zigging neighbor's 1/7
+    would leave it short of.
     """
-    force = array([1.0, -2.0, 0.5])
-    view  = viewed([[10.0, 0.0, 0.0]], force=force)
-
-    assert_allclose(Persistent(persistence_s=2.0)(view), force)
-    assert_allclose(Persistent(persistence_s=2.0).relaxation(view), -force / 2.0)
-    assert_allclose(White()(view), 0.0)
-    assert_allclose(White().relaxation(view), 0.0)
+    assert_allclose(
+        ZIG.excited(
+            delay_s     = 1.0,
+            draw        = array(0.2),
+            observation = viewed(
+                [[10.0 * (index + 1), 0.0, 0.0] for index in range(7)],
+                forces = array([[4.5, -1.0, 0.0]] * 2 + [[0.0, 0.0, 0.0]] * 5)
+            ),
+            step_s = ZIG.zig_s,
+            turn   = array([0.0, 0.0, 0.0])
+        ),
+        (6.0, -1.0, 0.0),
+        atol = 1e-6
+    )
 
 
 @mark.parametrize(("margin", "copied"), [(-1e-4, True), (1e-4, False)])
@@ -667,6 +690,72 @@ def test_the_time_to_reach_the_rim_follows_the_course_to_the_circle(
     still.
     """
     assert_allclose(Home().rim_s(array(ground), array(outward)), expected, rtol=1e-6)
+
+
+@mark.parametrize(
+    ("height", "climb", "updraft", "expected"),
+    [
+        param(100.0, 2.0, 0.0, -2.0, id="climbing"),
+        param(104.0, 0.0, 0.0, -1.0, id="above"),
+        param(100.0, 0.0, 1.5, -1.5, id="lifted"),
+        param(96.0, -1.0, 0.0, 2.0, id="below-and-sinking")
+    ]
+)
+def test_home_damps_a_drone_s_height_critically(
+    climb    : float,
+    expected : float,
+    height   : float,
+    updraft  : float
+):
+    """
+    Asserts that the roost pulls a drone toward its height by the stiffness
+    times the height away and against its climb over the ground, the wind's
+    included, by twice the stiffness's square root.
+    """
+    assert_allclose(
+        Home(height_m=100.0, stiffness_per_s2=0.25)(
+            viewed(
+                [[1.0, 0.0, 0.0]],
+                (10.0, 0.0, climb),
+                air = {"excess": array(0.0), "u": array(0.0), "v": array(0.0)}
+                | {"w": array(updraft)},
+                position = array([1000.0, 1000.0, height])
+            )
+        )[2],
+        expected,
+        atol = 1e-6
+    )
+
+
+def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
+    """
+    Asserts that a drone the roost alone moves, lifted 30 m above the
+    roost's height at the drone scale, settles back to within a meter of it
+    in ten minutes without ever falling below it, the height of a drone the
+    roost leaves undamped swinging as far below as it started above.
+    """
+    roost = Settings().roost.scaled(Plan().similarity)
+    alone = viewed([[1.0, 0.0, 0.0]])
+
+    def step(state: Array, *_: None) -> tuple[Array, Array]:
+        """
+        Advances the height and the climb by half a second under the roost's
+        vertical pull.
+        """
+        height, climb = state
+        pull          = roost.vertical(
+            tree_at(
+                lambda seen: (seen.position, seen.velocity),
+                alone,
+                (array([1000.0, 1000.0, height]), array([10.0, 0.0, climb]))
+            )
+        )
+        return array([height + climb * 0.5, climb + pull * 0.5]), height
+
+    _, heights = lax.scan(step, array([roost.height_m + 30.0, 0.0]), length=1200)
+
+    assert heights.min() >= roost.height_m - 1e-3
+    assert_allclose(heights[-1], roost.height_m, atol=1.0)
 
 
 @mark.parametrize(

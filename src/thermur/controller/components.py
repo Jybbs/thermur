@@ -415,6 +415,9 @@ class Home(Component):
     flock flat, beside the turn fish take from a wall, turning the drone
     across its heading away from the rim of a disk around the roost at a
     rate rising as its time to reach that rim falls.
+
+    The pull also opposes the drone's climb over the ground at twice the
+    square root of the stiffness, which damps the height critically.
     """
 
     bound_m_s2: Positive = Plant().level_m_s2
@@ -456,34 +459,24 @@ class Home(Component):
 
     def __call__(self, observation: Observation) -> Array:
         """
-        Pulls the drone along the vertical by `stiffness_per_s2` times
-        its height away from `height_m`, and turns it away from the rim
-        it would reach on its ground velocity's course by `turn` times its
-        ground speed over the time to reach it, at most `bound_m_s2`, and by
-        `bound_m_s2` outside the disk.
+        Pulls the drone along the vertical by `vertical`, and turns it
+        away from the rim it would reach on its ground velocity's course
+        by `turn` times its ground speed over the time to reach it, at most
+        `bound_m_s2`, and by `bound_m_s2` outside the disk.
         """
         ground  = (observation.velocity + observation.wind)[:2]
         outward = observation.position[:2] - asarray(self.center_m)
-        inside  = outward @ outward < self.radius_m**2
         reach   = self.rim_s(ground, outward)
-        normal  = unit(where(inside, outward + ground * reach, outward))
         heading = unit(ground)
         rate    = where(
-            inside,
+            outward @ outward < self.radius_m**2,
             self.turn * linalg.norm(ground) / maximum(reach, finfo(reach).tiny),
             inf
         )
         lateral = -minimum(rate, self.bound_m_s2) * unit(
-            normal - normal @ heading * heading
+            outward - outward @ heading * heading
         )
-        return concat(
-            [
-                lateral,
-                asarray(
-                    [-self.stiffness_per_s2 * (observation.position[2] - self.height_m)]
-                )
-            ]
-        )
+        return concat([lateral, asarray([self.vertical(observation)])])
 
     def rim_s(self, ground: Array, outward: Array) -> Array:
         """
@@ -513,6 +506,19 @@ class Home(Component):
             lambda home: home.stiffness_per_s2,
             self,
             self.stiffness_per_s2 / factor**2
+        )
+
+    def vertical(self, observation: Observation) -> Array:
+        """
+        Pulls the drone toward `height_m` by `stiffness_per_s2` times its
+        height away and against its climb over the ground by twice the
+        stiffness's square root.
+        """
+        return (
+            -self.stiffness_per_s2 * (observation.position[2] - self.height_m)
+            - 2 * sqrt(
+                self.stiffness_per_s2
+            ) * (observation.velocity + observation.wind)[2]
         )
 
 

@@ -324,7 +324,7 @@ class Observation(Module):
     of its topological neighbors as its radio last heard it, and the air at
     its position, each array laid out as `(n_drones, ...)` for a flock and
     without that axis once `vmap` hands one drone's view to a slot, so a
-    slot holds no route to a drone its neighbors leave out.
+    slot holds no route to a drone its radio does not hear.
     """
 
     air: dict[str, Array]
@@ -488,7 +488,7 @@ class Component(Module):
     """
     One slot of the controller, whose fields are its parameters and whose
     call reads one drone's `Observation`, so it holds no route to any drone
-    beyond that drone's neighbors.
+    its radio does not hear.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -562,7 +562,8 @@ class Noise(Component):
         Args:
             delay_s     : The age of a broadcast as it arrives, in seconds.
             draw        : A number drawn uniformly between zero and one.
-            observation : What the drone senses at the step's start.
+            observation : What the drone senses at the step's start, holding
+                          the state the step leaves it.
             step_s      : The step of the integrator, in seconds.
             turn        : The roost's acceleration on the drone, in meters
                           per second squared.
@@ -698,8 +699,9 @@ class Composite(Module):
     ) -> Flock:
         """
         Advances the state the noise slot holds on each drone by one step
-        of `step_s`, each drone reading one uniform draw from `key`, the
-        roost's acceleration on it, and the radio's `delay_s`.
+        of `step_s` from the state `flock` holds after the step, each drone
+        reading one uniform draw from `key`, the roost's acceleration on it,
+        and the radio's `delay_s`.
         """
         return tree_at(
             lambda held: held.forces,
@@ -708,8 +710,12 @@ class Composite(Module):
                 partial(self.noise.excited, delay_s=self.radio.delay_s, step_s=step_s)
             )(
                 draw        = uniform(key, flock.forces.shape[:-1]),
-                observation = observation,
-                turn        = vmap(self.roost)(observation)
+                observation = tree_at(
+                    lambda sensed: sensed.force,
+                    observation,
+                    flock.forces
+                ),
+                turn = vmap(self.roost)(observation)
             )
         )
 
