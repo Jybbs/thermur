@@ -2,23 +2,27 @@
 Holds the components filling each slot of the controller, each borrowed from
 another physical system and cited on the page that explains the choice among
 them, meaning the headings, the couplings, the noises, the cohesions, the
-one contact, the arena, the roost, and the speed control.
+one contact, the roost, and the speed control.
 """
 
 from equinox import tree_at
 from jax     import Array
 from jax.numpy  import (
-    absolute,
     asarray,
+    concat,
     cos,
+    cross,
     deg2rad,
     exp,
-    eye,
+    expm1,
+    finfo,
     full,
+    inf,
     linalg,
+    log1p,
     maximum,
-    newaxis,
-    sign,
+    minimum,
+    select,
     sqrt,
     square,
     where,
@@ -28,7 +32,8 @@ from pydantic import Field
 from typing   import Annotated, ClassVar, Self
 
 from thermur.controller.schemas  import Component, Heading, Noise, Observation, unit
-from thermur.environment.schemas import Grid, NonNegative, Positive, documented
+from thermur.environment.plant   import Plant
+from thermur.environment.schemas import NonNegative, Positive, documented
 
 
 @documented
@@ -59,82 +64,62 @@ class Anisotropic(Component):
 
 
 @documented
-class Arena(Component):
+class Centered(Component):
     """
-    The virtual walls of a drone flocking model, one shill agent on each
-    face of a box nearest the drone, moving straight into the box at
-    `shill_m_s`, whose velocity the drone relaxes toward wherever its
-    velocity differs from the shill's by more than a braking curve allows at
-    its distance from that face.
-    """
-
-    braking_m_s2: Positive = 4.18
-    """
-    The acceleration of the braking curve, in meters per second squared,
-    the model's optimized wall acceleration for a flock at 8 meters per
-    second.
+    The cohesion of a starling flock model, pulling a drone toward its
+    topological neighbors outside its rear blind angle and its hard sphere,
+    weighted by the drone's centrality over every sender its radio holds,
+    which falls near zero for a drone deep inside the flock.
     """
 
-    extent_m: tuple[Positive, Positive, Positive] = Grid().extent_m
+    blind_deg: Annotated[float, Field(ge=0, lt=360)] = 90.0
     """
-    The box's far corner east, north, and above the ground, in meters, its
-    near corner at the origin, by default the parametric threat's grid.
-    """
-
-    gain_per_s: Positive = 8.12
-    """
-    The slope of the braking curve's linear part near the wall, in
-    reciprocal seconds, the model's optimized wall gain for a flock at 8
-    meters per second.
+    The angle behind the drone within which a neighbor is left out, in
+    degrees, by default the model's 45 degrees to either side.
     """
 
-    offset_m: NonNegative = 0.1
+    sphere_m: Positive = 0.2
     """
-    The distance inside each face at which the braking curve stops, in
-    meters, the model's optimized wall offset for a flock at 8 meters per
-    second.
-    """
-
-    relaxation_s: Positive = 1.0
-    """
-    The time over which the drone's velocity relaxes toward the shill's
-    excess, in seconds, the model's velocity relaxation time.
+    The radius of the hard sphere within which a neighbor pulls nothing,
+    in meters, at a starling's scale, by default half a starling's
+    wingspan.
     """
 
-    shill_m_s: Positive = 22.8
+    weight_m_s2: NonNegative = 12.5
     """
-    The speed of each shill agent into the box, in meters per second, the
-    model's optimized shill speed for a flock at 8 meters per second.
+    The pull of a drone at a centrality of one, in meters per second
+    squared, at a starling's scale, by default the model's cohesion weight
+    of 1 newton over its bird's mass of 80 grams.
     """
 
     def __call__(self, observation: Observation) -> Array:
         """
-        Sums, over the nearer face on each axis, the velocity difference
-        from that face's shill in excess of the braking curve at the drone's
-        distance inside the face, directed from the drone's velocity toward
-        the shill's, divided by `relaxation_s`.
+        Multiplies the drone's centrality, the weight, and the sum of the
+        bearings of the neighbors it sees past the hard sphere over the
+        count of the heard neighbors outside the blind angle, the hard
+        sphere's among them.
         """
-        middle    = asarray(self.extent_m) / 2
-        inward    = middle - observation.position
-        inside    = middle - absolute(inward) - self.offset_m
-        shills    = self.shill_m_s * eye(3) * sign(inward)[:, newaxis]
-        gaps      = shills - observation.velocity
-        lengths   = linalg.norm(gaps, axis=-1)
-        crossover = self.braking_m_s2 / self.gain_per_s
-        allowed   = where(
-            inside * self.gain_per_s < crossover,
-            maximum(inside, 0.0) * self.gain_per_s,
-            sqrt(maximum(2 * self.braking_m_s2 * inside - crossover**2, 0.0))
+        counted = (observation.distances > 0) & (
+            observation.ahead > -cos(deg2rad(self.blind_deg / 2))
         )
-        excess = maximum(lengths - allowed, 0.0)[:, newaxis] * unit(gaps)
-        return excess.sum(0) / self.relaxation_s
+        seen = counted & (observation.distances > self.sphere_m)
+        return (
+            observation.centrality
+            * self.weight_m_s2
+            * where(seen[:, None], observation.bearings, 0.0).sum(0)
+            / maximum(counted.sum(), 1)
+        )
 
-    def scaled(self, _: float) -> Self:
+    def scaled(self, factor: float) -> Self:
         """
-        Leaves the walls as they stand, since their values are a drone's own
-        at any spacing.
+        Multiplies the hard sphere by `factor` and divides the pull by it,
+        as a flock magnified by `factor` at the same speed takes.
         """
-        return self
+        return tree_at(
+            lambda centered: (centered.sphere_m, centered.weight_m_s2),
+            self,
+            (self.sphere_m * factor, self.weight_m_s2 / factor)
+        )
 
 
 @documented
@@ -200,13 +185,13 @@ class Constant(Component):
     The coupling holding one rate over every topological neighbor.
     """
 
-    coupling_per_s: NonNegative = 3.571
+    coupling_per_s: NonNegative = 0.904
     """
     The rate at which a drone aligns with each neighbor, in reciprocal
-    seconds, at a starling's scale, by default one step of the projection
-    model spread over 7 neighbors, since that model replaces a bird's
-    heading in full at every step, its step the 0.04 seconds a starling at
-    10 meters per second takes to fly its wingspan of 0.4 meters.
+    seconds, at a starling's scale, by default the relaxation rate inferred
+    from the dynamics of starling flocks spread over 7 neighbors,
+    `1 / (7 * 0.158)`, where 0.158 seconds is the geometric mean of the
+    flocks' relaxation times.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -423,6 +408,115 @@ class HardSphere(Component):
 
 
 @documented
+class Home(Component):
+    """
+    The roost term of a starling flock model, pulling a drone toward the
+    roost's height in proportion to its distance from it, which keeps the
+    flock flat, beside the turn fish take from a wall, turning the drone
+    across its heading away from the rim of a disk around the roost at a
+    rate rising as its time to reach that rim falls.
+    """
+
+    bound_m_s2: Positive = Plant().level_m_s2
+    """
+    The largest turning acceleration, in meters per second squared, by
+    default the plant's bound on a horizontal acceleration.
+    """
+
+    center_m: tuple[float, float] = (1000.0, 1000.0)
+    """
+    The disk's center east and north, in meters, by default the launch's.
+    """
+
+    height_m: float = 100.0
+    """
+    The height the drone is pulled toward, in meters above the ground, by
+    default the launch's.
+    """
+
+    radius_m: Positive = 1000.0
+    """
+    The disk's radius, in meters.
+    """
+
+    stiffness_per_s2: NonNegative = 2.5
+    """
+    The acceleration toward the height per meter away from it, in
+    reciprocal square seconds, at a starling's scale, by default the
+    starling model's vertical weight of 0.2 newtons per meter over its
+    bird's mass of 80 grams, read per meter since the model multiplies it by
+    the height away, although its table of parameters lists it in newtons.
+    """
+
+    turn: NonNegative = 0.94
+    """
+    The turn rate times the time to reach the rim, in radians, by default
+    the strength fitted to fish turning from the wall of their tank.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Pulls the drone along the vertical by `stiffness_per_s2` times
+        its height away from `height_m`, and turns it away from the rim
+        it would reach on its ground velocity's course by `turn` times its
+        ground speed over the time to reach it, at most `bound_m_s2`, and by
+        `bound_m_s2` outside the disk.
+        """
+        ground  = (observation.velocity + observation.wind)[:2]
+        outward = observation.position[:2] - asarray(self.center_m)
+        inside  = outward @ outward < self.radius_m**2
+        reach   = self.rim_s(ground, outward)
+        normal  = unit(where(inside, outward + ground * reach, outward))
+        heading = unit(ground)
+        rate    = where(
+            inside,
+            self.turn * linalg.norm(ground) / maximum(reach, finfo(reach).tiny),
+            inf
+        )
+        lateral = -minimum(rate, self.bound_m_s2) * unit(
+            normal - normal @ heading * heading
+        )
+        return concat(
+            [
+                lateral,
+                asarray(
+                    [-self.stiffness_per_s2 * (observation.position[2] - self.height_m)]
+                )
+            ]
+        )
+
+    def rim_s(self, ground: Array, outward: Array) -> Array:
+        """
+        Computes the time a drone at `outward` from the disk's center takes
+        to reach its rim at the ground velocity `ground`, solving for where
+        that course meets the circle of `radius_m`.
+        """
+        along   = outward @ ground
+        squared = ground @ ground
+        return (
+            sqrt(
+                maximum(
+                    square(along) - squared * (outward @ outward - self.radius_m**2),
+                    0.0
+                )
+            )
+            - along
+        ) / maximum(squared, finfo(squared).tiny)
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Divides the stiffness by the square of `factor`, as a flock
+        magnified by `factor` at the same speed takes, and leaves the disk
+        and the turn at a drone flock's own values.
+        """
+        return tree_at(
+            lambda home: home.stiffness_per_s2,
+            self,
+            self.stiffness_per_s2 / factor**2
+        )
+
+
+@documented
 class Intrinsic(Noise):
     """
     The noise of finite numbers, which a drone copying one neighbor at a
@@ -507,70 +601,6 @@ class Overdamped(Heading):
 
 
 @documented
-class Peripheral(Component):
-    """
-    The cohesion of a starling flock model, pulling a drone toward its
-    topological neighbors outside its rear blind angle and its hard sphere,
-    weighted by how near the flock's border the drone sits, so a drone
-    deep inside the flock feels almost none and the flock keeps its spacing
-    rather than drawing in.
-
-    The drone's centrality is the length of the mean bearing of its heard
-    neighbors, near zero inside the flock and above a half at its border.
-    """
-
-    blind_deg: Annotated[float, Field(ge=0, lt=360)] = 90.0
-    """
-    The angle behind the drone within which a neighbor is left out, in
-    degrees, by default the model's 45 degrees to either side.
-    """
-
-    sphere_m: Positive = 0.2
-    """
-    The radius of the hard sphere within which a neighbor pulls nothing,
-    in meters, at a starling's scale, by default half a starling's
-    wingspan.
-    """
-
-    weight_m_s2: NonNegative = 12.5
-    """
-    The pull of a drone at a centrality of one, in meters per second
-    squared, at a starling's scale, by default the model's cohesion weight
-    of 1 newton over its bird's mass of 80 grams.
-    """
-
-    def __call__(self, observation: Observation) -> Array:
-        """
-        Multiplies the drone's centrality, the weight, and the sum of the
-        bearings of the neighbors it sees past the hard sphere over the
-        count of the heard neighbors outside the blind angle, the hard
-        sphere's among them.
-        """
-        counted = (observation.distances > 0) & (
-            observation.ahead > -cos(deg2rad(self.blind_deg / 2))
-        )
-        seen = counted & (observation.distances > self.sphere_m)
-        return (
-            linalg.norm(observation.bearings.sum(0))
-            / maximum((observation.distances > 0).sum(), 1)
-            * self.weight_m_s2
-            * where(seen[:, None], observation.bearings, 0.0).sum(0)
-            / maximum(counted.sum(), 1)
-        )
-
-    def scaled(self, factor: float) -> Self:
-        """
-        Multiplies the hard sphere by `factor` and divides the pull by it,
-        as a flock magnified by `factor` at the same speed takes.
-        """
-        return tree_at(
-            lambda peripheral: (peripheral.sphere_m, peripheral.weight_m_s2),
-            self,
-            (self.sphere_m * factor, self.weight_m_s2 / factor)
-        )
-
-
-@documented
 class Persistent(Noise):
     """
     The random force of an inertial active Ornstein-Uhlenbeck particle,
@@ -607,50 +637,6 @@ class Persistent(Noise):
         Decays the force over `persistence_s`.
         """
         return -observation.force / self.persistence_s
-
-
-@documented
-class Roost(Component):
-    """
-    The vertical part of a starling flock model's roost term, pulling a
-    drone toward the roost's height in proportion to its distance from it,
-    which keeps the flock flat.
-    """
-
-    height_m: float = 100.0
-    """
-    The height the drone is pulled toward, in meters above the ground, by
-    default the launch's.
-    """
-
-    stiffness_per_s2: NonNegative = 2.5
-    """
-    The acceleration toward the height per meter away from it, in
-    reciprocal square seconds, at a starling's scale, by default the
-    starling model's vertical weight of 0.2 newtons per meter over its
-    bird's mass of 80 grams, read per meter since the model multiplies it by
-    the height away, although its table of parameters lists it in newtons.
-    """
-
-    def __call__(self, observation: Observation) -> Array:
-        """
-        Pulls the drone along the vertical by `stiffness_per_s2` times its
-        height away from `height_m`.
-        """
-        return asarray([0.0, 0.0, -self.stiffness_per_s2]) * (
-            observation.position[2] - self.height_m
-        )
-
-    def scaled(self, factor: float) -> Self:
-        """
-        Divides the stiffness by the square of `factor`, as a flock
-        magnified by `factor` at the same speed takes.
-        """
-        return tree_at(
-            lambda roost: roost.stiffness_per_s2,
-            self,
-            self.stiffness_per_s2 / factor**2
-        )
 
 
 @documented
@@ -714,13 +700,13 @@ class White(Noise):
     command.
     """
 
-    amplitude: NonNegative = 3.15
+    amplitude: NonNegative = 2.455
     """
     The amplitude, in meters per second per root second, at a starling's
-    scale, by default the noise that leaves a flock aligning at
-    `Constant`'s default rate over 7 neighbors at the product of coupling
-    and interaction range of 503 inferred from starling flocks,
-    `10 * sqrt(2 * 7 * 3.571 / 503)` at 10 meters per second.
+    scale, by default `10 * sqrt(2 * T)` at 10 meters per second, the
+    temperature `T` of 0.0301 being the relaxation rate `1 / 0.158` over
+    the product of 12.13 and 17.31, the medians of the interaction range
+    and of the coupling over the temperature inferred from starling flocks.
     """
 
     def amplitudes(self, observation: Observation) -> tuple[Array, Array]:
@@ -741,3 +727,176 @@ class White(Noise):
             self,
             self.amplitude / sqrt(factor)
         )
+
+
+@documented
+class Zig(White):
+    """
+    The white noise on the command beside the zig of a starling flock
+    model's waves of agitation, a push to one side across the heading and
+    back that a drone starts once the roost turns it as hard as the zig
+    would, or copies from the neighbors it hears zigging, each zigging
+    neighbor setting it off within one zig with the chance `branching` over
+    the neighbor count, the branching ratio of an excitable network.
+
+    The noise state holds the countdown to the end of the refractory time
+    after the zig in seconds, the side it pushes toward, one to the left of
+    the heading and minus one to the right, and zero.
+    """
+
+    accel_m_s2: NonNegative = 12.5
+    """
+    The push across the heading, in meters per second squared, at a
+    starling's scale, by default the model's zig force of 1 newton over its
+    bird's mass of 80 grams.
+    """
+
+    back_s: Positive = 0.30
+    """
+    The time the drone pushes back toward its first heading, in seconds,
+    at a starling's scale.
+    """
+
+    branching: NonNegative = 1.0
+    """
+    The mean number of drones each zig sets off among the neighbors hearing
+    it, by default the critical branching ratio of an excitable network.
+    """
+
+    cue_s: NonNegative = 0.05
+    """
+    The time a drone takes to recognize a neighbor's zig, in seconds, at a
+    starling's scale.
+    """
+
+    reaction_s: NonNegative = 0.076
+    """
+    The time between a cue and the start of the zig, in seconds, at a
+    starling's scale, by default the reaction time of a starling.
+    """
+
+    refractory_s: NonNegative = 1.0
+    """
+    The time after a zig during which the drone starts none, in seconds, at
+    a starling's scale.
+    """
+
+    side_s: Positive = 0.25
+    """
+    The time the drone pushes to its side, in seconds, at a starling's
+    scale.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Pushes the drone across its heading by `accel_m_s2` toward its
+        side for `side_s` and away from it for `back_s`, once the countdown
+        enters the zig, and adds nothing through the wait and the refractory
+        time around it.
+        """
+        countdown, side, _ = observation.force
+        return where(
+            self.zigging(countdown),
+            side * self.accel_m_s2 * where(
+                self.refractory_s + self.back_s < countdown,
+                1.0,
+                -1.0
+            ),
+            0.0
+        ) * left(observation.velocity)
+
+    @property
+    def zig_s(self) -> float:
+        """
+        Adds the time the drone pushes to its side to the time it pushes
+        back, in seconds.
+        """
+        return self.side_s + self.back_s
+
+    def excited(
+        self,
+        delay_s     : float,
+        draw        : Array,
+        observation : Observation,
+        step_s      : float,
+        turn        : Array
+    ) -> Array:
+        """
+        Starts a resting drone's zig away from the rim once the roost's
+        horizontal turn reaches `accel_m_s2`, after `reaction_s`, or else
+        toward the side most of its zigging neighbors push where `draw`
+        falls below the chance their zigs set it off within the step, after
+        `reaction_s` and `cue_s` less the radio's `delay_s`, and otherwise
+        counts the countdown down by `step_s`.
+        """
+        countdown, side, _ = observation.force
+        start              = self.refractory_s + self.zig_s
+        zigging            = (observation.distances > 0) & self.zigging(
+            observation.forces[:, 0]
+        )
+        hazard  = -log1p(-self.branching / observation.distances.size) / self.zig_s
+        resting = countdown <= 0
+        walled  = resting & (linalg.norm(turn[:2]) >= self.accel_m_s2)
+        copied  = resting & ~walled & (
+            draw < -expm1(-hazard * zigging.sum() * step_s)
+        )
+        return select(
+            [walled, copied],
+            [
+                asarray(
+                    [
+                        start + self.reaction_s,
+                        where(turn @ left(observation.velocity) >= 0, 1.0, -1.0),
+                        0.0
+                    ]
+                ),
+                asarray(
+                    [
+                        start + maximum(self.reaction_s + self.cue_s - delay_s, 0.0),
+                        where(observation.forces[:, 1] @ zigging >= 0, 1.0, -1.0),
+                        0.0
+                    ]
+                )
+            ],
+            asarray([maximum(countdown - step_s, 0.0), side, 0.0])
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Multiplies the times by `factor`, divides the push by it, and the
+        white noise's amplitude by its square root, as a flock magnified by
+        `factor` at the same speed takes.
+        """
+        return tree_at(
+            lambda zig: (
+                zig.accel_m_s2, zig.back_s, zig.cue_s,
+                zig.reaction_s, zig.refractory_s, zig.side_s
+            ),
+            super().scaled(factor),
+            (
+                self.accel_m_s2 / factor,
+                self.back_s * factor,
+                self.cue_s * factor,
+                self.reaction_s * factor,
+                self.refractory_s * factor,
+                self.side_s * factor
+            )
+        )
+
+    def zigging(self, countdown: Array) -> Array:
+        """
+        Tells whether a drone holding `countdown` is pushing to its side or
+        back, the countdown having passed the wait and not yet reached the
+        refractory time.
+        """
+        return (countdown > self.refractory_s) & (
+            countdown <= self.refractory_s + self.zig_s
+        )
+
+
+def left(velocity: Array) -> Array:
+    """
+    Turns the horizontal part of `velocity` a quarter turn to the left and
+    divides it by its length.
+    """
+    return unit(cross(asarray([0.0, 0.0, 1.0]), velocity))

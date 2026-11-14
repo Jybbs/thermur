@@ -8,7 +8,7 @@ from pathlib           import Path
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
 
-from thermur.controller.components import Arena, Consensus, Constant, Cruise, HardSphere, Peripheral, Roost, White
+from thermur.controller.components import Centered, Consensus, Constant, Cruise, HardSphere, Home, Zig
 from thermur.controller.schemas    import Radio
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas   import Crop, ParametricThreat
@@ -36,13 +36,7 @@ class Settings(
     another node has already read.
     """
 
-    arena: Arena = Arena()
-    """
-    The acceleration turning a drone back from the walls of the box it
-    flies in.
-    """
-
-    cohesion: Peripheral = Peripheral()
+    cohesion: Centered = Centered()
     """
     The acceleration holding a drone at a spacing from its neighbors.
     """
@@ -68,9 +62,10 @@ class Settings(
     The acceleration turning a drone toward its neighbors.
     """
 
-    noise: White = White()
+    noise: Zig = Zig()
     """
-    The random increments driving each drone's command and force.
+    The random increments on each drone's command and the zig each drone
+    starts at the rim or takes up from its neighbors.
     """
 
     plan: Plan = Plan()
@@ -89,9 +84,9 @@ class Settings(
     The link carrying each drone's state to the others.
     """
 
-    roost: Roost = Roost()
+    roost: Home = Home()
     """
-    The acceleration pulling a drone toward the roost's height.
+    The acceleration holding a drone over the roost.
     """
 
     simulation: Path | None = None

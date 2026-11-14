@@ -4,10 +4,10 @@ one drone's view, a flock laid out by hand, a parcel of air holding one
 wind, and a short plan.
 """
 
-from jax.numpy import array, asarray, full, ones, zeros
+from jax.numpy import array, asarray, full, linalg, ones, zeros
 from xarray    import Dataset
 
-from thermur.controller.schemas import Flock, Observation
+from thermur.controller.schemas import Flock, Observation, unit
 from thermur.environment.air    import Air
 from thermur.metrics.schemas    import Plan
 
@@ -83,22 +83,27 @@ def viewed(  # prose: ignore[unsorted-positionals]
 ) -> Observation:
     """
     Builds one drone's view of neighbors at `offsets`, each flying as the
-    drone does and aligning at a rate of one, the drone at the center of the
-    default launch, unless `fields` says otherwise.
+    drone does, resting, and aligning at a rate of one, the drone at the
+    center of the default launch and its radio holding those neighbors
+    alone, unless `fields` says otherwise.
     """
-    spots = array(offsets)
-    own   = array(velocity)
+    spots     = array(offsets)
+    own       = array(velocity)
+    distances = linalg.norm(spots, axis=-1)
     return Observation(
         **{
             "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
-            "delayed"   : own * ones((len(offsets), 3)),
-            "distances" : (spots**2).sum(-1) ** 0.5,
-            "force"     : zeros(3),
-            "neighbors" : own * ones((len(offsets), 3)),
-            "offsets"   : spots,
-            "position"  : array(Plan().center_m),
-            "velocity"  : own,
-            "weights"   : ones(len(offsets)),
+            "centrality" : linalg.norm(unit(spots).sum(0))
+            / max(int((distances > 0).sum()), 1),
+            "delayed"    : own * ones((len(offsets), 3)),
+            "distances"  : distances,
+            "force"      : zeros(3),
+            "forces"     : zeros((len(offsets), 3)),
+            "neighbors"  : own * ones((len(offsets), 3)),
+            "offsets"    : spots,
+            "position"   : array(Plan().center_m),
+            "velocity"   : own,
+            "weights"    : ones(len(offsets)),
             **fields
         }
     )

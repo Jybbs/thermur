@@ -58,7 +58,6 @@ from thermur.pipeline.settings  import Settings
 AIR = still_air()
 
 STILL = Composite(
-    arena    = Centroid(stiffness_per_s2=0.0),
     cohesion = Centroid(stiffness_per_s2=0.0),
     contact  = HardSphere(weight_m_s2=0.0),
     coupling = Constant(coupling_per_s=0.0),
@@ -225,12 +224,22 @@ def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
 
     The mean over time and seeds is what the span bounds, since the model's
     flocks report their shape as a mean over time, and one frame's shape
-    stretches and folds as the flock turns at the walls.
+    stretches and folds as the flock turns at the roost's rim.
     """
     _, middle, longest = default.group_aspect_ratios.mean(0)
 
     assert 1.90 <= middle <= 3.58
     assert 4.02 <= longest <= 6.94
+
+
+@mark.slow
+def test_a_default_flight_sets_off_zigs(default: Flight):
+    """
+    Asserts that some drone of the default flight after two minutes and
+    after five holds a zig's countdown at some kept frame, so the roost's
+    turn and the neighbors' zigs reach the noise slot's state in flight.
+    """
+    assert (asarray(default.frames.forces)[..., 0] > 0).any()
 
 
 @mark.slow
@@ -244,15 +253,19 @@ def test_a_default_flight_keeps_the_outdoor_drone_flock_s_spacing(default: Fligh
 
 
 @mark.slow
-def test_a_default_flight_keeps_every_drone_over_the_threat_s_grid(default: Flight):
+def test_a_default_flight_keeps_every_drone_over_the_roost(default: Flight):
     """
     Asserts that every drone of the default flight after two minutes and
-    after five sits inside the parametric threat's grid, east, north, and
-    above the ground.
+    after five sits within the roost's radius of its center and above the
+    ground.
     """
+    roost = Settings().roost
     spots = asarray(default.frames.positions)[:, -1]
 
-    assert ((spots >= 0) & (spots <= Settings().threat.grid.extent_m)).all()
+    assert (
+        linalg.norm(spots[..., :2] - asarray(roost.center_m), axis=-1) <= roost.radius_m
+    ).all()
+    assert (spots[..., 2] >= 0).all()
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(

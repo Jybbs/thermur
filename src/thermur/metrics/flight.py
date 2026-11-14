@@ -8,7 +8,7 @@ from diffrax    import ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTr
 from equinox    import Module, field, tree_at
 from jax        import Array, ShapeDtypeStruct, jit, lax, tree, vmap
 from jax.numpy  import where
-from jax.random import key as seeded, split
+from jax.random import fold_in, key as seeded, split
 from numpy         import (
     angle,
     arange,
@@ -551,20 +551,20 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     Flies one flock, an outer `lax.scan` keeping every `frame_every`-th
     step of an inner one, each inner step hearing over the radio and sensing
     once, advancing through one `Euler().step`, then applying the discrete
-    updates, meaning the cruise speed where the heading holds it and the
-    first drone's turn, each on the drone's command.
+    updates, meaning the cruise speed where the heading holds it, the noise
+    slot's state, and the first drone's turn.
 
     Args:
         air       : The channels each drone reads.
         composite : The slots the flock flies under.
-        key       : The key the launch, the Brownian path, and each lost
-                    packet derive from.
+        key       : The key the launch, the Brownian path, each lost packet,
+                    and each step of the noise slot's state derive from.
         plan      : The plan the flock flies to.
 
     Returns:
         The flock at each kept frame.
     """
-    launch_key, path_key, radio_key = split(key, 3)
+    launch_key, path_key, radio_key, noise_key = split(key, 4)
     launch = plan.launched(launch_key)
     path   = VirtualBrownianTree(
         0.0,
@@ -601,6 +601,8 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         moved, *_ = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
         if composite.heading.confined:
             moved = moved.cruising(plan.cruise_m_s)
+
+        moved = composite.excited(moved, fold_in(noise_key, step), sensed, plan.step_s)
 
         turned = tree_at(
             lambda held: held.commands,

@@ -8,6 +8,7 @@ settings nest by name.
 
 from dataclasses import fields
 from equinox     import Module, field, tree_at
+from functools   import partial
 from jax         import Array, lax, tree, vmap
 from jax.numpy     import (
     broadcast_to,
@@ -23,7 +24,7 @@ from jax.numpy     import (
     where,
     zeros_like
 )
-from jax.random    import bernoulli, fold_in
+from jax.random    import bernoulli, fold_in, uniform
 from lineax        import DiagonalLinearOperator
 from math          import inf
 from numpy         import arange, argsort, asarray, ndarray, newaxis, take_along_axis
@@ -33,7 +34,7 @@ from typing        import Annotated, ClassVar, Self
 
 from thermur.environment.air     import Air
 from thermur.environment.plant   import Plant
-from thermur.environment.schemas import NonNegative, Positive, documented
+from thermur.environment.schemas import Count, NonNegative, Positive, documented
 from thermur.pipeline.settings   import Settings
 
 
@@ -52,8 +53,8 @@ class Flock(Module):
 
     forces: Array
     """
-    The persistent random force on each drone, in meters per second squared,
-    zero under a noise slot holding none.
+    The state the noise slot holds on each drone, in the units that slot
+    names, zero under a slot holding none.
     """
 
     positions: Array
@@ -122,15 +123,26 @@ class Inbox(Module):
     last heard, in meters per second.
     """
 
+    forces: Array
+    """
+    Each sender's noise state in the broadcast each receiver last heard.
+    """
+
     heard: Array
     """
-    Whether each receiver holds any broadcast of each sender.
+    Whether each receiver holds a broadcast of each sender younger than the
+    radio's hold.
     """
 
     positions: Array
     """
     Each sender's position in the broadcast each receiver last heard, in
     meters.
+    """
+
+    received: Array
+    """
+    The step at which each receiver last took a packet from each sender.
     """
 
     velocities: Array
@@ -145,17 +157,19 @@ class Inbox(Module):
         Builds the inbox in which every drone last heard the broadcast
         `sent`, each sender's velocity `Heading.lag_s` before it read from
         `earlier`, each receiver hearing only the senders within `range_m`
-        of it as `sent` went out.
+        of it as `sent` went out, and taking each packet at step zero.
         """
         drones = sent.positions.shape[-2]
         shape  = (drones, drones, 3)
+        heard  = linalg.norm(sent.positions[:, newaxis] - sent.positions, axis=-1) <= (
+            range_m
+        )
         return cls(
-            delayed = broadcast_to(earlier.velocities, shape),
-            heard   = linalg.norm(
-                sent.positions[:, newaxis] - sent.positions,
-                axis = -1
-            ) <= range_m,
+            delayed    = broadcast_to(earlier.velocities, shape),
+            forces     = broadcast_to(sent.forces, shape),
+            heard      = heard,
             positions  = broadcast_to(sent.positions, shape),
+            received   = zeros_like(heard, dtype="int32"),
             velocities = broadcast_to(sent.velocities, shape)
         )
 
@@ -163,15 +177,25 @@ class Inbox(Module):
 @documented
 class Radio(Module):
     """
-    The link each drone broadcasts its position and velocity over, each
-    packet reaching another drone within range late, at a fixed rate, and
-    only where the link does not lose it, after the simulated radios of an
-    outdoor drone flock.
+    The link each drone broadcasts its position, its velocity, and its
+    noise state over, each packet reaching another drone within range late,
+    at a fixed rate, and only where the link does not lose it, after the
+    simulated radios of an outdoor drone flock, each receiver forgetting a
+    sender once `hold_periods` packet periods pass with no packet from it,
+    the neighbor hold time of the mobile ad hoc routing protocols.
     """
 
     delay_s: NonNegative = field(default=1.0, static=True)
     """
     The age of a broadcast as it arrives, in seconds.
+    """
+
+    hold_periods: Count = field(default=3, static=True)
+    """
+    The number of packet periods after its last packet for which a receiver
+    keeps hearing a sender, by default the three refresh intervals the
+    mobile ad hoc routing protocols OLSR and NHDP set as the neighbor hold
+    time.
     """
 
     loss: Annotated[float, Field(ge=0, lt=1)] = 0.4
@@ -213,7 +237,8 @@ class Radio(Module):
         falls at `step`, delivers to each drone the broadcast each other
         drone sent `delay_s` earlier from within `range_m` of it, each drone
         holding what it last heard of a sender whose packet the link loses
-        or whose distance kept it from arriving.
+        or whose distance kept it from arriving, and hearing that sender
+        until `hold_periods` packet periods pass with no packet from it.
 
         Args:
             inbox  : What each drone heard by the step before.
@@ -247,7 +272,7 @@ class Radio(Module):
             1 - self.loss,
             fresh.heard.shape
         ) & (step % self.period_steps(step_s) == 0)
-        return tree.map(
+        held = tree.map(
             lambda new, old: where(
                 expand_dims(carried, tuple(range(carried.ndim, new.ndim))),
                 new,
@@ -255,6 +280,12 @@ class Radio(Module):
             ),
             fresh,
             inbox
+        )
+        young = step - inbox.received < self.hold_periods * self.period_steps(step_s)
+        return tree_at(
+            lambda kept_inbox: (kept_inbox.heard, kept_inbox.received),
+            held,
+            (carried | inbox.heard & young, where(carried, step, inbox.received))
         ), sent
 
     def opened(self, flock: Flock, lag: int, step_s: float) -> tuple[Inbox, Flock]:
@@ -301,6 +332,12 @@ class Observation(Module):
     Each channel of the air at the drone's position, by the channel's name.
     """
 
+    centrality: Array
+    """
+    The length of the mean bearing of every sender the drone's radio holds,
+    near zero inside the flock and rising toward one at its border.
+    """
+
     delayed: Array
     """
     Each neighbor's velocity `Heading.lag_s` before the state its radio last
@@ -315,7 +352,13 @@ class Observation(Module):
 
     force: Array
     """
-    The persistent random force on the drone, in meters per second squared.
+    The state the noise slot holds on the drone.
+    """
+
+    forces: Array
+    """
+    Each neighbor's noise state as its radio last heard it, `(n_neighbors,
+    3)`, in the order of its rank.
     """
 
     neighbors: Array
@@ -405,12 +448,10 @@ class Observation(Module):
         """
         positions       = flock.positions
         drones          = positions.shape[0]
+        held            = inbox.heard & ~eye(drones, dtype=bool)
+        apart           = inbox.positions - positions[:, newaxis]
         nearer, indices = lax.top_k(
-            -where(
-                inbox.heard & ~eye(drones, dtype=bool),
-                linalg.norm(inbox.positions - positions[:, newaxis], axis=-1),
-                inf
-            ),
+            -where(held, linalg.norm(apart, axis=-1), inf),
             count
         )
         rows    = arange(drones)[:, newaxis]
@@ -426,10 +467,15 @@ class Observation(Module):
 
         offsets = told(inbox.positions, positions) - positions[:, newaxis]
         return cls(
-            air       = air.sampled(positions, t),
+            air        = air.sampled(positions, t),
+            centrality = linalg.norm(
+                where(held[..., newaxis], unit(apart), 0.0).sum(1),
+                axis = -1
+            ) / maximum(held.sum(1), 1),
             delayed   = told(inbox.delayed, flock.commands),
             distances = linalg.norm(offsets, axis=-1),
             force     = flock.forces,
+            forces    = told(inbox.forces, flock.forces),
             neighbors = told(inbox.velocities, flock.commands),
             offsets   = offsets,
             position  = positions,
@@ -501,6 +547,28 @@ class Noise(Component):
         """
         raise NotImplementedError
 
+    def excited(
+        self,
+        delay_s     : float,
+        draw        : Array,
+        observation : Observation,
+        step_s      : float,
+        turn        : Array
+    ) -> Array:
+        """
+        Computes the state one drone holds after one step of `step_s`,
+        leaving it as it stands for a slot whose state no step updates.
+
+        Args:
+            delay_s     : The age of a broadcast as it arrives, in seconds.
+            draw        : A number drawn uniformly between zero and one.
+            observation : What the drone senses at the step's start.
+            step_s      : The step of the integrator, in seconds.
+            turn        : The roost's acceleration on the drone, in meters
+                          per second squared.
+        """
+        return observation.force
+
     def relaxation(self, observation: Observation) -> Array:
         """
         Holds the force on one drone, in meters per second cubed.
@@ -513,12 +581,6 @@ class Composite(Module):
     The slots the settings nest by name, summed for every drone into the
     rate of its command, beside the radio carrying each drone's state to the
     others and the plant carrying each drone's velocity toward its command.
-    """
-
-    arena: Component
-    """
-    The acceleration turning a drone back from the walls of the box it
-    flies in.
     """
 
     cohesion: Component
@@ -543,7 +605,8 @@ class Composite(Module):
 
     noise: Noise
     """
-    The random increments driving each drone's command and force.
+    The random increments on each drone's command and the zig each drone
+    starts at the rim or takes up from its neighbors.
     """
 
     plant: Plant
@@ -558,7 +621,7 @@ class Composite(Module):
 
     roost: Component
     """
-    The acceleration pulling a drone toward the roost's height.
+    The acceleration holding a drone over the roost.
     """
 
     speed: Component
@@ -582,7 +645,6 @@ class Composite(Module):
         )
         total = sum(
             (
-                self.arena(observation),
                 self.cohesion(observation),
                 self.contact(observation),
                 self.heading(weighted),
@@ -625,6 +687,30 @@ class Composite(Module):
             forces     = vmap(self.noise.relaxation)(observation),
             positions  = flock.velocities + observation.wind,
             velocities = self.plant.tracked(flock.commands, flock.velocities)
+        )
+
+    def excited(
+        self,
+        flock       : Flock,
+        key         : Array,
+        observation : Observation,
+        step_s      : float
+    ) -> Flock:
+        """
+        Advances the state the noise slot holds on each drone by one step
+        of `step_s`, each drone reading one uniform draw from `key`, the
+        roost's acceleration on it, and the radio's `delay_s`.
+        """
+        return tree_at(
+            lambda held: held.forces,
+            flock,
+            vmap(
+                partial(self.noise.excited, delay_s=self.radio.delay_s, step_s=step_s)
+            )(
+                draw        = uniform(key, flock.forces.shape[:-1]),
+                observation = observation,
+                turn        = vmap(self.roost)(observation)
+            )
         )
 
     @classmethod
