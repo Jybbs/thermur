@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { Kept }      from '../../../lib/crop/kept.ts'
 import * as sentence from '../../../lib/crop/sentence.ts'
+import model         from '../../../lib/rendered/crop.json' with { type: 'json' }
 
 describe('the menus', () => {
   const menus = sentence.menusOf(new Kept())
@@ -28,10 +29,10 @@ describe('the menus', () => {
   it.each([
     { lines: ['x_m = [0.0, 10000.0]'], picks: [1, 0, 0] },
     { lines: ['x_m = [10000.0, 20000.0]'], picks: [2, 0, 0] },
-    { lines: ['window_s = [3645.0, 3660.0]'], picks: [0, 1, 0] },
+    { lines: ['window_s = [4785.0, 4800.0]'], picks: [0, 1, 0] },
     { lines: ['levels = 10'], picks: [0, 0, 1] },
     { lines: ['levels = 50'], picks: [0, 0, 2] },
-    { lines: ['x_m = [10000.0, 20000.0]', 'window_s = [3645.0, 3660.0]', 'levels = 50'], picks: [2, 1, 2] }
+    { lines: ['x_m = [10000.0, 20000.0]', 'window_s = [4785.0, 4800.0]', 'levels = 50'], picks: [2, 1, 2] }
   ])('write $lines at the picks $picks under the table’s name', ({ lines, picks }) => {
     expect(sentence.linesOf(menus, picks)).toBe(['[tool.thermur.crop]', ...lines].join('\n'))
   })
@@ -45,7 +46,7 @@ describe('a choice of a menu', () => {
   it.each([
     { menu: 0, pick: 1, want: { east: 0.5, first: 0, top: 500, west: 0 } },
     { menu: 0, pick: 2, want: { east: 1, first: 0, top: 500, west: 0.5 } },
-    { menu: 1, pick: 1, want: { east: 1, first: 2, top: 500, west: 0 } },
+    { menu: 1, pick: 1, want: { east: 1, first: model.times_s.length - 2, top: 500, west: 0 } },
     { menu: 2, pick: 1, want: { east: 1, first: 0, top: 200, west: 0 } },
     { menu: 2, pick: 2, want: { east: 1, first: 0, top: 1000, west: 0 } }
   ])('sets what choice $pick of menu $menu moves, and the first takes it back', ({ menu, pick, want }) => {

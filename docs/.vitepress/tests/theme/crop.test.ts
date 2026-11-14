@@ -107,7 +107,7 @@ describe('a pick', () => {
     expect(widget.get('.crop-lines').element.textContent).toBe([
       '[tool.thermur.crop]',
       'x_m = [10000.0, 20000.0]',
-      'window_s = [3645.0, 3660.0]',
+      'window_s = [4785.0, 4800.0]',
       'levels = 50'
     ].join('\n'))
   })

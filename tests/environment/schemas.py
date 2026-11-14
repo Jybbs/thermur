@@ -5,23 +5,24 @@ Pins the records the fire data is read through:
 - The points and sizes of the `Grid` a threat lays its dataset out on
 - The dataset a `ParametricThreat` builds under WRF's names, and the reach
   its validator holds the front to
-- The address of the `Sample`, the request it sends, and the fetch that
-  checks and extracts its archive
+- The address of the `Sample`, the request it sends, the fetch that checks
+  and moves its file into place, and the checks it holds a window's
+  figures to
 """
 
 from contextlib         import AbstractContextManager, nullcontext
 from hashlib            import sha256
 from importlib.metadata import version
-from io                 import BytesIO
+from numpy              import nan
 from numpy.testing      import assert_allclose
 from pathlib            import Path
 from pydantic           import ValidationError
 from pytest             import MonkeyPatch, mark, param, raises
-from tarfile            import CHRTYPE, FilterError, SYMTYPE, TarFile, TarInfo
-from tempfile           import TemporaryFile
+from tempfile           import NamedTemporaryFile
 from unittest.mock      import Mock
-from urllib.error       import HTTPError, URLError
-from urllib.request     import HTTPRedirectHandler, Request, build_opener
+from urllib.error       import URLError
+from urllib.request     import Request, urlopen
+from xarray             import Dataset
 
 from thermur.environment.schemas import (
     BASE_K,
@@ -37,40 +38,48 @@ from thermur.environment.schemas import (
 from thermur.repo.checkout import Checkout
 
 
-class Unfollowed(HTTPRedirectHandler):
+def measured(**figures: list[float]) -> Dataset:
     """
-    The redirect handler that follows no redirect, so a request answered
-    with one raises `HTTPError` carrying the redirect's own headers.
+    Lays out the figures `WrfOutput.plume` measures over three snapshots
+    15 s apart, each figure `figures` names replacing the one a developed
+    plume holds.
     """
+    plume = {
+        "Time"        : [15.0, 30.0, 45.0],
+        "burning_m2"  : [100.0, 200.0, 3000.0],
+        "convected_k" : [1.0, 2.0, 1.5],
+        "heated_k"    : [5.0, 6.0, 7.0],
+        "hottest_k"   : [310.0, 312.04, 311.0]
+    } | figures
+    return Dataset(
+        {name: ("Time", values) for name, values in plume.items() if name != "Time"},
+        coords = {"Time": plume["Time"]}
+    )
 
-    def redirect_request(self, *_: object):
-        """
-        Declines every redirect.
-        """
 
-
-def served(folder: Path, members: dict[str, bytes], *entries: TarInfo) -> Sample:
+def pinned() -> Sample:
     """
-    Packs `members` into a gzipped tar archive, each under its name, beside
-    `entries`, each holding no data of its own, and writes it where the
-    sample's address points once `folder` stands in for the Hub.
+    Builds the sample pinning the figures `measured` lays out by default.
+    """
+    return Sample(
+        burning_m2 = (100.0, 3000.0),
+        hottest_k  = 312.0,
+        times_s    = (15.0, 30.0, 45.0)
+    )
+
+
+def served(data: bytes, folder: Path, *, digest: str | None = None) -> Sample:
+    """
+    Writes `data` where the sample's address points once `folder` stands in
+    for the bucket.
 
     Returns:
-        The sample pinning the archive's digest, with `folder` as its Hub.
+        The sample pinning `digest`, or the digest of `data` where none is
+        given, with `folder` as its host.
     """
-    buffer = BytesIO()
-    with TarFile.open(fileobj=buffer, mode="w:gz") as bundle:
-        for name, data in members.items():
-            info      = TarInfo(name)
-            info.size = len(data)
-            bundle.addfile(info, BytesIO(data))
-
-        for entry in entries:
-            bundle.addfile(entry)
-
-    sample = Sample(digest=sha256(buffer.getvalue()).hexdigest(), hub=folder.as_uri())
+    sample = Sample(digest=digest or sha256(data).hexdigest(), host=folder.as_uri())
     (path := Path.from_uri(sample.address)).parent.mkdir(parents=True)
-    path.write_bytes(buffer.getvalue())
+    path.write_bytes(data)
     return sample
 
 
@@ -86,92 +95,52 @@ def test_a_crop_lays_its_heights_out_evenly_from_its_floor():
     assert heights.height.values.tolist() == [10.0, 15.0, 20.0]
 
 
-def test_a_fetch_downloads_into_a_temporary_file_under_its_folder(
+def test_a_fetch_downloads_into_a_temporary_file_beside_its_target(
     monkeypatch : MonkeyPatch,
     tmp_path    : Path
 ):
     """
-    Asserts that a fetch writes its download into a temporary file under the
-    folder it extracts into.
+    Asserts that a fetch writes its download into a temporary file in the
+    folder the file lands in.
     """
-    sample = served(tmp_path / "hub", {"samples/wrf_sample.nc": b"CDF"})
-    spy    = Mock(wraps=TemporaryFile)
-    monkeypatch.setattr("thermur.environment.schemas.TemporaryFile", spy)
+    spy = Mock(wraps=NamedTemporaryFile)
+    monkeypatch.setattr("thermur.environment.schemas.NamedTemporaryFile", spy)
 
-    sample.fetch(tmp_path / "clone")
+    served(b"CDF", tmp_path / "bucket").fetch(tmp_path / "clone")
 
-    spy.assert_called_once_with(dir=tmp_path / "clone/data")
+    spy.assert_called_once_with(dir=tmp_path / "clone/data/samples")
 
 
-def test_a_fetch_extracts_an_archive_matching_its_digest(tmp_path: Path):
+def test_a_fetch_moves_a_file_matching_its_digest_into_place(tmp_path: Path):
     """
-    Asserts that a fetch downloads the archive, extracts every member under
-    the folder, removes the downloaded archive, and returns the path of the
-    member the graph reads.
+    Asserts that a fetch downloads the file, moves it to the sample's path
+    under the clone, leaves nothing else in its folder, and returns that
+    path.
     """
-    sample = served(
-        folder  = tmp_path / "hub",
-        members = {"samples/README.md": b"#", "samples/wrf_sample.nc": b"CDF"}
-    )
-
-    fetched = sample.fetch(tmp_path / "clone")
+    fetched = served(b"CDF", tmp_path / "bucket").fetch(tmp_path / "clone")
 
     assert fetched == tmp_path / "clone/data/samples/wrf_sample.nc"
     assert fetched.read_bytes() == b"CDF"
-    assert sorted(path.name for path in (tmp_path / "clone/data").rglob("*")) == [
-        "README.md", "samples", "wrf_sample.nc"
-    ]
+    assert list(fetched.parent.iterdir()) == [fetched]
 
 
-def test_a_fetch_extracts_nothing_from_an_archive_with_another_digest(tmp_path: Path):
+def test_a_fetch_moves_nothing_from_a_file_with_another_digest(tmp_path: Path):
     """
-    Asserts that a fetch whose archive hashes to another digest than the
-    pinned one raises naming both, leaving the folder empty.
+    Asserts that a fetch whose file hashes to another digest than the pinned
+    one raises naming both, leaving the folder empty.
     """
-    sample = served(tmp_path / "hub", {"samples/wrf_sample.nc": b"CDF"})
+    sample = served(b"CDF", tmp_path / "bucket", digest="0" * 64)
 
-    with raises(ValueError, match=f"hashes to `{sample.digest}`"):
-        sample.model_copy(update={"digest": "0" * 64}).fetch(tmp_path / "clone")
-
-    assert list((tmp_path / "clone/data").iterdir()) == []
-
-
-@mark.parametrize(
-    ("kind", "target"),
-    [
-        param(SYMTYPE, "/etc/hosts", id="a-link-leading-out"),
-        param(CHRTYPE, "", id="a-device")
-    ]
-)
-def test_a_fetch_refuses_a_link_leading_out_and_a_device(
-    kind     : bytes,
-    target   : str,
-    tmp_path : Path
-):
-    """
-    Asserts that a fetch refuses an archive holding a link leading out of
-    the folder it extracts into or a device, extracting neither.
-    """
-    entry = TarInfo("samples/member")
-    entry.linkname, entry.type = target, kind
-
-    with raises(FilterError):
-        served(tmp_path / "hub", {}, entry).fetch(tmp_path / "clone")
-
-    assert list((tmp_path / "clone/data").iterdir()) == []
-
-
-def test_a_fetch_refuses_a_member_reaching_outside_its_folder(tmp_path: Path):
-    """
-    Asserts that a fetch refuses an archive whose member reaches outside the
-    folder it extracts into, writing nothing outside it.
-    """
-    sample = served(tmp_path / "hub", {"../outside.txt": b"x"})
-
-    with raises(FilterError):
+    with raises(
+        ValueError,
+        match = (
+            f"hashes to `{sha256(b'CDF').hexdigest()}` rather than the pinned "
+            f"`{'0' * 64}`"
+        )
+    ):
         sample.fetch(tmp_path / "clone")
 
-    assert not (tmp_path / "clone/outside.txt").exists()
+    assert list((tmp_path / "clone/data/samples").iterdir()) == []
 
 
 def test_a_fetch_waits_on_its_download_for_at_most_its_timeout(
@@ -199,24 +168,24 @@ def test_a_fetch_waits_on_its_download_for_at_most_its_timeout(
         Sample(timeout_s=5.0).fetch(tmp_path / "clone")
 
     assert waits == [5.0]
-    assert list((tmp_path / "clone/data").iterdir()) == []
+    assert list((tmp_path / "clone/data/samples").iterdir()) == []
 
 
-def test_a_fetch_whose_download_fails_extracts_nothing(tmp_path: Path):
+def test_a_fetch_whose_download_fails_moves_nothing(tmp_path: Path):
     """
     Asserts that a fetch whose download fails raises the error the download
     raised, leaving the folder empty.
     """
     with raises(URLError):
-        Sample(hub=(tmp_path / "hub").as_uri()).fetch(tmp_path / "clone")
+        Sample(host=(tmp_path / "bucket").as_uri()).fetch(tmp_path / "clone")
 
-    assert list((tmp_path / "clone/data").iterdir()) == []
+    assert list((tmp_path / "clone/data/samples").iterdir()) == []
 
 
 @mark.parametrize(
     ("path", "status"),
     [
-        param(Sample().folder / Sample().member, 0, id="the-fetched-output"),
+        param(Sample().path, 0, id="the-fetched-output"),
         param(Path("docs/pages/data/index.md"), 1, id="the-data-page"),
         param(Path(".mise/tasks/data/fetch"), 1, id="the-data-task")
     ]
@@ -227,8 +196,8 @@ def test_git_ignores_the_fetched_output_and_no_other_data_folder(
     status   : int
 ):
     """
-    Asserts that git ignores what a fetch extracts under the clone's `data/`
-    folder, and no file under a `data` folder deeper in the clone.
+    Asserts that git ignores the file a fetch writes under the clone's
+    `data/` folder, and no file under a `data` folder deeper in the clone.
     """
     assert checkout.run("git", "check-ignore", path, check=False).returncode == status
 
@@ -292,17 +261,52 @@ def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():
     assert grid.zeros("west_east_stag", "Time").shape == (5, 5)
 
 
-def test_a_sample_addresses_its_archive_at_its_revision():
+@mark.parametrize(
+    ("sample", "address"),
+    [
+        param(
+            Sample(),
+            "https://data.thermur.fyi/samples/"
+            "620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09/"
+            "wrf_sample.nc",
+            id = "the-pinned-sample"
+        ),
+        param(
+            Sample(digest="a" * 64, host="https://bucket.test"),
+            f"https://bucket.test/samples/{'a' * 64}/wrf_sample.nc",
+            id = "another-digest-on-another-host"
+        )
+    ]
+)
+def test_a_sample_addresses_its_file_under_a_key_carrying_its_digest(
+    address : str,
+    sample  : Sample
+):
     """
-    Asserts that the sample's address names the Hub, the dataset, the pinned
-    revision, and the archive, in the form the Hub resolves a file of a
-    dataset at a commit.
+    Asserts that the sample's address names its host and then the key the
+    file is published under, `samples/`, the digest, and the file, so each
+    digest takes an address of its own.
     """
-    sample = Sample(hub="https://hub.test", repository="owner/data", revision="a" * 40)
+    assert sample.address == address
 
-    assert sample.address == (
-        f"https://hub.test/datasets/owner/data/resolve/{'a' * 40}/samples.tar.gz"
-    )
+
+def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
+    """
+    Asserts that the attributes a written sample carries name its license
+    and, as its source, the simulation and the credit of the dataset the
+    sample holds, crediting no creator the dataset does not name.
+    """
+    assert Sample(
+        dataset    = "Test Dataset by A. Author, https://doi.org/10.0000/test",
+        license    = "CC0 1.0",
+        simulation = "wrfout_W3F1R0"
+    ).attributes == {
+        "license" : "CC0 1.0",
+        "source"  : (
+            "Cut from wrfout_W3F1R0 of the Test Dataset by A. Author, "
+            "https://doi.org/10.0000/test"
+        )
+    }
 
 
 @mark.parametrize(
@@ -380,9 +384,18 @@ def test_a_record_refuses_a_value_past_a_field_s_bound(
         record(**{field: value})
 
 
-def test_a_sample_requests_its_archive_naming_the_package_alone():
+def test_a_sample_refuses_a_window_naming_every_figure_it_misses():
     """
-    Asserts that the request for the archive goes to the sample's address
+    Asserts that a window missing several figures is refused once, naming
+    each of them.
+    """
+    with raises(ValueError, match="no cell burns, and burns 0 and 3,000 m²"):
+        pinned().check(measured(burning_m2=[0.0, 200.0, 3000.0]), duration_s=30.0)
+
+
+def test_a_sample_requests_its_file_naming_the_package_alone():
+    """
+    Asserts that the request for the file goes to the sample's address
     and names the package and its installed version as the client, the one
     header it sends.
     """
@@ -392,34 +405,41 @@ def test_a_sample_requests_its_archive_naming_the_package_alone():
     assert request.header_items() == [("User-agent", f"thermur/{version('thermur')}")]
 
 
-def test_a_second_fetch_writes_each_member_afresh(tmp_path: Path):
-    """
-    Asserts that fetching again over an earlier extraction writes each
-    member afresh, so a member edited since reads as the archive holds it.
-    """
-    sample = served(tmp_path / "hub", {"samples/wrf_sample.nc": b"CDF"})
-    sample.fetch(tmp_path / "clone").write_bytes(b"edited")
-
-    assert sample.fetch(tmp_path / "clone").read_bytes() == b"CDF"
-
-
 @mark.parametrize(
     "field",
     [
         param({"digest": "6f97"}, id="a-short-digest"),
-        param(
-            {"revision": "E7D4FC2CA1F99E82DFEEC3CA2F7BA1C714965913"},
-            id = "an-uppercase-revision"
-        )
+        param({"digest": "E" * 64}, id="an-uppercase-digest")
     ]
 )
 def test_a_sample_refuses_a_pin_outside_its_form(field: dict[str, str]):
     """
-    Asserts that a digest other than 64 lowercase hexadecimal digits, or a
-    revision other than 40, is refused.
+    Asserts that a digest other than 64 lowercase hexadecimal digits is
+    refused.
     """
     with raises(ValidationError):
         Sample(**field)
+
+
+def test_a_sample_takes_a_window_holding_its_figures():
+    """
+    Asserts that a window falling at the pinned times, burning the pinned
+    areas, and reaching the pinned hottest air to a tenth of a kelvin,
+    with the air above the fire warmer than the ambient convection in every
+    snapshot, passes the check.
+    """
+    pinned().check(measured(), duration_s=30.0)
+
+
+def test_a_second_fetch_replaces_the_file_afresh(tmp_path: Path):
+    """
+    Asserts that fetching again over an earlier fetch replaces the file, so
+    a file edited since reads as the bucket serves it.
+    """
+    sample = served(b"CDF", tmp_path / "bucket")
+    sample.fetch(tmp_path / "clone").write_bytes(b"edited")
+
+    assert sample.fetch(tmp_path / "clone").read_bytes() == b"CDF"
 
 
 def test_a_still_threat_burns_nothing():
@@ -488,6 +508,66 @@ def test_a_threat_s_base_state_cools_at_the_dry_adiabatic_rate():
     )
 
 
+@mark.parametrize(
+    ("figures", "duration_s", "message"),
+    [
+        param(
+            {"Time": [15.0, 30.0, 60.0]},
+            30.0,
+            r"falls at \[15.0, 30.0, 60.0\] s rather than at \[15.0, 30.0, 45.0\] s",
+            id = "at-other-times"
+        ),
+        param(
+            {},
+            60.0,
+            "spans 30 s, short of 60 s",
+            id = "too-short"
+        ),
+        param(
+            {"burning_m2": [100.0, 0.0, 3000.0]},
+            30.0,
+            "holds a snapshot in which no cell burns",
+            id = "burning-out"
+        ),
+        param(
+            {"burning_m2": [100.0, 200.0, 4000.0]},
+            30.0,
+            "burns 100 and 4,000 m² rather than the pinned 100 and 3,000 m²",
+            id = "burning-another-area"
+        ),
+        param(
+            {"heated_k": [5.0, 2.0, 7.0]},
+            30.0,
+            "exceeds the ambient profile by no more than the 2.0 K",
+            id = "matched-by-the-convection"
+        ),
+        param(
+            {"convected_k": [nan, nan, nan]},
+            30.0,
+            "holds no air the smoke has not reached",
+            id = "with-no-ambient-air"
+        ),
+        param(
+            {"hottest_k": [310.0, 312.05, 311.0]},
+            30.0,
+            "reaches 312.1 K rather than the pinned 312 K",
+            id = "reaching-other-air"
+        )
+    ]
+)
+def test_a_sample_refuses_a_window_missing_a_figure_naming_it(
+    duration_s : float,
+    figures    : dict[str, list[float]],
+    message    : str
+):
+    """
+    Asserts that a window missing any one figure the sample holds it to is
+    refused with a message naming that figure.
+    """
+    with raises(ValueError, match=message):
+        pinned().check(measured(**figures), duration_s=duration_s)
+
+
 def test_a_threat_warms_and_burns_behind_its_front_alone():
     """
     Asserts that the threat's perturbation potential temperature reaches its
@@ -510,18 +590,15 @@ def test_a_threat_warms_and_burns_behind_its_front_alone():
 
 
 @mark.network
-def test_the_hub_serves_the_pinned_archive_under_the_pinned_digest():
+def test_the_bucket_serves_the_pinned_file_at_its_address():
     """
-    Asserts that the Hub answers the request for the archive with a redirect
-    naming the pinned digest as the file's linked ETag and its linked size,
-    read from the redirect's headers rather than from the archive.
+    Asserts that the bucket answers the request for the file at the sample's
+    address with the file's pinned size, read from the response's headers
+    rather than from the file, whose digest the fetch checks.
     """
     request        = Sample().request
     request.method = "HEAD"
 
-    with raises(HTTPError) as redirect:
-        build_opener(Unfollowed).open(request)
-
-    with redirect.value as response:
-        assert response.headers["X-Linked-Etag"].strip('"') == Sample().digest
-        assert int(response.headers["X-Linked-Size"]) == 490464998
+    with urlopen(request, timeout=Sample().timeout_s) as response:
+        assert response.status == 200
+        assert int(response.headers["Content-Length"]) == 455334719
