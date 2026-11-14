@@ -83,14 +83,14 @@ describe('murmuration', () => {
 })
 
 describe('skyBands', () => {
-  it('fills each band between its two edges, raised wherever the lift reports', () => {
+  it('fills each band between its two edges, raised wherever the rise reports', () => {
     const tones = ['#111111', '#222222']
-    const level = scene.skyBands({ edges: [0, 10, 20], lift: () => 0, tones, width: 16 })
+    const level = scene.skyBands({ edges: [0, 10, 20], rise: () => 0, tones, width: 16 })
     expect(level).toBe(
         '<path d="M0 0L8 0L16 0L16 10L8 10L0 10Z" fill="#111111"/>'
       + '<path d="M0 10L8 10L16 10L16 20L8 20L0 20Z" fill="#222222"/>'
     )
-    expect(scene.skyBands({ edges: [0, 10], lift: x => x / 8, tones: ['#111111'], width: 8 })).toBe(
+    expect(scene.skyBands({ edges: [0, 10], rise: x => x / 8, tones: ['#111111'], width: 8 })).toBe(
       '<path d="M0 0L8 -1L8 9L0 10Z" fill="#111111"/>'
     )
   })

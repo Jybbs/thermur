@@ -1,8 +1,8 @@
 import { VPImage }            from 'vitepress/theme-without-fonts'
 import { defineComponent, h } from 'vue'
 
+import { wordmarkImage } from '../../lib/head.ts'
 import source            from '../../lib/rendered/identity.json' with { type: 'json' }
-import { wordmarkImage } from '../../lib/site.ts'
 
 /**
  * The front page's hero above its button: the wordmark in each scheme's ink as

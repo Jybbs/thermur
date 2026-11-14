@@ -8,6 +8,7 @@ import FrontSky       from './front/sky.ts'
 import NotFoundPage   from './not-found/page.ts'
 import MotionPause    from './pause.ts'
 
+import '@thermur/kit/styles.css'
 import 'katex/dist/katex.min.css'
 import 'virtual:identity.css'
 import './styles/motion.css'
@@ -24,6 +25,14 @@ import './styles/threat.css'
 import './styles/rules/figure.css'
 import './styles/rules/neighbors.css'
 import './styles/values.css'
+import './styles/identity/specimen.css'
+import './styles/identity/palette.css'
+import './styles/identity/heat.css'
+import './styles/identity/faces.css'
+import './styles/identity/marks.css'
+import './styles/kit/parts.css'
+import './styles/kit/catalog.css'
+import './styles/kit/card.css'
 
 /**
  * The default layout's slots the theme fills: the front page's background

@@ -2,16 +2,19 @@
 Holds `Outputs`, the files the `docs:render` task writes into the site
 and every Markdown page git tracks, which `repo:audit` holds the committed
 copies to, beside `tabled`, which lays a record's fields out as the table a
-page's region holds.
+page's region holds, `specimens`, which lays out the identity as the regions
+of The Visual Identity, and `pieces`, which lays out the kit's pieces as the
+region of The Kit.
 """
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Collection, Iterable, Iterator, Mapping
 from functools       import cached_property
 from json            import dumps
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.docs.pages          import Page
+from thermur.docs.kit   import Piece
+from thermur.docs.pages import Page
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -21,7 +24,7 @@ from thermur.environment.schemas import (
     Ranges,
     Sample
 )
-from thermur.identity.schemas  import Identity
+from thermur.identity.schemas  import Identity, Pair, Palette
 from thermur.metrics.schemas   import Plan
 from thermur.metrics.trials    import Trial
 from thermur.pipeline.settings import Settings
@@ -100,22 +103,28 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     @cached_property
     def regions(self) -> dict[Path, dict[str, str]]:
         """
-        Renders the body of each region the render task writes into a page,
-        by the page's path and then by the region's name, meaning the fields
-        `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
-        Data page, and on The Interaction Rules the fields `Plan` and the
-        contact declare beside those of each open slot's default and each of
-        its candidates, every one named for its component.
+        Renders the body of each region the render task writes into a
+        page, by the page's path and then by the region's name, meaning the
+        fields `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare
+        on the Data page, on The Interaction Rules the fields `Plan` and the
+        contact declare beside those of each open slot's default and each
+        of its candidates, every one named for its component, on The Visual
+        Identity the identity as `specimens` lays it out, and on The Kit the
+        pieces each declaration in the clone records.
         """
         defaults = Settings()
         return {
-            Path("docs/pages/data/index.md")    : {
+            Path("docs/pages/reference/identity.md") : specimens(Identity.shipped()),
+            Path("docs/pages/reference/kit.md")      : {
+                "pieces": pieces(Piece.declared(self.checkout.root))
+            },
+            Path("docs/pages/data/index.md")         : {
                 "crop"   : tabled(Crop),
                 "ranges" : tabled(Ranges),
                 "sample" : tabled(Sample),
                 "threat" : tabled(ParametricThreat)
             },
-            Path("docs/pages/methods/rules.md") : {
+            Path("docs/pages/methods/rules.md")      : {
                 "contact" : tabled(type(defaults.contact)),
                 "plan"    : tabled(Plan)
             } | {
@@ -224,6 +233,22 @@ def bounded(field: Mapping[str, object]) -> str:
     return " and ".join(f"{word} {field[key]}" for key, word in words if key in field)
 
 
+def colored(name: str, palette: Palette) -> str:
+    """
+    Names the color `palette` files under `name` in words beside its hex in
+    code, such as ``Fire Lord Deep `#995500` `` for `fire-lord-deep`.
+    """
+    return f"{name.replace('-', ' ').title()} `{palette.colors[name]}`"
+
+
+def described(kind: type[BaseModel], name: str) -> str:
+    """
+    Reads the description of the field `name` that `kind` declares on one
+    line, without its closing period.
+    """
+    return " ".join(str(kind.model_fields[name].description).split()).removesuffix(".")
+
+
 def fielded(
     definitions : Mapping[str, Mapping[str, object]],
     properties  : Mapping[str, Mapping[str, object]],
@@ -256,6 +281,112 @@ def fielded(
             )
 
 
+def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> str:
+    """
+    Lays out `rows` as a Markdown table beneath `header`, each heading in
+    bold.
+    """
+    return "\n".join(
+        [
+            f"| {' | '.join(f'**{heading}**' for heading in header)} |",
+            "|---" * len(header) + "|",
+            *(f"| {' | '.join(row)} |" for row in rows)
+        ]
+    )
+
+
+def pieces(declared: Iterable[Piece]) -> str:
+    """
+    Lays out each of the kit's pieces in `declared` as a row naming the
+    piece, the names a widget imports it by, the Zag.js machine it runs on,
+    when a widget reads it, and what it replaces.
+    """
+    return markdown_table(
+        header = [
+            "Piece", "Imports", "Machine", "A Widget Reads It When", "It Replaces"
+        ],
+        rows = (
+            [
+                piece.name,
+                ", ".join(f"`{name}`" for name in piece.exports),
+                "None" if piece.machine is None else f"`{piece.machine}`",
+                piece.when, piece.replaces
+            ]
+            for piece in declared
+        )
+    )
+
+
+def specimens(identity: Identity) -> dict[str, str]:
+    """
+    Lays out each region of The Visual Identity, by the region's name:
+
+    - `faces`, each face beside the text it sets, its weights, its styles,
+      and the stack a reader falls back through
+    - `heat`, each step of the heat ramp from light to dark
+    - `marks`, each mark beside its file under each color scheme
+    - `palette`, each role and each chart series beside the color it takes
+      under each color scheme
+    - `tagline`, the tagline as a quotation
+    """
+    palette = identity.palette
+    roles   = [
+        (name.title(), role, described(Palette, name))
+        for name, role in palette
+        if isinstance(role, Pair)
+    ] + [
+        (f"Chart {place}", role, f"Series {place} of a chart")
+        for place, role in enumerate(palette.series, start=1)
+    ]
+    return {
+        "faces"   : markdown_table(
+            header = ["Face", "Sets", "Weights", "Styles", "Stack"],
+            rows   = (
+                [
+                    face.family,
+                    f"*{described(type(identity.faces), kind)}*",
+                    ", ".join(map(str, face.weights)),
+                    "Roman and italic" if face.italic else "Roman",
+                    f"`{', '.join([f"'{face.family}'", *face.fallbacks])}`"
+                ]
+                for kind, face in identity.faces
+            )
+        ),
+        "heat"    : markdown_table(
+            header = ["Step", "Color"],
+            rows   = (
+                [str(step), colored(name, palette)]
+                for step, name in enumerate(palette.heat, start=1)
+            )
+        ),
+        "marks"   : markdown_table(
+            header = ["Mark", "Light", "Dark", "Holds"],
+            rows   = (
+                [
+                    kind.title(),
+                    f"`{pair.light}`",
+                    f"`{pair.dark}`",
+                    f"*{described(type(identity.marks), kind)}*"
+                ]
+                for kind, pair in identity.marks
+            )
+        ),
+        "palette" : markdown_table(
+            header = ["Role", "Light", "Dark", "Holds"],
+            rows   = (
+                [
+                    label,
+                    colored(role.light, palette),
+                    colored(role.dark, palette),
+                    f"*{holds}*"
+                ]
+                for label, role, holds in roles
+            )
+        ),
+        "tagline" : f'> *"{identity.tagline.text}"*'
+    }
+
+
 def tabled(kind: type) -> str:
     """
     Lays out each field `kind` declares as a row of a Markdown table, in the
@@ -265,14 +396,10 @@ def tabled(kind: type) -> str:
     schema = TypeAdapter(kind).json_schema()
     rows   = list(fielded(schema.get("$defs", {}), schema["properties"]))
     bounds = any(bound for _, _, bound, _ in rows)
-    header = ["**Field**", "**Default**", *["**Bound**"] * bounds, "**Holds**"]
-    return "\n".join(
-        [
-            f"| {' | '.join(header)} |",
-            "|---" * len(header) + "|",
-            *(
-                f"| `{name}` | `{default}` | {f'{bound} | ' * bounds}{holds} |"
-                for name, default, bound, holds in rows
-            )
-        ]
+    return markdown_table(
+        header = ["Field", "Default", *["Bound"] * bounds, "Holds"],
+        rows   = (
+            [f"`{name}`", f"`{default}`", *[bound] * bounds, holds]
+            for name, default, bound, holds in rows
+        )
     )

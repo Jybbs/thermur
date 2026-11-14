@@ -9,7 +9,8 @@ repository holds:
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused
-- The table a region lays a record's fields out as
+- The table a region lays a record's fields out as, and the specimens The
+  Visual Identity's regions lay the identity out as
 """
 
 from common.edits import append, edit
@@ -19,7 +20,8 @@ from pydantic     import BaseModel, Field
 from typing       import Annotated
 
 from thermur.controller.components import SoftCore
-from thermur.docs.outputs          import Outputs, tabled
+from thermur.docs.kit              import Piece
+from thermur.docs.outputs          import Outputs, markdown_table, pieces, specimens, tabled
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -35,10 +37,13 @@ from thermur.metrics.trials   import Trial
 from thermur.repo.checkout    import Checkout
 from thermur.repo.schemas     import Finding
 
-# `DATA` and `RULES` hold the pages whose regions the render writes, from the
-# fire data's records and from the flight's.
-DATA  = Path("docs/pages/data/index.md")
-RULES = Path("docs/pages/methods/rules.md")
+# `DATA`, `IDENTITY`, `KIT`, and `RULES` hold the pages whose regions the
+# render writes, from the fire data's records, the identity's, the kit's,
+# and the flight's.
+DATA     = Path("docs/pages/data/index.md")
+IDENTITY = Path("docs/pages/reference/identity.md")
+KIT      = Path("docs/pages/reference/kit.md")
+RULES    = Path("docs/pages/methods/rules.md")
 
 
 class Inner(BaseModel, use_attribute_docstrings=True):
@@ -159,6 +164,21 @@ def test_a_region_missing_its_pair_of_markers_is_refused_and_left(checkout: Chec
     assert "<!-- /sample -->" not in checkout.read(DATA)
 
 
+def test_a_table_bolds_each_heading_above_its_rows():
+    """
+    Asserts that a table sets each heading in bold above a divider of one
+    cell per heading and each row in the order given.
+    """
+    assert markdown_table(
+        ["Step", "Color"],
+        [["1", "red"], ["2", "blue"]]
+    ) == "\n".join(
+        [
+            "| **Step** | **Color** |", "|---|---|", "| 1 | red |", "| 2 | blue |"
+        ]
+    )
+
+
 def test_a_table_names_each_field_beside_its_default_bound_and_description():
     """
     Asserts that a table lays out each field in the order its class declares
@@ -249,7 +269,54 @@ def test_each_region_is_written_from_its_record(checkout: Checkout):
         for page, regions in outputs.regions.items()
         for name, body in regions.items()
     )
-    assert not {DATA, RULES} & set(outputs.drifted)
+    assert not {DATA, IDENTITY, RULES} & set(outputs.drifted)
+
+
+def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Checkout):
+    """
+    Asserts that The Visual Identity carries the specimens of the shipped
+    identity, each role of the palette before each chart series, each heat
+    step from the lightest, each face beside its styles, each mark beside
+    its files, and the tagline as a quotation.
+    """
+    identity = Identity.shipped()
+    regions  = Outputs(checkout=checkout).regions[IDENTITY]
+    palette  = regions["palette"].splitlines()[2:]
+
+    assert regions == specimens(identity)
+    assert [row.split(" | ")[0].removeprefix("| ") for row in palette] == [
+        "Critical", "Ground", "Ink", "Lead", "Warning",
+        *(f"Chart {place}" for place in range(1, len(identity.palette.series) + 1))
+    ]
+    assert regions["heat"].splitlines()[2] == (
+        f"| 1 | Kindleflame `{identity.palette.colors['kindleflame']}` |"
+    )
+    assert "| Bellefair | " in regions["faces"]
+    assert "| Roman |" in regions["faces"]
+    assert "| Roman and italic |" in regions["faces"]
+    assert (
+        f"| Small | `{identity.marks.small.light}` | `{identity.marks.small.dark}` |"
+        in regions["marks"]
+    )
+    assert regions["tagline"] == f'> *"{identity.tagline.text}"*'
+
+
+def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkout):
+    """
+    Asserts that The Kit carries a row per piece declared in the clone, each
+    import and machine backticked and a piece no machine covers marked as
+    running on none.
+    """
+    declared = Piece.declared(checkout.root)
+    regions  = Outputs(checkout=checkout).regions[KIT]
+    table    = regions["pieces"]
+    rows     = table.splitlines()[2:]
+
+    assert regions == {"pieces": pieces(declared)}
+    assert len(rows) == len(declared)
+    assert "| Slider | `Slider` | `slider` | " in table
+    assert "| The Gate | `onMotion`, `pause`, `paused`, `still` | None | " in table
+    assert any(" | None | " in row for row in rows)
 
 
 def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):

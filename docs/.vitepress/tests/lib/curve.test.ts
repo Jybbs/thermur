@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { Curve } from '../../lib/curve.ts'
+import { Curve, pathThrough } from '../../lib/curve.ts'
 
 /**
  * A curve along a level line 300 pixels long, through points spaced unevenly
@@ -30,5 +30,17 @@ describe('Curve', () => {
     const [, , tx, ty] = corner.at(corner.length / 2)
     expect(tx).toBeGreaterThan(0.3)
     expect(ty).toBeGreaterThan(0.3)
+  })
+})
+
+describe('pathThrough', () => {
+  it('runs one cubic through each pair of points, its handles a sixth along the neighbors', () => {
+    expect(pathThrough([[0, 0], [60, 30], [120, 0]])).toBe('M0,0C10,5 40,30 60,30C80,30 110,5 120,0')
+  })
+
+  it('passes through the same points the sampled curve does', () => {
+    const points = [[0, 0], [40, 80], [90, 20], [160, 60]] as const
+    const ends   = [...pathThrough(points).matchAll(/ (-?[\d.]+),(-?[\d.]+)(?=C|$)/gu)]
+    expect(ends.map(([, x, y]) => [Number(x), Number(y)])).toEqual(points.slice(1))
   })
 })

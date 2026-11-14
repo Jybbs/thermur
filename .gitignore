@@ -1,5 +1,6 @@
 /.cache/
 /.claude
+/.mise/.mise.lock.*
 
 *.pyc
 __pycache__/
@@ -14,4 +15,4 @@ notes/
 .DS_Store
 
 docs/.vitepress/.temp/
-docs/node_modules/
+node_modules/

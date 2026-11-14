@@ -2,7 +2,10 @@ import fs                from 'node:fs'
 import path              from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-function docsDir(metaUrl: string): string {
+/**
+ * Joins the folder holding the site, its pages, and the kit.
+ */
+export function docsDir(metaUrl: string): string {
   return path.join(repoRoot(metaUrl), 'docs')
 }
 

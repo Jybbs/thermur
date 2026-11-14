@@ -1,15 +1,8 @@
 .motion-pause {
-  align-items     : center;
-  border          : 1px solid var(--vp-c-divider);
-  border-radius   : 50%;
-  display         : inline-flex;
-  height          : 2rem;
-  justify-content : center;
-  margin-left     : 0.75rem;
-  width           : 2rem;
+  height      : 2rem;
+  margin-left : 0.75rem;
+  width       : 2rem;
 }
-
-.motion-pause:hover { border-color: var(--vp-c-text-3); }
 
 .motion-pause-bars {
   border-left  : 2px solid currentcolor;

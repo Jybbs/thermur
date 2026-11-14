@@ -50,7 +50,7 @@ export interface Mix {
 /**
  * A palette entry holding one color per scheme rather than a list.
  */
-type Role = {
+export type Role = {
   [K in keyof Identity['palette']]: Identity['palette'][K] extends { dark: string, light: string } ? K : never
 }[keyof Identity['palette']]
 
@@ -124,6 +124,13 @@ export const ON_LEAD = {
 } as const
 
 /**
+ * The palette's roles, each holding one color per scheme, sorted by name.
+ */
+export const roles = (Object.keys(source.palette) as (keyof Identity['palette'])[])
+  .filter((key): key is Role => 'dark' in source.palette[key])
+  .toSorted()
+
+/**
  * Writes the color custom property `top` paints at `share` over the one
  * `under` paints, or `top` alone at a full share.
  */
@@ -189,21 +196,18 @@ export const heatRamp = (identity: Identity): string[] =>
  */
 export function identityCss(): string {
   const { palette } = source
-  const roles       = (Object.keys(palette) as (keyof typeof palette)[])
-    .filter((key): key is Role => 'dark' in palette[key])
-    .toSorted()
-    .map(role => `  --th-${role}: ${schemed(palette[role])};`)
-  const series = palette.series.map((role, index) => `  ${seriesProperty(index)}: ${schemed(role)};`)
-  const heat   = heatRamp(source).map((hex, index) => `  --th-heat-${index + 1}: ${hex};`)
-  const mixes  = Object.entries(MIXES).map(([property, { over = 'ground', role, share }]) =>
+  const tones       = roles.map(role => `  --th-${role}: ${schemed(palette[role])};`)
+  const series      = palette.series.map((role, index) => `  ${seriesProperty(index)}: ${schemed(role)};`)
+  const heat        = heatRamp(source).map((hex, index) => `  --th-heat-${index + 1}: ${hex};`)
+  const mixes       = Object.entries(MIXES).map(([property, { over = 'ground', role, share }]) =>
     `  ${property}: ${laid(`--th-${role}`, share, `--th-${over}`)};`)
-  const fills  = Object.entries(FILL).map(([property, { dark, light }]) =>
+  const fills       = Object.entries(FILL).map(([property, { dark, light }]) =>
     `  ${property}: light-dark(${heated(light)}, ${heated(dark)});`)
-  const labels = Object.keys(ON_LEAD).map(property => `  ${property}: var(--th-ground);`)
-  const faces  = Object.entries(FACES).map(([property, kind]) =>
+  const labels      = Object.keys(ON_LEAD).map(property => `  ${property}: var(--th-ground);`)
+  const faces       = Object.entries(FACES).map(([property, kind]) =>
     `  ${property}: ${fontStack(source.faces[kind])};`)
 
-  return `:root {\n${[...roles, ...series, ...heat, ...mixes, ...fills, ...labels, ...faces].join('\n')}\n}\n`
+  return `:root {\n${[...tones, ...series, ...heat, ...mixes, ...fills, ...labels, ...faces].join('\n')}\n}\n`
 }
 
 /**

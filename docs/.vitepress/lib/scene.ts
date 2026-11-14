@@ -3,11 +3,11 @@ import { type Pair, mulberry } from './common.ts'
 /**
  * A sky's bands, the band at index `k` filled with `tones[k]` between
  * `edges[k]` and `edges[k + 1]` across `width` pixels, each edge raised by what
- * `lift` returns where a plume rises through it.
+ * `rise` returns where a plume rises through it.
  */
 interface Bands {
   edges : readonly number[]
-  lift  : (x: number, y: number) => number
+  rise  : (x: number, y: number) => number
   tones : readonly string[]
   width : number
 }
@@ -50,7 +50,7 @@ interface Murmuration {
 /**
  * Lists the points from 0 to `x1` every `step` pixels.
  */
-const steps = (x1: number, step: number): number[] =>
+export const steps = (x1: number, step: number): number[] =>
   Array.from({ length: Math.floor(x1 / step) + 1 }, (_, index) => index * step)
 
 /**
@@ -139,10 +139,10 @@ export const polyline = (points: readonly Pair[]): string =>
 /**
  * Draws a sky's bands as SVG paths, each edge traced every eight pixels.
  */
-export function skyBands({ edges, lift, tones, width }: Bands): string {
+export function skyBands({ edges, rise, tones, width }: Bands): string {
   const xs   = steps(width, 8)
   const edge = (y: number, across: readonly number[]): string =>
-    polyline(across.map(x => [x, y - lift(x, y)]))
+    polyline(across.map(x => [x, y - rise(x, y)]))
   return tones.map((tone, k) =>
     `<path d="M${edge(edges[k]!, xs)}L${edge(edges[k + 1]!, xs.toReversed())}Z" fill="${tone}"/>`).join('')
 }

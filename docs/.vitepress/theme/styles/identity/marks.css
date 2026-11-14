@@ -1,0 +1,106 @@
+@property --th-dusk {
+  syntax        : '<percentage>';
+  inherits      : true;
+  initial-value : 50%;
+}
+
+.identity-marks { animation: identity-dusk calc(var(--th-settle) * 5) var(--th-settle-curve) backwards; }
+
+.identity-cards {
+  display               : grid;
+  gap                   : 0.625rem;
+  grid-template-columns : 1fr 1fr;
+}
+
+.identity-card {
+  aspect-ratio  : 1;
+  border-radius : 0.875rem;
+  overflow      : hidden;
+  position      : relative;
+}
+
+.identity-card::after {
+  border-radius  : inherit;
+  box-shadow     : inset 0 0 0 1px var(--vp-c-divider);
+  content        : '';
+  inset          : 0;
+  pointer-events : none;
+  position       : absolute;
+}
+
+.identity-card-wordmark {
+  aspect-ratio : 2.6;
+  grid-column  : 1 / -1;
+}
+
+.vp-doc .identity-side {
+  display         : grid;
+  inset           : 0;
+  place-items     : center;
+  position        : absolute;
+  text-decoration : none;
+}
+
+.vp-doc .identity-side-dark { clip-path: inset(0 0 0 var(--th-dusk)); }
+
+.identity-side img {
+  height     : 70%;
+  object-fit : contain;
+  width      : 70%;
+}
+
+.identity-card-wordmark img {
+  height : auto;
+  width  : 78%;
+}
+
+.identity-file {
+  bottom         : 0.5625rem;
+  font           : 400 0.62rem / 1 var(--vp-font-family-mono);
+  letter-spacing : 0.04em;
+  opacity        : 0.7;
+  position       : absolute;
+}
+
+.identity-side-light .identity-file { left: 0.75rem; }
+
+.identity-side-dark .identity-file { right: 0.75rem; }
+
+.identity-seam {
+  background     : linear-gradient(var(--th-lead), color-mix(in oklab, var(--th-lead) 30%, transparent));
+  bottom         : 0;
+  box-shadow     : 0 0 12px 1px color-mix(in oklab, var(--th-lead) 45%, transparent);
+  left           : var(--th-dusk);
+  margin-left    : -1px;
+  pointer-events : none;
+  position       : absolute;
+  top            : 0;
+  width          : 2px;
+}
+
+.identity-card-name {
+  background-color : color-mix(in oklab, var(--vp-c-bg) 80%, transparent);
+  border-radius    : 999px;
+  left             : 0.75rem;
+  padding          : 0.125rem 0.5rem;
+  pointer-events   : none;
+  position         : absolute;
+  top              : 0.625rem;
+}
+
+.identity-dusk {
+  align-items           : center;
+  display               : grid;
+  gap                   : 0.75rem;
+  grid-template-columns : auto 1fr auto;
+}
+
+@keyframes identity-dusk {
+  from { --th-dusk: 100%; }
+}
+
+@media (width < 40rem) {
+  .identity-file { display: none; }
+
+  .identity-card-wordmark .identity-file { display: block; }
+}

@@ -569,30 +569,31 @@ def test_a_document_failing_validation_is_reported_rather_than_raised(
 
 
 @mark.parametrize(
-    ("character", "problem"),
+    ("character", "message"),
     [
         param(
             "\x85",
+            f"`{ACTION}`: Value error, "
             "while scanning a simple key, could not find expected ':'",
             id = "next-line"
         ),
         param(
             "\x07",
+            f"`{ACTION}`: Value error, "
             "unacceptable character #x0007: special characters are not allowed",
             id = "control-character"
         )
     ]
 )
-def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(
+def test_a_manifest_failing_to_read_is_named_for_its_problem(
     character : str,
     checkout  : Checkout,
-    problem   : str
+    message   : str
 ):
     """
-    Asserts that a manifest yaml-rs reads but PyYAML cannot parse, here one
-    whose description holds the NEL that YAML 1.1 reads as a line break or
-    a control character PyYAML's reader rejects, is named for the problem
-    PyYAML reports rather than raising.
+    Asserts that a manifest failing to read is named for the problem its
+    read reports rather than raising, where a description holds a NEL, which
+    YAML 1.1 reads as a line break, or a control character YAML rejects.
     """
     edit(
         checkout,
@@ -602,7 +603,7 @@ def test_a_manifest_pyyaml_cannot_parse_is_named_for_its_problem(
     )
 
     assert AnchorCheck(checkout=checkout).findings == [
-        Finding(file=Path(ACTION), message=f"PyYAML cannot parse `{ACTION}`: {problem}")
+        Finding(file=Path(ACTION), message=message)
     ]
 
 
@@ -1854,15 +1855,15 @@ def test_a_validation_error_outside_the_documents_is_raised(
 
 def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
     """
-    Asserts that a workflow yaml-rs cannot read, here one repeating a key,
-    is reported as one finding on that workflow, whose error names no field.
+    Asserts that a workflow failing to read, here one repeating a key, is
+    reported as one finding on that workflow, whose error names no field.
     """
     (checkout.root / CI).write_text("name: one\nname: two\n")
 
     assert GateCheck(checkout=checkout).findings == [
         Finding(
             file    = Path(CI),
-            message = f"`{CI}`: Value error, duplicate mapping key: 'name'"
+            message = f"`{CI}`: Value error, names `name` more than once"
         )
     ]
 

@@ -19,14 +19,15 @@ ECHO = '#!/bin/sh\nprintf "%s\\n" "$(basename "$0")" "$@"\n'
 @fixture
 def site(tmp_path: Path) -> Path:
     """
-    Writes a `docs/` folder holding an empty `.vitepress` and a
-    `node_modules/.bin` holding a stand-in for each tool a `site` task runs,
-    each printing its own name and every argument it receives.
+    Writes a `docs/` folder holding an empty `.vitepress`, an empty `kit`,
+    and a `node_modules/.bin` holding a stand-in for each tool a `site` task
+    runs, each printing its own name and every argument it receives.
 
     Returns:
         The `docs/` folder, which every `site` task runs from.
     """
-    (tmp_path / "docs/.vitepress").mkdir(parents=True)
+    for folder in (".vitepress", "kit"):
+        (tmp_path / "docs" / folder).mkdir(parents=True)
     for tool in ("knip", "oxlint", "tsc", "vitepress", "vitest"):
         executable(tmp_path / "docs/node_modules/.bin" / tool, ECHO)
 
@@ -54,7 +55,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "true",
             [
                 "oxlint", "--config", ".vitepress/.oxlintrc.json", "--format",
-                "github", "--marker", ".vitepress"
+                "github", "--marker", ".vitepress", "kit"
             ],
             id = "lint-actions"
         ),
@@ -63,7 +64,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             None,
             [
                 "oxlint", "--config", ".vitepress/.oxlintrc.json", "--format",
-                "default", "--marker", ".vitepress"
+                "default", "--marker", ".vitepress", "kit"
             ],
             id = "lint-unset"
         ),
@@ -206,16 +207,21 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
     ]
 
 
+@mark.parametrize("component", [".vitepress/Card.vue", "kit/Card.vue"])
 def test_the_type_check_refuses_a_single_file_component(
+    component    : str,
     pytestconfig : Config,
     site         : Path
 ):
     """
     Asserts that the type check fails before `tsc` runs, naming each
-    single-file component under `.vitepress`, since `tsc` reads none.
+    single-file component under `.vitepress` or the kit, since `tsc` reads
+    none, and leaving one under the kit's own packages alone.
     """
-    (site / ".vitepress/Card.vue").write_text("", encoding="utf-8")
+    (site / "kit/node_modules").mkdir()
+    (site / "kit/node_modules/Packaged.vue").write_text("", encoding="utf-8")
+    (site / component).write_text("", encoding="utf-8")
     checked = ran(site, pytestconfig, "typecheck")
 
     assert (checked.returncode, checked.stdout) == (1, "")
-    assert checked.stderr.rstrip().endswith(".vitepress/Card.vue")
+    assert checked.stderr.rstrip().endswith(component)

@@ -391,6 +391,47 @@ def test_the_root_resolves_through_a_symlink(
     assert Checkout(root=link).root == checkout.root
 
 
+def test_tracked_leaves_out_the_file_mise_lock_writes_and_keeps_the_lock(
+    checkout: Checkout
+):
+    """
+    Asserts that the files a checkout tracks take in `.mise/mise.lock` and
+    leave out the temporary file `mise lock` writes beside it, so a reader
+    listing them while `lock:check` runs names no file `mise lock` may
+    remove before the reader opens it.
+    """
+    written = Path(".mise/.mise.lock.jQXMo2")
+    (checkout.root / written).touch()
+    files = checkout.tracked()
+
+    assert written not in files
+    assert Path(".mise/mise.lock") in files
+
+
+@mark.parametrize(
+    "written",
+    [
+        "docs/.vitepress/.temp/_headers", "docs/.vitepress/dist/_headers",
+        "docs/kit/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs",
+        "docs/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs"
+    ]
+)
+def test_tracked_leaves_out_a_file_from_each_folder_the_site_build_writes(
+    checkout : Checkout,
+    written  : str
+):
+    """
+    Asserts that a file the site's build writes is none of the files a
+    checkout tracks, so a reader listing them while the build runs names no
+    file the build may remove before the reader opens it.
+    """
+    path = checkout.root / written
+    path.parent.mkdir(parents=True)
+    path.touch()
+
+    assert Path(written) not in checkout.tracked()
+
+
 def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Checkout):
     """
     Asserts that the files a checkout tracks take in an untracked file
@@ -409,29 +450,6 @@ def test_tracked_lists_what_git_tracks_or_would_track_and_still_finds(clone: Che
     assert Path("café.md") in files
     assert Path(".env") not in files
     assert Path("LICENSE") not in files
-
-
-@mark.parametrize(
-    "written",
-    [
-        "docs/.vitepress/.temp/_headers", "docs/.vitepress/dist/_headers",
-        "docs/node_modules/.vite-temp/config.ts.timestamp-0-0.mjs"
-    ]
-)
-def test_tracked_leaves_out_a_file_from_each_folder_the_site_build_writes(
-    checkout : Checkout,
-    written  : str
-):
-    """
-    Asserts that a file the site's build writes is none of the files a
-    checkout tracks, so a reader listing them while the build runs names no
-    file the build may remove before the reader opens it.
-    """
-    path = checkout.root / written
-    path.parent.mkdir(parents=True)
-    path.touch()
-
-    assert Path(written) not in checkout.tracked()
 
 
 def test_unwrap_blanks_a_comment_and_keeps_the_blank_line_above_it():

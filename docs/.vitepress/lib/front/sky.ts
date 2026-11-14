@@ -61,7 +61,7 @@ export function quietAt(g: part.Geometry, x: number, y: number, depth: number): 
 
 /**
  * The hero's sky at dusk, banded from the night above down to a ridge at the
- * hero's foot, a short fire on the ridge lifting the bands with its plume, and
+ * hero's foot, a short fire on the ridge raising the bands with its plume, and
  * the flock a silhouette crossing the low bright sky, parting where the plume
  * rises and from the reader's pointer, which acts as the falcon. The light
  * scheme takes the dawn.
@@ -132,7 +132,7 @@ export class Sky implements part.Part {
    * Measures how far the plume raises a band's edge at a point, up to 16 pixels
    * at the plume's center, scaled by the fire's strength.
    */
-  #lift(x: number, y: number): number {
+  #rise(x: number, y: number): number {
     const rise   = this.horizon - y
     const { lean, spread } = this.#fire.rise
     const center = this.#fire.x + lean * rise
@@ -142,7 +142,7 @@ export class Sky implements part.Part {
   }
 
   /**
-   * Paints the night down to 40 pixels past the horizon, the bands lifting over
+   * Paints the night down to 40 pixels past the horizon, the bands rising over
    * the plume, and the flock fading behind the hero's words.
    */
   #night(ctx: CanvasRenderingContext2D, g: part.Geometry, dpr: number): void {
@@ -175,7 +175,7 @@ export class Sky implements part.Part {
 
   /**
    * Sets the horizon at the hero's foot, the fire on the ridge, the flock's
-   * region in the sky above it, and the outlines of the bands lifting over the
+   * region in the sky above it, and the outlines of the bands rising over the
    * plume, in the page's own coordinates, and of the ridge, traced down from
    * the horizon, settling the flock on the first fit alone.
    */
@@ -189,14 +189,14 @@ export class Sky implements part.Part {
     this.#edge  = groundPath(320, x => this.ridge(x) - this.horizon, g.w)
     this.#bands = Array.from({ length: count - 1 }, (_, index) => {
       const y = this.horizon * (index + 0.85) / count
-      return groundPath(this.horizon + 40, x => y - this.#lift(x, y), g.w, 8)
+      return groundPath(this.horizon + 40, x => y - this.#rise(x, y), g.w, 8)
     })
     this.#flock.settle(this.#settle, this.#field)
     this.#settle = 0
   }
 
   /**
-   * Paints the night, the bands lifting over the plume, and the flock fading
+   * Paints the night, the bands rising over the plume, and the flock fading
    * behind the hero's words while the sky is in the window, and the fire and
    * the ridge with the fire's line along it until the ridge's fade has scrolled
    * out of the window as well.

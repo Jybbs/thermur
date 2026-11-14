@@ -22,6 +22,17 @@ describe('widgetRules', () => {
     expect(html.indexOf('<table')).toBeLessThan(html.indexOf('</details>'))
   })
 
+  it.for([
+    { marker: 'faces', widget: 'IdentityFaces' },
+    { marker: 'heat', widget: 'IdentityHeat' },
+    { marker: 'marks', widget: 'IdentityMarks' },
+    { marker: 'palette', widget: 'IdentityPalette' }
+  ])('sets $widget over the $marker table, folded shut', async ({ marker, widget }) => {
+    const html = await rendered(`<!-- ${marker} -->\n\n| a |\n|---|\n| b |\n\n<!-- /${marker} -->\n`)
+    expect(html).toMatch(new RegExp(`^<${widget} />\n<details class="every-value">`, 'u'))
+    expect(html.indexOf('<table')).toBeLessThan(html.indexOf('</details>'))
+  })
+
   it('folds the crop’s table shut with no widget over it', async () => {
     const html = await rendered('<!-- crop -->\n\n| a |\n|---|\n| b |\n\n<!-- /crop -->\n')
     expect(html).toMatch(/^<details class="every-value"><summary>Every value as a table<\/summary>\n/u)
@@ -37,7 +48,7 @@ describe('widgetRules', () => {
     expect(await rendered(`<!-- ${marker} -->\n`)).toBe(`<${widget} />\n`)
   })
 
-  it.for(['<!-- sample -->', '<div>kept</div>'])('leaves %s as it was written', async block => {
+  it.for(['<!-- sample -->', '<!-- tagline -->', '<div>kept</div>'])('leaves %s as it was written', async block => {
     expect(await rendered(`${block}\n`)).toBe(`${block}\n`)
   })
 })
