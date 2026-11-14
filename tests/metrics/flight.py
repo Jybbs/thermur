@@ -32,6 +32,7 @@ from numpy         import (
     ones,
     pi,
     sin,
+    sort,
     stack,
     trapezoid,
     where,
@@ -612,7 +613,7 @@ def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
         ).frames.forces
     )
 
-    assert (diff(forces[..., 0], axis=1) != 0).all()
+    assert (diff(sort(forces[..., 0], axis=1), axis=1) != 0).all()
 
 
 def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():

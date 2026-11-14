@@ -734,8 +734,7 @@ def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
     roost's height at the drone scale, settles back to within a meter of
     it in ten minutes without ever falling below it, the pull setting the
     rate of the command and the velocity following the command through the
-    plant's lag, as in flight, where a roost left undamped swings the drone
-    more than 50 m below its height.
+    plant's lag, as a flight steps them.
     """
     plant = Plant()
     roost = Settings().roost.scaled(Plan().similarity)
