@@ -601,10 +601,15 @@ def test_the_first_zero_is_the_first_value_at_or_below_zero(
 def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
     """
     Asserts that a noise slot holding each step's draw as its force holds
-    another force at every kept frame, so no two steps read one draw.
+    another force at every step, each kept as a frame, so no two steps read
+    one draw.
     """
     forces = asarray(
-        Flight.flown(replace(composite, noise=Drawn()), AIR, short()).frames.forces
+        Flight.flown(
+            replace(composite, noise=Drawn()),
+            AIR,
+            short(frame_every=1)
+        ).frames.forces
     )
 
     assert (diff(forces[..., 0], axis=1) != 0).all()

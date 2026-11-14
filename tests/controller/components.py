@@ -36,6 +36,7 @@ from thermur.controller.components import (
 )
 from thermur.controller.schemas import Component, Composite, Inbox, Noise, Observation, nearest
 from thermur.environment.air    import Air
+from thermur.environment.plant  import Plant
 from thermur.metrics.schemas    import Plan
 from thermur.metrics.trials     import Trial
 from thermur.pipeline.settings  import Settings
@@ -730,29 +731,38 @@ def test_home_damps_a_drone_s_height_critically(
 def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
     """
     Asserts that a drone the roost alone moves, lifted 30 m above the
-    roost's height at the drone scale, settles back to within a meter of it
-    in ten minutes without ever falling below it, the height of a drone the
-    roost leaves undamped swinging as far below as it started above.
+    roost's height at the drone scale, settles back to within a meter of
+    it in ten minutes without ever falling below it, the pull setting the
+    rate of the command and the velocity following the command through the
+    plant's lag, as in flight, where a roost left undamped swings the drone
+    more than 50 m below its height.
     """
+    plant = Plant()
     roost = Settings().roost.scaled(Plan().similarity)
     alone = viewed([[1.0, 0.0, 0.0]])
 
     def step(state: Array, *_: None) -> tuple[Array, Array]:
         """
-        Advances the height and the climb by half a second under the roost's
-        vertical pull.
+        Advances the height, the commanded climb, and the climb by a tenth
+        of a second under the roost's vertical pull.
         """
-        height, climb = state
-        pull          = roost.vertical(
+        height, command, climb = state
+        pull = roost.vertical(
             tree_at(
                 lambda seen: (seen.position, seen.velocity),
                 alone,
                 (array([1000.0, 1000.0, height]), array([10.0, 0.0, climb]))
             )
         )
-        return array([height + climb * 0.5, climb + pull * 0.5]), height
+        rate = plant.tracked(array([10.0, 0.0, command]), array([10.0, 0.0, climb]))
+        return (
+            array([height + climb * 0.1, command + pull * 0.1, climb + rate[2] * 0.1]),
+            height
+        )
 
-    _, heights = lax.scan(step, array([roost.height_m + 30.0, 0.0]), length=1200)
+    _, heights = lax.scan(
+        step, array([roost.height_m + 30.0, 0.0, 0.0]), length=6000
+    )
 
     assert heights.min() >= roost.height_m - 1e-3
     assert_allclose(heights[-1], roost.height_m, atol=1.0)
