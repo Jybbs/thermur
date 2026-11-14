@@ -282,6 +282,25 @@ def test_a_default_flight_keeps_every_drone_over_the_roost(default: Flight):
     assert (spots[..., 2] >= 0).all()
 
 
+def test_a_flight_holds_every_command_within_the_plant_s_speed_bounds():
+    """
+    Asserts that noise strong enough to carry a command past the plant's
+    speed bounds within a step leaves every command at every kept frame
+    within them, some at a bound, so the command stops at the speed the
+    plant can fly rather than integrating past it.
+    """
+    plant    = Plant()
+    commands = Flight.flown(
+        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
+        AIR,
+        short(turn_deg=0.0)
+    ).frames.commands
+    assert (linalg.norm(commands[..., :2], axis=-1) <= plant.level_m_s + 1e-4).all()
+    assert (commands[..., 2] <= plant.climb_m_s + 1e-4).all()
+    assert (commands[..., 2] >= -plant.descent_m_s - 1e-4).all()
+    assert allclose(abs(commands[..., 2]).max(), plant.climb_m_s)
+
+
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     composite : Composite,
     flight    : Flight
@@ -338,23 +357,6 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
 
     assert_allclose(ratio_on_hull(lattice, ones(len(lattice))), 1.0)
     assert ratio_on_hull(lattice, where(inside, 0.5, 1.0)) < 1.0
-
-
-def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
-    """
-    Asserts that drones on the corners of a box 100 m long and 10 m across,
-    each 10 m from its nearest corner, around four drones on its axis 20 m
-    apart, read a border density eight times the inside's from each drone's
-    nearest neighbor rather than its farthest.
-    """
-    corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
-    axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
-
-    assert_allclose(
-        laid(concat([corners, axis]), [10.0, 0.0, 0.0]).border_density,
-        8.0,
-        rtol = 1e-5
-    )
 
 
 @mark.parametrize(
@@ -428,6 +430,23 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
+def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
+    """
+    Asserts that drones on the corners of a box 100 m long and 10 m across,
+    each 10 m from its nearest corner, around four drones on its axis 20 m
+    apart, read a border density eight times the inside's from each drone's
+    nearest neighbor rather than its farthest.
+    """
+    corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
+    axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
+
+    assert_allclose(
+        laid(concat([corners, axis]), [10.0, 0.0, 0.0]).border_density,
+        8.0,
+        rtol = 1e-5
+    )
+
+
 def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
     """
     Asserts that a flight under the persistent force holds a nonzero force
@@ -461,6 +480,32 @@ def test_a_replay_ranks_every_composite_it_is_given(
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
 
 
+@mark.parametrize(
+    ("heading", "held"),
+    [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
+)
+def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
+    composite : Composite,
+    heading   : Heading,
+    held      : bool
+):
+    """
+    Asserts that every drone commands `cruise_m_s` at every kept frame under
+    a heading holding the speed, and that the commanded speeds spread under
+    one leaving it free.
+    """
+    speeds = linalg.norm(
+        Flight.flown(
+            replace(composite, heading=heading),
+            AIR,
+            short()
+        ).frames.commands,
+        axis = -1
+    )
+
+    assert allclose(speeds, 10.0, rtol=1e-4) == held
+
+
 def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     """
     Asserts that a flight whose drones command a swing of one meter per
@@ -487,32 +532,6 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
         [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
         rtol = 1e-5
     )
-
-
-@mark.parametrize(
-    ("heading", "held"),
-    [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
-)
-def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
-    composite : Composite,
-    heading   : Heading,
-    held      : bool
-):
-    """
-    Asserts that every drone commands `cruise_m_s` at every kept frame under
-    a heading holding the speed, and that the commanded speeds spread under
-    one leaving it free.
-    """
-    speeds = linalg.norm(
-        Flight.flown(
-            replace(composite, heading=heading),
-            AIR,
-            short()
-        ).frames.commands,
-        axis = -1
-    )
-
-    assert allclose(speeds, 10.0, rtol=1e-4) == held
 
 
 def test_a_response_spreading_at_a_constant_speed_reads_that_speed():

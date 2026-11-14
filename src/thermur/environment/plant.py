@@ -70,6 +70,19 @@ class Plant(Module):
     the ceiling PX4's `MPC_ACC_HOR_MAX` sets in its direct-velocity mode.
     """
 
+    def held(self, commands: Array) -> Array:
+        """
+        Holds each command within the speed bounds, the horizontal bound
+        on the length of the horizontal part and the vertical bounds on the
+        height's rate.
+        """
+        return capped(
+            high    = self.climb_m_s,
+            level   = self.level_m_s,
+            low     = -self.descent_m_s,
+            vectors = commands
+        )
+
     def scaled(self, _: float) -> Self:
         """
         Leaves the plant as it stands, since its bounds are a drone's own at
@@ -95,17 +108,11 @@ class Plant(Module):
             Each drone's acceleration, `(..., 3)`, in meters per second
             squared.
         """
-        held = capped(
-            high    = self.climb_m_s,
-            level   = self.level_m_s,
-            low     = -self.descent_m_s,
-            vectors = commands
-        )
         return capped(
             high    = self.climbing_m_s2,
             level   = self.level_m_s2,
             low     = -self.descending_m_s2,
-            vectors = (held - velocities) / self.lag_s
+            vectors = (self.held(commands) - velocities) / self.lag_s
         )
 
 

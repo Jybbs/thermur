@@ -551,8 +551,9 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     Flies one flock, an outer `lax.scan` keeping every `frame_every`-th
     step of an inner one, each inner step hearing over the radio and sensing
     once, advancing through one `Euler().step`, then applying the discrete
-    updates, meaning the cruise speed where the heading holds it, the noise
-    slot's state, and the first drone's turn.
+    updates, meaning the plant's speed bounds on each command, the cruise
+    speed where the heading holds it, the noise slot's state, and the first
+    drone's turn.
 
     Args:
         air       : The channels each drone reads.
@@ -575,6 +576,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     )
     terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
     solver = Euler()
+    plant  = composite.plant
     radio  = composite.radio
     lag    = round(composite.heading.lag_s / plan.step_s)
 
@@ -599,6 +601,11 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         )
         sensed    = Observation.sensed(flock, heard, air, t, plan.neighbors)
         moved, *_ = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
+        moved     = tree_at(
+            lambda held: held.commands,
+            moved,
+            plant.held(moved.commands)
+        )
         if composite.heading.confined:
             moved = moved.cruising(plan.cruise_m_s)
 
