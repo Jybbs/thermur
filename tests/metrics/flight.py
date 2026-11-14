@@ -232,18 +232,18 @@ def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     """
     Asserts that the largest group of the default flight, averaged over the
     frames `Plan.shape_every_s` apart through two minutes and through five
-    and over the seeds, stands within the span of the starling flocks the
-    starling model is checked against, its middle axis 1.90 to 3.58 times
-    its thinnest and its longest 4.02 to 6.94 times.
+    and over the seeds, holds its longest axis within 4.02 to 6.94 times its
+    thinnest, the span of the starling flocks the starling model is checked
+    against.
 
-    The mean over time and seeds is what the span bounds, since the model's
-    flocks report their shape as a mean over time, and one frame's shape
-    stretches and folds as the flock turns at the roost's rim.
+    The middle axis goes unchecked, since that ratio rises with flock size
+    and the Rome flocks behind the span hold 448 to 2631 birds, whereas the
+    longest ratio does not depend on size. The mean over time and seeds is
+    what the span bounds, since the model's flocks report their shape as a
+    mean over time, and one frame's shape stretches and folds as the flock
+    turns at the roost's rim.
     """
-    _, middle, longest = default.group_aspect_ratios.mean(0)
-
-    assert 1.90 <= middle <= 3.58
-    assert 4.02 <= longest <= 6.94
+    assert 4.02 <= default.group_aspect_ratios.mean(0)[2] <= 6.94
 
 
 @mark.slow
