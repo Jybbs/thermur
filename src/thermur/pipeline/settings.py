@@ -45,7 +45,7 @@ class Settings(
 
     contact: HardSphere = HardSphere()
     """
-    The acceleration pushing apart two drones that overlap.
+    The acceleration pushing a drone away from each of its neighbors.
     """
 
     coupling: Constant = Constant()

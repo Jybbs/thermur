@@ -6,7 +6,7 @@ keeps, the `Observation` that is the one input a slot reads, the abstract
 settings nest by name.
 """
 
-from dataclasses import fields, replace
+from dataclasses import fields
 from equinox     import Module, field, tree_at
 from jax         import Array, lax, tree, vmap
 from jax.numpy     import (
@@ -180,11 +180,11 @@ class Radio(Module):
     drawn apart from every other.
     """
 
-    range_m: Positive = field(default=100.0, static=True)
+    range_m: Positive = field(default=50.0, static=True)
     """
     The distance between two drones, as a packet is sent, past which the
-    packet never arrives, in meters, at a starling's scale, by default the
-    starling flock model's farthest perception.
+    packet never arrives, in meters, by default the distance past which the
+    outdoor drone flock's radios began to fail.
     """
 
     rate_hz: Positive = field(default=5.0, static=True)
@@ -279,12 +279,12 @@ class Radio(Module):
         """
         return max(round(1 / (self.rate_hz * step_s)), 1)
 
-    def scaled(self, factor: float) -> Self:
+    def scaled(self, _: float) -> Self:
         """
-        Multiplies the range by `factor`, leaving the delay, the rate, and
-        the loss a drone's radio sets.
+        Leaves the radio as it stands, since its delay, its rate, its loss,
+        and its range are a drone radio's own at any spacing.
         """
-        return replace(self, range_m=self.range_m * factor)
+        return self
 
 
 class Observation(Module):
@@ -522,7 +522,7 @@ class Composite(Module):
 
     contact: Component
     """
-    The acceleration pushing apart two drones that overlap.
+    The acceleration pushing a drone away from each of its neighbors.
     """
 
     coupling: Component

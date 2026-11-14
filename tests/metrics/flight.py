@@ -239,6 +239,19 @@ def test_a_default_flight_keeps_the_outdoor_drone_flock_s_spacing(default: Fligh
     assert 12.0 <= float(default.spacing_m.mean()) <= 30.0
 
 
+@mark.slow
+def test_a_default_flight_keeps_every_drone_over_the_threat_s_grid(default: Flight):
+    """
+    Asserts that every drone of the default flight after two minutes and
+    after five sits over the parametric threat's grid, within its length
+    from west to east and its breadth from south to north.
+    """
+    grid  = Settings().threat.grid
+    spots = asarray(default.frames.positions)[:, -1, :, :2]
+
+    assert ((spots >= 0) & (spots <= [grid.length_m, grid.rows * grid.spacing_m])).all()
+
+
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     composite : Composite,
     flight    : Flight
@@ -343,7 +356,7 @@ def test_a_replay_reads_each_neighbor_the_radio_s_delay_and_the_lag_back(
         STILL,
         coupling = Constant(),
         heading  = Delayed(lag_s=lag_s) if lag_s else Overdamped(),
-        radio    = Radio(delay_s=delay_s, loss=0.0)
+        radio    = Radio(delay_s=delay_s, loss=0.0, range_m=1e4)
     )
     behind = velocities[clip(arange(19) - 2, 0, None)] - velocities[:-1]
 
@@ -620,8 +633,7 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
     """
     Asserts that two strings of drones 100 m apart replay otherwise under a
     range shorter than the gap than under one spanning it, and that a short
-    flight flies otherwise under a range the launch scales to shorter than
-    its spacing.
+    flight flies otherwise under a range shorter than its spacing.
     """
     string = stack([10.0 * arange(6), zeros(6), zeros(6)], -1)
     flight = laid(concat([string, string + [0.0, 100.0, 0.0]]), [10.0, 0.0, 0.0])
@@ -637,7 +649,7 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
     assert not allclose(flight.drifts(reach[50.0], AIR), flight.drifts(reach[1e4], AIR))
     assert not allclose(
         Flight.flown(
-            Composite.from_settings(Settings(radio=Radio(range_m=0.2))),
+            Composite.from_settings(Settings(radio=Radio(range_m=5.0))),
             AIR,
             short()
         ).frames.positions,

@@ -24,10 +24,11 @@ Flies the flock, or computes the steps of the graph named.
 │                               wingspan. [default: 0.2]                       │
 │ --contact.spread-m FLOAT      The standard deviation of the Gaussian past    │
 │                               the hard sphere, in meters, at a starling's    │
-│                               scale, by default the model's, which leaves    │
-│                               the push at about a fiftieth of its strength   │
-│                               at the model's separation radius of 4 meters.  │
-│                               [default: 1.37]                                │
+│                               scale, by default the one leaving the push at  │
+│                               a hundredth of its strength at the separation  │
+│                               radius of 1.6 meters the model sets for its    │
+│                               flock of 781 birds, (1.6 - 0.2) / sqrt(2 * ln  │
+│                               100). [default: 0.461]                         │
 │ --contact.weight-m-s2 FLOAT   The push at full strength, in meters per       │
 │                               second squared, at a starling's scale, by      │
 │                               default the model's separation weight of 1     │
@@ -35,11 +36,13 @@ Flies the flock, or computes the steps of the graph named.
 │                               [default: 12.5]                                │
 │ --coupling.coupling-per-s     The rate at which a drone aligns with each     │
 │   FLOAT                       neighbor, in reciprocal seconds, at a          │
-│                               starling's scale, by default the projection    │
-│                               model's alignment weight of 0.8 per step       │
-│                               spread over 7 neighbors, its step the time a   │
-│                               starling at 10 meters per second takes to fly  │
-│                               its wingspan of 0.4 meters. [default: 2.857]   │
+│                               starling's scale, by default one step of the   │
+│                               projection model spread over 7 neighbors,      │
+│                               since that model replaces a bird's heading in  │
+│                               full at every step, its step the 0.04 seconds  │
+│                               a starling at 10 meters per second takes to    │
+│                               fly its wingspan of 0.4 meters. [default:      │
+│                               3.571]                                         │
 │ --crop.floor-m FLOAT          The lowest fixed height above the ground, in   │
 │                               meters. [default: 20.0]                        │
 │ --crop.levels INT             The number of fixed heights, which reach 500 m │
@@ -62,8 +65,8 @@ Flies the flock, or computes the steps of the graph named.
 │                               Constant's default rate over 7 neighbors at    │
 │                               the product of coupling and interaction range  │
 │                               of 503 inferred from starling flocks, 10 *     │
-│                               sqrt(2 * 7 * 2.857 / 503) at 10 meters per     │
-│                               second. [default: 2.82]                        │
+│                               sqrt(2 * 7 * 3.571 / 503) at 10 meters per     │
+│                               second. [default: 3.15]                        │
 │ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │
 │   FLOAT --plan.empty-axes     in proportion, the thin horizontal shape       │
 │                               measured on starling flocks, whose long axis   │
@@ -126,8 +129,10 @@ Flies the flock, or computes the steps of the graph named.
 │                               second squared, PX4's MPC_ACC_UP_MAX.          │
 │                               [default: 4.0]                                 │
 │ --plant.descending-m-s2       The largest downward acceleration, in meters   │
-│   FLOAT                       per second squared, PX4's MPC_ACC_DOWN_MAX.    │
-│                               [default: 3.0]                                 │
+│   FLOAT                       per second squared, PX4's MPC_ACC_DOWN_MAX,    │
+│                               raised from its default of 3 within the 2 to   │
+│                               15 PX4 allows to match climbing_m_s2.          │
+│                               [default: 4.0]                                 │
 │ --plant.descent-m-s FLOAT     The fastest descent a command holds, in meters │
 │                               per second, PX4's MPC_Z_VEL_MAX_DN, raised     │
 │                               from its default of 1.5 within the 0.5 to 4    │
@@ -149,20 +154,27 @@ Flies the flock, or computes the steps of the graph named.
 │                               every other. [default: 0.4]                    │
 │ --radio.range-m FLOAT         The distance between two drones, as a packet   │
 │                               is sent, past which the packet never arrives,  │
-│                               in meters, at a starling's scale, by default   │
-│                               the starling flock model's farthest            │
-│                               perception. [default: 100.0]                   │
+│                               in meters, by default the distance past which  │
+│                               the outdoor drone flock's radios began to      │
+│                               fail. [default: 50.0]                          │
 │ --radio.rate-hz FLOAT         The number of packets each drone sends each    │
 │                               second. [default: 5.0]                         │
 │ --roost.center-m FLOAT FLOAT  The roost's east and north, in meters, by      │
-│   --roost.empty-center-m      default on the parametric threat's course from │
-│                               the launch to the domain's western edge.       │
-│                               [default: (600.0, 1000.0)]                     │
+│   --roost.empty-center-m      default under the launch, 1000 meters from the │
+│                               parametric threat's western, southern, and     │
+│                               northern edges. [default: (1000.0, 1000.0)]    │
 │ --roost.height-m FLOAT        The height the drone is pulled toward, in      │
 │                               meters above the ground. [default: 100.0]      │
-│ --roost.radius-m FLOAT        The radius of the cylinder, in meters, by      │
-│                               default the widest the parametric threat's     │
-│                               domain holds about center_m. [default: 600.0]  │
+│ --roost.radius-m FLOAT        The radius of the cylinder the drones fly      │
+│                               about, in meters, by default the widest whose  │
+│                               radius and turn radius together fit within the │
+│                               1000 meters from center_m to the parametric    │
+│                               threat's nearest edge, the turn radius kept at │
+│                               the model's ratio to the cylinder's. [default: │
+│                               936.0]                                         │
+│ --roost.roost-m FLOAT         The radius of the model's cylinder, in meters, │
+│                               at a starling's scale, which the turn keeps    │
+│                               its ratio to. [default: 150.0]                 │
 │ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
 │   FLOAT                       away from it, in reciprocal square seconds, at │
 │                               a starling's scale, by default the starling    │
@@ -179,7 +191,9 @@ Flies the flock, or computes the steps of the graph named.
 │                               since the model's roost term rolls a starling  │
 │                               past the bank its roll-out balances, so the    │
 │                               bird turns on the whole of a lift equal to its │
-│                               weight. [default: 9.81]                        │
+│                               weight, about 10 meters wide at 10 meters per  │
+│                               second against the model's cylinder of 150.    │
+│                               [default: 9.81]                                │
 │ --simulation PATH             The WRF-SFIRE output the graph reads, relative │
 │                               to the clone, such as the                      │
 │                               data/samples/wrf_sample.nc the thermur fetch   │

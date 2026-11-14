@@ -117,13 +117,13 @@ class Constant(Component):
     The coupling holding one rate over every topological neighbor.
     """
 
-    coupling_per_s: NonNegative = 2.857
+    coupling_per_s: NonNegative = 3.571
     """
     The rate at which a drone aligns with each neighbor, in reciprocal
-    seconds, at a starling's scale, by default the projection model's
-    alignment weight of 0.8 per step spread over 7 neighbors, its step the
-    time a starling at 10 meters per second takes to fly its wingspan of
-    0.4 meters.
+    seconds, at a starling's scale, by default one step of the projection
+    model spread over 7 neighbors, since that model replaces a bird's
+    heading in full at every step, its step the 0.04 seconds a starling at
+    10 meters per second takes to fly its wingspan of 0.4 meters.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -240,6 +240,10 @@ class HardSphere(Component):
     topological neighbor at full strength inside a hard sphere the width
     of a wingspan and along a halved Gaussian past it, averaged over the
     neighbors.
+
+    The model's equation prints the Gaussian as `exp(-(d - r_h)**2 /
+    sigma**2)`, whereas its text calls `sigma` a standard deviation, and the
+    slot takes the text's reading.
     """
 
     sphere_m: Positive = 0.2
@@ -248,12 +252,12 @@ class HardSphere(Component):
     default half a starling's wingspan.
     """
 
-    spread_m: Positive = 1.37
+    spread_m: Positive = 0.461
     """
     The standard deviation of the Gaussian past the hard sphere, in meters,
-    at a starling's scale, by default the model's, which leaves the push at
-    about a fiftieth of its strength at the model's separation radius of 4
-    meters.
+    at a starling's scale, by default the one leaving the push at a
+    hundredth of its strength at the separation radius of 1.6 meters the
+    model sets for its flock of 781 birds, `(1.6 - 0.2) / sqrt(2 * ln 100)`.
     """
 
     weight_m_s2: NonNegative = 12.5
@@ -408,19 +412,21 @@ class Peripheral(Component):
 
     def __call__(self, observation: Observation) -> Array:
         """
-        Multiplies the drone's centrality, the weight, and the mean bearing
-        of the neighbors it sees past the hard sphere.
+        Multiplies the drone's centrality, the weight, and the sum of the
+        bearings of the neighbors it sees past the hard sphere over the
+        count of the heard neighbors outside the blind angle, the hard
+        sphere's among them.
         """
-        seen = (
-            (observation.distances > self.sphere_m)
-            & (observation.ahead > -cos(deg2rad(self.blind_deg / 2)))
+        counted = (observation.distances > 0) & (
+            observation.ahead > -cos(deg2rad(self.blind_deg / 2))
         )
+        seen = counted & (observation.distances > self.sphere_m)
         return (
             linalg.norm(observation.bearings.sum(0))
             / maximum((observation.distances > 0).sum(), 1)
             * self.weight_m_s2
             * where(seen[:, None], observation.bearings, 0.0).sum(0)
-            / maximum(seen.sum(), 1)
+            / maximum(counted.sum(), 1)
         )
 
     def scaled(self, factor: float) -> Self:
@@ -484,10 +490,11 @@ class Roost(Component):
     damped spring.
     """
 
-    center_m: tuple[float, float] = (600.0, 1000.0)
+    center_m: tuple[float, float] = (1000.0, 1000.0)
     """
-    The roost's east and north, in meters, by default on the parametric
-    threat's course from the launch to the domain's western edge.
+    The roost's east and north, in meters, by default under the launch,
+    1000 meters from the parametric threat's western, southern, and
+    northern edges.
     """
 
     height_m: float = 100.0
@@ -495,10 +502,18 @@ class Roost(Component):
     The height the drone is pulled toward, in meters above the ground.
     """
 
-    radius_m: Positive = 600.0
+    radius_m: Positive = 936.0
     """
-    The radius of the cylinder, in meters, by default the widest the
-    parametric threat's domain holds about `center_m`.
+    The radius of the cylinder the drones fly about, in meters, by default
+    the widest whose radius and turn radius together fit within the 1000
+    meters from `center_m` to the parametric threat's nearest edge, the
+    turn radius kept at the model's ratio to the cylinder's.
+    """
+
+    roost_m: Positive = 150.0
+    """
+    The radius of the model's cylinder, in meters, at a starling's scale,
+    which the turn keeps its ratio to.
     """
 
     stiffness_per_s2: NonNegative = 2.5
@@ -517,7 +532,8 @@ class Roost(Component):
     cylinder's edge, at a starling's scale, by default the acceleration of
     gravity, since the model's roost term rolls a starling past the bank its
     roll-out balances, so the bird turns on the whole of a lift equal to its
-    weight.
+    weight, about 10 meters wide at 10 meters per second against the
+    model's cylinder of 150.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -544,14 +560,18 @@ class Roost(Component):
 
     def scaled(self, factor: float) -> Self:
         """
-        Divides the turn by `factor` and the stiffness by its square, as
-        a flock magnified by `factor` at the same speed takes, leaving the
-        roost's place and size, which the domain sets.
+        Divides the stiffness by the square of `factor`, as a flock
+        magnified by `factor` at the same speed takes, and the turn by the
+        cylinder's own magnification, `radius_m` over `roost_m`, so the turn
+        radius keeps the model's ratio to the cylinder the domain holds.
         """
         return tree_at(
             lambda roost: (roost.stiffness_per_s2, roost.turning_m_s2),
             self,
-            (self.stiffness_per_s2 / factor**2, self.turning_m_s2 / factor)
+            (
+                self.stiffness_per_s2 / factor**2,
+                self.turning_m_s2 * self.roost_m / self.radius_m
+            )
         )
 
 
@@ -616,13 +636,13 @@ class White(Noise):
     command.
     """
 
-    amplitude: NonNegative = 2.82
+    amplitude: NonNegative = 3.15
     """
     The amplitude, in meters per second per root second, at a starling's
     scale, by default the noise that leaves a flock aligning at
     `Constant`'s default rate over 7 neighbors at the product of coupling
     and interaction range of 503 inferred from starling flocks,
-    `10 * sqrt(2 * 7 * 2.857 / 503)` at 10 meters per second.
+    `10 * sqrt(2 * 7 * 3.571 / 503)` at 10 meters per second.
     """
 
     def amplitudes(self, observation: Observation) -> tuple[Array, Array]:

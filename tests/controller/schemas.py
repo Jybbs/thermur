@@ -394,11 +394,11 @@ def test_the_composite_adds_the_roost_to_its_slots():
     )
 
 
-def test_the_radio_carried_to_a_larger_flock_scales_only_its_range():
+def test_the_radio_carried_to_a_larger_flock_stays_a_drone_radio():
     """
     Asserts that the radio carried to a flock four times a starling flock's
-    size multiplies its range by four and keeps the delay, the rate, and the
-    loss a drone's radio sets.
+    size keeps the delay, the rate, the loss, and the range a drone's radio
+    sets.
     """
     radio = Radio(
         delay_s = 0.5,
@@ -407,12 +407,7 @@ def test_the_radio_carried_to_a_larger_flock_scales_only_its_range():
         rate_hz = 10.0
     )
 
-    assert radio.scaled(4.0) == Radio(
-        delay_s = 0.5,
-        loss    = 0.2,
-        range_m = 400.0,
-        rate_hz = 10.0
-    )
+    assert radio.scaled(4.0) == radio
 
 
 def test_the_radio_delivers_each_broadcast_its_delay_late_at_each_packet():

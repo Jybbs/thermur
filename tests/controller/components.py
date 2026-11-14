@@ -235,6 +235,12 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             id = "hard-sphere"
         ),
         param(
+            HardSphere(sphere_m=1.0, spread_m=2.0, weight_m_s2=8.0),
+            viewed([[3.0, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.0]]),
+            [-4.0 * exp(-0.5), -4.0, 0.0],
+            id = "hard-sphere-past-an-unfilled-rank"
+        ),
+        param(
             Overdamped(),
             viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]])),
             [0.0, 1.0, 0.0],
@@ -253,6 +259,19 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
                     [10.0, 0.0, 0.0],
                     [-10.0, 0.0, 0.0],
                     [0.0, 10.0, 0.0],
+                    [0.0, 0.0, 0.0]
+                ]
+            ),
+            [2.0, 2.0, 0.0],
+            id = "peripheral-past-an-unfilled-rank"
+        ),
+        param(
+            Peripheral(blind_deg=90.0, sphere_m=0.2, weight_m_s2=12.0),
+            viewed(
+                [
+                    [10.0, 0.0, 0.0],
+                    [-10.0, 0.0, 0.0],
+                    [0.0, 10.0, 0.0],
                     [0.0, -10.0, 0.0]
                 ]
             ),
@@ -262,7 +281,7 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
         param(
             Peripheral(blind_deg=90.0, sphere_m=5.0, weight_m_s2=12.0),
             viewed([[10.0, 0.0, 0.0], [0.0, 2.0, 0.0]]),
-            [12.0 * 2**0.5 / 2, 0.0, 0.0],
+            [12.0 * 2**0.5 / 4, 0.0, 0.0],
             id = "peripheral-past-the-hard-sphere"
         )
     ]
@@ -436,8 +455,8 @@ def test_the_roost_holds_the_heights_spread_in_proportion_to_the_flock_s_size(
             id = "peripheral"
         ),
         param(
-            Roost(stiffness_per_s2=32.0, turning_m_s2=8.0),
-            Roost(stiffness_per_s2=2.0, turning_m_s2=2.0),
+            Roost(radius_m=600.0, stiffness_per_s2=32.0, turning_m_s2=8.0),
+            Roost(radius_m=600.0, stiffness_per_s2=2.0, turning_m_s2=2.0),
             id = "roost"
         ),
         param(White(amplitude=4.0), White(amplitude=2.0), id="white"),
@@ -452,7 +471,8 @@ def test_each_slot_carried_to_a_flock_four_times_the_size_scales_its_values(
     """
     Asserts that each slot holding a starling flock's values multiplies its
     lengths by the factor, divides its accelerations and rates by it, its
-    stiffness by its square, and its noise by its square root, leaving the
-    roost's place and every slot holding a drone flock's own values.
+    stiffness by its square, and its noise by its square root, turning the
+    roost by the magnification from the model's cylinder to its own, and
+    leaving every slot holding a drone flock's own values.
     """
     assert_allclose(tree.leaves(component.scaled(4.0)), tree.leaves(expected))
