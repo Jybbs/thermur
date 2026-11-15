@@ -64,22 +64,16 @@ class Crop(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     started, or `None` to keep every snapshot.
     """
 
-    x_m: Span = (0.0, 5000.0)
+    x_m: Span = None
     """
     The westernmost and the easternmost mass point kept, in meters from the
-    domain's western edge, or `None` to keep every column. The default
-    keeps the sample's 125 columns from 0 to 5000 m, holding the roost
-    spanning 0 to 2000 m and the smoke above 1% of its peak, which reaches
-    4340 m east, while a parametric threat keeps every column unless set.
+    domain's western edge, or `None` to keep every column.
     """
 
-    y_m: Span = (0.0, 6500.0)
+    y_m: Span = None
     """
     The southernmost and the northernmost mass point kept, in meters from
-    the domain's southern edge, or `None` to keep every row. The default
-    keeps the sample's 163 rows from 0 to 6500 m, holding the roost
-    spanning 0 to 2000 m and the smoke above 1% of its peak, which reaches
-    6340 m north, while a parametric threat keeps every row unless set.
+    the domain's southern edge, or `None` to keep every row.
     """
 
     @property
@@ -290,11 +284,6 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The hottest air on the fixed heights in any snapshot, in kelvin.
     """
 
-    length_m: Positive = 5000.0
-    """
-    The length the sample covers from west to east, in meters.
-    """
-
     license: str = "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/"
     """
     The license the dataset is published under, which the sample stays
@@ -321,6 +310,22 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     started.
     """
 
+    x_m: Range = (0.0, 5000.0)
+    """
+    The westernmost and the easternmost mass point the sample keeps, in
+    meters from the domain's western edge, its 125 columns holding the roost
+    spanning 0 to 2000 m and the smoke above 1% of its peak, which reaches
+    4340 m east.
+    """
+
+    y_m: Range = (0.0, 6500.0)
+    """
+    The southernmost and the northernmost mass point the sample keeps, in
+    meters from the domain's southern edge, its 163 rows holding the roost
+    spanning 0 to 2000 m and the smoke above 1% of its peak, which reaches
+    6340 m north.
+    """
+
     @property
     def address(self) -> str:
         """
@@ -340,6 +345,14 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
             "license" : self.license,
             "source"  : f"Cut from {self.simulation} of the {self.dataset}"
         }
+
+    @property
+    def length_m(self) -> float:
+        """
+        Measures the length the sample covers from west to east across
+        `x_m`, in meters.
+        """
+        return self.x_m[1] - self.x_m[0]
 
     @property
     def path(self) -> Path:

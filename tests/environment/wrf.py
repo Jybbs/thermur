@@ -44,6 +44,7 @@ from thermur.environment.wrf   import (
     spans,
     unfilled
 )
+from thermur.pipeline.schemas  import Run
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 
@@ -395,6 +396,48 @@ def test_a_sample_cut_over_http_writes_the_file_a_cut_from_disk_writes(
     assert served.bytes_sent < developing.stat().st_size
 
 
+def test_a_sample_s_run_record_reloads_to_the_rectangle_it_was_cut_to(
+    crop       : Crop,
+    developing : Path,
+    tmp_path   : Path
+):
+    """
+    Asserts that a sample is cut to the 10 columns and 2 rows its own
+    rectangle keeps of the 20 and 3 `developing` holds, and that the run
+    record of a flight through the written file reloads to the grid the
+    cut wrote.
+    """
+    sample = Sample(
+        burning_m2 = (3200.0, 22400.0),
+        hottest_k  = 319.8,
+        times_s    = tuple(15.0 * snapshot for snapshot in range(1, 10)),
+        x_m        = (0.0, 400.0),
+        y_m        = (0.0, 80.0)
+    )
+    path = WrfOutput.from_sample(
+        str(developing),
+        sample   = sample,
+        settings = Settings(crop=crop)
+    ).write(
+        tmp_path / "wrf_sample.nc",
+        sample = sample
+    )
+    run = Run(
+        commit      = "0",
+        lock_digest = "0",
+        settings    = Settings(crop=crop, simulation=path)
+    )
+    record = Run.model_validate(run.model_dump(mode="json"))
+
+    with open_dataset(path, engine="netcdf4") as written:
+        assert (written.sizes["west_east"], written.sizes["south_north"]) == (10, 2)
+        assert (
+            WrfOutput.from_settings(record.settings).dataset.sizes
+            == WrfOutput.from_settings(run.settings).dataset.sizes
+            == written.sizes
+        )
+
+
 def test_a_sample_whose_window_misses_its_figures_is_refused(
     crop       : Crop,
     developing : Path
@@ -413,16 +456,43 @@ def test_a_sample_whose_window_misses_its_figures_is_refused(
         )
 
 
-def test_a_threat_reads_its_whole_grid_past_the_sample_s_default_crop():
+@mark.parametrize(
+    ("crop", "sizes"),
+    [
+        param(Crop(), (200, 200), id="the-default"),
+        param(
+            Crop(x_m=Sample().x_m, y_m=Sample().y_m),
+            (125, 163),
+            id = "the-sample-s-rectangle"
+        )
+    ]
+)
+def test_a_threat_s_run_record_reloads_to_the_grid_it_read(
+    crop  : Crop,
+    sizes : tuple[int, int]
+):
     """
-    Asserts that a parametric threat 200 columns and 50 rows wide, reaching
-    8000 m east past the 5000 m the default crop keeps of the sample, reads
-    every column and every row under that default.
+    Asserts that a parametric threat of 200 by 200 mass points, reaching
+    8000 m east and north past the 5000 m and 6500 m the sample keeps, reads
+    its whole grid under the default crop and the sample's 125 columns and
+    163 rows under a crop setting the sample's rectangle, and that the run
+    record of either reloads to the same grid.
     """
-    threat = ParametricThreat(grid=Grid(columns=200))
-    sizes  = WrfOutput.from_threat(threat, crop=Crop()).dataset.sizes
+    run = Run(
+        commit      = "0",
+        lock_digest = "0",
+        settings    = Settings(
+            crop   = crop,
+            threat = ParametricThreat(grid=Grid(columns=200, rows=200))
+        )
+    )
+    for settings in (
+        run.settings,
+        Run.model_validate(run.model_dump(mode="json")).settings
+    ):
+        dataset = WrfOutput.from_settings(settings).dataset
 
-    assert (sizes["west_east"], sizes["south_north"]) == (200, 50)
+        assert (dataset.sizes["west_east"], dataset.sizes["south_north"]) == sizes
 
 
 def test_an_output_lacking_a_variable_is_refused_naming_it(

@@ -351,12 +351,12 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         """
         Opens the full WRF-SFIRE output `source` names, through
         `RangedBackend` where it is an HTTP or HTTPS address, which reads
-        only the bytes the crop covers, and through netCDF4 otherwise,
-        crops it as `from_dataset` does to `settings.crop` over the window
-        `sample` holds, loads the window whole, reading the variables at
-        once on a pool of threads, closes `source`, and checks the figures
-        it measures there through `Sample.check` against a flight lasting
-        `settings.plan.duration_s`.
+        only the bytes the crop covers, and through netCDF4 otherwise, crops
+        it as `from_dataset` does to `settings.crop` over the window and
+        the rectangle `sample` holds, loads the window whole, reading the
+        variables at once on a pool of threads, closes `source`, and checks
+        the figures it measures there through `Sample.check` against a
+        flight lasting `settings.plan.duration_s`.
 
         Raises:
             ValueError: Where `source` names another output than
@@ -377,7 +377,10 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         ):
             output = cls.from_dataset(
                 full,
-                crop = settings.crop.model_copy(update={"window_s": sample.window_s})
+                crop = settings.crop.model_copy(
+                    update = sample.model_dump(include={"x_m", "y_m"})
+                    | {"window_s": sample.window_s}
+                )
             )
             list(pool.map(Variable.load, output.dataset.variables.values()))
 
@@ -402,12 +405,9 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
     def from_threat(cls, threat: ParametricThreat, *, crop: Crop) -> Self:
         """
         Wraps the WRF-shaped dataset `threat` builds, cropped as
-        `from_dataset` crops a simulation, though along `x_m` and `y_m`
-        only where `crop` sets them, keeping the whole grid along each axis
-        `crop` leaves at its default.
+        `from_dataset` crops a simulation.
         """
-        whole = dict.fromkeys({"x_m", "y_m"} - crop.model_fields_set)
-        return cls.from_dataset(threat.dataset, crop=crop.model_copy(update=whole))
+        return cls.from_dataset(threat.dataset, crop=crop)
 
     def write(self, path: Path, *, sample: Sample) -> Path:
         """
