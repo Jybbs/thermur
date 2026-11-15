@@ -108,9 +108,9 @@ class Settings(
 
         Raises:
             ValueError: Where `plan.step_s` times the curvature at a speed
-                        in the range exceeds two, under which a drone at
-                        that speed overshoots the cruise speed further at
-                        each step.
+                        in the range exceeds two, past which one step grows
+                        a speed's departure from the cruise speed rather
+                        than shrinking it.
         """
         if self.speed.fixed:
             return self

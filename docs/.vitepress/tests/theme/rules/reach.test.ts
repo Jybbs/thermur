@@ -22,6 +22,27 @@ const readings = (chart: Charted): string[] => words(chart).filter(line => /^\d+
  */
 const knobs = ({ host }: Charted): SVGElement[] => [...host.querySelectorAll<SVGElement>('[role="radio"]')]
 
+/**
+ * Reads the point `node` sets through its attributes `x` and `y`.
+ */
+const pointOf = (node: Element, x: string, y: string): number[] =>
+  [Number(node.getAttribute(x)), Number(node.getAttribute(y))]
+
+/**
+ * Finds the topmost painted disc in `knob` under the middle of its stop and
+ * its label's ink, set 4 above the label's baseline, where a pointer aimed at
+ * the stop's center lands, as the browser hits a circle by its fill.
+ */
+function centerOf(knob: SVGElement): SVGElement | undefined {
+  const [rx, ry] = pointOf(knob.querySelector('circle')!, 'cx', 'cy')
+  const [lx, ly] = pointOf(knob.querySelector('text')!, 'x', 'y')
+  const [x, y]   = [(rx! + lx!) / 2, (ry! + ly! - 4) / 2]
+  return [...knob.querySelectorAll<SVGElement>('circle')].findLast(disc => {
+    const [cx, cy] = pointOf(disc, 'cx', 'cy')
+    return disc.getAttribute('fill') !== 'none' && Math.hypot(x - cx!, y - cy!) <= Number(disc.getAttribute('r'))
+  })
+}
+
 enableAutoUnmount(afterEach)
 
 afterEach(() => {
@@ -80,6 +101,13 @@ describe('the stops on the dial’s rim', () => {
     expect(document.activeElement).toBe(knobs(chart)[to])
   })
 
+  it.for([0, 1])('picks the turn of stop %i from a click at its center, between the stop and its label', stop => {
+    const chart = charted(RulesReach, 672)
+    const knob  = knobs(chart)[stop]!
+    centerOf(knob)!.dispatchEvent(new Event('click', { bubbles: true }))
+    expect(knob.getAttribute('aria-checked')).toBe('true')
+  })
+
   it('leaves every other key to the browser', () => {
     const chart = charted(RulesReach, 672)
     expect(press(knobs(chart)[0]!, 'Tab')).toBe(false)
@@ -121,7 +149,7 @@ describe('the rings', () => {
     document.documentElement.style.setProperty('--th-settle', '240ms')
     vi.spyOn(performance, 'now').mockReturnValue(0)
     const chart = charted(RulesReach, 672)
-    chart.stand.frames.run(1, 400)
+    chart.stand.frames.run(1, 300)
     const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
     expect(Number(outer!.slice(0, -1)) / 76.6).toBeGreaterThan(Number(inner!.slice(0, -1)) / 7.3)
     chart.stand.frames.run(20, 400)

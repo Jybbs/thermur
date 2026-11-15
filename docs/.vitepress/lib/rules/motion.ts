@@ -67,18 +67,24 @@ export function tween(step: (share: number) => void, scale = 1): () => void {
 }
 
 /**
- * Calls `changed` with the host's width, rounded to a pixel, whenever the host
- * changes to a width it has not been drawn at, returning what releases the
- * observer.
+ * Calls `changed` with the host's width, rounded to a pixel, on the animation
+ * frame after the host changes to a width it has not been drawn at, so a
+ * redraw that resizes the host runs outside the observer's callback, and
+ * returns what releases the observer and any frame still waiting.
  */
 export function widthOf(host: HTMLElement, changed: (width: number) => void): () => void {
   let drawn      = 0
+  let handle     = 0
   const observer = new ResizeObserver(() => {
     const width = Math.round(host.getBoundingClientRect().width)
     if (width === drawn || width === 0) return
-    drawn = width
-    changed(width)
+    drawn  = width
+    cancelAnimationFrame(handle)
+    handle = requestAnimationFrame(() => changed(width))
   })
   observer.observe(host)
-  return () => observer.disconnect()
+  return () => {
+    observer.disconnect()
+    cancelAnimationFrame(handle)
+  }
 }

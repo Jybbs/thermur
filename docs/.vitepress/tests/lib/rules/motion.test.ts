@@ -70,7 +70,9 @@ describe('the motion a chart reads', () => {
     release()
     expect(stand.held()).toEqual(RELEASED)
   })
+})
 
+describe('the width a chart is drawn at', () => {
   it('calls back with a width only once the box takes one it was not drawn at', () => {
     const stand   = browser()
     const host    = box('rules-host')
@@ -78,9 +80,42 @@ describe('the motion a chart reads', () => {
     const changed = vi.fn<(width: number) => void>()
     vi.spyOn(host, 'getBoundingClientRect').mockImplementation(() => ({ width: widths.shift() }) as DOMRect)
     const release = motion.widthOf(host, changed)
-    for (let k = 0; k < 4; k++) stand.reflow(host)
+    for (let k = 0; k < 4; k++) {
+      stand.reflow(host)
+      stand.frames.run(1)
+    }
     expect(changed.mock.calls).toEqual([[640], [390]])
     release()
     expect(stand.held()).toEqual(RELEASED)
+  })
+
+  it('draws at a new width on the next frame, outside the observer’s callback', () => {
+    const stand   = browser()
+    const host    = box('rules-host')
+    const changed = vi.fn<(width: number) => void>()
+    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({ width: 640 } as DOMRect)
+    motion.widthOf(host, changed)
+    stand.reflow(host)
+    expect(changed).not.toHaveBeenCalled()
+    stand.frames.run(1)
+    expect(changed).toHaveBeenCalledExactlyOnceWith(640)
+  })
+
+  it('draws once at the last width a frame sees, dropping the frame on release', () => {
+    const stand   = browser()
+    const host    = box('rules-host')
+    const widths  = [640, 390, 512]
+    const changed = vi.fn<(width: number) => void>()
+    vi.spyOn(host, 'getBoundingClientRect').mockImplementation(() => ({ width: widths.shift() }) as DOMRect)
+    const release = motion.widthOf(host, changed)
+    stand.reflow(host)
+    stand.reflow(host)
+    stand.frames.run(1)
+    expect(changed.mock.calls).toEqual([[390]])
+    stand.reflow(host)
+    release()
+    expect(stand.held()).toEqual(RELEASED)
+    stand.frames.run(1)
+    expect(changed).toHaveBeenCalledOnce()
   })
 })

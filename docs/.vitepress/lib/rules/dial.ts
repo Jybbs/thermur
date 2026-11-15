@@ -156,15 +156,18 @@ export function drawFrame(layout: Layout, plot: SVGElement): SVGElement {
 
 /**
  * Draws the stop for the turn of `turn` degrees on the dial's rim, a radio
- * whose dot shows while it is picked.
+ * whose dot shows while it is picked, under a clear disc covering the stop and
+ * its label that takes a pointer anywhere over either.
  */
 export function drawKnob(layout: Layout, turn: number): SVGElement {
   const [x, y]   = at(layout, layout.outer + 6, turn)
+  const [hx, hy] = at(layout, layout.outer + 16, turn)
   const [lx, ly] = at(layout, layout.outer + 24, turn)
   return chart.svg('g', { 'aria-label': `${turn}°`, 'class': 'rules-knob', 'role': 'radio' },
     chart.svg('circle', { ...RIM, cx: x, cy: y }),
     chart.svg('circle', { class: 'rules-knob-dot', cx: x, cy: y, fill: chart.TONE.lead, r: 3.5 }),
-    chart.text(chart.FACE.mono, 11.5, `${turn}°`, lx, ly + 4, { 'text-anchor': 'middle' }))
+    chart.text(chart.FACE.mono, 11.5, `${turn}°`, lx, ly + 4, { 'text-anchor': 'middle' }),
+    chart.svg('circle', { class: 'rules-knob-hit', cx: hx, cy: hy, fill: 'transparent', r: 18 }))
 }
 
 /**
