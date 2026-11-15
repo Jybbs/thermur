@@ -78,6 +78,12 @@ def test_a_digest_changes_wherever_the_code_does(
         param("imported/module.py", "LIMIT = 1\n", True, id="imported-module"),
         param("deeper/module.py", "LIMIT = 1\n", True, id="module-imported-in-turn"),
         param("imported/norms.toml", "factor = 3\n", True, id="imported-data-file"),
+        param(
+            "deeper/norms.toml",
+            "factor = 3\n",
+            True,
+            id = "data-file-imported-in-turn"
+        ),
         param("unimported/module.py", "LIMIT = 1\n", False, id="unimported-module")
     ]
 )

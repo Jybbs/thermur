@@ -98,7 +98,8 @@ class Subpackage(BaseModel, extra="forbid", frozen=True, use_attribute_docstring
         - Each file under the folder
         - Each module of the package that one of those modules imports, and
           each module those modules import in turn
-        - Each other file of a subpackage holding one of the added modules
+        - Each file other than a module under the folder of a subpackage
+          holding one of the added modules
         """
         root    = self.folder.parent
         reached = self.contents

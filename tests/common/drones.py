@@ -1,7 +1,8 @@
 """
-Holds the stand-ins the controller's, the flight's, and the graph's cases
-share, meaning one drone's view, a flock laid out by hand, a parcel of air
-holding one wind, a short plan, and the settings of a small flight.
+Holds the stand-ins the controller's, the environment's, the flight's, and
+the graph's cases share, meaning one drone's view, a flock laid out by hand,
+a parcel of air holding one wind, a short plan, and the settings of a small
+flight.
 """
 
 from jax.numpy import array, asarray, full, linalg, ones, zeros
