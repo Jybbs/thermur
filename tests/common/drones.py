@@ -1,15 +1,17 @@
 """
-Holds the stand-ins the controller's and the flight's cases share, meaning
-one drone's view, a flock laid out by hand, a parcel of air holding one
-wind, and a short plan.
+Holds the stand-ins the controller's, the flight's, and the graph's cases
+share, meaning one drone's view, a flock laid out by hand, a parcel of air
+holding one wind, a short plan, and the settings of a small flight.
 """
 
 from jax.numpy import array, asarray, full, linalg, ones, zeros
 from xarray    import Dataset
 
-from thermur.controller.schemas import Flock, Observation, unit
-from thermur.environment.air    import Air
-from thermur.metrics.schemas    import Plan
+from thermur.controller.schemas  import Flock, Observation, unit
+from thermur.environment.air     import Air
+from thermur.environment.schemas import Crop, Grid, ParametricThreat
+from thermur.metrics.schemas     import Plan
+from thermur.pipeline.settings   import Settings
 
 
 def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
@@ -41,6 +43,27 @@ def short(**changes: object) -> Plan:
             "turning_window_s" : 0.5,
             **changes
         }
+    )
+
+
+def small() -> Settings:
+    """
+    Builds the settings of a short flight through the parametric threat
+    on a small grid, which the crop's fixed heights from 20 m to 100 m sit
+    inside.
+    """
+    return Settings(
+        crop   = Crop(floor_m=20.0, levels=5, spacing_m=20.0),
+        plan   = short(center_m=(160.0, 40.0, 60.0)),
+        threat = ParametricThreat(
+            edge_m = 10.0,
+            grid   = Grid(
+                columns   = 8,
+                levels    = 10,
+                rows      = 2,
+                snapshots = 2
+            )
+        )
     )
 
 
