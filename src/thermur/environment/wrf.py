@@ -5,17 +5,20 @@ functions it applies to a field, along one dimension, or to one snapshot.
 The `wrf_output` step builds the record and the `air` step reads it.
 """
 
-from functools     import cached_property
-from math          import prod
-from netCDF4       import default_fillvals
-from numpy         import arange, full, inf, int32, interp, ndarray
-from pathlib       import Path
-from pydantic      import BaseModel, InstanceOf
-from scipy.ndimage import distance_transform_edt
-from typing        import ClassVar, Self
-from xarray        import DataArray, Dataset, apply_ufunc, open_dataset
+from concurrent.futures import ThreadPoolExecutor
+from functools          import cached_property
+from math               import prod
+from netCDF4            import default_fillvals
+from numpy              import arange, full, inf, int32, interp, ndarray, zeros
+from pathlib            import Path, PurePosixPath
+from pydantic           import BaseModel, InstanceOf
+from scipy.ndimage      import distance_transform_edt
+from typing             import ClassVar, Self
+from urllib.parse       import urlsplit
+from xarray             import DataArray, Dataset, Variable, apply_ufunc, open_dataset
 
-from thermur.environment.air     import Air
+from thermur.environment.air    import Air
+from thermur.environment.ranged import RangedBackend
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -282,7 +285,9 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         The levels kept are read from the lowest height above the ground
         that geopotential gives each level, keeping one level more than
         the first to reach the top of the band, since the perturbation
-        geopotential can lower a level.
+        geopotential can lower a level. The base-state pressure `PB` and
+        geopotential `PHB` are read from the first snapshot kept alone,
+        since WRF holds its base state fixed through a run.
 
         Raises:
             ValueError: Where the window holds no snapshot, or the
@@ -317,9 +322,15 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
             dimension = "bottom_top_stag"
         )
         levels = int((lowest < crop.heights[-1]).sum()) + 2
+        first  = zeros(framed.sizes["Time"], int)
         return cls(
             crop    = crop,
-            dataset = framed.isel(
+            dataset = framed.assign(
+                {
+                    name: framed[name].isel(Time=first).assign_coords(Time=framed.Time)
+                    for name in ("PB", "PHB")
+                }
+            ).isel(
                 bottom_top      = slice(levels),
                 bottom_top_stag = slice(levels + 1)
             ).drop_vars("XTIME")
@@ -336,27 +347,40 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         return cls.from_dataset(open_dataset(path, engine="netcdf4"), crop=crop)
 
     @classmethod
-    def from_sample(cls, path: Path, *, sample: Sample, settings: Settings) -> Self:
+    def from_sample(cls, source: str, *, sample: Sample, settings: Settings) -> Self:
         """
-        Opens the full WRF-SFIRE output at `path` as `from_path` does,
-        cropped to `settings.crop` over the window `sample` holds, and
-        checks the figures it measures there through `Sample.check` against
-        a flight lasting `settings.plan.duration_s`.
+        Opens the full WRF-SFIRE output `source` names, through
+        `RangedBackend` where it is an HTTP or HTTPS address, which reads
+        only the bytes the crop covers, and through netCDF4 otherwise,
+        crops it as `from_dataset` does to `settings.crop` over the window
+        `sample` holds, loads the window whole, reading each variable once
+        from a thread of its own, closes `source`, and checks the figures
+        it measures there through `Sample.check` against a flight lasting
+        `settings.plan.duration_s`.
 
         Raises:
-            ValueError: Where `path` names another output than
+            ValueError: Where `source` names another output than
                         `sample.simulation`, or the window misses a figure
                         `Sample.check` holds it to.
         """
-        if path.name != sample.simulation:
+        address = urlsplit(source)
+        remote  = address.scheme in ("http", "https")
+        name    = PurePosixPath(address.path).name if remote else Path(source).name
+        if name != sample.simulation:
             raise ValueError(
-                f"`{path.name}` is not `{sample.simulation}`, the output the sample "
-                "is cut from"
+                f"`{name}` is not `{sample.simulation}`, the output the sample is cut "
+                "from"
             )
-        output = cls.from_path(
-            path,
-            crop = settings.crop.model_copy(update={"window_s": sample.window_s})
-        )
+        with (
+            open_dataset(source, engine=RangedBackend if remote else "netcdf4") as full,
+            ThreadPoolExecutor() as pool
+        ):
+            output = cls.from_dataset(
+                full,
+                crop = settings.crop.model_copy(update={"window_s": sample.window_s})
+            )
+            list(pool.map(Variable.load, output.dataset.variables.values()))
+
         sample.check(output.plume, duration_s=settings.plan.duration_s)
         return output
 

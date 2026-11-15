@@ -14,6 +14,7 @@ the dataset a parametric threat builds:
   file a cut writes
 """
 
+from common.served  import Served
 from contextlib     import AbstractContextManager, nullcontext
 from numpy          import arange, array, inf, isfinite, isnan, nan, sqrt, zeros
 from numpy.testing  import assert_allclose
@@ -82,8 +83,8 @@ def threat() -> ParametricThreat:
 def developing(tmp_path: Path) -> Path:
     """
     Writes a threat whose front advances 2 m each second over 10 snapshots
-    15 s apart to disk, standing in for a full simulation a sample is cut
-    from.
+    15 s apart to disk in the 64-bit offset format, its `Time` unlimited, as
+    WRF writes a full simulation a sample is cut from.
     """
     path = tmp_path / Sample().simulation
     ParametricThreat(
@@ -95,8 +96,26 @@ def developing(tmp_path: Path) -> Path:
             snapshots = 10
         ),
         speed_m_s = 2.0
-    ).dataset.to_netcdf(path, engine="netcdf4")
+    ).dataset.to_netcdf(
+        path,
+        engine         = "netcdf4",
+        format         = "NETCDF3_64BIT",
+        unlimited_dims = ["Time"]
+    )
     return path
+
+
+@fixture
+def sample() -> Sample:
+    """
+    Pins the sample `developing` holds over its last 9 snapshots, at the
+    figures the window measures under `crop`.
+    """
+    return Sample(
+        burning_m2 = (4800.0, 33600.0),
+        hottest_k  = 319.8,
+        times_s    = tuple(15.0 * snapshot for snapshot in range(1, 10))
+    )
 
 
 @fixture
@@ -199,17 +218,49 @@ def test_a_crop_keeps_the_levels_its_shortest_column_needs(
     assert output.aloft.sizes["height"] == 5
 
 
-def test_a_cut_from_another_output_than_the_sample_s_is_refused(
-    crop     : Crop,
-    tmp_path : Path
+@mark.parametrize("name", ["PB", "PHB"])
+def test_a_crop_reads_the_base_state_from_its_first_snapshot(
+    crop   : Crop,
+    name   : str,
+    threat : ParametricThreat
 ):
     """
-    Asserts that a sample is cut only from the output it names, refusing
-    another before opening it.
+    Asserts that a crop holds each snapshot's base-state pressure and
+    geopotential at the values its first snapshot kept holds, whatever a
+    later snapshot holds.
+    """
+    data    = threat.dataset
+    drifted = data.assign({name: data[name] + data.XTIME})
+    cropped = WrfOutput.from_dataset(
+        drifted,
+        crop = crop.model_copy(update={"window_s": (15.0, 30.0)})
+    ).dataset[name]
+    level = cropped.dims[1]
+
+    assert (
+        cropped.values
+        == drifted[name].isel({"Time": 1, level: slice(cropped.sizes[level])}).values
+    ).all()
+
+
+@mark.parametrize(
+    "source",
+    [
+        param("data/wrfout.nc", id="path"),
+        param("https://data.invalid/files/wrfout.nc", id="address")
+    ]
+)
+def test_a_cut_from_another_output_than_the_sample_s_is_refused(
+    crop   : Crop,
+    source : str
+):
+    """
+    Asserts that a sample is cut only from the output its path or its
+    address names, refusing another before opening it.
     """
     with raises(ValueError, match="`wrfout.nc` is not `wrfout_W5F7R4`"):
         WrfOutput.from_sample(
-            tmp_path / "wrfout.nc",
+            source,
             sample   = Sample(),
             settings = Settings(crop=crop)
         )
@@ -288,22 +339,60 @@ def test_a_cut_writes_its_snapshots_at_a_fixed_size(
         assert not written.encoding["unlimited_dims"]
 
 
-def test_a_sample_is_cut_over_its_window_and_checked(crop: Crop, developing: Path):
+def test_a_sample_is_cut_over_its_window_and_checked(
+    crop       : Crop,
+    developing : Path,
+    sample     : Sample
+):
     """
     Asserts that a sample is cut from the full output over the window its
     times bound, under the settings' crop, and taken where the window holds
     its figures over a two-minute flight.
     """
-    sample = Sample(
-        burning_m2 = (4800.0, 33600.0),
-        hottest_k  = 319.8,
-        times_s    = tuple(15.0 * snapshot for snapshot in range(1, 10))
+    cut = WrfOutput.from_sample(
+        str(developing),
+        sample   = sample,
+        settings = Settings(crop=crop)
     )
-
-    cut = WrfOutput.from_sample(developing, sample=sample, settings=Settings(crop=crop))
 
     assert cut.dataset.Time.values.tolist() == list(sample.times_s)
     assert cut.dataset.sizes["west_east"] == 20
+
+
+@mark.enable_socket
+@mark.allow_hosts(["127.0.0.1"])
+def test_a_sample_cut_over_http_writes_the_file_a_cut_from_disk_writes(
+    crop       : Crop,
+    developing : Path,
+    sample     : Sample,
+    tmp_path   : Path
+):
+    """
+    Asserts that a sample cut from the address serving the full output
+    passes the same checks and writes, byte for byte, the file a cut from
+    the output on disk writes, requesting no range twice and less of the
+    output than it holds.
+    """
+    served   = Served(path=developing)
+    settings = Settings(crop=crop)
+    with served.serving() as address:
+        ranged = WrfOutput.from_sample(address, sample=sample, settings=settings).write(
+            tmp_path / "ranged.nc",
+            sample = sample
+        )
+
+    local = WrfOutput.from_sample(
+        str(developing),
+        sample   = sample,
+        settings = settings
+    ).write(
+        tmp_path / "local.nc",
+        sample = sample
+    )
+
+    assert ranged.read_bytes() == local.read_bytes()
+    assert len(set(served.sent)) == len(served.sent)
+    assert served.bytes_sent < developing.stat().st_size
 
 
 def test_a_sample_whose_window_misses_its_figures_is_refused(
@@ -318,7 +407,7 @@ def test_a_sample_whose_window_misses_its_figures_is_refused(
 
     with raises(ValueError, match="no cell burns, .* spans 135 s, short of 150 s"):
         WrfOutput.from_sample(
-            developing,
+            str(developing),
             sample   = sample,
             settings = Settings(crop=crop, plan={"duration_s": 150.0})
         )

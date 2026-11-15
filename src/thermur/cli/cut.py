@@ -5,7 +5,6 @@ sample `thermur fetch sample` downloads.
 """
 
 from cyclopts import Parameter
-from pathlib  import Path
 from typing   import Annotated
 
 from thermur.environment.schemas import Sample
@@ -16,17 +15,21 @@ from thermur.repo.checkout       import Checkout
 
 def sample(
     source: Annotated[
-        Path,
+        str,
         Parameter(
-            help = "The full output the sample is cut from, such as `wrfout_W5F7R4`."
+            help = (
+                "The full output the sample is cut from, such as `wrfout_W5F7R4`, "
+                "as a path or as the HTTPS address the dataset serves it at."
+            )
         )
     ]
 ):
     """
     Cuts the WRF-SFIRE sample into the clone's `data/` folder.
 
-    Crops the output at `source` to the snapshots the sample pins under the
-    crop the graph reads, checks that the window holds a developed plume
+    Crops the output at `source` to the snapshots the sample pins under
+    the crop the graph reads, reading only the bytes the crop covers where
+    `source` is an address, checks that the window holds a developed plume
     at the figures the sample pins, and writes it as one NetCDF-4 file
     compressed with zlib, then prints the path of the file relative to the
     clone. Exits nonzero, writing nothing, where `source` names another

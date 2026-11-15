@@ -27,7 +27,7 @@ def test_a_window_missing_its_figures_writes_nothing_and_prints_nothing(
     printed.
     """
 
-    def refused(path: Path, *, sample: Sample, settings: Settings) -> WrfOutput:
+    def refused(source: str, *, sample: Sample, settings: Settings) -> WrfOutput:
         """
         Raises the error a cut raises on a window in which no cell burns.
         """
@@ -73,7 +73,7 @@ def test_the_sample_is_cut_into_the_clone_and_named_relative_to_it(
     relative to that root, the file carrying the pinned sample's license
     and source.
     """
-    cuts: list[tuple[Path, Sample, Settings]] = []
+    cuts: list[tuple[str, Sample, Settings]] = []
     output = WrfOutput.from_threat(
         ParametricThreat(
             grid = Grid(
@@ -86,19 +86,19 @@ def test_the_sample_is_cut_into_the_clone_and_named_relative_to_it(
         crop = Crop(floor_m=20.0, levels=5, spacing_m=20.0)
     )
 
-    def cut(path: Path, *, sample: Sample, settings: Settings) -> WrfOutput:
+    def cut(source: str, *, sample: Sample, settings: Settings) -> WrfOutput:
         """
         Records what a cut is given and stands in the small output for the
         one it would cut.
         """
-        cuts.append((path, sample, settings))
+        cuts.append((source, sample, settings))
         return output
 
     monkeypatch.setattr(Checkout, "installed", lambda: Checkout(root=tmp_path))
     monkeypatch.setattr(WrfOutput, "from_sample", cut)
     app(["cut", "sample", "wrfout_W5F7R4"], result_action="return_value")
 
-    assert cuts == [(Path("wrfout_W5F7R4"), Sample(), Settings())]
+    assert cuts == [("wrfout_W5F7R4", Sample(), Settings())]
     assert capsys.readouterr().out == "data/samples/wrf_sample.nc\n"
 
     with open_dataset(tmp_path / Sample().path, engine="netcdf4") as written:
