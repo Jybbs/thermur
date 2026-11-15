@@ -4,7 +4,9 @@ import { enableAutoUnmount }                   from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Marks }                 from '../../../lib/canvas/marks.ts'
-import { NEIGHBORS }             from '../../../lib/common.ts'
+import { FLIGHT, Flock }         from '../../../lib/front/flock.ts'
+import { seriesOf }              from '../../../lib/identity.ts'
+import { RANGED }                from '../../../lib/rules/falcon.ts'
 import RulesNeighbors            from '../../../theme/rules/neighbors.ts'
 import { RELEASED, point }       from '../../common/browser.ts'
 import { type Charted, charted } from '../../common/rules.ts'
@@ -66,6 +68,19 @@ const radios = ({ host }: Charted): [string, boolean, string][] =>
   [...host.querySelectorAll<HTMLElement>('.kit-radios-item')].map(item =>
     [item.textContent, item.querySelector('input')!.checked, item.title])
 
+/**
+ * Cuts the senders `Flock.heard` writes to the first `count` each bird ranked,
+ * `-1` past them, as for a bird whose radio holds fewer than seven.
+ */
+function short(count: number): void {
+  const heard = Flock.prototype.heard
+  vi.spyOn(Flock.prototype, 'heard').mockImplementation(function cut(this: Flock, index, into) {
+    heard.call(this, index, into)
+    into.fill(-1, count)
+    return count
+  })
+}
+
 enableAutoUnmount(afterEach)
 
 afterEach(() => {
@@ -82,7 +97,7 @@ describe('the header', () => {
       ['Select', false, 'Press a bird to mark it']
     ])
     expect(host.querySelector('[role=slider]')!.getAttribute('aria-label')).toBe('Range, in bird lengths')
-    expect(host.querySelector('.kit-chip-name')!.textContent).toBe('Seventh by rank')
+    expect(host.querySelector('.kit-chip-name')!.textContent).toBe('Farthest ranked')
     expect(host.querySelector('.kit-chip-value')!.textContent).toMatch(/^\d+\.\d lengths$/u)
     expect(canvas(chart).getAttribute('role')).toBe('img')
     expect(canvas(chart).getAttribute('aria-label')).toContain('over the last 12 seconds')
@@ -101,17 +116,14 @@ describe('the header', () => {
     const radii  = (): number[] => chart.stand.context.arc!.mock.calls.map(([, , radius]) => radius as number)
     const before = Math.max(...radii())
     chart.widget.getComponent(Slider).vm.$emit('change', 6)
-    expect(Math.max(...radii())).toBeCloseTo(before * 3, 6)
+    expect(Math.max(...radii())).toBeCloseTo(before * 2, 6)
   })
 })
 
 describe('the marked bird', () => {
-  it('draws the marked bird last, largest, with a line to each of its seven', () => {
-    const chart  = drawn()
-    const last   = frame(chart.birds)
-    const marked = last.at(-1)!
-    expect(marked.length).toBe(Math.max(...last.map(bird => bird.length)))
-    expect(chart.stand.context.lineTo!.mock.calls.length).toBeGreaterThanOrEqual(NEIGHBORS)
+  it('draws the marked bird last and largest', () => {
+    const last = frame(drawn().birds)
+    expect(last.at(-1)!.length).toBe(Math.max(...last.map(bird => bird.length)))
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {
@@ -154,31 +166,89 @@ describe('the marked bird', () => {
   })
 })
 
-describe('the strips', () => {
-  it('label each strip at its end on a wide canvas and above it on a narrow one', () => {
-    const chart  = drawn()
-    const labels = (): unknown[][] => chart.stand.context.fillText!.mock.calls
-      .filter(([words]) => String(words).startsWith('seven by rank'))
-    chart.stand.context.measureText!.mockReturnValue({ width: 200 })
+describe('the lines and the chip', () => {
+  it('draw to the senders the marked bird’s last step ranked, the chip reading the last one’s distance', () => {
+    const heard           = vi.spyOn(Flock.prototype, 'heard')
+    const chart           = drawn()
+    const flock           = heard.mock.contexts.at(-1)! as Flock
+    const [chosen, ranks] = heard.mock.lastCall!
+    const marked          = frame(chart.birds).at(-1)!
+    const senders         = [...ranks].filter(index => index >= 0)
+    const zoom            = marked.x / flock.x[chosen]!
+    const length          = (FLIGHT.size[0] + FLIGHT.size[1]) / 2
+    expect(flock.y[chosen]! * zoom).toBeCloseTo(marked.y, 6)
+    expect(chart.stand.context.lineTo!.mock.calls.slice(-senders.length)).toEqual(senders.map(index =>
+      [expect.closeTo(flock.x[index]! * zoom, 6), expect.closeTo(flock.y[index]! * zoom, 6)]))
+    expect(chart.host.querySelector('.kit-chip-value')!.textContent)
+      .toBe(`${(flock.apart(senders.at(-1)!, chosen) / length).toFixed(1)} lengths`)
+  })
+})
+
+describe('a marked bird ranking fewer than seven', () => {
+  it('draws a line to each sender it ranks, the chip reading the last one’s distance', () => {
+    short(3)
+    const chart           = drawn()
+    const heard           = vi.mocked(Flock.prototype.heard)
+    const flock           = heard.mock.contexts.at(-1)! as Flock
+    const [chosen, ranks] = heard.mock.lastCall!
+    const length          = (FLIGHT.size[0] + FLIGHT.size[1]) / 2
+    chart.stand.context.lineTo!.mockClear()
     chart.stand.reflow(canvas(chart))
-    expect(labels().at(-1)).toEqual([`seven by rank, ${NEIGHBORS}`, 982 + 8, expect.any(Number)])
-    chart.stand.resize(340, 300)
-    chart.stand.reflow(canvas(chart))
-    expect(labels().at(-1)).toEqual([`seven by rank, ${NEIGHBORS}`, 12, 300 - 78 + 15])
+    expect(chart.stand.context.lineTo).toHaveBeenCalledTimes(3)
+    expect(chart.host.querySelector('.kit-chip-value')!.textContent)
+      .toBe(`${(flock.apart(ranks[2]!, chosen) / length).toFixed(1)} lengths`)
   })
 
-  it('counts every other bird inside the ring around the marked one, the marked one left out', () => {
+  it('reads 0 on the chip where it ranks no one', () => {
+    short(0)
+    expect(drawn().host.querySelector('.kit-chip-value')!.textContent).toBe('0.0 lengths')
+  })
+
+  it('counts by rank the senders it ranks, held and flying, until it ranks seven again', () => {
+    short(3)
+    const chart  = drawn(false)
+    const labels = (): string[] => chart.stand.context.fillText!.mock.calls
+      .map(([words]) => String(words))
+      .filter(words => words.startsWith('by rank'))
+    expect(labels().at(-1)).toBe('by rank, 3')
+    chart.stand.frames.run(20, 50)
+    expect(labels().at(-1)).toBe('by rank, 3')
+    vi.mocked(Flock.prototype.heard).mockRestore()
+    chart.stand.frames.run(20, 50)
+    expect(labels().at(-1)).toBe('by rank, 7')
+  })
+})
+
+describe('the strips', () => {
+  it('label each strip at its end on a wide canvas and above it on a narrow one, by the count ranked', () => {
+    const heard  = vi.spyOn(Flock.prototype, 'heard')
+    const chart  = drawn()
+    const ranked = (): string => `by rank, ${heard.mock.results.at(-1)!.value}`
+    const labels = (): unknown[][] => chart.stand.context.fillText!.mock.calls
+      .filter(([words]) => String(words).startsWith('by rank'))
+    chart.stand.context.measureText!.mockReturnValue({ width: 200 })
+    chart.stand.reflow(canvas(chart))
+    expect(labels().at(-1)).toEqual([ranked(), 982 + 8, expect.any(Number)])
+    chart.stand.resize(340, 300)
+    chart.stand.reflow(canvas(chart))
+    expect(labels().at(-1)).toEqual([ranked(), 12, 300 - 78 + 15])
+  })
+
+  it('counts every bird it draws in the range’s color, each inside the ring, the marked one left out', () => {
     const chart  = drawn()
     const last   = frame(chart.birds)
     const marked = last.at(-1)!
     const reach  = Math.max(...chart.stand.context.arc!.mock.calls.map(([, , radius]) => radius as number))
-    const within = last.slice(0, -1)
-      .filter(bird => Math.hypot(bird.x - marked.x, bird.y - marked.y) <= reach).length
+    const ranged = new Set((['dark', 'light'] as const).map(scheme => seriesOf(RANGED, scheme)))
+    const inside = last.slice(0, -1).filter(bird => ranged.has(bird.color))
     const counts = chart.stand.context.fillText!.mock.calls
       .map(([words]) => String(words))
       .filter(words => words.startsWith('within range'))
-    expect(within).toBeGreaterThan(0)
-    expect(counts.at(-1)).toBe(`within range, ${within}`)
+    expect(inside.length).toBeGreaterThan(0)
+    for (const bird of inside) {
+      expect(Math.hypot(bird.x - marked.x, bird.y - marked.y)).toBeLessThanOrEqual(reach)
+    }
+    expect(counts.at(-1)).toBe(`within range, ${inside.length}`)
   })
 
   it('counts the birds inside the range as the flock flies under the falcon, leaving nothing behind', () => {

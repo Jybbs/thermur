@@ -4,7 +4,7 @@
     "Chip"
   ],
   "machine": null,
-  "when": "A drawing reads a value out beside its name, as the threat's front reads the time and the neighbors read the seventh's distance",
+  "when": "A drawing reads a value out beside its name, as the threat's front reads the time and the neighbors read the farthest ranked sender's distance",
   "replaces": "The threat's outlined chip and the filled chip the neighbors' header built by hand",
   "examples": [
     {
