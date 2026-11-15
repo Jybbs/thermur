@@ -1,10 +1,10 @@
+import { type Copier, heard, useCopy }           from '@thermur/kit'
 import { type VNode, defineComponent, h, useId } from 'vue'
 
-import { heatRamp }             from '../../lib/identity.ts'
-import source                   from '../../lib/rendered/identity.json' with { type: 'json' }
-import { type Copier, useCopy } from '../../lib/specimen/copy.ts'
-import * as sketch              from '../../lib/specimen/sketch.ts'
-import * as parts               from './parts.ts'
+import { heatRamp } from '../../lib/identity.ts'
+import source       from '../../lib/rendered/identity.json' with { type: 'json' }
+import * as sketch  from '../../lib/specimen/sketch.ts'
+import * as parts   from './parts.ts'
 
 /**
  * Lays out the labels at the heat profile's edges: the temperature at either
@@ -38,7 +38,7 @@ function readout(copy: Copier['copy'], steps: readonly string[]): VNode {
     h('span', { class: 'identity-caps' }, `${knot} m · ${Math.round(kelvin)} K · Step ${place + 1}`),
     h('button', { class: 'identity-chip', onClick: (event: Event) => copy(hex, event), type: 'button' }, [
       h('i', { style: { background: `var(--th-heat-${place + 1})` } }),
-      h('span', { class: 'identity-hex' }, hex)
+      h('span', { class: 'identity-hex kit-fuse' }, hex)
     ])
   ])
 }
@@ -84,7 +84,7 @@ export default defineComponent({
       ]),
       parts.madeUp('its temperatures'),
       readout(copy, steps),
-      parts.heard(said)
+      heard(said)
     ])
   }
 })

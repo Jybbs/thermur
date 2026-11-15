@@ -22,12 +22,12 @@ describe('IdentityMarks', () => {
   })
 
   it('sets dusk across every card from its slider, opening at the middle', async () => {
-    const widget = mount(IdentityMarks)
+    const widget = mount(IdentityMarks, { attachTo: document.body })
     const figure = widget.get('figure').element as HTMLElement
+    const thumb  = widget.get<HTMLElement>('[role=slider]')
     expect(figure.style.getPropertyValue('--th-dusk')).toBe('50%')
-    const slider = widget.get('input')
-    slider.element.value = '20'
-    await slider.trigger('input')
-    expect(figure.style.getPropertyValue('--th-dusk')).toBe('20%')
+    thumb.element.focus()
+    await thumb.trigger('keydown', { key: 'Home' })
+    expect(figure.style.getPropertyValue('--th-dusk')).toBe('0%')
   })
 })

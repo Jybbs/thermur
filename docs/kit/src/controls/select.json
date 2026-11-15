@@ -1,0 +1,15 @@
+{
+  "name": "Select",
+  "exports": [
+    "Select"
+  ],
+  "machine": "select",
+  "when": "A reader picks one of a list of choices inside a sentence, as the Data page sets how much of an output the graph reads",
+  "replaces": "The native menus of the crop's sentence, and the measuring that held the sentence at its widest wording",
+  "examples": [
+    {
+      "name": "Inside a Sentence",
+      "says": "The menu stands at its widest choice's width, so a pick moves no word around it, and a letter moves to the next choice opening on it."
+    }
+  ]
+}

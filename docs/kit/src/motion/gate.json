@@ -1,0 +1,18 @@
+{
+  "name": "The Gate",
+  "exports": [
+    "onMotion",
+    "pause",
+    "paused",
+    "still"
+  ],
+  "machine": null,
+  "when": "A drawing moves on its own and stands still while the page's pause is on or for a reader who prefers reduced motion",
+  "replaces": "The pause helpers under the canvas folder, the reduced-motion query each stage made of its own, and the motion helpers the charts read",
+  "examples": [
+    {
+      "name": "The Page's Pause",
+      "says": "Turning the pause on stands every drawing on the page still, this stage's flock included, until it is turned off."
+    }
+  ]
+}

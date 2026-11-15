@@ -13,6 +13,7 @@ from json            import dumps, loads
 from pathlib         import Path
 from pydantic        import BaseModel, Field
 from re              import escape, findall, fullmatch
+from semver          import Version
 from subprocess      import CalledProcessError
 from tempfile        import TemporaryDirectory
 from typing          import ClassVar
@@ -207,22 +208,32 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
 
         return Audit.model_validate_json(audited.stdout)
 
+    def info(self, name: str, *fields: str) -> str:
+        """
+        Reads what `bun info` prints of `fields` for the npm package `name`,
+        run from the site's folder.
+        """
+        return self.read(
+            "bun",
+            "info",
+            name,
+            *fields,
+            folder = self.checkout.package.folder
+        )
+
+    def latest(self, name: str) -> str:
+        """
+        Reads the release the `latest` tag of the npm package `name` names.
+        """
+        return self.info(name, "version").strip()
+
     def published(self, name: str, version: str) -> str | None:
         """
         Reads when the release `version` of the npm package `name` was
-        published, as `bun info` reports it from the site's folder, or
-        `None` where it reports no date.
+        published, as `bun info` reports it, or `None` where it reports
+        no date.
         """
-        return loads(
-            self.read(
-                "bun",
-                "info",
-                name,
-                "time",
-                "--json",
-                folder = self.checkout.package.folder
-            )
-        ).get(version)
+        return loads(self.info(name, "time", "--json")).get(version)
 
     def read(self, *command: str | Path, folder: Path = Path()) -> str:
         """
@@ -563,29 +574,51 @@ class Scripts(Manager):
 class Site(Manager):
     """
     Bun, reporting each package `docs/package.json` pins that `bun outdated`
-    lists, against the release its `latest` tag names.
+    lists, and each exact release `overrides` holds a package to, against
+    the release its `latest` tag names.
+    """
+
+    release: ClassVar[str] = r"\d+\.\d+\.\d+(?:[-+][\w.+-]+)?"
+    """
+    The pattern an exact release matches, three dotted integers and an
+    optional prerelease or build.
     """
 
     @property
     def lags(self) -> list[Lag]:
         """
-        Lists each package `bun outdated` prints a row for, beside the
-        advisories the lift clears on it.
+        Lists each package `bun outdated` prints a row for, then each
+        package it lists no row for that `overrides` holds to an exact
+        release behind its newest, beside the advisories the lift clears
+        on it.
         """
         package = self.checkout.package
-        return self.cleared(
-            [
-            Lag.declared(
-                {package.file: rf'"{escape(name)}"\s*:\s*"'},
-                current   = current,
-                newest    = newest,
-                pin       = name,
-                published = self.published(name, newest)
-            )
+        listed  = {
+            name: (current, newest)
             for name, current, newest in findall(
-                r"(?m)^\| (\S+)(?: \(\w+\))? +\| (\d\S*) +\| \S+ +\| (\S+) +\|$",
+                rf"(?m)^\| (\S+)(?: \(\w+\))? +\| ({self.release}) +"
+                r"\| \S+ +\| (\S+) +\|$",
                 self.read("bun", "outdated", folder=package.folder)
             )
+        }
+        pins = listed | {
+            name: (current, newest)
+            for name, current in package.overrides.items()
+            if name not in listed
+            and fullmatch(self.release, current)
+            and Version.is_valid(current)
+            and Version.parse(newest := self.latest(name)) > current
+        }
+        return self.cleared(
+            [
+                Lag.declared(
+                    {package.file: rf'"{escape(name)}"\s*:\s*"'},
+                    current   = current,
+                    newest    = newest,
+                    pin       = name,
+                    published = self.published(name, newest)
+                )
+                for name, (current, newest) in pins.items()
             ]
         )
 
@@ -622,7 +655,10 @@ class Site(Manager):
 
         with TemporaryDirectory(prefix="thermur-") as scratch:
             copy = Checkout(root=scratch)
-            self.checkout.copy([package.file, package.folder / "bun.lock"], copy.root)
+            self.checkout.copy(
+                [*package.manifests, package.folder / "bun.lock"],
+                copy.root
+            )
 
             for lag in lags:
                 lag.write(copy.root)
@@ -798,13 +834,7 @@ class Wrangler(Manager):
         if not pinned:
             return []
 
-        newest = self.read(
-            "bun",
-            "info",
-            "wrangler",
-            "version",
-            folder = self.checkout.package.folder
-        ).strip()
+        newest = self.latest("wrangler")
         return [
             Lag.declared(
                 dict.fromkeys(

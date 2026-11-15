@@ -41,7 +41,7 @@ export class Plot implements Part {
   readonly #pen      : CanvasRenderingContext2D
   readonly #playback : Playback
   readonly #readings : Readings
-  readonly #rail     : HTMLInputElement
+  readonly #rail     : HTMLElement
   readonly #shades   = new Map<Scheme, Shades>()
   readonly #tick     : string
   readonly #tones    : Tones

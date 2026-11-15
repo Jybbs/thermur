@@ -4,13 +4,13 @@ table of the clone's `pyproject.toml` sets for every run beneath a
 `THERMUR_` variable and a value passed in.
 """
 
-from cyclopts          import Parameter
 from pathlib           import Path
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
-from typing import Annotated
 
-from thermur.controller.components import Constant, Morse, Overdamped, SoftCore, White
+from thermur.controller.components import Centered, Consensus, Constant, Cruise, HardSphere, Home, Zig
+from thermur.controller.schemas    import Radio
+from thermur.environment.plant     import Plant
 from thermur.environment.schemas   import Crop, ParametricThreat
 from thermur.metrics.schemas       import Plan
 from thermur.repo.checkout         import Checkout
@@ -36,14 +36,14 @@ class Settings(
     another node has already read.
     """
 
-    cohesion: Morse = Morse()
+    cohesion: Centered = Centered()
     """
     The acceleration holding a drone at a spacing from its neighbors.
     """
 
-    contact: SoftCore = SoftCore()
+    contact: HardSphere = HardSphere()
     """
-    The acceleration pushing apart two drones that overlap.
+    The acceleration pushing a drone away from each of its neighbors.
     """
 
     coupling: Constant = Constant()
@@ -57,16 +57,15 @@ class Settings(
     to, and the fixed heights its fields are regridded onto.
     """
 
-    # `Overdamped` declares no field, which cyclopts renders as one flag taking a
-    # value no conversion accepts, so the command line leaves the slot out.
-    heading: Annotated[Overdamped, Parameter(parse=False)] = Overdamped()
+    heading: Consensus = Consensus()
     """
     The acceleration turning a drone toward its neighbors.
     """
 
-    noise: White = White()
+    noise: Zig = Zig()
     """
-    The random increments driving each drone's velocity and force.
+    The random increments on each drone's command and the zig each drone
+    starts at the rim or takes up from its neighbors.
     """
 
     plan: Plan = Plan()
@@ -75,11 +74,31 @@ class Settings(
     it flies.
     """
 
+    plant: Plant = Plant()
+    """
+    The lag and the bounds carrying a drone's velocity toward its command.
+    """
+
+    radio: Radio = Radio()
+    """
+    The link carrying each drone's state to the others.
+    """
+
+    roost: Home = Home()
+    """
+    The acceleration holding a drone over the roost.
+    """
+
     simulation: Path | None = None
     """
     The WRF-SFIRE output the graph reads, relative to the clone, such as the
     `data/samples/wrf_sample.nc` the `thermur fetch sample` command writes,
     or `None` to read the dataset `threat` builds.
+    """
+
+    speed: Cruise = Cruise()
+    """
+    The acceleration relaxing a drone's speed toward the cruise speed.
     """
 
     threat: ParametricThreat = ParametricThreat()

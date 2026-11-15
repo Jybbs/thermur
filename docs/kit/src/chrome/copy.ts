@@ -1,4 +1,4 @@
-import { type Ref, nextTick, onBeforeUnmount, ref } from 'vue'
+import { type Ref, type VNode, h, nextTick, onBeforeUnmount, ref } from 'vue'
 
 /**
  * What a widget copies through: the copy itself, and the words a screen reader
@@ -17,6 +17,13 @@ const HEX = /^#[\da-f]{6}$/iu
  * The milliseconds a pressed control reads as copied.
  */
 export const COPY_HOLD = 1400
+
+/**
+ * Lays out `said`, the words a screen reader hears once a copy lands, out of
+ * sight.
+ */
+export const heard = (said: Ref<string>): VNode =>
+  h('span', { 'aria-live': 'polite', 'class': 'visually-hidden' }, said.value)
 
 /**
  * Copies a value from a widget's control and marks the control as copied for

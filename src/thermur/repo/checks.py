@@ -14,7 +14,7 @@ from pathlib         import Path
 from pydantic        import BaseModel, ValidationError
 from re              import findall, finditer, search
 from typing          import ClassVar
-from yaml            import NodeEvent, YAMLError, parse
+from yaml            import NodeEvent, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
@@ -83,29 +83,13 @@ class AnchorCheck(Check):
     def scan(self) -> Iterator[Finding]:
         """
         Names each anchor a manifest declares or reads through an alias,
-        once and in the order PyYAML's parse events carry them, and where
-        PyYAML cannot parse the manifest, names the error it reports,
-        keeping each line of its message but the indented ones that locate
-        it in the text.
+        once and in the order PyYAML's parse events carry them, parsing only
+        the manifests that have already read as documents.
         """
         for path in self.checkout.actions:
-            try:
-                events = list(parse(self.checkout.read(path)))
-            except YAMLError as error:
-                yield Finding(
-                    file    = path,
-                    message = f"PyYAML cannot parse `{path}`: "
-                    + ", ".join(
-                        line
-                        for line in str(error).splitlines()
-                        if not line.startswith(" ")
-                    )
-                )
-                continue
-
             for name in dict.fromkeys(
                 event.anchor
-                for event in events
+                for event in parse(self.checkout.read(path))
                 if isinstance(event, NodeEvent) and event.anchor
             ):
                 yield Finding(

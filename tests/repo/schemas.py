@@ -12,12 +12,13 @@ Pins the records the `repo` tasks read and report:
 - The keys and values `GithubSettings` accepts, the calls `Toggles` writes,
   the checks a `Ruleset` requires and the call it writes, and the command
   and body each `Request` sends
+- The release or range each rule a `Package` reads from `overrides` gives
 - The release a requirement pins, whether a `Lag` is major and the row and
   files it names, what an `Edit` writes, the advisories an `Audit` clears,
   and the packages a `Tree` finds
 """
 
-from datetime  import UTC, datetime
+from datetime  import UTC, date, datetime
 from functools import reduce
 from json      import loads as from_json
 from packaging.requirements import Requirement
@@ -25,6 +26,7 @@ from pathlib                import Path
 from pydantic               import AliasPath, ValidationError
 from pytest                 import Config, mark, param, raises
 from urllib.parse           import unquote
+from yaml import safe_load
 
 from thermur.repo.schemas import (
     Action,
@@ -43,6 +45,7 @@ from thermur.repo.schemas import (
     Level,
     Lock,
     Manifest,
+    Package,
     Parity,
     Request,
     Ruleset,
@@ -53,7 +56,8 @@ from thermur.repo.schemas import (
     Tree,
     Trigger,
     Workflow,
-    read_pin
+    read_pin,
+    read_yaml
 )
 
 ROW      = {"color": "8c055e", "description": "Wrong output", "name": "🐞 bug"}
@@ -214,7 +218,7 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
 @mark.parametrize(
     ("text", "location", "message"),
     [
-        param("name: w\nname: v\n", (), "duplicate mapping key: 'name'", id="unread"),
+        param("name: w\nname: v\n", (), "names `name` more than once", id="unread"),
         param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid")
     ]
 )
@@ -714,6 +718,12 @@ def test_a_registry_omits_each_live_label_it_declares_nowhere(
             ".cff",
             "date-released: 2026-10-02\n",
             {"date-released": "2026-10-02"},
+            id = "date"
+        ),
+        param(
+            ".yml",
+            "at: 2026-10-02T10:00:00Z\n",
+            {"at": "2026-10-02T10:00:00Z"},
             id = "timestamp"
         )
     ]
@@ -725,11 +735,124 @@ def test_a_document_reads_the_value_its_suffix_names(
 ):
     """
     Asserts that a document's text reads as TOML under `.toml` and `.lock`,
-    as JSON under `.json`, as YAML 1.2 under any other suffix, keeping `on`,
-    a version, and a date as the strings they are written as, and as the
-    front matter alone under `.md`, ending at its first closing `---`.
+    as JSON under `.json`, as YAML under any other suffix, keeping `on`, a
+    version, and a date as the strings they are written as, and as the front
+    matter alone under `.md`, ending at its first closing `---`.
     """
     assert Document.load(suffix, text) == value
+
+
+@mark.parametrize(
+    ("text", "message"),
+    [
+        param(
+            "a:\n  k: 1\n  k: 2\n",
+            "names `k` more than once",
+            id = "nested-duplicate"
+        ),
+        param("a: b: c\n", "mapping values are not allowed here", id="no-context"),
+        param(
+            "? [a]\n: 1\n",
+            "while constructing a mapping, found unhashable key",
+            id = "sequence-key"
+        ),
+        param(
+            "? !!seq x\n: 1\n",
+            "while constructing a mapping, found unhashable key",
+            id = "collection-tagged-key"
+        ),
+        param(
+            "a: !!map foo\n",
+            "expected a mapping node, but found scalar",
+            id = "tagged-scalar"
+        ),
+        param(
+            "a: !!bool foo\n",
+            "could not read 'foo' as the tag 'tag:yaml.org,2002:bool'",
+            id = "mistyped-scalar"
+        ),
+        param(
+            "a: !!int ''\n",
+            "could not read '' as the tag 'tag:yaml.org,2002:int'",
+            id = "empty-tagged-scalar"
+        ),
+        param(
+            "a: !!map [x]\n",
+            "expected a mapping node, but found sequence",
+            id = "tagged-sequence"
+        ),
+        param(
+            "d: a\x07b\n",
+            "unacceptable character #x0007: special characters are not allowed",
+            id = "control-character"
+        ),
+        param(
+            'a: "x\n',
+            "while scanning a quoted scalar, found unexpected end of stream",
+            id = "unclosed-quote"
+        ),
+        param(
+            "[" * 1000 + "]" * 1000,
+            "maximum recursion depth exceeded",
+            id = "past-the-recursion-limit"
+        )
+    ]
+)
+def test_yaml_failing_to_read_names_its_problem_on_one_line(message: str, text: str):
+    """
+    Asserts that YAML failing to read raises a `ValueError` naming the
+    problem on one line, opening on the context the problem arose in where
+    the parser reports one, and leaving out where in the text it lies.
+    """
+    with raises(ValueError) as error:
+        read_yaml(text)
+
+    assert str(error.value) == message
+
+
+@mark.parametrize(
+    ("text", "value"),
+    [
+        param(
+            "a: on\nb: off\nc: yes\nd: no\n",
+            {
+                "a" : "on",
+                "b" : "off",
+                "c" : "yes",
+                "d" : "no"
+            },
+            id = "text"
+        ),
+        param(
+            "a: true\nb: False\nc: TRUE\n",
+            {"a": True, "b": False, "c": True},
+            id = "boolean"
+        ),
+        param(
+            "a: &a {k: 1, j: 1}\nb: {<<: *a, k: 2}\n",
+            {"a": {"j": 1, "k": 1}, "b": {"j": 1, "k": 2}},
+            id = "merge"
+        ),
+        param(
+            "d: !!timestamp 2026-10-02\n",
+            {"d": "2026-10-02"},
+            id = "tagged-timestamp"
+        ),
+        param(
+            "d: The number\x85  of commits\n",
+            {"d": "The number of commits"},
+            id = "next-line"
+        )
+    ]
+)
+def test_yaml_reads_core_booleans_merges_and_a_next_line(text: str, value: object):
+    """
+    Asserts that YAML reads only the booleans the YAML 1.2 core schema
+    resolves, keeps a timestamp tagged as one as its text, reads a NEL as
+    a line break, and reads a key overriding one a merge brings in as no
+    repeat.
+    """
+    assert read_yaml(text) == value
 
 
 def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
@@ -739,6 +862,27 @@ def test_a_markdown_file_opening_on_no_front_matter_fails_to_read():
     """
     with raises(ValueError, match="opens on no front matter"):
         Document.load(".md", "name: Bug\n---\n")
+
+
+def test_a_package_reads_its_overrides_or_none(pytestconfig: Config):
+    """
+    Asserts that `Package` reads the release or range each rule of
+    `overrides` gives, and reads none where `docs/package.json` declares
+    no `overrides`.
+    """
+    file   = Path(Package.model_config["title"])
+    parsed = Package.load(
+        file.suffix,
+        (pytestconfig.rootpath / file).read_text(encoding="utf-8")
+    )
+    declared = {**parsed, "overrides": {"fflate": "0.7.5", "glob": "^14.0.0"}}
+    absent   = {key: value for key, value in parsed.items() if key != "overrides"}
+
+    assert Package.model_validate(declared).overrides == {
+        "fflate" : "0.7.5",
+        "glob"   : "^14.0.0"
+    }
+    assert Package.model_validate(absent).overrides == {}
 
 
 @mark.parametrize(
@@ -1353,16 +1497,18 @@ def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Pa
     assert (tmp_path / "config.toml").read_text() == 'bun  = "1.4.4"\nnode = "1.4.3"\n'
 
 
-def test_the_lock_maps_each_package_to_its_version():
+def test_reading_yaml_leaves_the_safe_loader_reading_a_date_and_a_boolean():
     """
-    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
-    name mapped to the version it resolves.
+    Asserts that keeping a timestamp and `on` as their text changes no
+    other safe loader, which still reads the timestamp as a date and `on`
+    as `True`.
     """
-    rows = {
-        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
-    }
+    read_yaml("d: 2026-10-02\non: push\n")
 
-    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
+    assert safe_load("d: 2026-10-02\non: push\n") == {
+        "d"  : date(2026, 10, 2),
+        True : "push"
+    }
 
 
 @mark.parametrize(
@@ -1407,6 +1553,18 @@ def test_an_audit_clears_each_advisory_a_release_up_to_the_newest_fixes(
     )
 
     assert audit.clears(current, name, newest) == cleared
+
+
+def test_the_lock_maps_each_package_to_its_version():
+    """
+    Asserts that the lock reads each `[[package]]` row of `uv.lock` as its
+    name mapped to the version it resolves.
+    """
+    rows = {
+        "package": [{"name": "a", "version": "1.0"}, {"name": "b", "version": "2.0"}]
+    }
+
+    assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
 
 
 def workflow(text: str) -> Workflow:

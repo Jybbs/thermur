@@ -23,9 +23,11 @@ from pathlib       import Path
 from pydantic      import BaseModel, Field
 from typing        import Annotated
 
-from thermur.controller.components import SoftCore
-from thermur.controller.schemas    import Composite
-from thermur.docs.outputs          import Outputs, markdown_table, specimens, tabled
+from thermur.controller.components import Cruise, HardSphere, Home
+from thermur.controller.schemas    import Composite, Radio
+from thermur.docs.kit              import Piece
+from thermur.docs.outputs          import Outputs, markdown_table, pieces, specimens, tabled
+from thermur.environment.plant     import Plant
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -42,10 +44,12 @@ from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 from thermur.repo.schemas      import Finding
 
-# `DATA`, `IDENTITY`, and `RULES` hold the pages whose regions the render
-# writes, from the fire data's records, the identity's, and the flight's.
+# `DATA`, `IDENTITY`, `KIT`, and `RULES` hold the pages whose regions the
+# render writes, from the fire data's records, the identity's, the kit's,
+# and the flight's.
 DATA     = Path("docs/pages/data/index.md")
 IDENTITY = Path("docs/pages/reference/identity.md")
+KIT      = Path("docs/pages/reference/kit.md")
 RULES    = Path("docs/pages/methods/rules.md")
 
 
@@ -304,6 +308,24 @@ def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Chec
     assert regions["tagline"] == f'> *"{identity.tagline.text}"*'
 
 
+def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkout):
+    """
+    Asserts that The Kit carries a row per piece declared in the clone, each
+    import and machine backticked and a piece no machine covers marked as
+    running on none.
+    """
+    declared = Piece.declared(checkout.root)
+    regions  = Outputs(checkout=checkout).regions[KIT]
+    table    = regions["pieces"]
+    rows     = table.splitlines()[2:]
+
+    assert regions == {"pieces": pieces(declared)}
+    assert len(rows) == len(declared)
+    assert "| Slider | `Slider` | `slider` | " in table
+    assert "| The Gate | `onMotion`, `pause`, `paused`, `still` | None | " in table
+    assert any(" | None | " in row for row in rows)
+
+
 def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
     checkout: Checkout
 ):
@@ -323,7 +345,11 @@ def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
             Composite
         )
     }
-    assert written["contact"] == {"diameter_m": 6.0, "stiffness_m_s2": 8.0}
+    assert written["contact"] == {
+        "sphere_m"    : 0.2,
+        "spread_m"    : 0.461,
+        "weight_m_s2" : 12.5
+    }
     assert written["plan"] == settings.plan.model_dump(
         include = set(written["plan"]),
         mode    = "json"
@@ -423,22 +449,31 @@ def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
     checkout: Checkout
 ):
     """
-    Asserts that The Interaction Rules carries the fields of the plan and
-    the contact, and for each open slot those of its default and then each
-    candidate, every field named after its component.
+    Asserts that The Interaction Rules carries the fields of the plan, the
+    contact, the plant, the radio, the roost, and the speed control, and for
+    each open slot those of its default and then each candidate, every field
+    named after its component.
     """
     regions = Outputs(checkout=checkout).regions[RULES]
     rows    = regions["cohesion"].splitlines()[2:]
 
-    assert regions["contact"] == tabled(SoftCore)
+    assert regions["contact"] == tabled(HardSphere)
     assert regions["plan"] == tabled(Plan)
+    assert regions["plant"] == tabled(Plant)
+    assert regions["radio"] == tabled(Radio)
+    assert regions["roost"] == tabled(Home)
+    assert regions["speed"] == tabled(Cruise)
     assert set(regions) == {
         "contact",
         "plan",
+        "plant",
+        "radio",
+        "roost",
+        "speed",
         *(trial.slot for trial in Trial.listed())
     }
     assert [row.split("`")[1].partition(".")[0] for row in rows] == [
-        *["morse"] * 4,
+        *["centered"] * 3,
         "centroid",
         *["elastic"] * 2,
         *["fitted"] * 4

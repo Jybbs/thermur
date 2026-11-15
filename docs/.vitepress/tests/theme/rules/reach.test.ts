@@ -2,9 +2,9 @@
 import { enableAutoUnmount }                   from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import RulesReach                       from '../../../theme/rules/reach.ts'
-import { RELEASED }                       from '../../common/browser.ts'
-import { type Charted, charted, press } from '../../common/rules.ts'
+import RulesReach                from '../../../theme/rules/reach.ts'
+import { RELEASED }              from '../../common/browser.ts'
+import { type Charted, charted } from '../../common/rules.ts'
 
 /**
  * Reads the words of every line of text in the chart.
@@ -18,9 +18,15 @@ const words = ({ host }: Charted): string[] =>
 const readings = (chart: Charted): string[] => words(chart).filter(line => /^\d+\.\d°$|^of /u.test(line))
 
 /**
- * Finds the stops on the dial's rim, one per turn.
+ * Finds the radios standing over the stops on the dial's rim, one per turn.
  */
-const knobs = ({ host }: Charted): SVGElement[] => [...host.querySelectorAll<SVGElement>('[role="radio"]')]
+const knobs = ({ host }: Charted): HTMLInputElement[] => [...host.querySelectorAll<HTMLInputElement>('input[type=radio]')]
+
+/**
+ * Reads which stops drawn on the rim show their dot.
+ */
+const dots = ({ host }: Charted): (string | undefined)[] =>
+  [...host.querySelectorAll<SVGElement>('.rules-knob')].map(knob => knob.dataset.on)
 
 enableAutoUnmount(afterEach)
 
@@ -31,56 +37,58 @@ afterEach(() => {
 describe('the heading chart', () => {
   it('reads each rule’s reach at the smallest turn, named in full beside a wide dial', () => {
     const chart = charted(RulesReach, 672)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Overdamped, the default', 'Consensus', 'Delayed']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Overdamped', 'Delayed']))
     expect(readings(chart)).toEqual([
-      '16.4°', 'of 20° · 82% ± 18',
-      '15.7°', 'of 20° · 78% ± 20',
-      '6.7°', 'of 20° · 34% ± 12'
+      '11.7°', 'of 20° · 58% ± 8',
+      '14.5°', 'of 20° · 72% ± 12',
+      '13.7°', 'of 20° · 68% ± 11'
     ])
-    expect(knobs(chart).map(knob => knob.getAttribute('aria-checked'))).toEqual(['true', 'false'])
+    expect(knobs(chart).map(knob => knob.checked)).toEqual([true, false])
+    expect(dots(chart)).toEqual(['true', 'false'])
   })
 
   it('sets the shorter names under the dial on a narrow column', () => {
     const chart = charted(RulesReach, 672)
     chart.widen(390)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Overdamped', 'Consensus', 'Delayed']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Overdamped', 'Delayed']))
     expect(chart.host.querySelector('svg')!.getAttribute('width')).toBe('390')
   })
 
 })
 
 describe('the stops on the dial’s rim', () => {
-  it('sweeps to the turn picked on the rim, reading each rule’s reach of it', () => {
+  it('sweeps to the turn picked on the rim, reading each rule’s reach of it', async () => {
     const chart = charted(RulesReach, 672)
-    knobs(chart)[1]!.dispatchEvent(new Event('click'))
+    knobs(chart)[1]!.click()
+    await chart.widget.vm.$nextTick()
     expect(readings(chart)).toEqual([
-      '19.2°', 'of 90° · 21% ± 4',
-      '20.4°', 'of 90° · 23% ± 7',
-      '8.8°', 'of 90° · 10% ± 4'
+      '11.6°', 'of 90° · 13% ± 2',
+      '14.3°', 'of 90° · 16% ± 3',
+      '13.5°', 'of 90° · 15% ± 3'
     ])
-    expect(knobs(chart).map(knob => knob.getAttribute('tabindex'))).toEqual(['-1', '0'])
+    expect(knobs(chart).map(knob => knob.checked)).toEqual([false, true])
+    expect(dots(chart)).toEqual(['false', 'true'])
   })
 
-  it.for([
-    { from: 0, key: 'ArrowRight', to: 1 },
-    { from: 0, key: 'ArrowUp', to: 1 },
-    { from: 0, key: 'ArrowLeft', to: 1 },
-    { from: 1, key: 'ArrowDown', to: 0 },
-    { from: 1, key: 'Enter', to: 1 },
-    { from: 1, key: ' ', to: 1 }
-  ])('moves the pick from stop $from to stop $to on $key, focus and all', ({ from, key, to }) => {
+  it('names the group of radios and each radio for its turn, one name shared so the arrow keys move between them', () => {
     const chart = charted(RulesReach, 672)
-    knobs(chart)[from]!.dispatchEvent(new Event('click'))
-    expect(press(knobs(chart)[from]!, key)).toBe(true)
-    expect(knobs(chart)[to]!.getAttribute('aria-checked')).toBe('true')
-    expect(document.activeElement).toBe(knobs(chart)[to])
+    const group = chart.host.querySelector('[role=radiogroup]')!
+    expect(document.querySelector(`[id="${group.getAttribute('aria-labelledby')!}"]`)?.textContent).toBe('The first drone turns')
+    expect([...chart.host.querySelectorAll('.kit-radios-item')].map(item => item.textContent)).toEqual(['20°', '90°'])
+    expect(new Set(knobs(chart).map(knob => knob.name)).size).toBe(1)
   })
 
-  it('leaves every other key to the browser', () => {
+  it('stands each radio over its stop on the rim, again at each width', async () => {
     const chart = charted(RulesReach, 672)
-    expect(press(knobs(chart)[0]!, 'Tab')).toBe(false)
+    await chart.widget.vm.$nextTick()
+    const places = (): string[] => [...chart.host.querySelectorAll<HTMLElement>('.kit-radios-item')]
+      .map(item => `${item.style.left} ${item.style.top}`)
+    const wide   = places()
+    chart.widen(390)
+    await chart.widget.vm.$nextTick()
+    expect(wide.every(place => /^[\d.]+px [\d.]+px$/u.test(place))).toBe(true)
+    expect(places()).not.toEqual(wide)
   })
-
 })
 
 describe('the rings', () => {
@@ -100,15 +108,15 @@ describe('the rings', () => {
     const chart = charted(RulesReach, 672)
     chart.stand.frames.run(1, 400)
     const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
-    expect(Number(outer!.slice(0, -1)) / 16.4).toBeGreaterThan(Number(inner!.slice(0, -1)) / 6.7)
+    expect(Number(outer!.slice(0, -1)) / 11.7).toBeGreaterThan(Number(inner!.slice(0, -1)) / 13.7)
     chart.stand.frames.run(20, 400)
-    expect(readings(chart)[0]).toBe('16.4°')
+    expect(readings(chart)[0]).toBe('11.7°')
   })
 
   it('leaves no listener, observer, or frame behind once it unmounts mid-sweep', () => {
     document.documentElement.style.setProperty('--th-settle', '240ms')
     const chart = charted(RulesReach, 672)
-    knobs(chart)[1]!.dispatchEvent(new Event('click'))
+    knobs(chart)[1]!.click()
     chart.stand.frames.run(2)
     chart.widget.unmount()
     expect(chart.stand.held()).toEqual(RELEASED)

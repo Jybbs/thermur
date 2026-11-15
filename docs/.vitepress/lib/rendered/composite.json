@@ -1,26 +1,69 @@
 {
   "cohesion": {
-    "kind": "Morse",
-    "attraction_m": 12.0,
-    "attraction_m2_s2": 80.0,
-    "repulsion_m": 2.4,
-    "repulsion_m2_s2": 10400.0
+    "kind": "Centered",
+    "blind_deg": 90.0,
+    "sphere_m": 0.2,
+    "weight_m_s2": 12.5
   },
   "contact": {
-    "kind": "SoftCore",
-    "diameter_m": 6.0,
-    "stiffness_m_s2": 8.0
+    "kind": "HardSphere",
+    "sphere_m": 0.2,
+    "spread_m": 0.461,
+    "weight_m_s2": 12.5
   },
   "coupling": {
     "kind": "Constant",
-    "coupling_per_s": 0.6
+    "coupling_per_s": 0.904
   },
   "heading": {
-    "kind": "Overdamped"
+    "kind": "Consensus",
+    "centering": 0.0002
   },
   "noise": {
-    "kind": "White",
-    "amplitude": 4.2
+    "kind": "Zig",
+    "amplitude": 2.455,
+    "accel_m_s2": 12.5,
+    "back_s": 0.3,
+    "branching": 1.0,
+    "cue_s": 0.05,
+    "reaction_s": 0.076,
+    "refractory_s": 1.0,
+    "side_s": 0.25
+  },
+  "plant": {
+    "kind": "Plant",
+    "climb_m_s": 3.0,
+    "climbing_m_s2": 4.0,
+    "descending_m_s2": 4.0,
+    "descent_m_s": 3.0,
+    "lag_s": 1.0,
+    "level_m_s": 15.2,
+    "level_m_s2": 5.0
+  },
+  "radio": {
+    "kind": "Radio",
+    "delay_s": 1.0,
+    "hold_periods": 3,
+    "loss": 0.4,
+    "range_m": 50.0,
+    "rate_hz": 5.0
+  },
+  "roost": {
+    "kind": "Home",
+    "bound_m_s2": 5.0,
+    "center_m": [
+      1000.0,
+      1000.0
+    ],
+    "height_m": 100.0,
+    "radius_m": 1000.0,
+    "stiffness_per_s2": 2.5,
+    "turn": 0.94
+  },
+  "speed": {
+    "kind": "Cruise",
+    "cruise_m_s": 10.0,
+    "relaxation_s": 1.0
   },
   "plan": {
     "axes": [

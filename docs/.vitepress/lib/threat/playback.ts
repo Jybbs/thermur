@@ -55,17 +55,6 @@ export class Playback {
   }
 
   /**
-   * Moves the time to the snapshot after the one it stands at or before it, the
-   * way an arrow key on the rail does.
-   */
-  nudge(direction: -1 | 1): void {
-    const { interval } = this.#front
-    const place        = this.#target / interval
-    const snapshot     = direction > 0 ? Math.floor(place + 1e-6) + 1 : Math.ceil(place - 1e-6) - 1
-    this.seek(snapshot * interval)
-  }
-
-  /**
    * Holds the run for as long as a reader presses the rail.
    */
   press(): void {

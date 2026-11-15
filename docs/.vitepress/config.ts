@@ -1,14 +1,14 @@
 import { defineConfig } from 'vitepress'
 
-import { Cards }          from './lib/cards.ts'
-import * as head          from './lib/head.ts'
-import { identityModule } from './lib/identity.ts'
-import { projectFacts }   from './lib/manifest.ts'
-import { mathRules }      from './lib/math.ts'
-import { pageData }       from './lib/page-data.ts'
-import * as paths         from './lib/paths.ts'
-import { themeConfig }    from './lib/site.ts'
-import { widgetRules }    from './lib/widgets.ts'
+import { Cards }        from './lib/cards.ts'
+import * as head        from './lib/head.ts'
+import { projectFacts } from './lib/manifest.ts'
+import { mathRules }    from './lib/math.ts'
+import { pageData }     from './lib/page-data.ts'
+import * as paths       from './lib/paths.ts'
+import { themeConfig }  from './lib/site.ts'
+import * as vite        from './lib/vite.ts'
+import { widgetRules }  from './lib/widgets.ts'
 
 const facts    = projectFacts(import.meta.url)
 const previews = new head.Previews(Cards.under(import.meta.url, facts), facts)
@@ -26,11 +26,11 @@ export default defineConfig({
   themeConfig       : themeConfig(facts, paths.pagesDir(import.meta.url)),
   title             : head.TITLE,
   transformHead     : context => previews.head(context),
-  transformPageData : page => pageData(page, facts.repository),
+  transformPageData : page => pageData(page, facts.repository, paths.docsDir(import.meta.url)),
 
   vite: {
+    ...vite.shared(),
     css       : { transformer: 'lightningcss' },
-    plugins   : [identityModule()],
     publicDir : paths.publicDir(import.meta.url)
   }
 })

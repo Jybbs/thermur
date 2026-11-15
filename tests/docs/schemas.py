@@ -11,7 +11,7 @@ from pydantic        import ValidationError
 from pytest          import Config, fixture, mark, param, raises
 from re              import fullmatch, sub
 
-from thermur.docs.schemas import Article, Bibliography, Preprint, Study
+from thermur.docs.schemas import Article, Bibliography, Preprint, Report, Study
 
 ARTICLE = """@article{{{key},
     author   = {{{author}}},
@@ -117,6 +117,36 @@ def test_a_block_the_parser_cannot_read_is_named_by_its_line(
         match = "line 13 holds a block bibtexparser cannot read"
     ):
         read(text=f"{entry}\n{entry}")
+
+
+def test_a_numbered_report_cites_its_series_and_number(
+    read: Callable[..., Bibliography]
+):
+    """
+    Asserts that a `@techreport` entry reads as a report whose definition
+    gives the series and the number that cite it, in place of a journal's
+    volume and pages.
+    """
+    study = read(
+        text = """@techreport{clausen2011,
+    author   = {Clausen, Thomas Heide and Dearlove, Christopher and Dean, Justin},
+    title    = {Mobile Ad Hoc Network (MANET) Neighborhood Discovery Protocol (NHDP)},
+    type     = {RFC},
+    number   = {6130},
+    year     = {2011},
+    doi      = {10.17487/RFC6130},
+    priority = {prio2},
+    annote   = {What the standard sets.}
+}
+"""
+    ).studies["clausen2011"]
+
+    assert isinstance(study, Report)
+    assert study.definition == (
+        '[^clausen2011]: Clausen et al. 2011. "Mobile Ad Hoc Network (MANET) '
+        'Neighborhood Discovery Protocol (NHDP)." RFC 6130. '
+        "<https://doi.org/10.17487/RFC6130>"
+    )
 
 
 def test_a_preprint_in_the_arxiv_export_shape_cites_its_identifier(
