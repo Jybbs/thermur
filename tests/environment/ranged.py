@@ -20,7 +20,7 @@ from contextlib      import closing
 from http.client     import HTTPException
 from io              import BytesIO
 from math            import prod
-from numpy           import arange, int16
+from numpy           import arange, full, int16
 from pathlib         import Path
 from pytest          import FixtureRequest, fixture, mark, param, raises
 from xarray          import Dataset, open_dataset
@@ -89,9 +89,11 @@ def threat(tmp_path: Path) -> Path:
 def written(request: FixtureRequest, tmp_path: Path) -> Path:
     """
     Writes a netCDF file in the classic or the 64-bit offset format, holding
-    a variable along the record dimension and one without it, or a file
-    whose one record variable holds three 16-bit integers a record, which
-    the format writes with no padding between records.
+    a variable along the record dimension and one without it, beside a text
+    variable of 19 characters a record, as WRF writes `Times`, which the
+    format pads to 20 between the record's variables, or a file whose one
+    record variable holds three 16-bit integers a record, which the format
+    writes with no padding between records.
     """
     path = tmp_path / "written.nc"
     lone = request.param == "lone"
@@ -102,9 +104,10 @@ def written(request: FixtureRequest, tmp_path: Path) -> Path:
                 arange(9, dtype=int16).reshape(3, 3),
                 {"units": "1"}
             ),
-            "ground" : (("y", "x"), arange(6.0).reshape(2, 3), {"scale": 0.5})
+            "ground" : (("y", "x"), arange(6.0).reshape(2, 3), {"scale": 0.5}),
+            "Times"  : (("Time", "DateStrLen"), full((3, 19), b"0", "S1"))
         }
-    ).drop_vars(["ground"] if lone else []).to_netcdf(
+    ).drop_vars(["ground", "Times"] if lone else []).to_netcdf(
         path,
         engine         = "netcdf4",
         format         = "NETCDF3_CLASSIC" if lone else request.param,
@@ -291,6 +294,17 @@ def test_a_server_ignoring_the_range_is_refused(remote: Remote, served: Served):
 
     with raises(ValueError, match="status 200 rather than 206"):
         remote.fetch([(0, 4)])
+
+
+def test_a_stalled_read_is_requested_again_over_a_new_connection(threat: Path):
+    """
+    Asserts that a request whose answer stalls past `Remote.timeout_s` is
+    sent again over its connection opened anew, and read whole.
+    """
+    with Served(faults=["stalled"], path=threat).serving() as address:
+        remote = Remote.from_url(address).model_copy(update={"timeout_s": 0.2})
+        with closing(remote):
+            assert remote.fetch([(0, 4)]) == b"CDF\x02"
 
 
 def test_an_address_is_read_where_its_redirect_leads(threat: Path):

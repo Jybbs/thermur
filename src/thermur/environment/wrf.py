@@ -353,8 +353,8 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
         `RangedBackend` where it is an HTTP or HTTPS address, which reads
         only the bytes the crop covers, and through netCDF4 otherwise,
         crops it as `from_dataset` does to `settings.crop` over the window
-        `sample` holds, loads the window whole, reading each variable once
-        from a thread of its own, closes `source`, and checks the figures
+        `sample` holds, loads the window whole, reading the variables at
+        once on a pool of threads, closes `source`, and checks the figures
         it measures there through `Sample.check` against a flight lasting
         `settings.plan.duration_s`.
 

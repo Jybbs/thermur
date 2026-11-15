@@ -11,6 +11,7 @@ from http.server     import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib         import Path
 from pydantic        import BaseModel
 from threading       import Thread
+from time            import sleep
 from typing          import Literal
 
 
@@ -26,12 +27,16 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
     The file served.
     """
 
-    faults: list[Literal["cut", "dropped", "merged", "unavailable", "whole"]] = []
+    faults: list[
+        Literal["cut", "dropped", "merged", "stalled", "unavailable", "whole"]
+    ] = []
     """
     The answers the next requests take, one each in order, meaning a body
     cut short, a multipart body leaving out the part of the first range, a
     multipart body of one part running from the first range to the last, a
-    status of 503, and the whole file with a status of 200.
+    body whose first byte is followed by a pause of a second before the
+    connection closes, a status of 503, and the whole file with a status of
+    200.
     """
 
     kept_alive: int = 100
@@ -144,6 +149,13 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
                 self.end_headers()
                 if fault == "cut":
                     self.wfile.write(body[: len(body) // 2])
+                    return
+
+                if fault == "stalled":
+                    self.wfile.write(body[:1])
+                    self.wfile.flush()
+                    sleep(1.0)
+                    self.close_connection = True
                     return
 
                 self.wfile.write(body)

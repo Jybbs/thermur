@@ -154,12 +154,13 @@ class Remote(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
                         headers = {"Range": f"bytes={ranges}"} | self.headers
                     )
                     with connection.getresponse() as response:
+                        if response.status == 200:
+                            connection.close()
+                            raise ValueError(
+                                f"`{self.url}` answered a range request with status "
+                                "200 rather than 206"
+                            )
                         body = response.read()
-                    if response.status == 200:
-                        raise ValueError(
-                            f"`{self.url}` answered a range request with status 200 "
-                            "rather than 206"
-                        )
                     if response.status != 206:
                         raise HTTPException(
                             f"`{self.url}` answered with status {response.status} "
@@ -510,8 +511,13 @@ class RangedBackend(BackendEntrypoint):
         Opens the file at the address `filename_or_obj` names, reading its
         header and leaving every value unread until a caller reads it.
         """
-        remote  = Remote.from_url(filename_or_obj)
-        header  = remote.header
+        remote = Remote.from_url(filename_or_obj)
+        try:
+            header = remote.header
+        except BaseException:
+            remote.close()
+            raise
+
         dataset = decode_cf(
             Dataset(
                 {
