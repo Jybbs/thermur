@@ -1,5 +1,4 @@
 import { type VueWrapper, mount } from '@vue/test-utils'
-import { vi }                     from 'vitest'
 import type { Component }         from 'vue'
 
 import { type Browser, browser } from './browser.ts'
@@ -22,14 +21,10 @@ export interface Charted {
  * on the next frame.
  */
 export function charted(component: Component, width: number, reduced = false): Charted {
-  const stand = browser(reduced)
-  let across  = width
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() =>
-    ({ height: 300, left: 0, top: 0, width: across }) as DOMRect)
+  const stand  = browser(reduced)
   const widget = mount(component, { attachTo: document.body })
   const host   = widget.element as HTMLElement
   const widen  = (next: number): void => {
-    across = next
     stand.reflow(host, next)
     stand.frames.run(1)
   }
