@@ -403,9 +403,9 @@ def test_a_sample_s_run_record_reloads_to_the_rectangle_it_was_cut_to(
 ):
     """
     Asserts that a sample is cut to the 10 columns and 2 rows its own
-    rectangle keeps of the 20 and 3 `developing` holds, and that the run
-    record of a flight through the written file reloads to the grid the
-    cut wrote.
+    rectangle keeps of the 20 and 3 `developing` holds, over the rectangle
+    the crop sets, and that the run record of a flight through the written
+    file reloads to the grid the cut wrote.
     """
     sample = Sample(
         burning_m2 = (3200.0, 22400.0),
@@ -417,7 +417,9 @@ def test_a_sample_s_run_record_reloads_to_the_rectangle_it_was_cut_to(
     path = WrfOutput.from_sample(
         str(developing),
         sample   = sample,
-        settings = Settings(crop=crop)
+        settings = Settings(
+            crop = crop.model_copy(update={"x_m": (0.0, 200.0), "y_m": (0.0, 40.0)})
+        )
     ).write(
         tmp_path / "wrf_sample.nc",
         sample = sample

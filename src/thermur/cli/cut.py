@@ -27,14 +27,14 @@ def sample(
     """
     Cuts the WRF-SFIRE sample into the clone's `data/` folder.
 
-    Crops the output at `source` to the snapshots the sample pins under
-    the crop the graph reads, reading only the bytes the crop covers where
-    `source` is an address, checks that the window holds a developed plume
-    at the figures the sample pins, and writes it as one NetCDF-4 file
-    compressed with zlib, then prints the path of the file relative to the
-    clone. Exits nonzero, writing nothing, where `source` names another
-    output than the one the sample is cut from, or where the window misses a
-    figure it is held to, naming each one it misses.
+    Crops the output at `source` to the snapshots and the rectangle the
+    sample pins under the crop the graph reads, reading only the bytes the
+    crop covers where `source` is an address, checks that the window holds
+    a developed plume at the figures the sample pins, and writes it as one
+    NetCDF-4 file compressed with zlib, then prints the path of the file
+    relative to the clone. Exits nonzero, writing nothing, where `source`
+    names another output than the one the sample is cut from, or where the
+    window misses a figure it is held to, naming each one it misses.
     """
     root, pinned = Checkout.installed().root, Sample()
     output       = WrfOutput.from_sample(source, sample=pinned, settings=Settings())

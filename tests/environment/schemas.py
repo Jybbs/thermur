@@ -5,9 +5,9 @@ Pins the records the fire data is read through:
 - The points and sizes of the `Grid` a threat lays its dataset out on
 - The dataset a `ParametricThreat` builds under WRF's names, and the reach
   its validator holds the front to
-- The address of the `Sample`, the request it sends, the fetch that checks
-  and moves its file into place, and the checks it holds a window's
-  figures to
+- The address and length of the `Sample`, the request it sends, the fetch
+  that checks and moves its file into place, and the checks it holds a
+  window's figures to
 """
 
 from contextlib         import AbstractContextManager, nullcontext
@@ -307,6 +307,14 @@ def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
             "https://doi.org/10.0000/test"
         )
     }
+
+
+def test_a_sample_measures_its_length_across_its_rectangle():
+    """
+    Asserts that a sample's length is the east edge of its rectangle less
+    its west edge.
+    """
+    assert Sample(x_m=(1000.0, 4000.0)).length_m == 3000.0
 
 
 @mark.parametrize(
