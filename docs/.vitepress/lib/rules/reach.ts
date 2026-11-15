@@ -170,7 +170,7 @@ export class Reach {
       })
       chart.set(ring.bar, { width: Math.max(0, ring.width * Math.min(1, share)) })
       chart.set(ring.whisker, {
-        x1 : x0 + ring.width * Math.max(0, share - spread / turned),
+        x1 : x0 + ring.width * Math.min(1.1, Math.max(0, share - spread / turned)),
         x2 : x0 + ring.width * Math.min(1.1, share + spread / turned)
       })
       ring.angle.textContent = `${shown.toFixed(1)}°`

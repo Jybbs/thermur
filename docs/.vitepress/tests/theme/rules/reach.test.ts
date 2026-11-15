@@ -107,6 +107,16 @@ describe('the rings', () => {
     expect(Math.min(...xs)).toBeGreaterThanOrEqual(center - 1e-6)
   })
 
+  it.for([0, 1])('holds each bar’s whisker inside the chart on stop %i', stop => {
+    const chart = charted(RulesReach, 672)
+    knobs(chart)[stop]!.dispatchEvent(new Event('click'))
+    const width = Number(chart.host.querySelector('svg')!.getAttribute('width'))
+    const ends  = [...chart.host.querySelectorAll('line')]
+      .flatMap(line => [line.getAttribute('x1'), line.getAttribute('x2')])
+      .map(Number)
+    expect(Math.max(...ends)).toBeLessThanOrEqual(width)
+  })
+
   it('staggers the rings over the theme’s settling time, outer first', () => {
     document.documentElement.style.setProperty('--th-settle', '240ms')
     vi.spyOn(performance, 'now').mockReturnValue(0)

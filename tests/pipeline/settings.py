@@ -82,13 +82,13 @@ def test_a_confinement_too_stiff_for_the_step_fails(installed: Checkout):
     plan names, times the step, exceeds two fails validation.
     """
     with raises(ValidationError, match="exceeds two within 6.9 to 15.2 m/s"):
-        Tuned(speed={"confinement_per_s": 1.0})
+        Tuned(speed={"confinement_per_s": 0.5})
 
 
 @mark.parametrize(
     "speed",
     [
-        param({"confinement_per_s": 0.2}, id="stable"),
+        param({"confinement_per_s": 0.45}, id="stable"),
         param({"confinement_per_s": 1.0, "fixed": True}, id="fixed")
     ]
 )

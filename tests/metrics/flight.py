@@ -5,11 +5,12 @@ the first drone's turn, the replay ranking composites, and the helpers each
 statistic reads.
 """
 
-from common.drones import flock_of, short, still_air
-from dataclasses   import replace
-from jax           import jit
-from jax.numpy     import array
-from jax.random    import key, split
+from collections.abc import Callable
+from common.drones   import flock_of, short, still_air
+from dataclasses     import replace
+from jax             import Array, jit
+from jax.numpy       import array
+from jax.random      import key, split
 from numpy         import (
     allclose,
     arange,
@@ -38,19 +39,21 @@ from numpy         import (
     zeros
 )
 from numpy.testing import assert_allclose, assert_array_equal
-from pytest        import fixture, mark, param
+from pytest        import MonkeyPatch, fixture, mark, param
 
 from thermur.controller.components import (
     Centroid,
     Constant,
     Delayed,
+    InertialSpin,
     Marginal,
     Overdamped,
     SoftCore,
     White
 )
-from thermur.controller.schemas import Composite, across
+from thermur.controller.schemas import Composite, Flock, across
 from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response
+from thermur.metrics.schemas    import Plan
 from thermur.pipeline.settings  import Settings
 
 AIR = still_air()
@@ -65,6 +68,30 @@ STILL = Composite(
 )
 """
 The composite whose drift is zero on every flock.
+"""
+
+PUSHED = Composite(
+    cohesion = Centroid(stiffness_per_s2=0.0),
+    contact  = SoftCore(stiffness_m_s2=500.0),
+    coupling = Constant(coupling_per_s=0.0),
+    heading  = InertialSpin(friction=1.0, inertia_s=0.02),
+    noise    = White(amplitude=0.0),
+    speed    = Marginal(amplitude=0.0)
+)
+"""
+The composite under which two overlapping drones push each other apart at
+250 m/s^2 across a 3 m gap, and the friction stops a spin within one step
+of 0.02 s, with no noise and no alignment.
+"""
+
+EAST = array([[10.0, 0.0, 0.0]] * 9)
+"""
+The velocities of nine drones flying east at 10 m/s.
+"""
+
+SPOTS = array([[1000.0, 1000.0 + 200.0 * row, 100.0] for row in range(9)])
+"""
+A line of nine drones 200 m apart across the course, inside the still air.
 """
 
 
@@ -82,6 +109,35 @@ def flight(composite: Composite) -> Flight:
     Flies the short plan under the default composite through still air.
     """
     return Flight.flown(composite, AIR, short())
+
+
+@fixture
+def stepped(monkeypatch: MonkeyPatch) -> Callable[[Flock], Array]:
+    """
+    Builds the flight of a flock laid out by hand, flown under `PUSHED` for
+    one step through still air, that step its one kept frame.
+    """
+
+    def flown(flock: Flock) -> Array:
+        """
+        Flies `flock` for one step from where it stands, reading each
+        drone's velocity at the step's end.
+        """
+        monkeypatch.setattr(Plan, "launched", lambda *_: flock)
+        return kept(
+            air       = AIR,
+            composite = PUSHED,
+            key       = key(0),
+            plan      = Plan(
+                drones           = len(flock.positions),
+                duration_s       = 0.02,
+                frame_every      = 1,
+                settled_s        = 0.0,
+                turning_window_s = 0.01
+            )
+        ).velocities[0]
+
+    return flown
 
 
 def laid(positions: object, velocities: object, **changes: object) -> Flight:
@@ -236,6 +292,20 @@ def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     )
 
 
+def test_a_push_across_the_velocity_keeps_each_drone_s_speed(
+    stepped: Callable[[Flock], Array]
+):
+    """
+    Asserts that two drones a contact pushes apart across their velocity
+    keep the 10 m/s they flew at, the speed being the stepped velocity's
+    part along the heading rather than its length of `sqrt(10^2 + 5^2)`.
+    """
+    velocities = stepped(flock_of(SPOTS.at[1, 1].set(SPOTS[0, 1] + 3.0), EAST))
+
+    assert_allclose(linalg.norm(velocities[:2], axis=-1), 10.0, rtol=1e-5)
+    assert abs(velocities[1, 1]) > 1.0
+
+
 def test_a_replay_ranks_every_composite_it_is_given(
     composite : Composite,
     flight    : Flight
@@ -250,6 +320,27 @@ def test_a_replay_ranks_every_composite_it_is_given(
     assert list(ranked.model.values) == ["one", "two"]
     assert isfinite(ranked.log_likelihood).all()
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
+
+
+@mark.parametrize(
+    ("gap_m", "groups"),
+    [param(44.0, 2.0, id="inside-the-hop"), param(46.0, 12.0, id="past-the-hop")]
+)
+def test_two_strings_of_drones_read_their_spacing_and_their_groups(
+    gap_m  : float,
+    groups : float
+):
+    """
+    Asserts that two strings of six drones 200 m apart, each drone `gap_m`
+    from the next, read that nearest-neighbor distance, and two groups where
+    the gap sits inside the hop of three launch spacings, or one group per
+    drone where it sits past it.
+    """
+    string = stack([gap_m * arange(6), zeros(6), zeros(6)], -1)
+    flight = laid(concat([string, string + [0.0, 200.0, 0.0]]), [10.0, 0.0, 0.0])
+
+    assert_allclose(flight.spacing_m, gap_m, rtol=1e-6)
+    assert_allclose(flight.fragments, groups)
 
 
 def test_a_replay_reads_a_delayed_heading_s_neighbors_lag_s_back():
@@ -283,27 +374,6 @@ def test_a_replay_reads_a_delayed_heading_s_neighbors_lag_s_back():
     )
 
 
-@mark.parametrize(
-    ("gap_m", "groups"),
-    [param(44.0, 2.0, id="inside-the-hop"), param(46.0, 12.0, id="past-the-hop")]
-)
-def test_two_strings_of_drones_read_their_spacing_and_their_groups(
-    gap_m  : float,
-    groups : float
-):
-    """
-    Asserts that two strings of six drones 200 m apart, each drone `gap_m`
-    from the next, read that nearest-neighbor distance, and two groups where
-    the gap sits inside the hop of three launch spacings, or one group per
-    drone where it sits past it.
-    """
-    string = stack([gap_m * arange(6), zeros(6), zeros(6)], -1)
-    flight = laid(concat([string, string + [0.0, 200.0, 0.0]]), [10.0, 0.0, 0.0])
-
-    assert_allclose(flight.spacing_m, gap_m, rtol=1e-6)
-    assert_allclose(flight.fragments, groups)
-
-
 def test_a_replay_reads_the_likelihood_of_its_residual_across_each_velocity():
     """
     Asserts that a flight whose drones swing one meter per second across the
@@ -325,29 +395,6 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_velocity():
         [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
         rtol = 1e-5
     )
-
-
-def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
-    """
-    Asserts that shells of drones turning at times proportional to their
-    distance from the first drone read the speed of that spread, and a reach
-    of one where the farthest shell ends the flight turned through the whole
-    turn.
-    """
-    plan      = short(turn_deg=90.0, turning_window_s=0.1)
-    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
-
-    speed, reach = response(
-        distances = distances,
-        plan      = plan,
-        rotation  = exp(
-            1j * pi / 2 * (arange(
-                60
-            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
-        )
-    )
-
-    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
 
 
 @mark.parametrize(
@@ -376,6 +423,45 @@ def test_a_fixed_speed_keeps_every_drone_at_the_cruise(
 
     assert allclose(speeds, plan.cruise_m_s, rtol=1e-4) == held
     assert plan.airspeeds_m_s[0] < speeds.min() <= speeds.max() < plan.airspeeds_m_s[1]
+
+
+def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
+    """
+    Asserts that shells of drones turning at times proportional to their
+    distance from the first drone read the speed of that spread, and a reach
+    of one where the farthest shell ends the flight turned through the whole
+    turn.
+    """
+    plan      = short(turn_deg=90.0, turning_window_s=0.1)
+    distances = array([0.0, 10.0, 10.0, 30.0, 30.0, 50.0, 50.0, 70.0, 70.0, 90.0, 90.0])
+
+    speed, reach = response(
+        distances = distances,
+        plan      = plan,
+        rotation  = exp(
+            1j * pi / 2 * (arange(
+                60
+            )[:, None] >= (distances / 20.0 / plan.frame_s)[None])
+        )
+    )
+
+    assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
+
+
+def test_a_spin_the_friction_stops_within_the_step_leaves_the_heading(
+    stepped: Callable[[Flock], Array]
+):
+    """
+    Asserts that each velocity turns at the spin the step reaches, so a spin
+    of 1 rad/s the friction stops within one step leaves every drone flying
+    east, where turning at the spin the step starts from would swing it 0.2
+    m/s north.
+    """
+    velocities = stepped(
+        replace(flock_of(SPOTS, EAST), spins=array([[0.0, 0.0, 1.0]] * 9))
+    )
+
+    assert_allclose(velocities, EAST, atol=1e-4)
 
 
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():

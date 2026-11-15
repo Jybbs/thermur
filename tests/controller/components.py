@@ -252,9 +252,9 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             Nonmutual(asymmetry=0.5),
             viewed(
                 [[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0]],
-                neighbors = array([[10.0, 1.0, 0.0], [10.0, 1.0, 0.0]])
+                neighbors = array([[10.0, 1.0, 0.0], [10.0, 3.0, 0.0]])
             ),
-            [0.0, 1.5 + 0.5, 0.0],
+            [0.0, 1.5 * 1.0 + 0.5 * 3.0, 0.0],
             id = "nonmutual"
         ),
         param(
@@ -412,6 +412,21 @@ def test_a_persistent_force_enters_the_acceleration_and_decays():
     assert_allclose(Persistent(persistence_s=2.0).relaxation(view), -force / 2.0)
     assert_allclose(White()(view), 0.0)
     assert_allclose(White().relaxation(view), 0.0)
+
+
+def test_an_inertial_spin_carries_its_spin_along_the_turn_a_force_makes():
+    """
+    Asserts that a force across the velocity turns the spin a drone holds at
+    the rate `turning x spin`, `turning` being the force's torque `v x force
+    / |v|^2`, beside the friction's relaxation.
+    """
+    turned, spun = InertialSpin(friction=0.5, inertia_s=2.0).steered(
+        array([0.0, 0.0, 1.0]),
+        viewed([[10.0, 0.0, 0.0]], spin=array([0.0, 0.0, 0.2]))
+    )
+
+    assert_allclose(turned, [0.0, 2.0, 1.0], atol=1e-6)
+    assert_allclose(spun, [-0.02, 0.0, -0.05], atol=1e-6)
 
 
 def test_an_inertial_spin_holds_at_the_spin_its_pull_sets():
