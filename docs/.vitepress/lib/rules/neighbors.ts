@@ -48,8 +48,8 @@ export const RANGE = { max: 6, min: 1, step: 0.25, value: 3 } as const
 
 /**
  * The elements of the chip a drawing of the neighbors reads how far out the
- * marked bird's seventh flies into: the name, set in the seven's color, and
- * the value.
+ * farthest sender the marked bird ranks flies into: the name, set in the
+ * seven's color, and the value.
  */
 export interface Reach {
   named : HTMLElement
@@ -59,8 +59,8 @@ export interface Reach {
 /**
  * The drawing of the neighbors a drone senses: the front page's flock under
  * the pointer's falcon, its pointer's mode set through `mode` and its fixed
- * range through `range`, reading how far out the marked bird's seventh flies
- * into the chip `reach`. A new mark grows its lines to its seven out from it.
+ * range through `range`, reading how far out the farthest sender the marked
+ * bird ranks flies into the chip `reach`. A new mark grows its lines to its seven out from it.
  * `destroy` releases every listener, observer, frame, and canvas it holds.
  */
 export class Neighbors {
@@ -85,7 +85,7 @@ export class Neighbors {
   ) {
     const tones            = new Tones(identity)
     const marks            = Marks.traced(tones, identity)
-    const read             = (seventh: number, scheme: Scheme): void => this.#read(seventh, scheme)
+    const read             = (farthest: number, scheme: Scheme): void => this.#read(farthest, scheme)
     const part             = new falcon.Falcon(identity, marks, read, this.#shared, tones, tuning)
     this.#reach            = reach
     this.#sky              = host
@@ -118,15 +118,16 @@ export class Neighbors {
   }
 
   /**
-   * Reads the seventh's distance into the chip, its name in the seven's color
-   * in `scheme`, and grows the lines of a bird newly marked out to its seven.
+   * Reads the farthest ranked sender's distance into the chip, its name in the
+   * seven's color in `scheme`, and grows the lines of a bird newly marked out
+   * to the senders it ranks.
    */
-  #read(seventh: number, scheme: Scheme): void {
+  #read(farthest: number, scheme: Scheme): void {
     const { chosen }              = this.#shared
     const moved                   = this.#drawn >= 0 && chosen !== this.#drawn
     this.#drawn                   = chosen
     this.#reach.named.style.color = this.#tones.flock(scheme, falcon.ALONG.seven, 1)
-    this.#reach.value.textContent = `${seventh.toFixed(1)} lengths`
+    this.#reach.value.textContent = `${farthest.toFixed(1)} lengths`
     if (!moved) return
     this.#stop()
     this.#stop = tween(share => {

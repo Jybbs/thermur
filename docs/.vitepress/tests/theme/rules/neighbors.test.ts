@@ -68,6 +68,19 @@ const radios = ({ host }: Charted): [string, boolean, string][] =>
   [...host.querySelectorAll<HTMLElement>('.kit-radios-item')].map(item =>
     [item.textContent, item.querySelector('input')!.checked, item.title])
 
+/**
+ * Cuts the senders `Flock.heard` writes to the first `count` each bird ranked,
+ * `-1` past them, as for a bird whose radio holds fewer than seven.
+ */
+function short(count: number): void {
+  const heard = Flock.prototype.heard
+  vi.spyOn(Flock.prototype, 'heard').mockImplementation(function cut(this: Flock, index, into) {
+    heard.call(this, index, into)
+    into.fill(-1, count)
+    return count
+  })
+}
+
 enableAutoUnmount(afterEach)
 
 afterEach(() => {
@@ -84,7 +97,7 @@ describe('the header', () => {
       ['Select', false, 'Press a bird to mark it']
     ])
     expect(host.querySelector('[role=slider]')!.getAttribute('aria-label')).toBe('Range, in bird lengths')
-    expect(host.querySelector('.kit-chip-name')!.textContent).toBe('Seventh by rank')
+    expect(host.querySelector('.kit-chip-name')!.textContent).toBe('Farthest ranked')
     expect(host.querySelector('.kit-chip-value')!.textContent).toMatch(/^\d+\.\d lengths$/u)
     expect(canvas(chart).getAttribute('role')).toBe('img')
     expect(canvas(chart).getAttribute('aria-label')).toContain('over the last 12 seconds')
@@ -168,6 +181,41 @@ describe('the lines and the chip', () => {
       [expect.closeTo(flock.x[index]! * zoom, 6), expect.closeTo(flock.y[index]! * zoom, 6)]))
     expect(chart.host.querySelector('.kit-chip-value')!.textContent)
       .toBe(`${(flock.apart(senders.at(-1)!, chosen) / length).toFixed(1)} lengths`)
+  })
+})
+
+describe('a marked bird ranking fewer than seven', () => {
+  it('draws a line to each sender it ranks, the chip reading the last one’s distance', () => {
+    short(3)
+    const chart           = drawn()
+    const heard           = vi.mocked(Flock.prototype.heard)
+    const flock           = heard.mock.contexts.at(-1)! as Flock
+    const [chosen, ranks] = heard.mock.lastCall!
+    const length          = (FLIGHT.size[0] + FLIGHT.size[1]) / 2
+    chart.stand.context.lineTo!.mockClear()
+    chart.stand.reflow(canvas(chart))
+    expect(chart.stand.context.lineTo).toHaveBeenCalledTimes(3)
+    expect(chart.host.querySelector('.kit-chip-value')!.textContent)
+      .toBe(`${(flock.apart(ranks[2]!, chosen) / length).toFixed(1)} lengths`)
+  })
+
+  it('reads 0 on the chip where it ranks no one', () => {
+    short(0)
+    expect(drawn().host.querySelector('.kit-chip-value')!.textContent).toBe('0.0 lengths')
+  })
+
+  it('counts by rank the senders it ranks, held and flying, until it ranks seven again', () => {
+    short(3)
+    const chart  = drawn(false)
+    const labels = (): string[] => chart.stand.context.fillText!.mock.calls
+      .map(([words]) => String(words))
+      .filter(words => words.startsWith('by rank'))
+    expect(labels().at(-1)).toBe('by rank, 3')
+    chart.stand.frames.run(20, 50)
+    expect(labels().at(-1)).toBe('by rank, 3')
+    vi.mocked(Flock.prototype.heard).mockRestore()
+    chart.stand.frames.run(20, 50)
+    expect(labels().at(-1)).toBe('by rank, 7')
   })
 })
 

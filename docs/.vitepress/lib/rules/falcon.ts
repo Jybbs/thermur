@@ -88,7 +88,7 @@ export class Falcon implements Part {
   readonly #marks   : Marks
   readonly #nbr     = new Int32Array(common.NEIGHBORS)
   #ranked           = 0
-  readonly #read    : (seventh: number, scheme: Scheme) => void
+  readonly #read    : (farthest: number, scheme: Scheme) => void
   readonly #shared  : Shared
   #stamp            = -Infinity
   readonly #strips  : paint.Strips
@@ -99,7 +99,7 @@ export class Falcon implements Part {
   constructor(
     identity : Identity,
     marks    : Marks,
-    read     : (seventh: number, scheme: Scheme) => void,
+    read     : (farthest: number, scheme: Scheme) => void,
     shared   : Shared,
     tones    : Tones,
     tuning   : Tuning
@@ -126,7 +126,7 @@ export class Falcon implements Part {
    * Reads the distance to the last sender the marked bird ranks, in bird
    * lengths, or 0 where it ranked none.
    */
-  get #seventh(): number {
+  get #farthest(): number {
     const last = this.#nbr[this.#ranked - 1]
     return last === undefined ? 0 : this.#flock!.apart(last, this.#shared.chosen) / this.#length
   }
@@ -161,10 +161,10 @@ export class Falcon implements Part {
   }
 
   /**
-   * Draws the flock: the marked bird's hairlines out to its seven as far as
-   * they have grown, every other bird in the range's color inside the range,
-   * in the seven's among its seven, and faint in the ink elsewhere, and the
-   * marked bird over them.
+   * Draws the flock: the marked bird's hairlines out to the senders it ranks
+   * as far as they have grown, every other bird in the range's color inside
+   * the range, in the seven's among those senders, and faint in the ink
+   * elsewhere, and the marked bird over them.
    */
   #paintFlock(ctx: CanvasRenderingContext2D, g: Geometry, dpr: number, ranged: string): void {
     const birds                    = this.#flock!
@@ -177,9 +177,8 @@ export class Falcon implements Part {
     ctx.strokeStyle                = this.#tones.flock(g.scheme, ALONG.seven, 0.7)
     ctx.lineWidth                  = 1.2
     ctx.beginPath()
-    for (let rank = 0; rank < common.NEIGHBORS; rank++) {
+    for (let rank = 0; rank < this.#ranked; rank++) {
       const index = this.#nbr[rank]!
-      if (index < 0) break
       ctx.moveTo(ox, oy)
       ctx.lineTo(ox + (x[index]! * zoom - ox) * grown, oy + (y[index]! * zoom - oy) * grown)
     }
@@ -268,7 +267,7 @@ export class Falcon implements Part {
     const now = performance.now()
     if (now - this.#stamp < this.#tuning.read && !g.still) return
     this.#stamp = now
-    this.#read(this.#seventh, g.scheme)
+    this.#read(this.#farthest, g.scheme)
   }
 
   press(g: Geometry): void {
@@ -279,8 +278,8 @@ export class Falcon implements Part {
 
   /**
    * Sways the plume, puts the falcon at the pointer while predator mode is on
-   * and the pointer is over the sky, moves the flock on, and samples the count
-   * inside the range.
+   * and the pointer is over the sky, moves the flock on, and samples the
+   * senders ranked and the count inside the range.
    */
   step(dt: number, g: Geometry): void {
     const { pointer }    = g

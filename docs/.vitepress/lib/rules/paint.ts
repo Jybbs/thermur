@@ -19,9 +19,18 @@ export interface Rect {
  */
 const DASH = [5, 4]
 /**
+ * The opacity of a strip's sample counting none.
+ */
+const FAINT = 0.15
+/**
  * The unbroken line the ring returns to from `DASH`.
  */
 const LINE: readonly number[] = []
+/**
+ * The opacity of the by-rank strip's sample counting none in each scheme,
+ * which in the dark holds every count at 3:1 or more against the panel.
+ */
+const FLOOR: Record<Geometry['scheme'], number> = { dark: 0.6, light: FAINT }
 
 /**
  * Draws the bird at `index` of `birds` centered on where the flock places it
@@ -153,11 +162,13 @@ export class Strips {
 
   /**
    * Draws the strip of `trace` from `left` to `right`, `tall` pixels from
-   * `top`, shaded by each sample's count against the seven.
+   * `top`, shaded by each sample's count against the seven from the opacity
+   * `floor` up to 0.85.
    */
   #strip(
     ctx   : CanvasRenderingContext2D,
     color : string,
+    floor : number,
     left  : number,
     right : number,
     tall  : number,
@@ -169,7 +180,7 @@ export class Strips {
     ctx.fillStyle = color
     for (let k = 0; k < count; k++) {
       const value     = trace[(this.#traced + k) % count]!
-      ctx.globalAlpha = 0.15 + 0.7 * common.clamp(value / common.NEIGHBORS)
+      ctx.globalAlpha = floor + (0.85 - floor) * common.clamp(value / common.NEIGHBORS)
       ctx.fillRect(left + k * width, top, width + 0.5, tall)
     }
     ctx.globalAlpha = 1
@@ -218,8 +229,8 @@ export class Strips {
     const foot      = panel.y1 - (stacked ? 5 : 6)
     this.#label(ctx, 'left', faint, g, words.ago, left, foot)
     this.#label(ctx, 'right', faint, g, 'now', end, foot)
-    this.#strip(ctx, seven, left, end, tall, stacked ? panel.y0 + 19 : top, this.#ranks)
-    this.#strip(ctx, ranged, left, end, tall, next, this.#trace)
+    this.#strip(ctx, seven, FLOOR[g.scheme], left, end, tall, stacked ? panel.y0 + 19 : top, this.#ranks)
+    this.#strip(ctx, ranged, FAINT, left, end, tall, next, this.#trace)
     if (stacked) {
       this.#label(ctx, 'left', seven, g, words.seven, left, panel.y0 + 15)
       this.#label(ctx, 'left', ranged, g, words.range, left, panel.y0 + 45)
