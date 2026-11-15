@@ -7,19 +7,31 @@ import model          from '../../../lib/rendered/composite.json' with { type: '
 import parity         from '../../../lib/rendered/parity.json' with { type: 'json' }
 
 /**
- * No increment and no push on any drone of `parity`'s flock.
+ * The flocks `parity` holds, each beside the step the package moves it through.
  */
-const STILL = new Float64Array(parity.flock.positions.length * 3)
+type Parity = typeof parity.flocks.rim
 
 /**
- * Builds a copy of `parity`'s flock, every drone having heard every other.
+ * The flock `parity` holds astride the roost's rim.
  */
-function launched(): Composite {
-  const copy = new Composite(parity.flock.positions.length)
-  copy.positions.set(parity.flock.positions.flat())
-  copy.velocities.set(parity.flock.velocities.flat())
-  copy.commands.set(parity.flock.commands.flat())
-  copy.forces.set(parity.flock.forces.flat())
+const RIM = parity.flocks.rim
+
+/**
+ * No increment and no push on any drone of `parity`'s flocks.
+ */
+const STILL = new Float64Array(RIM.flock.positions.length * 3)
+
+/**
+ * Builds a copy of `held`'s flock, the rim's unless given, under a radio of
+ * its delay, every drone having heard every other.
+ */
+function launched(held: Parity = RIM): Composite {
+  const { commands, forces, positions, velocities } = held.flock
+  const copy = new Composite(positions.length, { ...model, radio: { ...model.radio, delay_s: held.delay_s } })
+  copy.positions.set(positions.flat())
+  copy.velocities.set(velocities.flat())
+  copy.commands.set(commands.flat())
+  copy.forces.set(forces.flat())
   copy.open()
   return copy
 }
@@ -32,7 +44,7 @@ const divergence = (held: Float64Array, stepped: number[][]): number =>
   Math.max(...stepped.flat().map((value, index) => Math.abs(held[index]! - value)))
 
 /**
- * Builds a copy of `parity`'s flock under a roost whose disk reaches far past
+ * Builds a copy of the rim's flock under a roost whose disk reaches far past
  * every drone.
  */
 function inside(): Composite {
@@ -41,21 +53,17 @@ function inside(): Composite {
   return copy
 }
 
-/**
- * Steps `copy` once under `parity`'s increments and draws and no push.
- */
-function once(copy: Composite): Composite {
-  copy.advance(parity.increments.flat(), parity.draws, STILL)
-  return copy
-}
-
 describe('Composite.advance', () => {
-  it.for(['positions', 'velocities', 'commands', 'forces'] as const)(
-    'steps the %s the package steps from one state to the package’s, within a thousandth',
-    name => {
-      expect(divergence(once(launched())[name], parity.stepped[name])).toBeLessThan(1e-3)
-    }
-  )
+  it.for(
+    (['late', 'rim', 'roost'] as const).flatMap(flock =>
+      (['positions', 'velocities', 'commands', 'forces'] as const).map(name => [flock, name] as const)
+    )
+  )('steps the %s flock’s %s from one state to the package’s, within a thousandth', ([flock, name]) => {
+    const held = parity.flocks[flock]
+    const copy = launched(held)
+    copy.advance(held.increments.flat(), held.draws, STILL)
+    expect(divergence(copy[name], held.stepped[name])).toBeLessThan(1e-3)
+  })
 
   it('holds every command inside the plant’s horizontal and vertical bounds', () => {
     const copy = launched()
@@ -68,7 +76,7 @@ describe('Composite.advance', () => {
   })
 
   it('starts a resting drone’s zig off a zigging neighbor where its draw is zero, and never where it is one', () => {
-    const resting = parity.flock.forces.findIndex(([countdown]) => countdown === 0)
+    const resting = RIM.flock.forces.findIndex(([countdown]) => countdown === 0)
     const off     = inside()
     const on      = inside()
     off.advance(STILL, new Float64Array(off.count).fill(1), STILL)
@@ -81,7 +89,8 @@ describe('Composite.advance', () => {
     const copy = launched()
     copy.positions.copyWithin(3, 0, 3)
     copy.open()
-    expect(once(copy).commands.every(Number.isFinite)).toBe(true)
+    copy.advance(RIM.increments.flat(), RIM.draws, STILL)
+    expect(copy.commands.every(Number.isFinite)).toBe(true)
   })
 })
 

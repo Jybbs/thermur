@@ -96,11 +96,24 @@ describe('Flock’s birds', () => {
     expect(near(flown(fire))).toBeLessThan(near(flown()))
   })
 
+  it('pushes its birds up and away from heat below them', () => {
+    const below: Heat = { heat: (_, y) => Math.exp(-((y - 300) ** 2) / 20000) }
+    expect(mean(flown(below, 4).y)).toBeLessThan(mean(flown(STILL, 4).y))
+  })
+
   it('moves its middle with its region', () => {
     const flock  = flown()
     const before = flock.x[0]!
     flock.region({ x0: 100, x1: 700, y0: 0, y1: 300 })
     expect(flock.x[0]).toBeCloseTo(before + 100, 3)
+  })
+
+  it('flies no more than the flight’s stretch in one frame, however long the frame', () => {
+    const long  = flown()
+    const short = flown()
+    long.step(1, STILL)
+    short.step(FLIGHT.stretch, STILL)
+    expect([...long.positions]).toEqual([...short.positions])
   })
 
   it('flies whole steps of the plan, carrying what is left of a frame to the next one', () => {
