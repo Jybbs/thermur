@@ -601,4 +601,4 @@ def test_the_bucket_serves_the_pinned_file_at_its_address():
 
     with urlopen(request, timeout=Sample().timeout_s) as response:
         assert response.status == 200
-        assert int(response.headers["Content-Length"]) == 455334719
+        assert int(response.headers["Content-Length"]) == 81215582

@@ -68,16 +68,18 @@ class Crop(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     """
     The westernmost and the easternmost mass point kept, in meters from the
     domain's western edge, or `None` to keep every column. The default
-    keeps the 125 columns from 0 to 5000 m, holding the roost spanning 0 to
-    2000 m and the fire's smoke reaching 4340 m east.
+    keeps the sample's 125 columns from 0 to 5000 m, holding the roost
+    spanning 0 to 2000 m and the smoke above 1% of its peak, which reaches
+    4340 m east, while a parametric threat keeps every column unless set.
     """
 
     y_m: Span = (0.0, 6500.0)
     """
     The southernmost and the northernmost mass point kept, in meters from
     the domain's southern edge, or `None` to keep every row. The default
-    keeps the 163 rows from 0 to 6500 m, holding the roost spanning 0 to
-    2000 m and the fire's plume reaching 6340 m north.
+    keeps the sample's 163 rows from 0 to 6500 m, holding the roost
+    spanning 0 to 2000 m and the smoke above 1% of its peak, which reaches
+    6340 m north, while a parametric threat keeps every row unless set.
     """
 
     @property

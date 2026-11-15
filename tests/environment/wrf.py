@@ -413,6 +413,18 @@ def test_a_sample_whose_window_misses_its_figures_is_refused(
         )
 
 
+def test_a_threat_reads_its_whole_grid_past_the_sample_s_default_crop():
+    """
+    Asserts that a parametric threat 200 columns and 50 rows wide, reaching
+    8000 m east past the 5000 m the default crop keeps of the sample, reads
+    every column and every row under that default.
+    """
+    threat = ParametricThreat(grid=Grid(columns=200))
+    sizes  = WrfOutput.from_threat(threat, crop=Crop()).dataset.sizes
+
+    assert (sizes["west_east"], sizes["south_north"]) == (200, 50)
+
+
 def test_an_output_lacking_a_variable_is_refused_naming_it(
     crop   : Crop,
     threat : ParametricThreat
@@ -440,24 +452,6 @@ def test_an_output_on_disk_keeps_every_field_unloaded(
 
     assert dataset.data_vars
     assert not any(dataset[name].variable._in_memory for name in dataset.data_vars)
-
-
-def test_an_output_on_disk_reads_as_the_dataset_it_holds(
-    crop     : Crop,
-    output   : WrfOutput,
-    threat   : ParametricThreat,
-    tmp_path : Path
-):
-    """
-    Asserts that an output opened from a NetCDF file reads as the same
-    dataset the threat builds, cropped alike.
-    """
-    threat.dataset.to_netcdf(path := tmp_path / "wrfout.nc", engine="netcdf4")
-
-    assert_identical(
-        WrfOutput.from_path(path, crop=crop).dataset.load(),
-        output.dataset
-    )
 
 
 @mark.parametrize(
@@ -494,19 +488,22 @@ def test_the_air_aloft_refuses_heights_its_levels_do_not_reach(
         WrfOutput.from_threat(threat, crop=crop).aloft
 
 
-def test_destaggering_averages_each_pair_of_faces():
+def test_an_output_on_disk_reads_as_the_dataset_it_holds(
+    crop     : Crop,
+    output   : WrfOutput,
+    threat   : ParametricThreat,
+    tmp_path : Path
+):
     """
-    Asserts that a field destaggers onto the points between each pair of its
-    faces, along the dimension named without its `_stag` suffix and carrying
-    no coordinate there.
+    Asserts that an output opened from a NetCDF file reads as the same
+    dataset the threat builds, cropped alike.
     """
-    field = DataArray([0.0, 2.0, 6.0], coords={"x_stag": [0, 1, 2]}, dims="x_stag")
+    threat.dataset.to_netcdf(path := tmp_path / "wrfout.nc", engine="netcdf4")
 
-    averaged = destaggered(field, dimension="x_stag")
-
-    assert averaged.dims == ("x",)
-    assert averaged.values.tolist() == [1.0, 4.0]
-    assert "x" not in averaged.coords
+    assert_identical(
+        WrfOutput.from_path(path, crop=crop).dataset.load(),
+        output.dataset
+    )
 
 
 @mark.parametrize(
@@ -556,6 +553,21 @@ def test_the_air_aloft_refuses_a_band_missed_by_two_millimeters(level_m: float):
 
     with raises(ValueError, match="short of the band"):
         WrfOutput.from_threat(threat, crop=crop).aloft
+
+
+def test_destaggering_averages_each_pair_of_faces():
+    """
+    Asserts that a field destaggers onto the points between each pair of its
+    faces, along the dimension named without its `_stag` suffix and carrying
+    no coordinate there.
+    """
+    field = DataArray([0.0, 2.0, 6.0], coords={"x_stag": [0, 1, 2]}, dims="x_stag")
+
+    averaged = destaggered(field, dimension="x_stag")
+
+    assert averaged.dims == ("x",)
+    assert averaged.values.tolist() == [1.0, 4.0]
+    assert "x" not in averaged.coords
 
 
 def test_each_wind_is_averaged_from_its_faces_onto_the_mass_points(
@@ -639,19 +651,6 @@ def test_the_air_aloft_takes_a_band_beginning_on_the_level_it_reads():
     assert WrfOutput.from_threat(threat, crop=crop).aloft.sizes["height"] == 2
 
 
-def test_the_air_aloft_takes_a_band_ending_on_the_levels_it_reads(
-    threat: ParametricThreat
-):
-    """
-    Asserts that a band beginning at the lowest level's center and ending
-    at the highest's is regridded, though those centers land tens of
-    micrometers off in single precision.
-    """
-    crop = Crop(floor_m=10.0, levels=12, spacing_m=20.0)
-
-    assert WrfOutput.from_threat(threat, crop=crop).aloft.sizes["height"] == 12
-
-
 @mark.parametrize(
     ("crop", "times", "sizes"),
     [
@@ -733,6 +732,19 @@ def test_a_crop_keeps_the_window_the_neighborhood_and_the_band(
     assert "XTIME" not in dataset
 
 
+def test_the_air_aloft_takes_a_band_ending_on_the_levels_it_reads(
+    threat: ParametricThreat
+):
+    """
+    Asserts that a band beginning at the lowest level's center and ending
+    at the highest's is regridded, though those centers land tens of
+    micrometers off in single precision.
+    """
+    crop = Crop(floor_m=10.0, levels=12, spacing_m=20.0)
+
+    assert WrfOutput.from_threat(threat, crop=crop).aloft.sizes["height"] == 12
+
+
 def test_the_air_lays_out_every_channel_finitely(output: WrfOutput):
     """
     Asserts that the air holds the winds, the smoke, the air temperature,
@@ -744,24 +756,6 @@ def test_the_air_lays_out_every_channel_finitely(output: WrfOutput):
     assert air.names == ("u", "v", "w", "smoke", "temperature", "excess", "front")
     assert air.channels.shape == (7, 3, 5, 3, 20)
     assert isfinite(air.channels).all()
-
-
-def test_the_air_temperature_is_the_potential_temperature_at_its_pressure(
-    output : WrfOutput,
-    threat : ParametricThreat
-):
-    """
-    Asserts that the air temperature is `T` plus 300 K scaled by the Exner
-    function of the pressure `P` plus `PB`, which the threat's base state
-    sets to its dry adiabatic profile.
-    """
-    potential = threat.dataset.T.isel(bottom_top=slice(7)) + BASE_K
-
-    assert_allclose(
-        output.temperature.values,
-        (potential * exner(threat.grid.heights.isel(bottom_top=slice(7)))).values,
-        rtol = 1e-5
-    )
 
 
 @mark.parametrize(
@@ -854,36 +848,21 @@ def test_a_height_outside_its_range_is_refused(
         output.heights
 
 
-def test_the_conversions_read_each_perturbation_and_the_ground(
-    crop   : Crop,
+def test_the_air_temperature_is_the_potential_temperature_at_its_pressure(
+    output : WrfOutput,
     threat : ParametricThreat
 ):
     """
-    Asserts that the air temperature reads the perturbation pressure beside
-    the base state, and that the height reads the perturbation geopotential
-    beside the base state, measured from the ground's own.
+    Asserts that the air temperature is `T` plus 300 K scaled by the Exner
+    function of the pressure `P` plus `PB`, which the threat's base state
+    sets to its dry adiabatic profile.
     """
-    data   = threat.dataset
-    output = WrfOutput.from_dataset(
-        data.assign(
-            P   = data.P + 500.0,
-            PH  = data.PHB * 0.5,
-            PHB = data.PHB + GRAVITY_M_S2 * 100.0
-        ),
-        crop = crop
-    )
-    levels   = data.isel(bottom_top=slice(output.dataset.sizes["bottom_top"]))
-    exponent = DRY_AIR_J_KG_K / HEAT_CAPACITY_J_KG_K
+    potential = threat.dataset.T.isel(bottom_top=slice(7)) + BASE_K
 
     assert_allclose(
         output.temperature.values,
-        ((levels.T + BASE_K) * ((levels.PB + 500.0) / REFERENCE_PA) ** exponent).values,
+        (potential * exner(threat.grid.heights.isel(bottom_top=slice(7)))).values,
         rtol = 1e-5
-    )
-    assert_allclose(
-        output.heights.isel(Time=0, south_north=0, west_east=0).values,
-        1.5 * threat.grid.heights.isel(bottom_top=levels.bottom_top).values,
-        rtol = 1e-4
     )
 
 
@@ -997,6 +976,39 @@ def test_a_wind_outside_its_range_is_refused_naming_its_axis(
         match = f"`{variable.lower()}` .* outside the range from -113.3 to 113.3 m/s"
     ):
         output.wind
+
+
+def test_the_conversions_read_each_perturbation_and_the_ground(
+    crop   : Crop,
+    threat : ParametricThreat
+):
+    """
+    Asserts that the air temperature reads the perturbation pressure beside
+    the base state, and that the height reads the perturbation geopotential
+    beside the base state, measured from the ground's own.
+    """
+    data   = threat.dataset
+    output = WrfOutput.from_dataset(
+        data.assign(
+            P   = data.P + 500.0,
+            PH  = data.PHB * 0.5,
+            PHB = data.PHB + GRAVITY_M_S2 * 100.0
+        ),
+        crop = crop
+    )
+    levels   = data.isel(bottom_top=slice(output.dataset.sizes["bottom_top"]))
+    exponent = DRY_AIR_J_KG_K / HEAT_CAPACITY_J_KG_K
+
+    assert_allclose(
+        output.temperature.values,
+        ((levels.T + BASE_K) * ((levels.PB + 500.0) / REFERENCE_PA) ** exponent).values,
+        rtol = 1e-5
+    )
+    assert_allclose(
+        output.heights.isel(Time=0, south_north=0, west_east=0).values,
+        1.5 * threat.grid.heights.isel(bottom_top=levels.bottom_top).values,
+        rtol = 1e-4
+    )
 
 
 def test_the_default_settings_lay_out_the_default_threat():

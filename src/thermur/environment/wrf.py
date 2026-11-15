@@ -402,9 +402,12 @@ class WrfOutput(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings
     def from_threat(cls, threat: ParametricThreat, *, crop: Crop) -> Self:
         """
         Wraps the WRF-shaped dataset `threat` builds, cropped as
-        `from_dataset` crops a simulation.
+        `from_dataset` crops a simulation, though along `x_m` and `y_m`
+        only where `crop` sets them, keeping the whole grid along each axis
+        `crop` leaves at its default.
         """
-        return cls.from_dataset(threat.dataset, crop=crop)
+        whole = dict.fromkeys({"x_m", "y_m"} - crop.model_fields_set)
+        return cls.from_dataset(threat.dataset, crop=crop.model_copy(update=whole))
 
     def write(self, path: Path, *, sample: Sample) -> Path:
         """
