@@ -60,7 +60,7 @@ describe('the widget’s markup', () => {
     const labels     = widget.findAll('[role=combobox]').map(menu =>
       document.querySelector(`[id="${menu.attributes('aria-labelledby')!}"]`)?.textContent)
     expect(labels).toEqual(['Where along the ground', 'When', 'How high'])
-    expect(shown(widget)).toEqual(['the whole domain', 'every snapshot', '500 m'])
+    expect(shown(widget)).toEqual(['the whole sample', 'every snapshot', '500 m'])
     expect(widget.get('.crop-sentence').element.childNodes[4]?.textContent).toBe(', from 20 m up to ')
     expect(widget.get('.crop-sentence').text()).toMatch(/^Read .* for .*, from 20 m up to .*\.$/su)
   })
@@ -92,9 +92,9 @@ describe('a pick', () => {
     const { widget } = mounted(true)
     await pick(widget, 0, 'the western half')
     const lines = widget.get('.crop-lines')
-    expect(lines.element.textContent).toBe('[tool.thermur.crop]\nx_m = [0.0, 10000.0]')
+    expect(lines.element.textContent).toBe('[tool.thermur.crop]\nx_m = [0.0, 2500.0]')
     expect(lines.attributes('data-empty')).toBeUndefined()
-    await pick(widget, 0, 'the whole domain')
+    await pick(widget, 0, 'the whole sample')
     expect(lines.text()).toBe(DEFAULTS)
     expect(lines.attributes('data-empty')).toBe('')
   })
@@ -106,7 +106,7 @@ describe('a pick', () => {
     await pick(widget, 2, '1,000 m')
     expect(widget.get('.crop-lines').element.textContent).toBe([
       '[tool.thermur.crop]',
-      'x_m = [10000.0, 20000.0]',
+      'x_m = [2500.0, 5000.0]',
       'window_s = [4785.0, 4800.0]',
       'levels = 50'
     ].join('\n'))

@@ -267,7 +267,7 @@ def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():
         param(
             Sample(),
             "https://data.thermur.fyi/samples/"
-            "620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09/"
+            "6e9eed4b67be50f4fe4509b198f30df85261c2347e5ca3c27f117dd5d22c82df/"
             "wrf_sample.nc",
             id = "the-pinned-sample"
         ),

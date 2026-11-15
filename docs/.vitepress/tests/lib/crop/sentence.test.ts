@@ -9,7 +9,7 @@ describe('the menus', () => {
 
   it('name each choice in plain words, each height from the record', () => {
     expect(menus.map(({ choices }) => choices.map(({ name }) => name))).toEqual([
-      ['the whole domain', 'the western half', 'the eastern half'],
+      ['the whole sample', 'the western half', 'the eastern half'],
       ['every snapshot', 'the last two snapshots'],
       ['500 m', '200 m', '1,000 m']
     ])
@@ -27,12 +27,12 @@ describe('the menus', () => {
   })
 
   it.each([
-    { lines: ['x_m = [0.0, 10000.0]'], picks: [1, 0, 0] },
-    { lines: ['x_m = [10000.0, 20000.0]'], picks: [2, 0, 0] },
+    { lines: ['x_m = [0.0, 2500.0]'], picks: [1, 0, 0] },
+    { lines: ['x_m = [2500.0, 5000.0]'], picks: [2, 0, 0] },
     { lines: ['window_s = [4785.0, 4800.0]'], picks: [0, 1, 0] },
     { lines: ['levels = 10'], picks: [0, 0, 1] },
     { lines: ['levels = 50'], picks: [0, 0, 2] },
-    { lines: ['x_m = [10000.0, 20000.0]', 'window_s = [4785.0, 4800.0]', 'levels = 50'], picks: [2, 1, 2] }
+    { lines: ['x_m = [2500.0, 5000.0]', 'window_s = [4785.0, 4800.0]', 'levels = 50'], picks: [2, 1, 2] }
   ])('write $lines at the picks $picks under the table’s name', ({ lines, picks }) => {
     expect(sentence.linesOf(menus, picks)).toBe(['[tool.thermur.crop]', ...lines].join('\n'))
   })

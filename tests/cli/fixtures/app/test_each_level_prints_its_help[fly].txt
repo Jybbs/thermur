@@ -33,10 +33,18 @@ Flies the flock, or computes the steps of the graph named.
 │                               every snapshot.                                │
 │ --crop.x-m FLOAT FLOAT        The westernmost and the easternmost mass point │
 │   --crop.empty-x-m            kept, in meters from the domain's western      │
-│                               edge, or None to keep every column.            │
+│                               edge, or None to keep every column. The        │
+│                               default keeps the 125 columns from 0 to 5000   │
+│                               m, holding the roost spanning 0 to 2000 m and  │
+│                               the fire's smoke reaching 4340 m east.         │
+│                               [default: (0.0, 5000.0)]                       │
 │ --crop.y-m FLOAT FLOAT        The southernmost and the northernmost mass     │
 │   --crop.empty-y-m            point kept, in meters from the domain's        │
-│                               southern edge, or None to keep every row.      │
+│                               southern edge, or None to keep every row. The  │
+│                               default keeps the 163 rows from 0 to 6500 m,   │
+│                               holding the roost spanning 0 to 2000 m and the │
+│                               fire's plume reaching 6340 m north. [default:  │
+│                               (0.0, 6500.0)]                                 │
 │ --noise.amplitude FLOAT       The amplitude, in meters per second per root   │
 │                               second. [default: 4.2]                         │
 │ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │

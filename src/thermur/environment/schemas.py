@@ -64,16 +64,20 @@ class Crop(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     started, or `None` to keep every snapshot.
     """
 
-    x_m: Span = None
+    x_m: Span = (0.0, 5000.0)
     """
     The westernmost and the easternmost mass point kept, in meters from the
-    domain's western edge, or `None` to keep every column.
+    domain's western edge, or `None` to keep every column. The default
+    keeps the 125 columns from 0 to 5000 m, holding the roost spanning 0 to
+    2000 m and the fire's smoke reaching 4340 m east.
     """
 
-    y_m: Span = None
+    y_m: Span = (0.0, 6500.0)
     """
     The southernmost and the northernmost mass point kept, in meters from
-    the domain's southern edge, or `None` to keep every row.
+    the domain's southern edge, or `None` to keep every row. The default
+    keeps the 163 rows from 0 to 6500 m, holding the roost spanning 0 to
+    2000 m and the fire's plume reaching 6340 m north.
     """
 
     @property
@@ -257,7 +261,7 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
 
     digest: Annotated[str, Field(
         pattern = r"^[0-9a-f]{64}$"
-    )] = "620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09"
+    )] = "6e9eed4b67be50f4fe4509b198f30df85261c2347e5ca3c27f117dd5d22c82df"
     """
     The SHA-256 digest of the file.
     """
@@ -284,9 +288,9 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The hottest air on the fixed heights in any snapshot, in kelvin.
     """
 
-    length_m: Positive = 20000.0
+    length_m: Positive = 5000.0
     """
-    The length of the domain the output covers from west to east, in meters.
+    The length the sample covers from west to east, in meters.
     """
 
     license: str = "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/"

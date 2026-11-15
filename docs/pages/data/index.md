@@ -8,7 +8,7 @@ The dataset holds 147 simulations, each over a domain 20 km long and 10 km wide 
 
 ## The Sample
 
-The sample is `wrfout_W5F7R4`, the output of one simulation 3,000 m deep running 20 minutes after an hour of spin-up, cut to its last two minutes, and it stays under the dataset's CC BY 4.0. It covers the whole domain on its 500 by 250 grid and the model levels the default crop keeps, holding the variables the graph reads:
+The sample is `wrfout_W5F7R4`, the output of one simulation 3,000 m deep running 20 minutes after an hour of spin-up, cut to its last two minutes, and it stays under the dataset's CC BY 4.0. It covers the rectangle the default crop keeps, reaching 5,000 m east and 6,500 m north from the domain's southwest corner, which holds the roost the flock launches from and the fire's plume. That rectangle is 125 by 163 of the grid's 500 by 250 mass points, and the file keeps it at the model levels the default crop keeps, holding the variables the graph reads:
 
 | **Variable** | **Holds** |
 |---|---|
@@ -32,12 +32,12 @@ The table below pins the snapshots the window holds, the area of the cells whose
 |---|---|---|---|
 | `burning_m2` | `[1272000.0, 1443200.0]` |  | The area of the cells whose ground heat flux shows burning, in the first snapshot and in the last, in square meters |
 | `dataset` | `WRF-SFIRE LES Synthetic Wildfire Plume Dataset by Nadya Moisseeva and Roland Stull, https://doi.org/10.20383/102.0314` |  | The credit of the dataset the sample is cut from, naming its title, its creators, and its DOI |
-| `digest` | `620c829bc086d0e014290d7f4a31bb7cfd20ea5c646aca4a61df516342176c09` |  | The SHA-256 digest of the file |
+| `digest` | `6e9eed4b67be50f4fe4509b198f30df85261c2347e5ca3c27f117dd5d22c82df` |  | The SHA-256 digest of the file |
 | `file` | `wrf_sample.nc` |  | The file the bucket serves the sample as, under the name the fetch writes it by |
 | `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
 | `host` | `https://data.thermur.fyi` |  | The address of the public Cloudflare R2 bucket serving the file, on its custom domain |
 | `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |
-| `length_m` | `20000.0` | above 0 | The length of the domain the output covers from west to east, in meters |
+| `length_m` | `5000.0` | above 0 | The length the sample covers from west to east, in meters |
 | `license` | `CC BY 4.0, https://creativecommons.org/licenses/by/4.0/` |  | The license the dataset is published under, which the sample stays under |
 | `simulation` | `wrfout_W5F7R4` |  | The output of the plume dataset the sample is cut from |
 | `timeout_s` | `60.0` | above 0 | The longest the download waits on the connection or on one read, in seconds |
@@ -78,8 +78,8 @@ The table is written from the record the crop is set in, each field set under `[
 | `levels` | `25` | at least 1 | The number of fixed heights, which reach 500 m above the ground at the default floor and spacing |
 | `spacing_m` | `20.0` | above 0 | The distance between neighboring fixed heights, in meters |
 | `window_s` | `None` |  | The first and the last time kept, in seconds since the simulation started, or `None` to keep every snapshot |
-| `x_m` | `None` |  | The westernmost and the easternmost mass point kept, in meters from the domain's western edge, or `None` to keep every column |
-| `y_m` | `None` |  | The southernmost and the northernmost mass point kept, in meters from the domain's southern edge, or `None` to keep every row |
+| `x_m` | `[0.0, 5000.0]` |  | The westernmost and the easternmost mass point kept, in meters from the domain's western edge, or `None` to keep every column. The default keeps the 125 columns from 0 to 5000 m, holding the roost spanning 0 to 2000 m and the fire's smoke reaching 4340 m east |
+| `y_m` | `[0.0, 6500.0]` |  | The southernmost and the northernmost mass point kept, in meters from the domain's southern edge, or `None` to keep every row. The default keeps the 163 rows from 0 to 6500 m, holding the roost spanning 0 to 2000 m and the fire's plume reaching 6340 m north |
 
 <!-- /crop -->
 
