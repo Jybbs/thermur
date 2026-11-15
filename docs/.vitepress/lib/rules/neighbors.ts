@@ -60,8 +60,9 @@ export interface Reach {
  * The drawing of the neighbors a drone senses: the front page's flock under
  * the pointer's falcon, its pointer's mode set through `mode` and its fixed
  * range through `range`, reading how far out the farthest sender the marked
- * bird ranks flies into the chip `reach`. A new mark grows its lines to its seven out from it.
- * `destroy` releases every listener, observer, frame, and canvas it holds.
+ * bird ranks flies into the chip `reach`. A new mark grows its lines out from
+ * it to the senders it ranks. `destroy` releases every listener, observer,
+ * frame, and canvas it holds.
  */
 export class Neighbors {
   #drawn           = -1

@@ -16,8 +16,8 @@ const OPTIONS = MODES.map(mode => ({ title: MODE[mode].title, value: mode, words
  * front page's flock under the pointer's falcon, one bird marked with its
  * seven and its range, beneath a header naming the strips beside the radios
  * choosing the pointer's mode, the slider setting the fixed range, and the
- * chip reading how far out the farthest sender it ranks flies, over two strips
- * counting each over the last seconds.
+ * chip reading how far out the farthest sender the marked bird ranks flies,
+ * over two strips counting each over the last seconds.
  */
 export default defineComponent({
   name: 'RulesNeighbors',
