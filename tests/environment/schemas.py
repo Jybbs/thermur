@@ -7,9 +7,12 @@ Pins the records the fire data is read through:
   its validator holds the front to
 - The address of the `Sample`, the request it sends, and the fetch that
   checks and extracts its archive
+- The docstring `documented` gives each field of a record
 """
 
 from contextlib         import AbstractContextManager, nullcontext
+from dataclasses        import fields
+from equinox            import Module
 from hashlib            import sha256
 from importlib.metadata import version
 from io                 import BytesIO
@@ -32,7 +35,8 @@ from thermur.environment.schemas import (
     HEAT_CAPACITY_J_KG_K,
     ParametricThreat,
     REFERENCE_PA,
-    Sample
+    Sample,
+    documented
 )
 from thermur.repo.checkout import Checkout
 
@@ -237,13 +241,15 @@ def test_a_grid_places_each_point_from_its_spacings():
     """
     Asserts that a grid's mass points sit midway between its staggered ones,
     its staggered levels start at the ground, and its snapshots start at
-    zero, each along the WRF dimension it lies on.
+    zero, each along the WRF dimension it lies on, and that its extent runs
+    to its last staggered column, row, and level.
     """
     grid = Grid(
         columns    = 3,
         interval_s = 10.0,
         level_m    = 4.0,
         levels     = 2,
+        rows       = 5,
         snapshots  = 3,
         spacing_m  = 2.0
     )
@@ -265,6 +271,7 @@ def test_a_grid_places_each_point_from_its_spacings():
         grid.seconds.values.tolist()
     ) == (("Time",), [0.0, 10.0, 20.0])
     assert (grid.length_m, grid.span_s) == (6.0, 20.0)
+    assert grid.extent_m == (6.0, 10.0, 8.0)
 
 
 def test_a_grid_sizes_each_staggered_dimension_one_past_its_mass_points():
@@ -525,3 +532,30 @@ def test_the_hub_serves_the_pinned_archive_under_the_pinned_digest():
     with redirect.value as response:
         assert response.headers["X-Linked-Etag"].strip('"') == Sample().digest
         assert int(response.headers["X-Linked-Size"]) == 490464998
+
+
+def test_documented_sets_each_field_s_doc_to_its_docstring_unindented():
+    """
+    Asserts that each field of a documented record carries the docstring
+    beneath it with its indentation and its surrounding newlines removed,
+    and a field carrying none keeps no doc.
+    """
+
+    @documented
+    class Spring(Module):
+        """
+        A stand-in record.
+        """
+
+        length_m: float = 1.0
+        """
+        The rest length, in meters, across
+        two lines.
+        """
+
+        stiffness: float = 1.0
+
+    assert {declared.name: declared.doc for declared in fields(Spring)} == {
+        "length_m"  : "The rest length, in meters, across\ntwo lines.",
+        "stiffness" : None
+    }

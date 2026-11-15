@@ -73,7 +73,7 @@
     pages    = {4786--4791},
     doi      = {10.1073/pnas.1118633109},
     priority = {prio2},
-    annote   = {Bialek and colleagues fit a maximum-entropy model to the flight directions of 21 starling flocks of 122 to 4,268 birds over Rome, with polarizations of 0.844 to 0.995, finding the least structured model consistent with the measured correlations between neighbors. The model couples each bird with one constant strength to each of its nearest topological neighbors, and with no parameter left free it predicts the correlations across the whole flock, a correlation length growing with the flock's size among them. The fit gives about 21 neighbors, which the authors attribute to a static model counting neighbors that change during the measurement, and a calibration on simulated flocks brings it near 7.8, close to the count measured directly. The model reads directions alone, assumes a stationary state, and fixes the birds on the border. Thermur's coupling takes this form, one constant over a fixed count of topological neighbors, while the count of seven comes from the direct measurement, so the study shapes the coupling slot moderately, as its form and as evidence that so simple a coupling accounts for the measured correlations.}
+    annote   = {Bialek and colleagues fit a maximum-entropy model to the flight directions of 21 starling flocks of 122 to 4,268 birds over Rome, with polarizations of 0.844 to 0.995, finding the least structured model consistent with the measured correlations between neighbors. The model couples each bird with one constant strength to each of its nearest topological neighbors, and with no parameter left free it predicts the correlations across the whole flock, a correlation length growing with the flock's size among them. The fit gives about 21 neighbors, which the authors attribute to a static model counting neighbors that change during the measurement, and a calibration on simulated flocks brings it near 7.8, close to the count measured directly. The model reads directions alone, assumes a stationary state, and fixes the birds on the border. Thermur's coupling takes this form, one constant over a fixed count of topological neighbors, while the count of seven comes from the direct measurement, so the study shapes the coupling and noise slots moderately, as the coupling's form, as evidence that so simple a coupling accounts for the measured correlations, and through the product of coupling and interaction range fitted on one flock, 503, which sets the default noise's amplitude.}
 }
 
 @article{bialek2014,
@@ -206,6 +206,28 @@
     annote   = {Chaté and colleagues study Vicsek-style self-propelled particles in two and three dimensions, aligning only with neighbors within a range, and show the onset of collective motion to be discontinuous, with dense ordered bands traveling through a disordered sea across a wide region of parameters including the transition, and an ordered phase beyond it with anomalously strong density fluctuations, superdiffusion, and intermittency. The entry rests on the study's abstract and on its definition of vectorial noise. The study frames the difference between scalar noise added to a heading and vectorial noise added to the field a particle aligns with, which Thermur's noise slot takes as one candidate, so it shapes the composite through that candidate's form rather than through a figure a flock is held to.}
 }
 
+@techreport{clausen2003,
+    author   = {Clausen, Thomas Heide and Jacquet, Philippe},
+    title    = {Optimized Link State Routing Protocol (OLSR)},
+    type     = {RFC},
+    number   = {3626},
+    year     = {2003},
+    doi      = {10.17487/RFC3626},
+    priority = {prio2},
+    annote   = {Clausen and Jacquet edit the Optimized Link State Routing Protocol for mobile ad hoc networks, in which each node broadcasts a HELLO message every 2 s and holds a neighbor it has heard for a neighbor hold time of three refresh intervals, after which, with no message from it, the neighbor's record expires (Sec. 18.3). The protocol routes packets between radios rather than flying anything, and the hold time is the rule Thermur's radio reads to forget a sender, so the standard shapes the radio moderately.}
+}
+
+@techreport{clausen2011,
+    author   = {Clausen, Thomas Heide and Dearlove, Christopher and Dean, Justin},
+    title    = {Mobile Ad Hoc Network (MANET) Neighborhood Discovery Protocol (NHDP)},
+    type     = {RFC},
+    number   = {6130},
+    year     = {2011},
+    doi      = {10.17487/RFC6130},
+    priority = {prio2},
+    annote   = {Clausen, Dearlove, and Dean set the neighborhood discovery protocol for mobile ad hoc networks, in which each router sends a HELLO message every 2 s by default and keeps the information a HELLO carries for a hold time of three refresh intervals (Sec. 15.2), the same multiple the earlier routing protocol set. The standard discovers neighbors between radios rather than flying anything, and its hold time is the rule Thermur's radio reads to forget a sender, so it shapes the radio moderately.}
+}
+
 @article{courtney2012,
     author   = {Courtney, J. and Buchan, S. and Cerveny, R. and Bessemoulin, P. and Peterson, T. and Rubiera Torres, J. and Beven, J. and King, J. and Trewin, B. and Rancourt, K.},
     title    = {Documentation and verification of the world extreme wind gust record: 113.3 m/s on Barrow Island, Australia, during passage of tropical cyclone Olivia},
@@ -228,8 +250,8 @@
     number   = {10},
     pages    = {104302},
     doi      = {10.1103/PhysRevLett.96.104302},
-    priority = {prio2},
-    annote   = {D'Orsogna and colleagues study self-propelled particles under a soft-core Morse potential, a short-range repulsion against a longer-range attraction each decaying exponentially, summed over every pair. With the ratio of the repulsion's strength to the attraction's and the ratio of their ranges as the two parameters, they map in two dimensions which swarms are H-stable, holding their spacing as they grow, and which are catastrophic, collapsing as particles join, the boundary falling where the strength ratio times the square of the range ratio equals one, and they find flocks, rings, vortices, and clumps across the regions. The simulations are deterministic and two-dimensional, with up to about 600 particles. Thermur's cohesion slot takes a generalized Morse potential over the topological neighbors alone, with parameters chosen outside the collapse region, so the study shapes the composite moderately, although its stability map is drawn for a sum over all pairs in two dimensions rather than over seven neighbors in three.}
+    priority = {prio3},
+    annote   = {D'Orsogna and colleagues study self-propelled particles under a soft-core Morse potential, a short-range repulsion against a longer-range attraction each decaying exponentially, summed over every pair. With the ratio of the repulsion's strength to the attraction's and the ratio of their ranges as the two parameters, they map in two dimensions which swarms are H-stable, holding their spacing as they grow, and which are catastrophic, collapsing as particles join, the boundary falling where the strength ratio times the square of the range ratio equals one, and they find flocks, rings, vortices, and clumps across the regions. The simulations are deterministic and two-dimensional, with up to about 600 particles. Thermur's cohesion slot takes the starling model's pull toward the neighbors rather than a pair potential, so the study shapes the composite little, as a map of where a cohesion summed over pairs holds a swarm's spacing.}
 }
 
 @article{evangelista2017,
@@ -284,6 +306,19 @@
     annote   = {Ferretti and colleagues set out a technique for inferring the equations of motion of a Langevin model, including an underdamped one, from trajectories sampled at discrete times, opening a class of models widely used for stochastic dynamics in physics and biophysics to a robust inference. The entry rests on the study's abstract. Thermur's trials regress a flight's velocity increments on each candidate composite's drift, with every state observed, where the study's estimators serve the case of positions observed alone, so the study shapes how candidates are told apart rather than the composite itself.}
 }
 
+@article{gautrais2012,
+    author   = {Gautrais, Jacques and Ginelli, Francesco and Fournier, Richard and Blanco, St\'{e}phane and Soria, Marc and Chat\'{e}, Hugues and Theraulaz, Guy},
+    title    = {Deciphering Interactions in Moving Animal Groups},
+    journal  = {PLoS Computational Biology},
+    year     = {2012},
+    volume   = {8},
+    number   = {9},
+    pages    = {e1002678},
+    doi      = {10.1371/journal.pcbi.1002678},
+    priority = {prio1},
+    annote   = {Gautrais and colleagues build a model of the barred flagtail, Kuhlia mugil, step by step from the trajectories of fish alone and in groups in a circular tank. A fish relaxes its turning rate toward a target (Eq. 4), and near the wall that target turns it away at a rate of a fitted strength over its time to reach the wall at its speed (Eq. 5), the strength fitted at 0.94. The model is of fish in a tank rather than birds in the open, yet its wall turn is the form Thermur's roost turns a drone from the rim by, applied directly as an acceleration rather than through the relaxation, so the study shapes the roost strongly.}
+}
+
 @article{geiss2022,
     author   = {Geiß, Daniel and Kroy, Klaus and Holubec, Viktor},
     title    = {Signal propagation and linear response in the delay Vicsek model},
@@ -310,6 +345,19 @@
     annote   = {Gerardos and Ronceray show that selecting a stochastic differential equation from a large library of terms overfits through the combinatorial growth of the possible models as well as through each model's complexity, and introduce parsimonious stochastic inference, which combines likelihood statistics with extreme value theory to suppress superfluous parameters and identifies minimal models even at low sampling rates or under measurement error. The entry rests on the study's abstract. Thermur's trials rank candidate composites by the likelihood of a flight under each, which this study sets the hazards of, so it shapes how candidates are told apart rather than the composite itself.}
 }
 
+@article{gomeznava2023,
+    author   = {G\'{o}mez-Nava, Luis and Lange, Robert T. and Klamser, Pascal P. and Lukas, Juliane and Arias-Rodriguez, Lenin and Bierbach, David and Krause, Jens and Sprekeler, Henning and Romanczuk, Pawel},
+    title    = {Fish shoals resemble a stochastic excitable system driven by environmental perturbations},
+    journal  = {Nature Physics},
+    year     = {2023},
+    volume   = {19},
+    number   = {5},
+    pages    = {663--669},
+    doi      = {10.1038/s41567-022-01916-1},
+    priority = {prio3},
+    annote   = {G\'{o}mez-Nava and colleagues film the repeated dive cascades of wild sulphur molly shoals under heavy bird predation and model each fish as a stochastic excitable unit, resting, active, or refractory, set off spontaneously at a rate or by its neighbors. The best fitting model sits at a critical point, where a perturbation spreads furthest through the shoal. The study models fish diving rather than birds turning, and Thermur's zig is an excitable state copied between neighbors without a spontaneous rate, so it serves as close prior art for that mechanism and shapes the slot weakly.}
+}
+
 @article{greenberg1978,
     author   = {Greenberg, J. M. and Hastings, S. P.},
     title    = {Spatial Patterns for Discrete Models of Diffusion in Excitable Media},
@@ -323,6 +371,19 @@
     annote   = {Greenberg and Hastings study discrete models of an excitable medium, one with a globally stable resting state and a threshold past which a disturbance sets off a large but temporary response, and show that spatial inhomogeneities organize into patterns that repeat in time. No open copy of the paper is available, so this entry rests on its abstract alone. The models measure nothing of birds or drones, yet Thermur's escape slot runs the excitable structure the abstract describes on its neighbor graph, each drone resting, alarmed, firing a turn or a climb its neighbors copy, then refractory. The study therefore shapes that slot's structure moderately, while the norms the slot answers to come from starlings.}
 }
 
+@article{hemelrijk2011,
+    author   = {Hemelrijk, Charlotte K. and Hildenbrandt, Hanno},
+    title    = {Some causes of the variable shape of flocks of birds},
+    journal  = {PLoS ONE},
+    year     = {2011},
+    volume   = {6},
+    number   = {8},
+    pages    = {e22479},
+    doi      = {10.1371/journal.pone.0022479},
+    priority = {prio1},
+    annote   = {Hemelrijk and Hildenbrandt fly StarDisplay, the starling model with banked turns and a speed control relaxing each bird toward its cruise speed over 1 s, to trace why a flock's shape varies. A flock turning with little variation in speed changes shape against its heading, a wide flock becoming oblong after a turn of 90 degrees, and flocks whose speeds vary more grow longer in their direction of motion, as fish schools do. A flock of a given size is characterized by each property averaged over its members and over 30 minutes, measured once per second. The findings come from simulation, and the authors offer the low variability of a bird's speed as a hypothesis. Thermur takes the speed control as its speed slot and averages its flock's shape over time each second, as the study does, so the study shapes the composite strongly.}
+}
+
 @article{hemelrijk2015,
     author   = {Hemelrijk, Charlotte K. and van Zuidam, Lars and Hildenbrandt, Hanno},
     title    = {What underlies waves of agitation in starling flocks},
@@ -333,7 +394,20 @@
     pages    = {755--764},
     doi      = {10.1007/s00265-015-1891-3},
     priority = {prio2},
-    annote   = {Hemelrijk, van Zuidam, and Hildenbrandt reproduce the agitation waves of starling flocks under attack in StarDisplay, with 2,000 birds by default and 500 to 8,000 tested. A wave appears only where a bird repeats a zig, a roll to one side and back, that it sees among its nearest neighbors, and it shows as a dark band through the change in the birds' orientation, whereas the same simulation drawn with spheres shows no band, so the wave carries no change of density. Copying from 2 to 7 neighbors at nearest-neighbor distances of 0.71 to 1.93 m reproduces the wave speeds of 3.66 to 25.24 m/s measured in the field. The results come from simulation alone and are offered as hypotheses for the field. A drone's change of heading shows no dark band, yet the relay of a maneuver copied among neighbors is the mechanism Thermur's escape slot runs, so the study shapes that slot moderately and rules out a density wave as its form.}
+    annote   = {Hemelrijk, van Zuidam, and Hildenbrandt reproduce the agitation waves of starling flocks under attack in StarDisplay, with 2,000 birds by default and 500 to 8,000 tested. A wave appears only where a bird repeats a zig, a roll to one side and back, that it sees among its nearest neighbors, and it shows as a dark band through the change in the birds' orientation, whereas the same simulation drawn with spheres shows no band, so the wave carries no change of density. Copying from 2 to 7 neighbors at nearest-neighbor distances of 0.71 to 1.93 m reproduces the wave speeds of 3.66 to 25.24 m/s measured in the field. The results come from simulation alone and are offered as hypotheses for the field. A drone's change of heading shows no dark band, yet the relay of a maneuver copied among neighbors is the mechanism Thermur's noise slot's zig runs, so the study shapes that slot moderately and rules out a density wave as its form.}
+}
+
+@article{hertz1909,
+    author   = {Hertz, Paul},
+    title    = {Über den gegenseitigen durchschnittlichen Abstand von Punkten, die mit bekannter mittlerer Dichte im Raume angeordnet sind},
+    journal  = {Mathematische Annalen},
+    year     = {1909},
+    volume   = {67},
+    number   = {3},
+    pages    = {387--398},
+    doi      = {10.1007/BF01450410},
+    priority = {prio3},
+    annote   = {Hertz derives the distribution of the distance from a point to its nearest neighbor among points scattered at random through space with a known mean density, and tabulates its moments, the mean distance being 0.554 times the cube root of the volume per point. The result is exact for a uniform density and says nothing about animals or flocks. Thermur averages it over the density of its Gaussian launch cloud to give the nearest-neighbor distance a launch holds, the spacing its roost's vertical spring is scaled to, so the study shapes the composite only through that one scale.}
 }
 
 @article{higham2001,
@@ -358,8 +432,20 @@
     number   = {6},
     pages    = {1349--1359},
     doi      = {10.1093/beheco/arq149},
-    priority = {prio2},
-    annote   = {Hildenbrandt, Carere, and Hemelrijk build StarDisplay, a model of thousands of starlings flying with lift, drag, and banked turns around a cruise speed of 10 m/s, each bird interacting with about 6.5 topological neighbors through separation, alignment, and a cohesion weighted toward the flock's edge. A roost term holds flocks over a roost, a horizontal force turning a bird back once it strays outside a cylinder of 150 m radius, stronger the more it heads outward, and a vertical force pulling it toward a preferred height, which the authors call arbitrary and which flattens the flock. The model flocks match the Rome measurements in 10 of 18 statistical tests, though they come out thinner, smaller, and more level than real ones, and no predator flies in the model. Thermur takes the roost term as the component holding its flock over a band near the fire and keeping it flat, so the study shapes the composite moderately, as that one component, while the shape it serves is measured on starlings.}
+    priority = {prio1},
+    annote   = {Hildenbrandt, Carere, and Hemelrijk build StarDisplay, a model of thousands of starlings flying with lift, drag, and banked turns around a cruise speed of 10 m/s, each bird interacting with about 6.5 topological neighbors through separation, alignment, and a cohesion weighted toward the flock's edge. A roost term holds flocks over a roost, a horizontal force turning a bird back once it strays outside a cylinder of 150 m radius, stronger the more it heads outward, and a vertical force pulling it toward a preferred height, which the authors call arbitrary and which flattens the flock. The model flocks match the Rome measurements in 10 of 18 statistical tests, though they come out thinner, smaller, and more level than real ones, and no predator flies in the model. Thermur takes the model's separation as its contact, its centrality-weighted cohesion read over every sender a drone's radio holds, the vertical part of its roost term, and its speed control, each at the model's own values, together with the nearest-neighbor distance of its flock of 781 birds as the length every value is scaled from, and checks its flock's shape against the span of the starling flocks the model is checked against, so the study shapes the composite strongly.}
+}
+
+@article{hoetzlein2024,
+    author   = {Hoetzlein, Rama Carl},
+    title    = {Flock2: A model for orientation-based social flocking},
+    journal  = {Journal of Theoretical Biology},
+    year     = {2024},
+    volume   = {593},
+    pages    = {111880},
+    doi      = {10.1016/j.jtbi.2024.111880},
+    priority = {prio3},
+    annote   = {Hoetzlein models starlings through social influences that set a desired turn in an aerodynamic flight model, rather than through forces, and finds orientation waves crossing flocks of up to 10,000 birds with no predator and no coded transmission between birds, arising where sub-flocks meet and avoid each other. The study shows waves without a predator in a starling model, which Thermur's zig produces through a copied escape instead, so it serves as close prior art and shapes the slot weakly.}
 }
 
 @article{jhawar2020,
@@ -373,6 +459,19 @@
     doi      = {10.1038/s41567-020-0787-y},
     priority = {prio2},
     annote   = {Jhawar and colleagues followed groups of 10 to 100 cichlids, Etroplus suratensis, and found that their schooling is induced by noise, the intrinsic stochasticity of a finite number of interacting fish, so the fewer the fish, the larger the multiplicative noise and the likelier the alignment, and simulations indicate the fish align with one neighbor at a time rather than averaging their neighbors' directions. The entry rests on the abstract of the study's arXiv preprint. Thermur's noise slot borrows noise intrinsic to a finite number of neighbors as one candidate, measured by polarization against flock size, so the study shapes the composite only where that candidate is favored.}
+}
+
+@article{kinouchi2006,
+    author   = {Kinouchi, Osame and Copelli, Mauro},
+    title    = {Optimal dynamical range of excitable networks at criticality},
+    journal  = {Nature Physics},
+    year     = {2006},
+    volume   = {2},
+    number   = {5},
+    pages    = {348--351},
+    doi      = {10.1038/nphys289},
+    priority = {prio2},
+    annote   = {Kinouchi and Copelli drive a random network of excitable elements, each resting, excited, or refractory, by an external Poisson input, each excited element exciting each of its neighbors with a chance drawn uniformly up to twice the branching ratio over the neighbor count, and find the range of inputs the network tells apart largest at a branching ratio of one. The model is of neurons rather than animals, and Thermur's zig copies at that ratio without the external drive, so the study sets one value of the noise slot and shapes it moderately.}
 }
 
 @article{ling2019b,
@@ -411,7 +510,7 @@
     pages    = {035401},
     doi      = {10.1103/6976-lcw7},
     priority = {prio2},
-    annote   = {Lizárraga and de Aguiar show in a minimal model of aggregation that a turn started by one individual crosses the collective mostly at a constant speed with no spin variable, and trace the propagating waves in the continuum limit to the nonreciprocity of the interactions alone, beside spectral anomalies a perturbative analysis explains. The entry rests on the study's abstract. Thermur's heading slot borrows a spinless second-order consensus as one candidate against the overdamped reference, measured by single-initiator turns, so the study shapes the composite only where that candidate is favored.}
+    annote   = {Lizárraga and de Aguiar show in a minimal model of aggregation that a turn started by one individual crosses the collective mostly at a constant speed with no spin variable, and trace the propagating waves in the continuum limit to the nonreciprocity of the interactions alone, beside spectral anomalies a perturbative analysis explains. Thermur's heading slot takes a spinless second-order consensus as its default, its speed left to the speed control, its pull toward the neighbors' mean set by the study's ratio of aggregation to alignment, 0.01 to 50, so the study shapes the composite strongly.}
 }
 
 @misc{metz2021,
@@ -461,8 +560,8 @@
     number   = {1},
     pages    = {011306},
     doi      = {10.1103/PhysRevE.68.011306},
-    priority = {prio2},
-    annote   = {O'Hern, Silbert, Liu, and Nagel study frictionless soft spheres at zero temperature in two and three dimensions, with a repulsion that acts only on overlap and grows as a power of the overlap, harmonic at power two. Packings of 4 to 4,096 particles made by minimizing their energy jam at a packing fraction of 0.639, plus or minus 0.001, in three dimensions, matching random close packing, each particle touching twice as many others as the dimension at the threshold, while the pressure and the elastic moduli scale as powers of the excess packing fraction the potential sets. The study concerns static packings and no motion. Thermur's contact slot takes the harmonic soft-sphere core, whose force grows linearly with the overlap and stays bounded however far two drones overlap, so the study shapes the composite moderately, as the form of that one component.}
+    priority = {prio3},
+    annote   = {O'Hern, Silbert, Liu, and Nagel study frictionless soft spheres at zero temperature in two and three dimensions, with a repulsion that acts only on overlap and grows as a power of the overlap, harmonic at power two. Packings of 4 to 4,096 particles made by minimizing their energy jam at a packing fraction of 0.639, plus or minus 0.001, in three dimensions, matching random close packing, each particle touching twice as many others as the dimension at the threshold, while the pressure and the elastic moduli scale as powers of the excess packing fraction the potential sets. The study concerns static packings and no motion. Thermur's contact slot takes the starling model's Gaussian separation outside a hard sphere rather than this harmonic core, so the study shapes the composite little, as a bounded contact the slot could take.}
 }
 
 @article{papadopoulou2026,
@@ -476,6 +575,32 @@
     doi      = {10.1038/s42003-026-10173-4},
     priority = {prio1},
     annote   = {Papadopoulou and colleagues filmed 19 starling flocks chased by RobotFalcon, a remote-controlled robotic falcon, and build StarEscape, a three-dimensional model of 20 to 5,000 birds each coordinating with its 7 nearest neighbors. Each bird moves among normal coordination, alarmed coordination, escape, and a refractory state through a Markov chain of its own whose probabilities depend on its alertness. A stimulus only the predator produces raises that alertness by an amount falling off exponentially with the square root of the distance to the predator, with no cutoff, and the alertness relaxes at a rate of 1 per second, while an alarmed bird may copy a neighbor's escape, a level turn of about 180 degrees or a dive. The model reproduces the collective escape patterns of the footage, the authors grant that other rules could produce the same patterns, and waves appear only in the largest flock and go unmodeled. A preprint first posted to bioRxiv in 2024 as \textit{Starling murmurations under predation} carries the earlier versions, the latest titled \textit{Towards a mechanistic understanding of collective escape in starlings}. Thermur's escape slot runs the same structure of states on its neighbor graph, its alertness built from the fire's excess over ambient air, so the study shapes that slot strongly, as the closest published model of an escape spreading through a murmuration.}
+}
+
+@article{pearce2014,
+    author   = {Pearce, Daniel J. G. and Miller, Adam M. and Rowlands, George and Turner, Matthew S.},
+    title    = {Role of projection in the control of bird flocks},
+    journal  = {Proceedings of the National Academy of Sciences},
+    year     = {2014},
+    volume   = {111},
+    number   = {29},
+    pages    = {10422--10426},
+    doi      = {10.1073/pnas.1402202111},
+    priority = {prio3},
+    annote   = {Pearce and colleagues argue that local interactions alone cannot set the density of a large flock, and propose a model in which each bird steers toward the projection of the flock it sees against the sky, combined with alignment to its nearest neighbors and noise, each weighted at every step of a bird flying its own size a step. The model's flocks hold together and settle at marginal opacity, the densest a flock can be while a bird inside still sees out in many directions, which the authors compare with experimental data on starling flocks. The model is two weights and a noise on a discrete step, with no measured interaction behind its projection. Each step replaces a bird's heading in full with the weighted sum, and Thermur takes that step, read as the time a starling takes to fly its wingspan, as the time over which the default coupling turns a heading toward its seven neighbors, so the study shapes the composite little, as the source of one value.}
+}
+
+@article{poel2022,
+    author   = {Poel, Winnie and Daniels, Bryan C. and Sosna, Matthew M. G. and Twomey, Colin R. and Leblanc, Simon P. and Couzin, Iain D. and Romanczuk, Pawel},
+    title    = {Subcritical escape waves in schooling fish},
+    journal  = {Science Advances},
+    year     = {2022},
+    volume   = {8},
+    number   = {25},
+    pages    = {eabm6385},
+    doi      = {10.1126/sciadv.abm6385},
+    priority = {prio2},
+    annote   = {Poel and colleagues treat the startle cascades of schooling golden shiners as a branching process over the visual network between fish and find the measured schools subcritical, their branching ratio below one, moving closer to one as the perceived risk rises. The study measures fish rather than birds, and it bears on the branching ratio of one Thermur's zig copies at, so it shapes the noise slot moderately.}
 }
 
 @article{procaccini2011,
@@ -553,7 +678,7 @@
     pages    = {eaat3536},
     doi      = {10.1126/scirobotics.aat3536},
     priority = {prio1},
-    annote   = {Vásárhelyi and colleagues fly 30 autonomous quadcopters as a flock outdoors, at 4 to 8 m/s in arenas 200 to 260 m across at one altitude, under a decentralized controller whose 11 parameters an evolutionary search tuned in simulations of 100 agents carrying a 1 s delay, a 0.2 s sensor period, and an 80 m communication range. The search's fitness multiplies scores for speed, collisions closer than 3 m, disconnected agents, cluster size, wall contact, and velocity correlation. In flight the drones keep an average closest-neighbor distance of 12 to 30 m, their radios delivering 40 to 80 percent of packets from close peers and failing beyond about 50 m, a loss the simulations leave out. The authors note pressure building against the walls as the flock grows and the need to tune the parameters again for each vehicle. The study sets the bar a credible drone flock clears and the nearest-neighbor distance Thermur's calibration fits, so it shapes the composite strongly, as a measure and as the source of the radio's delay, period, and range rather than as a controller to adopt.}
+    annote   = {Vásárhelyi and colleagues fly 30 autonomous quadcopters as a flock outdoors, at 4 to 8 m/s in arenas 200 to 260 m across at one altitude, under a decentralized controller whose 11 parameters an evolutionary search tuned in simulations of 100 agents carrying a 1 s delay, a 0.2 s sensor period, and an 80 m communication range. The search's fitness multiplies scores for speed, collisions closer than 3 m, disconnected agents, cluster size, wall contact, and velocity correlation. In flight the drones keep an average closest-neighbor distance of 12 to 30 m, their radios delivering 40 to 80 percent of packets from close peers, nearly every one from peers within 20 m, with long outages starting past 50 m, a loss the simulations leave out. The authors note pressure building against the walls as the flock grows and the need to tune the parameters again for each vehicle. The study sets the bar a credible drone flock clears and the nearest-neighbor distance Thermur's calibration fits, so it shapes the composite strongly, as a measure, and as the source of the radio's delay, its period, its range, and the 50 m past which outages began, rather than as a controller to adopt.}
 }
 
 @article{viragh2014,

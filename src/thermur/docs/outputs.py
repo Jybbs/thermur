@@ -8,13 +8,15 @@ region of The Kit.
 """
 
 from collections.abc import Collection, Iterable, Iterator, Mapping
+from dataclasses     import fields
 from functools       import cached_property
 from json            import dumps
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.docs.kit   import Piece
-from thermur.docs.pages import Page
+from thermur.controller.schemas import Composite
+from thermur.docs.kit           import Piece
+from thermur.docs.pages         import Page
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -103,14 +105,15 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     @cached_property
     def regions(self) -> dict[Path, dict[str, str]]:
         """
-        Renders the body of each region the render task writes into a
-        page, by the page's path and then by the region's name, meaning the
-        fields `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare
-        on the Data page, on The Interaction Rules the fields `Plan` and the
-        contact declare beside those of each open slot's default and each
-        of its candidates, every one named for its component, on The Visual
-        Identity the identity as `specimens` lays it out, and on The Kit the
-        pieces each declaration in the clone records.
+        Renders the body of each region the render task writes into a page,
+        by the page's path and then by the region's name, meaning the fields
+        `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
+        Data page, on The Interaction Rules the fields `Plan`, the contact,
+        the plant, the radio, the roost, and the speed control declare
+        beside those of each open slot's default and each of its candidates,
+        every one named for its component, on The Visual Identity the
+        identity as `specimens` lays it out, and on The Kit the pieces each
+        declaration in the clone records.
         """
         defaults = Settings()
         return {
@@ -125,9 +128,10 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 "threat" : tabled(ParametricThreat)
             },
             Path("docs/pages/methods/rules.md")      : {
-                "contact" : tabled(type(defaults.contact)),
-                "plan"    : tabled(Plan)
-            } | {
+                slot.name: tabled(type(getattr(defaults, slot.name)))
+                for slot in fields(Composite)
+                if slot.name not in {trial.slot for trial in Trial.listed()}
+            } | {"plan": tabled(Plan)} | {
                 trial.slot: tabled(
                     kind = create_model(
                         trial.slot,

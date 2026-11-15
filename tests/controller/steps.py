@@ -14,7 +14,7 @@ from thermur.pipeline.settings     import Settings
 def test_the_composite_step_reads_each_slot_from_the_settings():
     """
     Asserts that the `composite` step returns the composite the settings
-    nest, a slot the settings change included.
+    nest, a slot the settings change included, scaled to the launch.
     """
     settings = Settings(coupling=Constant(coupling_per_s=1.5))
 
@@ -24,4 +24,6 @@ def test_the_composite_step_reads_each_slot_from_the_settings():
     )
 
     assert computed["composite"] == Composite.from_settings(settings)
-    assert computed["composite"].coupling == Constant(coupling_per_s=1.5)
+    assert computed["composite"].coupling == Constant(coupling_per_s=1.5).scaled(
+        settings.plan.similarity
+    )

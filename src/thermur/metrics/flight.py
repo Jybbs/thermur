@@ -7,8 +7,8 @@ flock per seed, beside each statistic its frames give, which the `flight`,
 from diffrax    import ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
 from equinox    import Module, field, tree_at
 from jax        import Array, ShapeDtypeStruct, jit, lax, tree, vmap
-from jax.numpy  import roll, where
-from jax.random import key as seeded, split
+from jax.numpy  import where
+from jax.random import fold_in, key as seeded, split
 from numpy         import (
     angle,
     arange,
@@ -18,6 +18,7 @@ from numpy         import (
     array,
     array_split,
     asarray,
+    bincount,
     clip,
     diff,
     einsum,
@@ -47,7 +48,7 @@ from scipy.stats            import linregress
 from typing                 import Self
 from xarray                 import Dataset
 
-from thermur.controller.schemas import Composite, Flock, Observation, across, nearest, unit
+from thermur.controller.schemas import Composite, Flock, Inbox, Observation, across, nearest, unit
 from thermur.environment.air    import Air
 from thermur.metrics.schemas    import Plan
 
@@ -186,23 +187,34 @@ class Flight(Module):
     @property
     def fragments(self) -> ndarray:
         """
-        Counts the groups the last frame splits into, two drones sharing
-        a group where a chain of hops under three times `spacing_m` joins
-        them.
+        Counts the groups the last frame splits into.
+        """
+        return asarray([labels.max() + 1 for labels in self.groups], dtype=float)
+
+    @property
+    def group_aspect_ratios(self) -> ndarray:
+        """
+        Averages the shape of the largest group each frame splits into over
+        the frames `Plan.shape_frames` picks, `(n_seeds, 3)`, as the length
+        of each axis over the thinnest's.
         """
         return asarray(
             [
-                connected_components(
-                    (tree := KDTree(cloud)).sparse_distance_matrix(
-                        tree,
-                        3 * self.plan.spacing_m
-                    ),
-                    directed = False
-                )[0]
-                for cloud in asarray(self.frames.positions)[:, -1]
-            ],
-            dtype = float
-        )
+                [
+                    self.largest(frame, seed).aspect_ratios
+                    for frame in self.plan.shape_frames
+                ]
+                for seed in range(self.plan.seeds)
+            ]
+        ).mean(1)
+
+    @property
+    def groups(self) -> list[ndarray]:
+        """
+        Labels the group each drone of the last frame flies in, one row
+        per seed.
+        """
+        return [self.grouped(cloud) for cloud in asarray(self.frames.positions)[:, -1]]
 
     @property
     def last(self) -> Flock:
@@ -222,7 +234,7 @@ class Flight(Module):
         """
         positions = asarray(self.last.positions)
         headings  = asarray(self.last.headings)
-        indices   = nearest(positions, self.plan.neighbors)[..., newaxis]
+        indices   = nearest(self.plan.neighbors, positions)[..., newaxis]
         spots     = take_along_axis(positions[..., newaxis, :, :], indices, axis=-2)
         others    = take_along_axis(headings[..., newaxis, :, :], indices, axis=-2)
         return (
@@ -396,43 +408,45 @@ class Flight(Module):
     def drifts(self, composite: Composite, air: Air) -> Array:  # prose: ignore[unsorted-positionals]
         """
         Replays each frame but the last through `composite` at the frame's
-        own time, keeping each acceleration's part across the drone's
-        velocity, so the speed a flight holds enters no residual.
+        own time, every drone hearing the frame each other drone sent
+        `delay_s` earlier from within the radio's `range_m` of it, with no
+        packet lost, keeping each command's rate across the command, so the
+        speed a flight holds enters no residual.
 
         Returns:
             The drift, `(n_seeds, n_frames - 1, n_drones, 3)`, in meters per
             second squared.
         """
-        velocities = asarray(self.frames.velocities)
-        lag        = self.plan.framed(composite.heading.lag_s)
-        times      = self.plan.times[:-1]
+        times = self.plan.times[:-1]
+        late  = arange(times.size) - self.plan.framed(composite.radio.delay_s)
 
-        def drift(  # prose: ignore[unsorted-positionals]
-            forces    : Array,
-            positions : Array,
-            past      : Array,
-            moving    : Array,
-            t         : Array
-        ) -> Array:
+        def drift(earlier: Flock, flock: Flock, sent: Flock, t: Array) -> Array:
             """
-            Computes the drift across each velocity of one flock at `t`.
+            Computes the drift across each command of one flock at `t`.
             """
             sensed = Observation.sensed(
-                Flock(forces=forces, positions=positions, velocities=moving),
-                past,
+                flock,
+                Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
                 air,
                 t,
                 self.plan.neighbors
             )
-            return across(vmap(composite)(sensed), moving)
+            return across(vmap(composite)(sensed), flock.commands)
 
-        return jit(
-            vmap(vmap(drift), in_axes=(0, 0, 0, 0, None))
-        )(
-            asarray(self.frames.forces)[:, :-1],
-            asarray(self.frames.positions)[:, :-1],
-            velocities[:, clip(arange(times.size) - lag, 0, None)],
-            velocities[:, :-1],
+        def taken(indices: ndarray) -> Flock:
+            """
+            Reads the frames at `indices`, the first frame standing for any
+            before it.
+            """
+            return tree.map(
+                lambda leaf: asarray(leaf)[:, clip(indices, 0, None)],
+                self.frames
+            )
+
+        return jit(vmap(vmap(drift), in_axes=(0, 0, 0, None)))(
+            taken(late - self.plan.framed(composite.heading.lag_s)),
+            taken(arange(times.size)),
+            taken(late),
             times
         )
 
@@ -460,6 +474,30 @@ class Flight(Module):
             plan = plan
         )
 
+    def grouped(self, cloud: ndarray) -> ndarray:
+        """
+        Labels the group each drone of `cloud` flies in, two drones sharing
+        a group where a chain of hops under three times `spacing_m` joins
+        them.
+        """
+        return connected_components(
+            (tree := KDTree(cloud)).sparse_distance_matrix(
+                tree,
+                3 * self.plan.spacing_m
+            ),
+            directed = False
+        )[1]
+
+    def largest(self, frame: int, seed: int) -> Flock:
+        """
+        Keeps the largest group one seed's frame splits into.
+        """
+        labels = self.grouped(asarray(self.frames.positions)[seed, frame])
+        return tree.map(
+            lambda frames: frames[seed, frame, labels == bincount(labels).argmax()],
+            self.frames
+        )
+
     def likelihoods(self, composites: dict[str, Composite], air: Air) -> Dataset:  # prose: ignore[unsorted-positionals]
         """
         Ranks `composites` by how well each one's drift explains the frames'
@@ -473,9 +511,9 @@ class Flight(Module):
             By composite, `log_likelihood`, per drone and per step, and
             `coefficient`.
         """
-        velocities = asarray(self.frames.velocities)
-        rates      = asarray(
-            across(diff(velocities, axis=1) / self.plan.frame_s, velocities[:, :-1])
+        commands = asarray(self.frames.commands)
+        rates    = asarray(
+            across(diff(commands, axis=1) / self.plan.frame_s, commands[:, :-1])
         )
         drifts = {name: asarray(
             self.drifts(item, air)
@@ -510,23 +548,26 @@ def first_zero(curve: ndarray) -> int:
 
 def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     """
-    Flies one flock, an outer `lax.scan` keeping every `frame_every`-th step
-    of an inner one, each inner step sensing once, advancing through one
-    `Euler().step`, then applying the discrete updates, meaning the cruise
-    speed where the heading holds it and the first drone's turn.
+    Flies one flock, an outer `lax.scan` keeping every `frame_every`-th
+    step of an inner one, each inner step hearing over the radio and sensing
+    once, advancing through one `Euler().step`, then applying the discrete
+    updates, meaning the plant's speed bounds on each command, the cruise
+    speed where the heading holds it, the noise slot's state, and the first
+    drone's turn.
 
     Args:
         air       : The channels each drone reads.
         composite : The slots the flock flies under.
-        key       : The key the launch and the Brownian path derive from.
+        key       : The key the launch, the Brownian path, each lost packet,
+                    and each step of the noise slot's state derive from.
         plan      : The plan the flock flies to.
 
     Returns:
         The flock at each kept frame.
     """
-    launch_key, path_key = split(key)
-    launch               = plan.launched(launch_key)
-    path                 = VirtualBrownianTree(
+    launch_key, path_key, radio_key, noise_key = split(key, 4)
+    launch = plan.launched(launch_key)
+    path   = VirtualBrownianTree(
         0.0,
         plan.duration_s + plan.step_s,
         key   = path_key,
@@ -535,35 +576,54 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     )
     terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
     solver = Euler()
-    lag    = max(round(composite.heading.lag_s / plan.step_s), 1)
+    plant  = composite.plant
+    radio  = composite.radio
+    lag    = round(composite.heading.lag_s / plan.step_s)
 
     def advance(
-        state : tuple[Flock, Array],
+        state : tuple[Flock, Inbox, Flock],
         step  : Array
-    ) -> tuple[tuple[Flock, Array], None]:
+    ) -> tuple[tuple[Flock, Inbox, Flock], None]:
         """
-        Advances the flock and the velocities it remembers by one step.
+        Advances the flock, what each drone heard, and the broadcasts the
+        radio keeps by one step.
         """
-        flock, past = state
+        flock, inbox, sent = state
         t           = step * plan.step_s
-        sensed      = Observation.sensed(flock, past[0], air, t, plan.neighbors)
-        moved, *_   = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
+        heard, sent = radio.heard(
+            flock,
+            inbox,
+            radio_key,
+            lag,
+            sent,
+            step,
+            plan.step_s
+        )
+        sensed    = Observation.sensed(flock, heard, air, t, plan.neighbors)
+        moved, *_ = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
+        moved     = tree_at(
+            lambda held: held.commands,
+            moved,
+            plant.held(moved.commands)
+        )
         if composite.heading.confined:
             moved = moved.cruising(plan.cruise_m_s)
 
+        moved = composite.excited(moved, fold_in(noise_key, step), sensed, plan.step_s)
+
         turned = tree_at(
-            lambda held: held.velocities,
+            lambda held: held.commands,
             moved,
-            moved.velocities.at[0].set(
-                where(t >= plan.turn_at_s, plan.turned, moved.velocities[0])
+            moved.commands.at[0].set(
+                where(t >= plan.turn_at_s, plan.turned, moved.commands[0])
             )
         ) if plan.turn_deg else moved
-        return (turned, roll(past, -1, axis=0).at[-1].set(flock.velocities)), None
+        return (turned, heard, sent), None
 
     def frame(  # prose: ignore[unsorted-positionals]
-        state : tuple[Flock, Array],
+        state : tuple[Flock, Inbox, Flock],
         start : Array
-    ) -> tuple[tuple[Flock, Array], Flock]:
+    ) -> tuple[tuple[Flock, Inbox, Flock], Flock]:
         """
         Advances the flock through `frame_every` steps, keeping the last.
         """
@@ -572,7 +632,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
 
     return lax.scan(
         frame,
-        (launch, launch.velocities[None].repeat(lag, axis=0)),
+        (launch, *radio.opened(launch, lag, plan.step_s)),
         plan.frame_every * lax.iota("int32", plan.frames)
     )[1]
 
