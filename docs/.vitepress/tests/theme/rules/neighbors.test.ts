@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Marks }                 from '../../../lib/canvas/marks.ts'
 import { NEIGHBORS }             from '../../../lib/common.ts'
+import { seriesOf }              from '../../../lib/identity.ts'
+import { RANGED }                from '../../../lib/rules/falcon.ts'
 import RulesNeighbors            from '../../../theme/rules/neighbors.ts'
 import { RELEASED, point }       from '../../common/browser.ts'
 import { type Charted, charted } from '../../common/rules.ts'
@@ -93,7 +95,7 @@ describe('the header', () => {
     const radii  = (): number[] => chart.stand.context.arc!.mock.calls.map(([, , radius]) => radius as number)
     const before = Math.max(...radii())
     await chart.widget.get('input').setValue(6)
-    expect(Math.max(...radii())).toBeCloseTo(before * 3, 6)
+    expect(Math.max(...radii())).toBeCloseTo(before * 2, 6)
   })
 })
 
@@ -159,18 +161,19 @@ describe('the strips', () => {
     expect(labels().at(-1)).toEqual([`seven by rank, ${NEIGHBORS}`, 12, 300 - 78 + 15])
   })
 
-  it('counts every other bird inside the ring around the marked one, the marked one left out', () => {
+  it('counts every bird it draws in the range’s color, each inside the ring, the marked one left out', () => {
     const chart  = drawn()
     const last   = frame(chart.birds)
     const marked = last.at(-1)!
     const reach  = Math.max(...chart.stand.context.arc!.mock.calls.map(([, , radius]) => radius as number))
-    const within = last.slice(0, -1)
-      .filter(bird => Math.hypot(bird.x - marked.x, bird.y - marked.y) <= reach).length
+    const ranged = new Set((['dark', 'light'] as const).map(scheme => seriesOf(RANGED, scheme)))
+    const inside = last.slice(0, -1).filter(bird => ranged.has(bird.color))
     const counts = chart.stand.context.fillText!.mock.calls
       .map(([words]) => String(words))
       .filter(words => words.startsWith('within range'))
-    expect(within).toBeGreaterThan(0)
-    expect(counts.at(-1)).toBe(`within range, ${within}`)
+    expect(inside.length).toBeGreaterThan(0)
+    for (const bird of inside) expect(Math.hypot(bird.x - marked.x, bird.y - marked.y)).toBeLessThanOrEqual(reach)
+    expect(counts.at(-1)).toBe(`within range, ${inside.length}`)
   })
 
   it('counts the birds inside the range as the flock flies under the falcon, leaving nothing behind', () => {

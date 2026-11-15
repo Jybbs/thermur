@@ -7,12 +7,20 @@ regions of The Visual Identity.
 """
 
 from collections.abc import Collection, Iterable, Iterator, Mapping
+from dataclasses     import fields
 from functools       import cached_property
+from jax             import numpy as jnp, tree
+from jax.random      import key as seeded
 from json            import dumps
+from math            import sqrt
+from numpy           import around, asarray, zeros, zeros_like
+from numpy.random    import default_rng
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.docs.pages          import Page
+from thermur.controller.schemas import Composite, Flock
+from thermur.docs.pages         import Page
+from thermur.environment.air    import Air
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -23,6 +31,7 @@ from thermur.environment.schemas import (
     Sample
 )
 from thermur.identity.schemas  import Identity, Pair, Palette
+from thermur.metrics.flight    import stepped
 from thermur.metrics.schemas   import Plan
 from thermur.metrics.trials    import Trial
 from thermur.pipeline.settings import Settings
@@ -41,6 +50,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     The clone the task writes into, the working directory by default.
     """
 
+    composite: Path = Path("docs/.vitepress/lib/rendered/composite.json")
+    """
+    The file the site's flocks read each default slot's kind and parameters
+    from, beside the fields of the plan their launch and their step read.
+    """
+
     crop: Path = Path("docs/.vitepress/lib/rendered/crop.json")
     """
     The file the Data page's sketch of the part kept reads the crop's defaults
@@ -50,6 +65,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     identity: Path = Path("docs/.vitepress/lib/rendered/identity.json")
     """
     The file the site's theme and its preview cards read the identity from.
+    """
+
+    parity: Path = Path("docs/.vitepress/lib/rendered/parity.json")
+    """
+    The file the site's suite reads a small flock, its Brownian increments,
+    and the flock one step of the package's composite moves it to from.
     """
 
     threat: Path = Path("docs/.vitepress/lib/rendered/threat.json")
@@ -178,11 +199,32 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             "gravity_m_s2"         : GRAVITY_M_S2,
             "heat_capacity_j_kg_k" : HEAT_CAPACITY_J_KG_K
         } | ParametricThreat().model_dump()
+        settings = Settings()
         return {
-            self.crop     : dumps(crop | sample, indent=2) + "\n",
-            self.identity : Identity.shipped().model_dump_json(indent=2) + "\n",
-            self.threat   : dumps(threat, indent=2) + "\n",
-            self.trials   : dumps(
+            self.composite : dumps(
+                {
+                    slot.name: {"kind": type(component).__name__}
+                    | {name.name: getattr(component, name.name) for name in fields(
+                        component
+                    )}
+                    for slot in fields(Composite)
+                    if (component := getattr(settings, slot.name))
+                }
+                | {
+                    "plan": settings.plan.model_dump(
+                        include = {
+                            "axes", "course_deg", "cruise_m_s", "neighbors",
+                            "scatter_deg", "spacing_m", "step_s"
+                        }
+                    )
+                },
+                indent = 2
+            ) + "\n",
+            self.crop      : dumps(crop | sample, indent=2) + "\n",
+            self.identity  : Identity.shipped().model_dump_json(indent=2) + "\n",
+            self.parity    : dumps(paired(settings), indent=2) + "\n",
+            self.threat    : dumps(threat, indent=2) + "\n",
+            self.trials    : dumps(
                 {trial.slot: trial.conditions for trial in Trial.listed()},
                 indent = 2
             ) + "\n"
@@ -287,6 +329,57 @@ def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> st
             *(f"| {' | '.join(row)} |" for row in rows)
         ]
     )
+
+
+def paired(settings: Settings) -> dict[str, list]:
+    """
+    Moves a flock of twelve drones, launched a few meters apart around
+    the origin from `settings.plan`, through one step of the composite the
+    settings nest, under Brownian increments drawn from the plan's seed and
+    still air, every value rounded to four decimals before and after the
+    step, so a copy of the step reads the same flock the package moved.
+
+    Returns:
+        The positions, the velocities, and the increments the step reads,
+        each `(n_drones, 3)`, beside the positions and the velocities it
+        moves the flock to.
+    """
+    plan   = settings.plan.changed(center_m=(0.0, 0.0, 0.0), drones=12, spacing_m=8.0)
+    launch = tree.map(
+        lambda leaf: around(asarray(leaf, dtype=float), 4),
+        plan.launched(seeded(plan.seed))
+    )
+    increments = around(
+        default_rng(plan.seed).normal(size=launch.velocities.shape) * sqrt(plan.step_s),
+        4
+    )
+    still = zeros_like(launch.velocities)
+    moved = stepped(
+        air = Air(
+            channels = zeros((1, 1, 1, 1, 1), dtype="float32"),
+            names    = ("excess",),
+            origin   = (0.0, 0.0, 0.0, 0.0),
+            spacing  = (1.0, 1.0, 1.0, 1.0)
+        ),
+        composite = Composite.from_settings(settings),
+        flock     = tree.map(jnp.asarray, launch),
+        past      = jnp.asarray(launch.velocities),
+        path      = lambda *_: tree.map(
+            jnp.asarray,
+            Flock(forces=still, positions=still, velocities=increments)
+        ),
+        plan = plan,
+        t    = jnp.asarray(0.0)
+    )
+    return {
+        "increments" : increments.tolist(),
+        "positions"  : launch.positions.tolist(),
+        "stepped"    : {
+            "positions"  : around(asarray(moved.positions, dtype=float), 4).tolist(),
+            "velocities" : around(asarray(moved.velocities, dtype=float), 4).tolist()
+        },
+        "velocities" : launch.velocities.tolist()
+    }
 
 
 def specimens(identity: Identity) -> dict[str, str]:

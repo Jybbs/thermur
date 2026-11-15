@@ -1,3 +1,5 @@
+import source from './rendered/composite.json' with { type: 'json' }
+
 /**
  * A rectangle, in pixels across and down from a top left corner, from `x0` to
  * `x1` across and from `y0` to `y1` down.
@@ -29,9 +31,9 @@ interface Ridge {
 
 /**
  * The number of nearest neighbors each bird reads, the topological count the
- * starling studies measured.
+ * package's plan sets.
  */
-export const NEIGHBORS = 7
+export const NEIGHBORS = source.plan.neighbors
 
 /**
  * Reads the value `map` holds under `key`, building it through `build` and
@@ -56,6 +58,26 @@ export const channels = (hex: string): number[] =>
  * Holds `value` between `from` and `to`, between 0 and 1 unless given.
  */
 export const clamp = (value: number, from = 0, to = 1): number => Math.min(to, Math.max(from, value))
+
+/**
+ * Builds a generator of standard normal draws from the uniform draws `random`
+ * returns, each pair of uniform draws giving two normal ones through the
+ * Box-Muller transform.
+ */
+export function gaussian(random: () => number): () => number {
+  let spare = Number.NaN
+  return () => {
+    if (!Number.isNaN(spare)) {
+      const drawn = spare
+      spare       = Number.NaN
+      return drawn
+    }
+    const radius = Math.sqrt(-2 * Math.log(1 - random()))
+    const angle  = 2 * Math.PI * random()
+    spare        = radius * Math.sin(angle)
+    return radius * Math.cos(angle)
+  }
+}
 
 /**
  * Reads the height at `x` of the ridge whose waves of `amplitude` cancel at

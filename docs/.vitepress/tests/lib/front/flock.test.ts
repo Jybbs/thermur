@@ -4,9 +4,10 @@ import type { Box }      from '../../../lib/common.ts'
 import { FLIGHT, Flock } from '../../../lib/front/flock.ts'
 import type { Heat }     from '../../../lib/front/heat.ts'
 import { Ring }          from '../../../lib/front/ring.ts'
+import model             from '../../../lib/rendered/composite.json' with { type: 'json' }
 
 /**
- * The region the case's flock flies over, 600 by 300 pixels.
+ * The region the case's flock is drawn in, 600 by 300 pixels.
  */
 const REGION: Box = { x0: 0, x1: 600, y0: 0, y1: 300 }
 /**
@@ -15,23 +16,20 @@ const REGION: Box = { x0: 0, x1: 600, y0: 0, y1: 300 }
 const STILL: Heat = { heat: () => 0 }
 
 /**
- * Flies a flock of sixty birds over a region 600 by 300 pixels through `field`
- * for `seconds`, two unless given.
+ * Flies a flock of sixty birds drawn over a region 600 by 300 pixels through
+ * `field` for `seconds`, two unless given.
  */
 function flown(field: Heat = STILL, seconds = 2): Flock {
-  const flock = new Flock({ ...FLIGHT, count: 60, glyphs: 28, roost: middle })
+  const flock = new Flock({ ...FLIGHT, count: 60, glyphs: 28 })
   flock.region(REGION)
   flock.settle(seconds, field)
   return flock
 }
 
 /**
- * Holds the roost at the middle of its region.
+ * Reads the mean of `values`.
  */
-const middle = (_: number, box: Box, out: [number, number]): void => {
-  out[0] = (box.x0 + box.x1) / 2
-  out[1] = (box.y0 + box.y1) / 2
-}
+const mean = (values: Float32Array): number => values.reduce((sum, value) => sum + value, 0) / values.length
 
 /**
  * Counts the birds within 40 pixels of the middle of the region.
@@ -44,14 +42,33 @@ describe('Flock', () => {
     expect([...flown().x]).toEqual([...flown().x])
   })
 
-  it('keeps its birds inside the region it is given', () => {
+  it('keeps the middle of the flock at the middle of its region however far it flies', () => {
     const flock = flown(STILL, 20)
-    expect(Math.min(...flock.x)).toBeGreaterThanOrEqual(REGION.x0)
-    expect(Math.max(...flock.x)).toBeLessThanOrEqual(REGION.x1)
-    expect(Math.min(...flock.y)).toBeGreaterThanOrEqual(REGION.y0)
-    expect(Math.max(...flock.y)).toBeLessThanOrEqual(REGION.y1)
+    expect(mean(flock.x)).toBeCloseTo(300, 3)
+    expect(mean(flock.y)).toBeCloseTo(150, 3)
   })
 
+  it('draws each bird at the cruise speed or slower, seen from the side', () => {
+    const flock = flown()
+    flock.vx.forEach((vx, i) => {
+      expect(Math.hypot(vx, flock.vy[i]!)).toBeLessThanOrEqual(model.plan.cruise_m_s * flock.scale + 1e-3)
+    })
+  })
+
+  it('draws the plan’s launch spacing as many pixels as the flight sets', () => {
+    expect(flown().scale * model.plan.spacing_m).toBeCloseTo(FLIGHT.spacing, 6)
+  })
+
+  it('reads the distance between two birds in three dimensions, in the drawing’s pixels', () => {
+    const flock   = flown()
+    const offsets = [0, 1, 2].map(axis => flock.positions[3 + axis]! - flock.positions[axis]!)
+    expect(flock.apart(0, 1)).toBeCloseTo(Math.hypot(...offsets) * flock.scale, 6)
+    expect(flock.apart(1, 0)).toBe(flock.apart(0, 1))
+  })
+
+})
+
+describe('Flock’s birds', () => {
   it('gives each bird one of the traced birds and a length between the two given', () => {
     const flock = flown()
     expect(Math.max(...flock.glyph)).toBeLessThan(28)
@@ -64,10 +81,19 @@ describe('Flock', () => {
     expect(near(flown(fire))).toBeLessThan(near(flown()))
   })
 
-  it('moves every bird with its region when the region is resized', () => {
+  it('moves its middle with its region', () => {
     const flock  = flown()
     const before = flock.x[0]!
-    flock.region({ x0: 0, x1: 1200, y0: 0, y1: 300 })
-    expect(flock.x[0]).toBeCloseTo(before * 2, 3)
+    flock.region({ x0: 100, x1: 700, y0: 0, y1: 300 })
+    expect(flock.x[0]).toBeCloseTo(before + 100, 3)
+  })
+
+  it('flies whole steps of the plan, carrying what is left of a frame to the next one', () => {
+    const flock  = flown()
+    const before = [...flock.positions]
+    flock.step(model.plan.step_s / 2, STILL)
+    expect([...flock.positions]).toEqual(before)
+    flock.step(model.plan.step_s / 2, STILL)
+    expect([...flock.positions]).not.toEqual(before)
   })
 })

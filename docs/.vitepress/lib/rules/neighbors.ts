@@ -44,7 +44,7 @@ const MODE: Readonly<Record<falcon.Mode, { icon: string, title: string, words: s
 /**
  * The fixed range the slider sets, in bird lengths.
  */
-const RANGE = { max: 6, min: 1, step: 0.25, value: 2 } as const
+const RANGE = { max: 6, min: 1, step: 0.25, value: 3 } as const
 /**
  * The SVG namespace the switch's icons are made in.
  */

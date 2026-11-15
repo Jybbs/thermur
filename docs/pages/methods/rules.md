@@ -6,7 +6,7 @@ Each drone in *Thermur* steers by the sum of a few rules, and each rule reads on
 
 A drone senses its seven nearest neighbors by rank rather than within a fixed range, the topological interaction measured in starling flocks[^ballerini2008a]. For each neighbor it reads the offset, the distance, and the velocity, together with the velocity a neighbor held half a second earlier for the rule that reads a delay, and it reads its own velocity and the excess temperature of the air at its position. A rule receives that view and nothing else.
 
-By rank a drone always senses seven neighbors, whereas the number within a fixed range swings as a flock gathers and splits. The drawing below flies the front page's illustration flock rather than the controller, the pointer its falcon, so it shows how the two counts differ and nothing about how the controller's drones fly.
+By rank a drone always senses seven neighbors, whereas the number within a fixed range swings as a flock gathers and splits. The drawing below flies the front page's flock, which steps the default composite in the page, the pointer its falcon, and counts both by the distance between the drones it flies.
 
 <!-- neighbors -->
 

@@ -1,8 +1,8 @@
 """
 Pins `Flight`, meaning that a flight repeats from its seed, that its batch
 flies each seed as one flight alone would, the tables a recorded run saves,
-the first drone's turn, the replay ranking composites, and the helpers each
-statistic reads.
+the first drone's turn, one step moving a flock along its old velocities,
+the replay ranking composites, and the helpers each statistic reads.
 """
 
 from common.drones import flock_of, short, still_air
@@ -50,7 +50,7 @@ from thermur.controller.components import (
     White
 )
 from thermur.controller.schemas import Composite, Heading, across
-from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response
+from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response, stepped
 from thermur.pipeline.settings  import Settings
 
 AIR = still_air()
@@ -439,23 +439,34 @@ def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
     )
 
 
-@mark.parametrize(
-    ("curve", "expected"),
-    [
-        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
-        param([1.0, 0.0], 1, id="zero"),
-        param([1.0, 0.5], 2, id="none")
-    ]
-)
-def test_the_first_zero_is_the_first_value_at_or_below_zero(
-    curve    : list[float],
-    expected : int
+def test_one_step_moves_each_drone_along_its_old_velocity_and_holds_the_cruise(
+    composite: Composite
 ):
     """
-    Asserts that `first_zero` finds the first value at or below zero, or the
-    curve's length where none is.
+    Asserts that one step under no Brownian increment moves each drone by
+    `step_s` times the velocity it held, and leaves each new velocity at
+    `cruise_m_s` under the default heading, which holds the speed.
     """
-    assert first_zero(array(curve)) == expected
+    plan   = short()
+    launch = plan.launched(key(plan.seed))
+    still  = zeros(launch.velocities.shape)
+
+    moved = stepped(
+        air       = AIR,
+        composite = composite,
+        flock     = launch,
+        past      = launch.velocities,
+        path      = lambda *_: flock_of(still, still),
+        plan      = plan,
+        t         = array(0.0)
+    )
+
+    assert_allclose(
+        moved.positions,
+        launch.positions + plan.step_s * launch.velocities,
+        rtol = 1e-5
+    )
+    assert_allclose(linalg.norm(moved.velocities, axis=-1), plan.cruise_m_s, rtol=1e-5)
 
 
 def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
@@ -478,6 +489,25 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
     assert isfinite(speed).all()
     assert (speed >= 0).all()
     assert isfinite(reach).all()
+
+
+@mark.parametrize(
+    ("curve", "expected"),
+    [
+        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
+        param([1.0, 0.0], 1, id="zero"),
+        param([1.0, 0.5], 2, id="none")
+    ]
+)
+def test_the_first_zero_is_the_first_value_at_or_below_zero(
+    curve    : list[float],
+    expected : int
+):
+    """
+    Asserts that `first_zero` finds the first value at or below zero, or the
+    curve's length where none is.
+    """
+    assert first_zero(array(curve)) == expected
 
 
 def test_the_frames_table_holds_each_kept_frame_at_its_time(flight: Flight):

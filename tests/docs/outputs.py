@@ -4,8 +4,9 @@ repository holds:
 
 - The identity as JSON, the crop with the shape of the sample as JSON, the
   threat with the constants of its air as JSON, the conditions of each trial
-  as JSON, and each page carrying the definition of every study it cites and
-  each region written from its record
+  as JSON, the default slots and the plan the site's flocks fly as JSON
+  beside one step of a small flock under them, and each page carrying the
+  definition of every study it cites and each region written from its record
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused
@@ -13,13 +14,17 @@ repository holds:
   Visual Identity's regions lay the identity out as
 """
 
-from common.edits import append, edit
-from json         import loads
-from pathlib      import Path
-from pydantic     import BaseModel, Field
-from typing       import Annotated
+from common.edits  import append, edit
+from dataclasses   import fields
+from json          import loads
+from numpy         import asarray, linalg
+from numpy.testing import assert_allclose
+from pathlib       import Path
+from pydantic      import BaseModel, Field
+from typing        import Annotated
 
 from thermur.controller.components import SoftCore
+from thermur.controller.schemas    import Composite
 from thermur.docs.outputs          import Outputs, markdown_table, specimens, tabled
 from thermur.environment.schemas import (
     BASE_K,
@@ -30,11 +35,12 @@ from thermur.environment.schemas import (
     Ranges,
     Sample
 )
-from thermur.identity.schemas import Identity
-from thermur.metrics.schemas  import Plan
-from thermur.metrics.trials   import Trial
-from thermur.repo.checkout    import Checkout
-from thermur.repo.schemas     import Finding
+from thermur.identity.schemas  import Identity
+from thermur.metrics.schemas   import Plan
+from thermur.metrics.trials    import Trial
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
+from thermur.repo.schemas      import Finding
 
 # `DATA`, `IDENTITY`, and `RULES` hold the pages whose regions the render
 # writes, from the fire data's records, the identity's, and the flight's.
@@ -298,6 +304,33 @@ def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Chec
     assert regions["tagline"] == f'> *"{identity.tagline.text}"*'
 
 
+def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
+    checkout: Checkout
+):
+    """
+    Asserts that the composite's file holds the kind and the fields of each
+    slot's default and the plan's fields a site flock reads, and that the
+    copy the repository holds has not drifted.
+    """
+    outputs  = Outputs(checkout=checkout)
+    settings = Settings()
+    written  = loads(outputs.written[outputs.composite])
+
+    assert {slot: entry.pop(
+        "kind"
+    ) for slot, entry in written.items() if slot != "plan"} == {
+        slot.name: type(getattr(settings, slot.name)).__name__ for slot in fields(
+            Composite
+        )
+    }
+    assert written["contact"] == {"diameter_m": 6.0, "stiffness_m_s2": 8.0}
+    assert written["plan"] == settings.plan.model_dump(
+        include = set(written["plan"]),
+        mode    = "json"
+    )
+    assert outputs.composite not in outputs.drifted
+
+
 def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
     """
     Asserts that the trials' file holds what each condition of each trial
@@ -315,6 +348,32 @@ def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
         "sparse" : {"spacing_m": 25.0}
     }
     assert outputs.trials not in outputs.drifted
+
+
+def test_the_render_writes_one_step_of_a_small_flock_at_the_cruise(checkout: Checkout):
+    """
+    Asserts that the parity file holds a flock, its increments, and the
+    flock one step moves it to, each drone stepped by its old velocity and
+    held at the cruise speed, and that the copy the repository holds has
+    not drifted.
+    """
+    outputs = Outputs(checkout=checkout)
+    plan    = Settings().plan
+    paired  = loads(outputs.written[outputs.parity])
+    moved   = paired["stepped"]
+
+    assert asarray(paired["increments"]).shape == (12, 3)
+    assert_allclose(
+        moved["positions"],
+        asarray(paired["positions"]) + plan.step_s * asarray(paired["velocities"]),
+        atol = 1e-3
+    )
+    assert_allclose(
+        linalg.norm(moved["velocities"], axis=-1),
+        plan.cruise_m_s,
+        atol = 1e-3
+    )
+    assert outputs.parity not in outputs.drifted
 
 
 def test_the_render_writes_the_crop_beside_the_shape_of_the_sample():

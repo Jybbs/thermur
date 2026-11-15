@@ -4,11 +4,12 @@ flock per seed, beside each statistic its frames give, which the `flight`,
 `frames`, and `statistics` steps and `thermur fly` read.
 """
 
-from diffrax    import ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
-from equinox    import Module, field, tree_at
-from jax        import Array, ShapeDtypeStruct, jit, lax, tree, vmap
-from jax.numpy  import roll, where
-from jax.random import key as seeded, split
+from collections.abc import Callable
+from diffrax         import AbstractPath, ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
+from equinox         import Module, field, tree_at
+from jax             import Array, ShapeDtypeStruct, jit, lax, tree, vmap
+from jax.numpy       import roll, where
+from jax.random      import key as seeded, split
 from numpy         import (
     angle,
     arange,
@@ -511,9 +512,8 @@ def first_zero(curve: ndarray) -> int:
 def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
     """
     Flies one flock, an outer `lax.scan` keeping every `frame_every`-th step
-    of an inner one, each inner step sensing once, advancing through one
-    `Euler().step`, then applying the discrete updates, meaning the cruise
-    speed where the heading holds it and the first drone's turn.
+    of an inner one, each inner step moving the flock through `stepped` and
+    then setting the first drone's turn.
 
     Args:
         air       : The channels each drone reads.
@@ -533,9 +533,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         shape = tree.map(lambda leaf: ShapeDtypeStruct(leaf.shape, leaf.dtype), launch),
         tol   = plan.resolution_s
     )
-    terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
-    solver = Euler()
-    lag    = max(round(composite.heading.lag_s / plan.step_s), 1)
+    lag = max(round(composite.heading.lag_s / plan.step_s), 1)
 
     def advance(
         state : tuple[Flock, Array],
@@ -546,11 +544,15 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         """
         flock, past = state
         t           = step * plan.step_s
-        sensed      = Observation.sensed(flock, past[0], air, t, plan.neighbors)
-        moved, *_   = solver.step(terms, t, t + plan.step_s, flock, sensed, None, False)
-        if composite.heading.confined:
-            moved = moved.cruising(plan.cruise_m_s)
-
+        moved       = stepped(
+            air       = air,
+            composite = composite,
+            flock     = flock,
+            past      = past[0],
+            path      = path,
+            plan      = plan,
+            t         = t
+        )
         turned = tree_at(
             lambda held: held.velocities,
             moved,
@@ -629,3 +631,38 @@ def response(
 
     spans = asarray([distances[shell].mean() for shell in shells])[joins]
     return max(float(linregress(times, spans).slope), 0.0), reach
+
+
+def stepped(
+    air       : Air,
+    composite : Composite,
+    flock     : Flock,
+    past      : Array,
+    path      : AbstractPath | Callable[[Array, Array], Flock],
+    plan      : Plan,
+    t         : Array
+) -> Flock:
+    """
+    Moves one flock through one step of the composite, sensing once,
+    advancing through one `Euler().step` over the drift and the Brownian
+    increments `path` gives between `t` and `t + plan.step_s`, and holding
+    the cruise speed where the heading holds it.
+
+    Args:
+        air       : The channels each drone reads.
+        composite : The slots the flock flies under.
+        flock     : The flock at `t`.
+        past      : Each drone's velocity at the delay a heading reads,
+                    `(n_drones, 3)`.
+        path      : The Brownian path the increments are read from, or a
+                    function of the step's two ends returning them.
+        plan      : The plan the flock flies to.
+        t         : The time, in seconds since the flight started.
+
+    Returns:
+        The flock at `t + plan.step_s`.
+    """
+    sensed = Observation.sensed(flock, past, air, t, plan.neighbors)
+    terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
+    moved, *_ = Euler().step(terms, t, t + plan.step_s, flock, sensed, None, False)
+    return moved.cruising(plan.cruise_m_s) if composite.heading.confined else moved

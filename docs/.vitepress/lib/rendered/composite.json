@@ -1,0 +1,38 @@
+{
+  "cohesion": {
+    "kind": "Morse",
+    "attraction_m": 12.0,
+    "attraction_m2_s2": 80.0,
+    "repulsion_m": 2.4,
+    "repulsion_m2_s2": 10400.0
+  },
+  "contact": {
+    "kind": "SoftCore",
+    "diameter_m": 6.0,
+    "stiffness_m_s2": 8.0
+  },
+  "coupling": {
+    "kind": "Constant",
+    "coupling_per_s": 0.6
+  },
+  "heading": {
+    "kind": "Overdamped"
+  },
+  "noise": {
+    "kind": "White",
+    "amplitude": 4.2
+  },
+  "plan": {
+    "axes": [
+      5.6,
+      2.8,
+      1.0
+    ],
+    "course_deg": 180.0,
+    "cruise_m_s": 10.0,
+    "neighbors": 7,
+    "scatter_deg": 10.0,
+    "spacing_m": 15.0,
+    "step_s": 0.02
+  }
+}

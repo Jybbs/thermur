@@ -1,225 +1,180 @@
-import * as common          from '../common.ts'
-import { type Heat, repel } from './heat.ts'
+import * as common           from '../common.ts'
+import { Composite, ranked } from './composite.ts'
+import { type Heat, repel }  from './heat.ts'
 
 /**
  * A flock as `Flock` builds it: `count` birds drawn from `seed`, each between
- * the two lengths `size` holds and drawing one of the `glyphs` traced birds,
- * cruising at `speed` and keeping `sep` pixels from its nearest neighbors, and
- * following the roost `roost` writes into its last argument for each moment and
- * region.
+ * the two lengths `size` holds and drawing one of the `glyphs` traced birds, the
+ * plan's launch spacing drawn `spacing` pixels long.
  */
 interface Flight {
-  count  : number
-  glyphs : number
-  roost  : (t: number, box: common.Box, out: [number, number]) => void
-  seed   : number
-  sep    : number
-  size   : readonly [number, number]
-  speed  : number
+  count   : number
+  glyphs  : number
+  seed    : number
+  size    : readonly [number, number]
+  spacing : number
 }
+
+/**
+ * The most a heat at full strength pushes a bird across its flight, in meters
+ * per second squared.
+ */
+const BREAK = 60
+/**
+ * The longest stretch one call to `Flock.step` flies, in seconds, so a frame
+ * after a stall runs a bounded number of steps.
+ */
+const STRETCH = 0.1
 
 /**
  * How the site's flocks fly: from one seed, each bird between the two lengths
- * `size` holds, keeping `sep` pixels from its nearest neighbors, and cruising
- * at `speed` pixels a second.
+ * `size` holds, the plan's launch spacing drawn `spacing` pixels long.
  */
-export const FLIGHT = { seed: 41, sep: 9, size: [4, 6.6], speed: 30 } as const
+export const FLIGHT = { seed: 41, size: [4, 6.6], spacing: 7 } as const
 
 /**
- * Wanders a flock's roost from one side of the sky to the other, writing where
- * it stands at `t` inside `box` into `out`.
- */
-export function roost(t: number, box: common.Box, out: [number, number]): void {
-  const side = Math.sin(t * 0.035 + 2.2) >= 0 ? 1 : -1
-  out[0]     = box.x0 + (box.x1 - box.x0) * (0.5 + side * (0.3 + 0.08 * Math.sin(t * 0.11)))
-  out[1]     = box.y0 + (box.y1 - box.y0) * (0.5 + 0.22 * Math.sin(t * 0.09))
-}
-
-/**
- * A murmuration of birds that each read their seven nearest neighbors, align
- * with them, keep together and apart, follow a roost that wanders the sky, and
- * turn away from whatever heat the field around them gives off, an alarm
- * passing from neighbor to neighbor once one of them feels it. Every array a
- * step reads and writes is built once, so a step allocates nothing.
+ * A flock flown by the package's composite under its default slots, seen from
+ * the side with east across and height up, the view following the middle of
+ * the flock so it stays in the middle of its region. Heat the field around a
+ * bird gives off pushes it across its flight down the heat's slope, beside the
+ * slots, so the flock breaks from the plume and from the falcon. Each bird's
+ * place and velocity in the drawing's pixels sit in `x`, `y`, `vx`, and `vy`,
+ * and every array a step reads and writes is built once, so a step allocates
+ * nothing.
  */
 export class Flock {
-  readonly glyph   : Uint8Array
-  readonly size    : Float32Array
-  readonly vx      : Float32Array
-  readonly vy      : Float32Array
-  readonly x       : Float32Array
-  readonly y       : Float32Array
-  readonly #away   : [number, number] = [0, 0]
-  readonly #ax     : Float32Array
-  readonly #ay     : Float32Array
-  readonly #best   = new Float32Array(common.NEIGHBORS)
-  #box             : common.Box = { x0: 0, x1: 1, y0: 0, y1: 1 }
-  #calm            = 0
-  readonly #flight : Flight
-  #margin          = 0
-  readonly #nbr    : Int16Array
-  readonly #panic  : Float32Array
-  #placed          = false
-  readonly #random : () => number
-  readonly #roost  : [number, number] = [0, 0]
-  #t               = 0
+  readonly glyph       : Uint8Array
+  /**
+   * Each bird's east, north, and height, in meters.
+   */
+  readonly positions   : Float64Array
+  /**
+   * The pixels one meter is drawn across.
+   */
+  readonly scale       : number
+  readonly size        : Float32Array
+  readonly vx          : Float32Array
+  readonly vy          : Float32Array
+  readonly x           : Float32Array
+  readonly y           : Float32Array
+  readonly #away       : [number, number] = [0, 0]
+  #box                 : common.Box = { x0: 0, x1: 1, y0: 0, y1: 1 }
+  #clock               = 0
+  readonly #composite  : Composite
+  readonly #increments : Float64Array
+  readonly #normal     : () => number
+  readonly #pushes     : Float64Array
 
   constructor(flight: Flight) {
     const { count } = flight
-    this.#flight    = flight
-    this.#random    = common.mulberry(flight.seed)
-    this.x          = new Float32Array(count)
-    this.y          = new Float32Array(count)
-    this.vx         = new Float32Array(count)
-    this.vy         = new Float32Array(count)
-    this.#ax        = new Float32Array(count)
-    this.#ay        = new Float32Array(count)
-    this.size       = new Float32Array(count)
-    this.glyph      = new Uint8Array(count)
-    this.#panic     = new Float32Array(count)
-    this.#nbr       = new Int16Array(count * common.NEIGHBORS)
+    const random    = common.mulberry(flight.seed)
+    this.#composite  = new Composite(count)
+    this.#normal     = common.gaussian(random)
+    this.#increments = new Float64Array(count * 3)
+    this.#pushes     = new Float64Array(count * 3)
+    this.positions   = this.#composite.positions
+    this.scale       = flight.spacing / this.#composite.model.plan.spacing_m
+    this.x           = new Float32Array(count)
+    this.y           = new Float32Array(count)
+    this.vx          = new Float32Array(count)
+    this.vy          = new Float32Array(count)
+    this.size        = new Float32Array(count)
+    this.glyph       = new Uint8Array(count)
     for (let i = 0; i < count; i++) {
-      this.size[i]  = flight.size[0] + (flight.size[1] - flight.size[0]) * this.#random() ** 1.6
-      this.glyph[i] = Math.floor(this.#random() * flight.glyphs)
+      this.size[i]  = flight.size[0] + (flight.size[1] - flight.size[0]) * random() ** 1.6
+      this.glyph[i] = Math.floor(random() * flight.glyphs)
     }
+    this.#composite.launch(this.#normal)
+    this.#project()
   }
 
   /**
-   * Moves every bird on by `dt` seconds along the force `#steer` set on it,
-   * easing its speed toward the flock's cruise, faster while it panics.
+   * Flies the composite one step through the heat `field` gives off where each
+   * bird is drawn, under fresh Brownian increments.
    */
-  #move(dt: number): void {
-    const { vx, vy, x, y } = this
-    const ax               = this.#ax
-    const ay               = this.#ay
-    const panic            = this.#panic
-    for (let i = 0; i < this.#flight.count; i++) {
-      vx[i]   = vx[i]! + ax[i]! * dt
-      vy[i]   = vy[i]! + ay[i]! * dt
-      const s = Math.hypot(vx[i]!, vy[i]!) + 1e-6
-      const k = 1 + (this.#flight.speed * (1 + panic[i]! * 0.9) / s - 1) * Math.min(1, dt * 2.5)
-      vx[i]   = vx[i]! * k
-      vy[i]   = vy[i]! * k
-      x[i]    = x[i]! + vx[i]! * dt
-      y[i]    = y[i]! + vy[i]! * dt
+  #advance(field: Heat): void {
+    const root   = Math.sqrt(this.#composite.model.plan.step_s)
+    const pushes = this.#pushes
+    const away   = this.#away
+    for (let i = 0; i < this.#increments.length; i++) this.#increments[i] = this.#normal() * root
+    pushes.fill(0)
+    for (let i = 0; i < this.x.length; i++) {
+      const hot = field.heat(this.x[i]!, this.y[i]!)
+      if (hot <= 0.002) continue
+      repel(field, this.x[i]!, this.y[i]!, hot, BREAK, away)
+      pushes[i * 3]     = away[0]
+      pushes[i * 3 + 2] = -away[1]
     }
+    this.#composite.advance(this.#increments, pushes)
+    this.#project()
   }
 
   /**
-   * Finds each bird's seven nearest neighbors by distance alone, however far
-   * they stand.
+   * Draws each bird from the side, east across and height up, the flock's
+   * middle at the middle of the region.
    */
-  #neighbors(): void {
-    for (let i = 0; i < this.#flight.count; i++) {
-      common.nearest(this.#best, i, this.#nbr, this.x, this.y, i * common.NEIGHBORS)
+  #project(): void {
+    const { positions, velocities } = this.#composite
+    const { x0, x1, y0, y1 }        = this.#box
+    const count                     = this.x.length
+    let east                        = 0, up = 0
+    for (let at = 0; at < positions.length; at += 3) {
+      east += positions[at]!
+      up   += positions[at + 2]!
+    }
+    for (let at = 0, i = 0; i < count; at += 3, i++) {
+      this.x[i]  = (x0 + x1) / 2 + (positions[at]! - east / count) * this.scale
+      this.y[i]  = (y0 + y1) / 2 - (positions[at + 2]! - up / count) * this.scale
+      this.vx[i] = velocities[at]! * this.scale
+      this.vy[i] = -velocities[at + 2]! * this.scale
     }
   }
 
   /**
-   * Scatters the birds around the roost's first place, all headed one way.
+   * Reads the distance between the birds at `first` and `second`, in the
+   * drawing's pixels.
    */
-  #scatter(): void {
-    const { x0, x1, y0, y1 } = this.#box
-    this.#flight.roost(0, this.#box, this.#roost)
-    const [cx, cy] = this.#roost
-    const reach    = Math.min(x1 - x0, y1 - y0) * 0.18
-    const heading  = this.#random() * Math.PI * 2
-    for (let i = 0; i < this.#flight.count; i++) {
-      const angle  = this.#random() * Math.PI * 2
-      const radius = Math.sqrt(this.#random()) * reach
-      this.x[i]    = cx + Math.cos(angle) * radius * 1.6
-      this.y[i]    = cy + Math.sin(angle) * radius * 0.7
-      this.vx[i]   = Math.cos(heading) * this.#flight.speed
-      this.vy[i]   = Math.sin(heading) * this.#flight.speed
-    }
-    this.#placed = true
+  apart(first: number, second: number): number {
+    const { positions } = this
+    return this.scale * Math.hypot(
+      positions[first * 3]! - positions[second * 3]!,
+      positions[first * 3 + 1]! - positions[second * 3 + 1]!,
+      positions[first * 3 + 2]! - positions[second * 3 + 2]!
+    )
   }
 
   /**
-   * Sets the force on bird `i`: toward its neighbors' heading and middle and
-   * apart from the nearest, toward the roost, back from the region's edges, and
-   * down the slope of the heat it feels, its panic rising with the heat and the
-   * alarm its neighbors pass on.
+   * Writes the indices of the bird at `index`'s `best.length` nearest others
+   * into `into`, nearest first, by the distance between the drones the flock
+   * flies, leaving in `best` the squared distances in meters.
    */
-  #steer(i: number, dt: number, field: Heat): void {
-    const { vx, vy, x, y }   = this
-    const { x0, x1, y0, y1 } = this.#box
-    const panic              = this.#panic
-    const away               = this.#away
-    const reach              = this.#flight.sep * (1 + panic[i]! * 1.4)
-    let alarm                = 0, apx = 0, apy = 0, avx = 0, avy = 0, sx = 0, sy = 0
-    for (let k = 0; k < common.NEIGHBORS; k++) {
-      const j  = this.#nbr[i * common.NEIGHBORS + k]!
-      const dx = x[i]! - x[j]!
-      const dy = y[i]! - y[j]!
-      const d  = Math.sqrt(dx * dx + dy * dy + 0.01)
-      avx     += vx[j]!
-      avy     += vy[j]!
-      apx     += x[j]!
-      apy     += y[j]!
-      alarm    = Math.max(alarm, panic[j]!)
-      sx      += d < reach ? dx / d * (reach - d) / reach : 0
-      sy      += d < reach ? dy / d * (reach - d) / reach : 0
-    }
-    const tx   = this.#roost[0] - x[i]!
-    const ty   = this.#roost[1] - y[i]!
-    const td   = Math.hypot(tx, ty) + 1
-    const pull = common.clamp((td - this.#calm) * 1.4, 0, 240)
-    const hot  = field.heat(x[i]!, y[i]!)
-    let fx     = (avx / common.NEIGHBORS - vx[i]!) * 2.4 + (apx / common.NEIGHBORS - x[i]!) * 1.6 + sx * 240
-               + (this.#random() - 0.5) * 60 + tx / td * pull
-               + Math.max(0, x0 + this.#margin - x[i]!) * 6 - Math.max(0, x[i]! - x1 + this.#margin) * 6
-    let fy = (avy / common.NEIGHBORS - vy[i]!) * 2.4 + (apy / common.NEIGHBORS - y[i]!) * 1.6 + sy * 240
-           + (this.#random() - 0.5) * 60 + ty / td * pull
-           + Math.max(0, y0 + this.#margin - y[i]!) * 6 - Math.max(0, y[i]! - y1 + this.#margin) * 6
-    if (hot > 0.002) {
-      repel(field, x[i]!, y[i]!, hot, 900, away)
-      fx += away[0]
-      fy += away[1] * 0.4
-    }
-    panic[i]    = Math.max(Math.min(1, hot * 3), alarm * 0.86, panic[i]! - dt * 0.9)
-    this.#ax[i] = fx
-    this.#ay[i] = fy
+  nearest(best: Float64Array, index: number, into: Int32Array): void {
+    ranked(best, index, into, this.positions)
   }
 
   /**
-   * Sets the region the birds keep to, scattering them on the first call and
-   * moving every bird with the region on each later one.
+   * Sets the region the flock is drawn in, its middle at the region's middle.
    */
   region(box: common.Box): void {
-    const old = this.#box
     this.#box = box
-    if (!this.#placed) {
-      this.#scatter()
-      return
-    }
-    const sx = (box.x1 - box.x0) / Math.max(1, old.x1 - old.x0)
-    const sy = (box.y1 - box.y0) / Math.max(1, old.y1 - old.y0)
-    for (let i = 0; i < this.#flight.count; i++) {
-      this.x[i] = box.x0 + (this.x[i]! - old.x0) * sx
-      this.y[i] = box.y0 + (this.y[i]! - old.y0) * sy
-    }
+    this.#project()
   }
 
   /**
    * Runs the flock ahead by `seconds` without drawing, so the first frame shows
-   * a formed flock rather than its first scatter.
+   * a formed flock rather than its launch.
    */
   settle(seconds: number, field: Heat): void {
-    for (let t = 0; t < seconds; t += 1 / 30) this.step(1 / 30, field)
+    for (let t = 0; t < seconds; t += this.#composite.model.plan.step_s) this.#advance(field)
   }
 
   /**
-   * Moves every bird on by `dt` seconds through the heat `field` gives off.
+   * Moves the flock on by `dt` seconds through the heat `field` gives off, in
+   * whole steps of the plan's `step_s`, carrying the remainder to the next call.
    */
   step(dt: number, field: Heat): void {
-    const { x0, x1, y0, y1 } = this.#box
-    this.#t                 += dt
-    this.#margin             = Math.min(x1 - x0, y1 - y0) * 0.08
-    this.#calm               = Math.min(x1 - x0, y1 - y0) * 0.14
-    this.#neighbors()
-    this.#flight.roost(this.#t, this.#box, this.#roost)
-    for (let i = 0; i < this.#flight.count; i++) this.#steer(i, dt, field)
-    this.#move(dt)
+    const step   = this.#composite.model.plan.step_s
+    this.#clock += Math.min(dt, STRETCH)
+    for (; this.#clock >= step; this.#clock -= step) this.#advance(field)
   }
 }
