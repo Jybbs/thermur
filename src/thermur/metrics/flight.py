@@ -234,7 +234,7 @@ class Flight(Module):
         """
         positions = asarray(self.last.positions)
         headings  = asarray(self.last.headings)
-        indices   = nearest(positions, self.plan.neighbors)[..., newaxis]
+        indices   = nearest(self.plan.neighbors, positions)[..., newaxis]
         spots     = take_along_axis(positions[..., newaxis, :, :], indices, axis=-2)
         others    = take_along_axis(headings[..., newaxis, :, :], indices, axis=-2)
         return (
@@ -420,7 +420,7 @@ class Flight(Module):
         times = self.plan.times[:-1]
         late  = arange(times.size) - self.plan.framed(composite.radio.delay_s)
 
-        def drift(flock: Flock, sent: Flock, earlier: Flock, t: Array) -> Array:  # prose: ignore[unsorted-positionals]
+        def drift(earlier: Flock, flock: Flock, sent: Flock, t: Array) -> Array:
             """
             Computes the drift across each command of one flock at `t`.
             """
@@ -444,9 +444,9 @@ class Flight(Module):
             )
 
         return jit(vmap(vmap(drift), in_axes=(0, 0, 0, None)))(
+            taken(late - self.plan.framed(composite.heading.lag_s)),
             taken(arange(times.size)),
             taken(late),
-            taken(late - self.plan.framed(composite.heading.lag_s)),
             times
         )
 
@@ -591,12 +591,12 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         flock, inbox, sent = state
         t           = step * plan.step_s
         heard, sent = radio.heard(
-            inbox,
-            sent,
             flock,
+            inbox,
             radio_key,
-            step,
             lag,
+            sent,
+            step,
             plan.step_s
         )
         sensed    = Observation.sensed(flock, heard, air, t, plan.neighbors)

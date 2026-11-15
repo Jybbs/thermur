@@ -222,14 +222,14 @@ class Radio(Module):
         """
         return round(self.delay_s / step_s)
 
-    def heard(  # prose: ignore[unsorted-positionals]
+    def heard(
         self,
-        inbox  : Inbox,
-        sent   : Flock,
         flock  : Flock,
+        inbox  : Inbox,
         key    : Array,
-        step   : Array,
         lag    : int,
+        sent   : Flock,
+        step   : Array,
         step_s : float
     ) -> tuple[Inbox, Flock]:
         """
@@ -241,14 +241,14 @@ class Radio(Module):
         until `hold_periods` packet periods pass with no packet from it.
 
         Args:
+            flock  : The state each drone broadcasts.
             inbox  : What each drone heard by the step before.
+            key    : The key each packet's loss derives from.
+            lag    : The number of steps `Heading.lag_s` spans.
             sent   : The flock at each of the last steps the radio keeps,
                      each array laid out as `(n_kept, n_drones, 3)`, the
                      step `s` under the index `s % n_kept`.
-            flock  : The state each drone broadcasts.
-            key    : The key each packet's loss derives from.
             step   : The number of steps since launch.
-            lag    : The number of steps `Heading.lag_s` spans.
             step_s : The step of the integrator, in seconds.
 
         Returns:
@@ -742,18 +742,15 @@ def across(accelerations: Array, velocities: Array) -> Array:
     return accelerations - along * direction
 
 
-def nearest(  # prose: ignore[unsorted-positionals]
-    points : Array,
-    count  : int
-) -> ndarray:
+def nearest(count: int, points: Array) -> ndarray:
     """
     Queries each drone's `count` nearest other drones on the host, leaving
     a drone out of its own row even where others sit at its exact position,
     which `KDTree.query` may order ahead of it.
 
     Args:
-        points : The positions, `(..., n_drones, 3)`.
         count  : The number of neighbors per drone.
+        points : The positions, `(..., n_drones, 3)`.
 
     Returns:
         The indices of each drone's neighbors in the order of their distance,

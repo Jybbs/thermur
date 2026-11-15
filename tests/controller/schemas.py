@@ -127,16 +127,18 @@ def test_a_radio_faster_than_the_step_delivers_at_every_step():
     Asserts that a radio sending more packets a second than the integrator
     takes steps delivers one packet at every step rather than none.
     """
-    radio = Radio(delay_s=0.0, loss=0.0, rate_hz=50.0)
+    radio       = Radio(delay_s=0.0, loss=0.0, rate_hz=50.0)
+    inbox, sent = radio.opened(flock_of(zeros((3, 3)), zeros((3, 3))), 0, 0.1)
 
     assert radio.period_steps(0.1) == 1
     assert_allclose(
         radio.heard(
-            *radio.opened(flock_of(zeros((3, 3)), zeros((3, 3))), 0, 0.1),
             flock_of(ones((3, 3)), ones((3, 3))),
+            inbox,
             key(0),
-            3,
             0,
+            sent,
+            3,
             0.1
         )[0].positions,
         1.0
@@ -354,7 +356,7 @@ def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position():
     Asserts that drones stacked at one point each list every other drone,
     which `KDTree.query` may order ahead of the drone itself.
     """
-    for own, row in enumerate(nearest(zeros((4, 3)), 3)):
+    for own, row in enumerate(nearest(3, zeros((4, 3)))):
         assert sorted(row) == sorted({0, 1, 2, 3} - {own})
 
 
@@ -365,7 +367,7 @@ def test_nearest_orders_neighbors_by_distance_over_a_batch():
     """
     line = array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [3.0, 0.0, 0.0], [7.0, 0.0, 0.0]])
 
-    rows = nearest(array([line, line[::-1]]), 2)
+    rows = nearest(2, array([line, line[::-1]]))
 
     assert rows.shape == (2, 4, 2)
     assert rows[0, 0].tolist() == [1, 2]
@@ -578,7 +580,7 @@ def test_the_radio_delivers_each_broadcast_its_delay_late_at_each_packet():
     inbox, sent = radio.opened(flocks[0], 1, 0.1)
     heard       = {}
     for step in range(1, 8):
-        inbox, sent = radio.heard(inbox, sent, flocks[step], key(0), step, 1, 0.1)
+        inbox, sent = radio.heard(flocks[step], inbox, key(0), 1, sent, step, 0.1)
         heard[step] = inbox
 
     assert sent.positions.shape == (5, 3, 3)
@@ -601,7 +603,7 @@ def test_the_radio_draws_each_packet_s_loss_apart_at_each_step():
     moved       = flock_of(ones((200, 3)), ones((200, 3)))
 
     for step in (1, 2):
-        inbox, sent = radio.heard(inbox, sent, moved, key(0), step, 0, 0.1)
+        inbox, sent = radio.heard(moved, inbox, key(0), 0, sent, step, 0.1)
 
     assert_allclose(float((inbox.positions[..., 0] == 0.0).mean()), 0.16, atol=0.01)
 
@@ -624,7 +626,7 @@ def test_the_radio_forgets_a_sender_once_its_hold_passes_with_no_packet():
     inbox, sent = radio.opened(near, 0, 0.1)
     heard       = []
     for step, flock in enumerate([far] * 7 + [near], start=1):
-        inbox, sent = radio.heard(inbox, sent, flock, key(0), step, 0, 0.1)
+        inbox, sent = radio.heard(flock, inbox, key(0), 0, sent, step, 0.1)
         heard.append(bool(inbox.heard[0, 1]))
 
     assert heard == [True] * 5 + [False] * 2 + [True]
@@ -658,12 +660,12 @@ def test_the_radio_loses_its_share_of_the_packets_between_two_drones():
     inbox, sent = radio.opened(flock_of(zeros((200, 3)), zeros((200, 3))), 0, 0.1)
 
     inbox, _ = radio.heard(
-        inbox,
-        sent,
         flock_of(ones((200, 3)), ones((200, 3))),
+        inbox,
         key(0),
-        1,
         0,
+        sent,
+        1,
         0.1
     )
 
@@ -687,9 +689,9 @@ def test_the_radio_s_range_acts_on_the_distance_as_each_packet_is_sent():
     far         = flock_of(array([[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]]), zeros((2, 3)))
     inbox, sent = radio.opened(near, 0, 0.1)
 
-    inbox, sent = radio.heard(inbox, sent, far, key(0), 1, 0, 0.1)
+    inbox, sent = radio.heard(far, inbox, key(0), 0, sent, 1, 0.1)
     assert_allclose(inbox.positions[0, 1], [5.0, 0.0, 0.0])
 
-    inbox, sent = radio.heard(inbox, sent, far, key(0), 2, 0, 0.1)
+    inbox, sent = radio.heard(far, inbox, key(0), 0, sent, 2, 0.1)
     assert_allclose(inbox.positions[0, 1], [5.0, 0.0, 0.0])
     assert bool(inbox.heard[0, 1])

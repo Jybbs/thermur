@@ -237,11 +237,11 @@ def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     against.
 
     The middle axis goes unchecked, since that ratio rises with flock size
-    and the Rome flocks behind the span hold 448 to 2631 birds, whereas the
-    longest ratio does not depend on size. The mean over time and seeds is
-    what the span bounds, since the model's flocks report their shape as a
-    mean over time, and one frame's shape stretches and folds as the flock
-    turns at the roost's rim.
+    in the starling model's flocks, a dependence the Rome flocks behind the
+    span do not show, whereas the longest ratio depends on size in neither.
+    The mean over time and seeds is what the span bounds, since the model's
+    flocks report their shape as a mean over time, and one frame's shape
+    stretches and folds as the flock turns at the roost's rim.
     """
     assert 4.02 <= default.group_aspect_ratios.mean(0)[2] <= 6.94
 

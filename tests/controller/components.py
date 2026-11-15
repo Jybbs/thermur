@@ -111,7 +111,7 @@ def test_moving_a_drone_the_last_drone_cannot_hear_leaves_an_action_as_it_stands
     ]
     assume(unheard)
     reach = max(
-        float(apart[nearest(positions, NEIGHBORS)[-1]].max()),
+        float(apart[nearest(NEIGHBORS, positions)[-1]].max()),
         composite.radio.range_m
     )
     heading = array(direction) / sqrt((array(direction) ** 2).sum())
