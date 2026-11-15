@@ -70,12 +70,12 @@ export const RANGED = 1
 const REST = 0.5
 /**
  * The front page's own flock, flown larger in the same sky under the same
- * roost and plume, each bird reading the seven it heard nearest. One bird
- * is marked with a hairline to its seven and a dashed ring at a fixed range, and
- * two strips along the foot count the birds inside the ring over the last
- * seconds against the seven by rank, which holds as the flock gathers and
- * splits. The pointer is the falcon in predator mode and marks the bird it
- * presses in select mode, where the flock flies on undisturbed.
+ * roost and plume, each bird reading up to the seven it heard nearest. One
+ * bird is marked with a hairline to each sender it ranks and a dashed ring at
+ * a fixed range, and two strips along the foot count those senders over the
+ * last seconds against the birds inside the ring. The pointer is the falcon in
+ * predator mode and marks the bird it presses in select mode, where the flock
+ * flies on undisturbed.
  */
 export class Falcon implements Part {
   #clock            = 0
@@ -87,6 +87,7 @@ export class Falcon implements Part {
   #floor            = 0
   readonly #marks   : Marks
   readonly #nbr     = new Int32Array(common.NEIGHBORS)
+  #ranked           = 0
   readonly #read    : (seventh: number, scheme: Scheme) => void
   readonly #shared  : Shared
   #stamp            = -Infinity
@@ -122,28 +123,27 @@ export class Falcon implements Part {
   }
 
   /**
-   * Reads the distance to the last of the marked bird's seven, in bird lengths,
-   * or 0 where it heard none.
+   * Reads the distance to the last sender the marked bird ranks, in bird
+   * lengths, or 0 where it ranked none.
    */
   get #seventh(): number {
-    const last = this.#nbr.findLast(index => index >= 0)
+    const last = this.#nbr[this.#ranked - 1]
     return last === undefined ? 0 : this.#flock!.apart(last, this.#shared.chosen) / this.#length
   }
 
   /**
    * Counts the birds inside the fixed range of the marked one, by the distance
-   * between the drones, and reads the seven its last step ranked.
+   * between the drones, and reads the senders its last step ranked.
    */
   #count(): void {
     const birds             = this.#flock!
     const { chosen, range } = this.#shared
     const reach             = range * this.#length
-    birds.heard(chosen, this.#nbr)
-    let within = 0
+    this.#ranked            = birds.heard(chosen, this.#nbr)
+    this.#within            = 0
     for (let index = 0; index < birds.x.length; index++) {
-      if (index !== chosen && birds.apart(index, chosen) <= reach) within++
+      if (index !== chosen && birds.apart(index, chosen) <= reach) this.#within++
     }
-    this.#within = within
   }
 
   /**
@@ -242,7 +242,7 @@ export class Falcon implements Part {
     this.#flock.settle(this.#tuning.settle, this.#field)
     this.#shared.chosen = this.#middle()
     this.#count()
-    this.#strips.fill(this.#within)
+    this.#strips.fill(this.#within, this.#ranked)
   }
 
   paint(ctx: CanvasRenderingContext2D, g: Geometry, dpr: number): void {
@@ -294,7 +294,7 @@ export class Falcon implements Part {
     while (this.#clock >= 1 / rate) {
       this.#clock -= 1 / rate
       this.#count()
-      this.#strips.sample(this.#within)
+      this.#strips.sample(this.#within, this.#ranked)
     }
   }
 }

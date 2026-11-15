@@ -85,11 +85,11 @@ describe('Flock', () => {
     expect(flock.apart(1, 0)).toBe(flock.apart(0, 1))
   })
 
-  it('writes the senders each bird’s last step ranked, which for some birds are not its nearest seven', () => {
+  it('writes the senders each bird’s last step ranked, and how many, which for some birds are not its nearest seven', () => {
     const flock  = flown(STILL, 2, 60)
     const into   = new Int32Array(model.plan.neighbors)
     const missed = [...flock.x.keys()].filter(index => {
-      flock.heard(index, into)
+      expect(flock.heard(index, into)).toBe(into.filter(sender => sender >= 0).length)
       expect(into).not.toContain(index)
       expect(Math.max(...into)).toBeLessThan(flock.x.length)
       return sorted(into) !== sorted(nearest(flock, index).slice(0, into.length))

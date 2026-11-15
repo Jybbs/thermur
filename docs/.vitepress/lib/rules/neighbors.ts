@@ -94,10 +94,10 @@ export class Neighbors {
     this.#stage            = new Stage(this.#sky, [part], { pinned: false })
     const canvas           = this.#sky.querySelector('canvas')!
     canvas.setAttribute('role', 'img')
-    canvas.setAttribute('aria-label', 'The illustration flock in the logo’s birds, one bird marked with a '
-                                    + 'line to each of its seven and a ring at the fixed range, above two '
-                                    + 'strips counting the seven and the birds inside the ring over the last '
-                                    + `${tuning.trace} seconds`)
+    canvas.setAttribute('aria-label', 'The front page’s flock in the logo’s birds, one bird marked with a '
+                                    + 'line to each of the up to seven senders it ranks and a ring at the '
+                                    + 'fixed range, above two strips counting those senders and the birds '
+                                    + `inside the ring over the last ${tuning.trace} seconds`)
   }
 
   /**

@@ -7,8 +7,8 @@ repository holds:
   as JSON, the default slots and the plan the site's flocks fly as JSON
   beside one step of three small flocks under them and a run of the radio,
   the zig drawn in place of the key moving as the step's own, and each page
-  carrying the
-  definition of every study it cites and each region written from its record
+  carrying the definition of every study it cites and each region written
+  from its record
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused

@@ -4,7 +4,7 @@ import { enableAutoUnmount }                   from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { Marks }                 from '../../../lib/canvas/marks.ts'
-import { NEIGHBORS }             from '../../../lib/common.ts'
+import { FLIGHT, Flock }         from '../../../lib/front/flock.ts'
 import { seriesOf }              from '../../../lib/identity.ts'
 import { RANGED }                from '../../../lib/rules/falcon.ts'
 import RulesNeighbors            from '../../../theme/rules/neighbors.ts'
@@ -108,12 +108,9 @@ describe('the header', () => {
 })
 
 describe('the marked bird', () => {
-  it('draws the marked bird last, largest, with a line to each of its seven', () => {
-    const chart  = drawn()
-    const last   = frame(chart.birds)
-    const marked = last.at(-1)!
-    expect(marked.length).toBe(Math.max(...last.map(bird => bird.length)))
-    expect(chart.stand.context.lineTo!.mock.calls.length).toBeGreaterThanOrEqual(NEIGHBORS)
+  it('draws the marked bird last and largest', () => {
+    const last = frame(drawn().birds)
+    expect(last.at(-1)!.length).toBe(Math.max(...last.map(bird => bird.length)))
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {
@@ -156,17 +153,37 @@ describe('the marked bird', () => {
   })
 })
 
+describe('the lines and the chip', () => {
+  it('draw to the senders the marked bird’s last step ranked, the chip reading the last one’s distance', () => {
+    const heard           = vi.spyOn(Flock.prototype, 'heard')
+    const chart           = drawn()
+    const flock           = heard.mock.contexts.at(-1)! as Flock
+    const [chosen, ranks] = heard.mock.lastCall!
+    const marked          = frame(chart.birds).at(-1)!
+    const senders         = [...ranks].filter(index => index >= 0)
+    const zoom            = marked.x / flock.x[chosen]!
+    const length          = (FLIGHT.size[0] + FLIGHT.size[1]) / 2
+    expect(flock.y[chosen]! * zoom).toBeCloseTo(marked.y, 6)
+    expect(chart.stand.context.lineTo!.mock.calls.slice(-senders.length)).toEqual(senders.map(index =>
+      [expect.closeTo(flock.x[index]! * zoom, 6), expect.closeTo(flock.y[index]! * zoom, 6)]))
+    expect(chart.host.querySelector('.kit-chip-value')!.textContent)
+      .toBe(`${(flock.apart(senders.at(-1)!, chosen) / length).toFixed(1)} lengths`)
+  })
+})
+
 describe('the strips', () => {
-  it('label each strip at its end on a wide canvas and above it on a narrow one', () => {
+  it('label each strip at its end on a wide canvas and above it on a narrow one, by the count ranked', () => {
+    const heard  = vi.spyOn(Flock.prototype, 'heard')
     const chart  = drawn()
+    const ranked = (): string => `by rank, ${heard.mock.results.at(-1)!.value}`
     const labels = (): unknown[][] => chart.stand.context.fillText!.mock.calls
-      .filter(([words]) => String(words).startsWith('seven by rank'))
+      .filter(([words]) => String(words).startsWith('by rank'))
     chart.stand.context.measureText!.mockReturnValue({ width: 200 })
     chart.stand.reflow(canvas(chart))
-    expect(labels().at(-1)).toEqual([`seven by rank, ${NEIGHBORS}`, 982 + 8, expect.any(Number)])
+    expect(labels().at(-1)).toEqual([ranked(), 982 + 8, expect.any(Number)])
     chart.stand.resize(340, 300)
     chart.stand.reflow(canvas(chart))
-    expect(labels().at(-1)).toEqual([`seven by rank, ${NEIGHBORS}`, 12, 300 - 78 + 15])
+    expect(labels().at(-1)).toEqual([ranked(), 12, 300 - 78 + 15])
   })
 
   it('counts every bird it draws in the range’s color, each inside the ring, the marked one left out', () => {

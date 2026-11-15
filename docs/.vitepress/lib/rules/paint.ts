@@ -91,38 +91,41 @@ export function sky(ctx: CanvasRenderingContext2D, g: Geometry, tones: Tones): v
 
 /**
  * The two strips along the foot of the neighbors drawing, counting over the
- * last seconds the seven by rank, a solid bar, against the birds inside the
- * fixed range, a bar whose shade deepens with its count, on one time axis.
- * Each strip is labeled at its end, or above a strip as wide as the panel
- * where the labels leave the strips too little room. The trace and every word
- * are written once, the count's word once per change of count, so a frame
- * builds nothing.
+ * last seconds the senders the marked bird ranks, seven wherever its radio
+ * holds seven or more, against the birds inside the fixed range, each a bar
+ * whose shade deepens with its count, on one time axis. Each strip is labeled
+ * at its end, or above a strip as wide as the panel where the labels leave the
+ * strips too little room. The traces and every word are written once, each
+ * count's word once per change of that count, so a frame builds nothing.
  */
 export class Strips {
   readonly #font  : string
   panel           : Rect = { x0: 0, x1: 0, y0: 0, y1: 0 }
+  readonly #ranks : Float32Array
   readonly #tones : Tones
   readonly #trace : Float32Array
   #traced         = 0
-  readonly #words : { ago: string, counted: number, range: string, seven: string }
+  readonly #words : { ago: string, counted: number, range: string, ranked: number, seven: string }
 
   constructor(font: string, samples: number, seconds: number, tones: Tones) {
     this.#font  = font
+    this.#ranks = new Float32Array(samples)
     this.#tones = tones
     this.#trace = new Float32Array(samples)
     this.#words = {
       ago     : `${seconds} s ago`,
       counted : -1,
       range   : '',
-      seven   : `seven by rank, ${common.NEIGHBORS}`
+      ranked  : -1,
+      seven   : ''
     }
   }
 
   /**
-   * Reads the newest sample of the trace.
+   * Reads the newest sample of `trace`.
    */
-  get last(): number {
-    return this.#trace[(this.#traced + this.#trace.length - 1) % this.#trace.length]!
+  #last(trace: Float32Array): number {
+    return trace[(this.#traced + trace.length - 1) % trace.length]!
   }
 
   /**
@@ -149,36 +152,36 @@ export class Strips {
   }
 
   /**
-   * Draws one strip from `left` to `right`, `tall` pixels from `top`: the
-   * seven's solid, and the range's shaded by each sample's count against the
-   * seven.
+   * Draws the strip of `trace` from `left` to `right`, `tall` pixels from
+   * `top`, shaded by each sample's count against the seven.
    */
   #strip(
     ctx   : CanvasRenderingContext2D,
     color : string,
     left  : number,
     right : number,
-    row   : number,
     tall  : number,
-    top   : number
+    top   : number,
+    trace : Float32Array
   ): void {
-    const count   = this.#trace.length
+    const count   = trace.length
     const width   = (right - left) / count
     ctx.fillStyle = color
     for (let k = 0; k < count; k++) {
-      const value     = this.#trace[(this.#traced + k) % count]!
-      ctx.globalAlpha = row === 0 ? 0.85 : 0.15 + 0.7 * common.clamp(value / common.NEIGHBORS)
+      const value     = trace[(this.#traced + k) % count]!
+      ctx.globalAlpha = 0.15 + 0.7 * common.clamp(value / common.NEIGHBORS)
       ctx.fillRect(left + k * width, top, width + 0.5, tall)
     }
     ctx.globalAlpha = 1
   }
 
   /**
-   * Fills the whole trace with `count`, as though the count had held for the
-   * whole of it.
+   * Fills the whole of each trace with its count, `count` inside the range and
+   * `ranked` by rank, as though each had held for the whole of it.
    */
-  fill(count: number): void {
+  fill(count: number, ranked: number): void {
     this.#trace.fill(count)
+    this.#ranks.fill(ranked)
   }
 
   /**
@@ -190,9 +193,15 @@ export class Strips {
     const words     = this.#words
     const faint     = this.#tones.ink(g.scheme, 0.55)
     const left      = panel.x0 + 12
-    if (words.counted !== this.last) {
-      words.counted = this.last
-      words.range   = `within range, ${this.last}`
+    const counted   = this.#last(this.#trace)
+    const ranked    = this.#last(this.#ranks)
+    if (words.counted !== counted) {
+      words.counted = counted
+      words.range   = `within range, ${counted}`
+    }
+    if (words.ranked !== ranked) {
+      words.ranked = ranked
+      words.seven  = `by rank, ${ranked}`
     }
     ctx.fillStyle   = this.#tones.sky(g.scheme).top
     ctx.globalAlpha = 0.82
@@ -209,8 +218,8 @@ export class Strips {
     const foot      = panel.y1 - (stacked ? 5 : 6)
     this.#label(ctx, 'left', faint, g, words.ago, left, foot)
     this.#label(ctx, 'right', faint, g, 'now', end, foot)
-    this.#strip(ctx, seven, left, end, 0, tall, stacked ? panel.y0 + 19 : top)
-    this.#strip(ctx, ranged, left, end, 1, tall, next)
+    this.#strip(ctx, seven, left, end, tall, stacked ? panel.y0 + 19 : top, this.#ranks)
+    this.#strip(ctx, ranged, left, end, tall, next, this.#trace)
     if (stacked) {
       this.#label(ctx, 'left', seven, g, words.seven, left, panel.y0 + 15)
       this.#label(ctx, 'left', ranged, g, words.range, left, panel.y0 + 45)
@@ -221,9 +230,11 @@ export class Strips {
   }
 
   /**
-   * Takes `count` as the trace's newest sample, dropping its oldest.
+   * Takes `count` inside the range and `ranked` by rank as each trace's newest
+   * sample, dropping its oldest.
    */
-  sample(count: number): void {
+  sample(count: number, ranked: number): void {
+    this.#ranks[this.#traced] = ranked
     this.#trace[this.#traced] = count
     this.#traced              = (this.#traced + 1) % this.#trace.length
   }

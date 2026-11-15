@@ -169,12 +169,14 @@ export class Flock {
   /**
    * Writes into `into` the senders the bird at `index` ranked at the last step,
    * nearest first by the positions its radio heard them at, `-1` past the last
-   * it heard.
+   * it heard, and returns how many it ranked.
    */
-  heard(index: number, into: Int32Array): void {
+  heard(index: number, into: Int32Array): number {
     const { model, ranks } = this.#composite
     const base             = index * model.plan.neighbors
     for (let rank = 0; rank < into.length; rank++) into[rank] = ranks[base + rank]!
+    const gap = into.indexOf(-1)
+    return gap < 0 ? into.length : gap
   }
 
   /**
