@@ -155,9 +155,16 @@ describe('the gathering of a strip’s birds', () => {
 })
 
 describe('a strip’s birds at the part', () => {
-  it('stay inside it, fading as they near its edge', () => {
-    const strip = crop.flown(crop.CROWD)
-    for (let k = 0; k < 30; k++) strip.part.step(1 / 30, geometry(crop.STRIP))
+  it('stay inside a part narrower than the flock, fading as they near its edge', () => {
+    const strip         = crop.flown(crop.CROWD, [2, 0, 2])
+    const { positions } = strip.birds
+    const middles       = [0, 1, 2].map(axis =>
+      positions.filter((_, i) => i % 3 === axis).reduce((sum, meters) => sum + meters) / strip.birds.x.length
+    )
+    positions.forEach((meters, at) => {
+      positions[at] = middles[at % 3]! + (meters - middles[at % 3]!) * 3
+    })
+    for (let k = 0; k < 90; k++) strip.part.step(1 / 30, geometry(crop.STRIP))
     strip.part.paint(strip.stand.pen, geometry(crop.STRIP), 1)
     const [[left, top, wide, tall]] = strip.stand.context.fillRect!.mock.calls as [Box]
     const alphas  = strip.stand.wrote('globalAlpha') as number[]

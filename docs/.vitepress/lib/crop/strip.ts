@@ -120,8 +120,7 @@ export class FlightStrip implements Part {
     this.#flock      = new flock.Flock({
       ...flock.FLIGHT,
       count  : murmur.count,
-      glyphs : marks.count,
-      roost  : flock.roost
+      glyphs : marks.count
     })
     this.#plume.fire = fire
     this.#plume.y    = SKY_TALL + PLUME.below * shrink

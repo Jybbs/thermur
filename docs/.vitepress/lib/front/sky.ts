@@ -90,8 +90,7 @@ export class Sky implements part.Part {
     this.#flock     = new flock.Flock({
       ...flock.FLIGHT,
       count  : murmur.count,
-      glyphs : marks.count,
-      roost  : flock.roost
+      glyphs : marks.count
     })
   }
 

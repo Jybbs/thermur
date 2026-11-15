@@ -4,8 +4,11 @@ repository holds:
 
 - The identity as JSON, the crop with the shape of the sample as JSON, the
   threat with the constants of its air as JSON, the conditions of each trial
-  as JSON, and each page carrying the definition of every study it cites and
-  each region written from its record
+  as JSON, the default slots and the plan the site's flocks fly as JSON
+  beside one step of three small flocks under them and a run of the radio,
+  the zig drawn in place of the key moving as the step's own, and each page
+  carrying the definition of every study it cites and each region written
+  from its record
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused
@@ -14,15 +17,19 @@ repository holds:
 """
 
 from common.edits import append, edit
+from dataclasses  import asdict, fields
+from jax          import numpy as jnp
+from jax.random   import key as seeded, uniform
 from json         import loads
+from numpy        import asarray, linalg
 from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
 
 from thermur.controller.components import Cruise, HardSphere, Home
-from thermur.controller.schemas    import Radio
+from thermur.controller.schemas    import Composite, Flock, Radio
 from thermur.docs.kit              import Piece
-from thermur.docs.outputs          import Outputs, markdown_table, pieces, specimens, tabled
+from thermur.docs.outputs          import Outputs, flown, markdown_table, pieces, specimens, tabled
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas import (
     BASE_K,
@@ -33,11 +40,12 @@ from thermur.environment.schemas import (
     Ranges,
     Sample
 )
-from thermur.identity.schemas import Identity
-from thermur.metrics.schemas  import Plan
-from thermur.metrics.trials   import Trial
-from thermur.repo.checkout    import Checkout
-from thermur.repo.schemas     import Finding
+from thermur.identity.schemas  import Identity
+from thermur.metrics.schemas   import Plan
+from thermur.metrics.trials    import Trial
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
+from thermur.repo.schemas      import Finding
 
 # `DATA`, `IDENTITY`, `KIT`, and `RULES` hold the pages whose regions the
 # render writes, from the fire data's records, the identity's, the kit's,
@@ -211,6 +219,29 @@ def test_a_table_of_fields_setting_no_bound_carries_no_bound_column():
     )
 
 
+def test_a_zig_drawn_in_place_of_the_key_steps_as_the_composite_does():
+    """
+    Asserts that one step of the rim's flock under the draws the step's key
+    gives, read in place of the key, moves each zig as the composite's own
+    step does.
+    """
+    settings  = Settings()
+    composite = Composite.from_settings(settings)
+    plan      = settings.plan
+    rim       = loads(Outputs().written[Outputs().parity])["flocks"]["rim"]["flock"]
+    flock     = Flock(
+        **{name: jnp.asarray(value, dtype="float32") for name, value in rim.items()}
+    )
+    drawn = asarray(uniform(seeded(plan.seed), (len(rim["forces"]),)), dtype=float)
+
+    assert flown(composite, drawn, flock, plan)["stepped"] == flown(
+        composite,
+        None,
+        flock,
+        plan
+    )["stepped"]
+
+
 def test_an_edited_region_drifts_and_is_written_again(checkout: Checkout):
     """
     Asserts that a region edited by hand drifts and is written back from its
@@ -321,6 +352,36 @@ def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkou
     assert any(" | None | " in row for row in rows)
 
 
+def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
+    checkout: Checkout
+):
+    """
+    Asserts that the composite's file holds the kind and the fields of each
+    slot's default scaled to the plan, and the plan's fields a site flock
+    reads, and that the copy the repository holds has not drifted.
+    """
+    outputs  = Outputs(checkout=checkout)
+    settings = Settings()
+    written  = loads(outputs.written[outputs.composite])
+
+    assert {slot: entry.pop(
+        "kind"
+    ) for slot, entry in written.items() if slot != "plan"} == {
+        slot.name: type(getattr(settings, slot.name)).__name__ for slot in fields(
+            Composite
+        )
+    }
+    assert written["contact"] == {
+        name: float(value)
+        for name, value in asdict(Composite.from_settings(settings).contact).items()
+    }
+    assert written["plan"] == settings.plan.model_dump(
+        include = set(written["plan"]),
+        mode    = "json"
+    )
+    assert outputs.composite not in outputs.drifted
+
+
 def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
     """
     Asserts that the trials' file holds what each condition of each trial
@@ -338,6 +399,53 @@ def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
         "sparse" : {"spacing_m": 25.0}
     }
     assert outputs.trials not in outputs.drifted
+
+
+def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio(
+    checkout: Checkout
+):
+    """
+    Asserts that the parity file holds a flock of twelve astride the rim of
+    the roost's disk and two on its center, each commanding off its velocity
+    and off the cruise speed with one pair inside the cohesion's hard
+    sphere, the center's resting drones starting a zig toward their zigging
+    neighbors' side where their draw is zero and the last flock's radio
+    delay outlasting the zig's reaction and cue, beside a run of the radio
+    in which every drone hears every other as it opens, and that the copy
+    the repository holds has not drifted.
+    """
+    outputs   = Outputs(checkout=checkout)
+    settings  = Settings()
+    composite = Composite.from_settings(settings)
+    zig       = composite.noise
+    paired    = loads(outputs.written[outputs.parity])
+    flocks    = {
+        name: {part: asarray(value) for part, value in flock["flock"].items()}
+        | {
+            "draws"   : asarray(flock["draws"]),
+            "stepped" : asarray(flock["stepped"]["forces"])
+        }
+        for name, flock in paired["flocks"].items()
+    }
+    rim     = flocks["rim"]
+    roost   = flocks["roost"]
+    outward = linalg.norm(rim["positions"][:, :2] - composite.roost.center_m, axis=-1)
+    apart   = linalg.norm(rim["positions"][:, None] - rim["positions"], axis=-1)
+    resting = (roost["forces"][:, 0] == 0) & (roost["draws"] == 0)
+    radio   = paired["radio"]
+
+    assert outward.min() < composite.roost.radius_m < outward.max()
+    assert (rim["commands"] != rim["velocities"]).all()
+    assert (
+        abs(linalg.norm(rim["commands"], axis=-1) - settings.plan.cruise_m_s) > 1
+    ).all()
+    assert apart[apart > 0].min() < composite.cohesion.sphere_m
+    assert (roost["stepped"][resting, 0] > zig.refractory_s).all()
+    assert (roost["stepped"][resting, 1] == -1).any()
+    assert paired["flocks"]["late"]["delay_s"] > zig.reaction_s + zig.cue_s
+    assert asarray(radio["heard"][0]).all()
+    assert len(radio["packets"]) == len(radio["draws"]) == len(radio["positions"])
+    assert outputs.parity not in outputs.drifted
 
 
 def test_the_render_writes_the_crop_beside_the_shape_of_the_sample():
