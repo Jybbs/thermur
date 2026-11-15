@@ -37,11 +37,11 @@ afterEach(() => {
 describe('the heading chart', () => {
   it('reads each rule’s reach at the smallest turn, named in full beside a wide dial', () => {
     const chart = charted(RulesReach, 672)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Overdamped, the default', 'Consensus', 'Delayed']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Overdamped', 'Delayed']))
     expect(readings(chart)).toEqual([
-      '16.4°', 'of 20° · 82% ± 18',
-      '15.7°', 'of 20° · 78% ± 20',
-      '6.7°', 'of 20° · 34% ± 12'
+      '11.7°', 'of 20° · 58% ± 8',
+      '14.5°', 'of 20° · 72% ± 12',
+      '13.7°', 'of 20° · 68% ± 11'
     ])
     expect(knobs(chart).map(knob => knob.checked)).toEqual([true, false])
     expect(dots(chart)).toEqual(['true', 'false'])
@@ -50,7 +50,7 @@ describe('the heading chart', () => {
   it('sets the shorter names under the dial on a narrow column', () => {
     const chart = charted(RulesReach, 672)
     chart.widen(390)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Overdamped', 'Consensus', 'Delayed']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Overdamped', 'Delayed']))
     expect(chart.host.querySelector('svg')!.getAttribute('width')).toBe('390')
   })
 
@@ -62,9 +62,9 @@ describe('the stops on the dial’s rim', () => {
     knobs(chart)[1]!.click()
     await chart.widget.vm.$nextTick()
     expect(readings(chart)).toEqual([
-      '19.2°', 'of 90° · 21% ± 4',
-      '20.4°', 'of 90° · 23% ± 7',
-      '8.8°', 'of 90° · 10% ± 4'
+      '11.6°', 'of 90° · 13% ± 2',
+      '14.3°', 'of 90° · 16% ± 3',
+      '13.5°', 'of 90° · 15% ± 3'
     ])
     expect(knobs(chart).map(knob => knob.checked)).toEqual([false, true])
     expect(dots(chart)).toEqual(['false', 'true'])
@@ -108,9 +108,9 @@ describe('the rings', () => {
     const chart = charted(RulesReach, 672)
     chart.stand.frames.run(1, 400)
     const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
-    expect(Number(outer!.slice(0, -1)) / 16.4).toBeGreaterThan(Number(inner!.slice(0, -1)) / 6.7)
+    expect(Number(outer!.slice(0, -1)) / 11.7).toBeGreaterThan(Number(inner!.slice(0, -1)) / 13.7)
     chart.stand.frames.run(20, 400)
-    expect(readings(chart)[0]).toBe('16.4°')
+    expect(readings(chart)[0]).toBe('11.7°')
   })
 
   it('leaves no listener, observer, or frame behind once it unmounts mid-sweep', () => {

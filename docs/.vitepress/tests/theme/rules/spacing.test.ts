@@ -81,7 +81,7 @@ describe('the coupling chart', () => {
     expect(read.rows.map(row => row.querySelector('text')!.textContent)).toEqual([
       'Constant, the default', 'Anisotropic', 'Distance-weighted', 'Metric'
     ])
-    expect(read.values).toEqual(['0.93 ± 0.01', '0.91 ± 0.02', '0.77 ± 0.06', '0.66 ± 0.07'])
+    expect(read.values).toEqual(['0.98 ± 0.00', '1.00 ± 0.00', '1.00 ± 0.00', '1.00 ± 0.00'])
     expect(read.readout).toBe('10 m')
     expect(chart.host.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 672 236')
   })
@@ -154,7 +154,7 @@ describe('a drag along the track', () => {
     await drag(chart, 17.5)
     expect(parts(chart).readout).toBe('17.5 m')
     expect(parts(chart).thumb.getAttribute('aria-valuetext')).toBe('17.5 m, between measured spacings')
-    expect(parts(chart).values[0]).toMatch(/^≈ 0\.94$/u)
+    expect(parts(chart).values[0]).toMatch(/^≈ 0\.97$/u)
     await drag(chart, 17.5, true)
     expect(parts(chart).readout).toBe('15 m')
   })

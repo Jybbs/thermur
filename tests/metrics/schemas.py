@@ -6,9 +6,11 @@ counts it derives from its length and its step, and the launch it draws.
 from common.drones import short
 from jax.numpy     import arccos, array, cos, deg2rad, sin, sqrt
 from jax.random    import key
+from numpy         import arange
 from numpy.testing import assert_allclose
 from pydantic      import ValidationError
 from pytest        import mark, param, raises
+from scipy.spatial import KDTree
 
 from thermur.metrics.schemas import Plan
 
@@ -77,6 +79,20 @@ def test_a_launch_flies_the_course_at_the_cruise_in_a_cloud_about_its_center():
     assert_allclose(plan.launched(key(3)).positions, flock.positions)
 
 
+def test_a_launch_magnifies_the_starling_flock_by_its_nearest_neighbor_distance():
+    """
+    Asserts that the plan's similarity is the launch's nearest-neighbor
+    distance over the starling flock's, doubling with the spacing.
+    """
+    plan = Plan(spacing_m=15.0, starling_m=0.5)
+
+    assert_allclose(plan.similarity, plan.nearest_m / 0.5)
+    assert_allclose(
+        Plan(spacing_m=30.0, starling_m=0.5).similarity,
+        2 * plan.similarity
+    )
+
+
 def test_a_launch_scatters_each_heading_about_the_course_by_scatter_deg():
     """
     Asserts that a launch at a `scatter_deg` of 10 tilts each heading off
@@ -126,6 +142,49 @@ def test_a_turn_late_in_a_plan_with_no_turn_is_kept():
     turn, so a plan with no turn reaches past its flight's end unrefused.
     """
     assert short(turn_at_s=5.0).turn_at_s == 5.0
+
+
+@mark.parametrize(
+    "axes",
+    [param((5.6, 2.8, 1.0), id="flat"), param((1.0, 1.0, 1.0), id="round")]
+)
+def test_a_launch_keeps_the_nearest_neighbor_distance_its_density_sets(
+    axes: tuple[float, float, float]
+):
+    """
+    Asserts that a launch of 1000 drones holds its drones a mean distance
+    from their nearest neighbors within 3% of `nearest_m`, whatever its
+    shape.
+    """
+    plan  = Plan(axes=axes, drones=1000)
+    cloud = plan.launched(key(0)).positions
+
+    assert_allclose(
+        KDTree(cloud).query(cloud, 2)[0][:, 1].mean(),
+        plan.nearest_m,
+        rtol = 0.03
+    )
+
+
+def test_the_shape_frames_sit_a_shape_interval_apart_through_the_settled_flight():
+    """
+    Asserts that a flight of 100 s reads its shape each second from 21 s,
+    the first whole second past `settled_s`, through its last frame.
+    """
+    plan = Plan(duration_s=100.0)
+
+    assert_allclose(plan.times[plan.shape_frames], arange(21.0, 101.0))
+
+
+@mark.parametrize("every_s", [0.1, 0.5])
+def test_a_shape_interval_within_one_frame_reads_every_settled_frame(every_s: float):
+    """
+    Asserts that a shape interval no longer than a kept frame reads every
+    frame from `settled_s` on.
+    """
+    plan = Plan(duration_s=30.0, shape_every_s=every_s)
+
+    assert_allclose(plan.times[plan.shape_frames], arange(20.5, 30.5, 0.5))
 
 
 def test_the_turned_velocity_holds_the_cruise_along_the_course_plus_the_turn():

@@ -61,9 +61,9 @@ export const DIAL: Tuning = { lag: 0.14, narrow: 520, sweep: 5 }
  * shorter name a narrow chart sets.
  */
 export const NAMES = {
-  reference : ['Overdamped, the default', 'Overdamped'],
-  consensus : ['Consensus', 'Consensus'],
-  delayed   : ['Delayed', 'Delayed']
+  reference  : ['Consensus, the default', 'Consensus'],
+  overdamped : ['Overdamped', 'Overdamped'],
+  delayed    : ['Delayed', 'Delayed']
 } as const
 /**
  * How the ring of each stop on the dial's rim is drawn.

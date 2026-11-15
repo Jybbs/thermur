@@ -10,7 +10,7 @@ The catalog below walks the kit one piece at a time, its stage setting out each 
 
 | **Piece** | **Imports** | **Machine** | **A Widget Reads It When** | **It Replaces** |
 |---|---|---|---|---|
-| Chip | `Chip` | None | A drawing reads a value out beside its name, as the threat's front reads the time and the neighbors read the seventh's distance | The threat's outlined chip and the filled chip the neighbors' header built by hand |
+| Chip | `Chip` | None | A drawing reads a value out beside its name, as the threat's front reads the time and the neighbors read the farthest ranked sender's distance | The threat's outlined chip and the filled chip the neighbors' header built by hand |
 | Copy | `heard`, `useCopy` | None | A press copies a value to the clipboard, as each color, face, and step of the heat ramp on The Visual Identity does | The copier the identity's widgets read from the specimen helpers, the words each of them set out of sight for a screen reader, and the fuse The Visual Identity's sheet burned beneath a copied value |
 | Radios | `Radios` | `radio-group` | A reader picks one of a few choices, as the neighbors pick the pointer's mode and the heading chart picks the first drone's turn on its rim | The radio group the neighbors' header built by hand and the radios the heading chart drew into its dial |
 | Select | `Select` | `select` | A reader picks one of a list of choices inside a sentence, as the Data page sets how much of an output the graph reads | The native menus of the crop's sentence, and the measuring that held the sentence at its widest wording |

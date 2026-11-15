@@ -1,9 +1,10 @@
 """
 Holds the records `docs/references.bib` validates into, meaning the
-`Bibliography` of every study the file holds, each an `Article` or a
-`Preprint` built on `Study`, beside the `Priority` JabRef files a study
-under. The `docs:render` task writes each page's footnote definitions from
-them, and the `docs:cite` task prints the definitions it is asked for.
+`Bibliography` of every study the file holds, each an `Article`, a
+`Preprint`, or a `Report` built on `Study`, beside the `Priority` JabRef
+files a study under. The `docs:render` task writes each page's footnote
+definitions from them, and the `docs:cite` task prints the definitions it is
+asked for.
 """
 
 from abc          import abstractmethod
@@ -227,13 +228,44 @@ class Preprint(Study):
         return f"{self.archiveprefix}:{self.eprint} [{self.primaryclass}]"
 
 
+class Report(Study):
+    """
+    A standard or a report a series numbers, as a `@techreport` entry, such
+    as a Request for Comments.
+    """
+
+    kind: Literal["techreport"]
+    """
+    The entry's type.
+    """
+
+    number: str
+    """
+    The report's number within its series.
+    """
+
+    type: str
+    """
+    The series that numbers the report, such as `RFC`.
+    """
+
+    @property
+    def venue(self) -> str:
+        """
+        Names the report by its series and its number, such as `RFC 3626`.
+        """
+        return f"{self.type} {self.number}"
+
+
 class Bibliography(Document, extra="forbid", title="docs/references.bib"):
     """
     Every study `docs/references.bib` holds, under the key a footnote cites
     it by.
     """
 
-    studies: frozendict[str, Annotated[Article | Preprint, Field(discriminator="kind")]]
+    studies: frozendict[str, Annotated[Article | Preprint | Report, Field(
+        discriminator = "kind"
+    )]]
     """
     Each study, by its key.
     """

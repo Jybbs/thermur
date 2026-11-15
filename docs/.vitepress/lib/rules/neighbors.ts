@@ -44,12 +44,12 @@ export const MODE: Readonly<Record<falcon.Mode, { icon: string, title: string, w
 /**
  * The fixed range the slider sets, in bird lengths.
  */
-export const RANGE = { max: 6, min: 1, step: 0.25, value: 2 } as const
+export const RANGE = { max: 6, min: 1, step: 0.25, value: 3 } as const
 
 /**
  * The elements of the chip a drawing of the neighbors reads how far out the
- * marked bird's seventh flies into: the name, set in the seven's color, and
- * the value.
+ * farthest sender the marked bird ranks flies into: the name, set in the
+ * seven's color, and the value.
  */
 export interface Reach {
   named : HTMLElement
@@ -59,9 +59,10 @@ export interface Reach {
 /**
  * The drawing of the neighbors a drone senses: the front page's flock under
  * the pointer's falcon, its pointer's mode set through `mode` and its fixed
- * range through `range`, reading how far out the marked bird's seventh flies
- * into the chip `reach`. A new mark grows its lines to its seven out from it.
- * `destroy` releases every listener, observer, frame, and canvas it holds.
+ * range through `range`, reading how far out the farthest sender the marked
+ * bird ranks flies into the chip `reach`. A new mark grows its lines out from
+ * it to the senders it ranks. `destroy` releases every listener, observer,
+ * frame, and canvas it holds.
  */
 export class Neighbors {
   #drawn           = -1
@@ -85,7 +86,7 @@ export class Neighbors {
   ) {
     const tones            = new Tones(identity)
     const marks            = Marks.traced(tones, identity)
-    const read             = (seventh: number, scheme: Scheme): void => this.#read(seventh, scheme)
+    const read             = (farthest: number, scheme: Scheme): void => this.#read(farthest, scheme)
     const part             = new falcon.Falcon(identity, marks, read, this.#shared, tones, tuning)
     this.#reach            = reach
     this.#sky              = host
@@ -94,10 +95,10 @@ export class Neighbors {
     this.#stage            = new Stage(this.#sky, [part], { pinned: false })
     const canvas           = this.#sky.querySelector('canvas')!
     canvas.setAttribute('role', 'img')
-    canvas.setAttribute('aria-label', 'The illustration flock in the logo’s birds, one bird marked with a '
-                                    + 'line to each of its seven and a ring at the fixed range, above two '
-                                    + 'strips counting the seven and the birds inside the ring over the last '
-                                    + `${tuning.trace} seconds`)
+    canvas.setAttribute('aria-label', 'The front page’s flock in the logo’s birds, one bird marked with a '
+                                    + 'line to each of the up to seven senders it ranks and a ring at the '
+                                    + 'fixed range, above two strips counting those senders and the birds '
+                                    + `inside the ring over the last ${tuning.trace} seconds`)
   }
 
   /**
@@ -118,15 +119,16 @@ export class Neighbors {
   }
 
   /**
-   * Reads the seventh's distance into the chip, its name in the seven's color
-   * in `scheme`, and grows the lines of a bird newly marked out to its seven.
+   * Reads the farthest ranked sender's distance into the chip, its name in the
+   * seven's color in `scheme`, and grows the lines of a bird newly marked out
+   * to the senders it ranks.
    */
-  #read(seventh: number, scheme: Scheme): void {
+  #read(farthest: number, scheme: Scheme): void {
     const { chosen }              = this.#shared
     const moved                   = this.#drawn >= 0 && chosen !== this.#drawn
     this.#drawn                   = chosen
     this.#reach.named.style.color = this.#tones.flock(scheme, falcon.ALONG.seven, 1)
-    this.#reach.value.textContent = `${seventh.toFixed(1)} lengths`
+    this.#reach.value.textContent = `${farthest.toFixed(1)} lengths`
     if (!moved) return
     this.#stop()
     this.#stop = tween(share => {
