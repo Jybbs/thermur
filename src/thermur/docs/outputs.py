@@ -8,10 +8,11 @@ region of The Kit.
 """
 
 from collections.abc import Collection, Iterable, Iterator, Mapping
-from dataclasses     import fields
+from dataclasses     import asdict, fields
+from equinox         import tree_at
 from functools       import cached_property
 from jax             import numpy as jnp, tree
-from jax.random      import key as seeded
+from jax.random      import key as seeded, uniform
 from json            import dumps
 from math            import sqrt
 from numpy           import around, asarray, zeros, zeros_like
@@ -71,8 +72,9 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
 
     parity: Path = Path("docs/.vitepress/lib/rendered/parity.json")
     """
-    The file the site's suite reads a small flock, its Brownian increments,
-    and the flock one step of the package's composite moves it to from.
+    The file the site's suite reads a small flock from, beside its Brownian
+    increments, the uniform draw each drone's zig reads, and the flock one
+    step of the package's composite moves it to.
     """
 
     threat: Path = Path("docs/.vitepress/lib/rendered/threat.json")
@@ -207,30 +209,29 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             "gravity_m_s2"         : GRAVITY_M_S2,
             "heat_capacity_j_kg_k" : HEAT_CAPACITY_J_KG_K
         } | ParametricThreat().model_dump()
-        settings = Settings()
+        settings  = Settings()
+        composite = Composite.from_settings(settings)
         return {
             self.composite : dumps(
                 {
-                    slot.name: {"kind": type(component).__name__}
-                    | {name.name: getattr(component, name.name) for name in fields(
-                        component
-                    )}
+                    slot.name: {"kind": type(component).__name__} | asdict(component)
                     for slot in fields(Composite)
-                    if (component := getattr(settings, slot.name))
+                    if (component := getattr(composite, slot.name))
                 }
                 | {
                     "plan": settings.plan.model_dump(
                         include = {
-                            "axes", "course_deg", "cruise_m_s", "neighbors",
-                            "scatter_deg", "spacing_m", "step_s"
+                            "axes", "center_m", "course_deg", "cruise_m_s",
+                            "neighbors", "scatter_deg", "spacing_m", "step_s"
                         }
                     )
                 },
-                indent = 2
+                default = float,
+                indent  = 2
             ) + "\n",
             self.crop      : dumps(crop | sample, indent=2) + "\n",
             self.identity  : Identity.shipped().model_dump_json(indent=2) + "\n",
-            self.parity    : dumps(paired(settings), indent=2) + "\n",
+            self.parity    : dumps(paired(composite, settings.plan), indent=2) + "\n",
             self.threat    : dumps(threat, indent=2) + "\n",
             self.trials    : dumps(
                 {trial.slot: trial.conditions for trial in Trial.listed()},
@@ -339,29 +340,53 @@ def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> st
     )
 
 
-def paired(settings: Settings) -> dict[str, list]:
+def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     """
-    Moves a flock of twelve drones, launched a few meters apart around
-    the origin from `settings.plan`, through one step of the composite the
-    settings nest, under Brownian increments drawn from the plan's seed and
-    still air, every value rounded to four decimals before and after the
-    step, so a copy of the step reads the same flock the package moved.
+    Moves a flock of twelve drones from `plan`, launched a few meters apart
+    astride the rim of the roost's disk, through one step of `composite` in
+    still air under Brownian increments drawn from the plan's seed. Every
+    drone has heard every other at launch, and the first five hold a zig
+    at its side, at its push back, and in its refractory time. Every value
+    is rounded to four decimals before and after the step, so a copy of the
+    step reads the same flock the package moved.
 
     Returns:
-        The positions, the velocities, and the increments the step reads,
-        each `(n_drones, 3)`, beside the positions and the velocities it
-        moves the flock to.
+        The flock the step reads, its increments, and the uniform draw each
+        drone's noise state reads, beside the flock the step moves it to.
     """
-    plan   = settings.plan.changed(center_m=(0.0, 0.0, 0.0), drones=12, spacing_m=8.0)
-    launch = tree.map(
-        lambda leaf: around(asarray(leaf, dtype=float), 4),
-        plan.launched(seeded(plan.seed))
+    zig    = composite.noise
+    center = (
+        composite.roost.center_m[0] + composite.roost.radius_m,
+        composite.roost.center_m[1]
+    )
+    plan = plan.changed(
+        center_m  = (*center, composite.roost.height_m),
+        drones    = 12,
+        spacing_m = 8.0
+    )
+    rest           = zig.refractory_s
+    launch         = plan.launched(seeded(plan.seed))
+    forces         = zeros_like(launch.forces)
+    forces[:5, :2] = [
+        [rest + zig.back_s + zig.side_s / 2, 1.0],
+        [rest + zig.back_s + zig.side_s / 2, -1.0],
+        [rest + zig.back_s / 2, 1.0],
+        [rest + zig.back_s / 2, -1.0],
+        [rest / 2, 1.0]
+    ]
+    flock = tree.map(
+        lambda leaf: jnp.asarray(
+            around(asarray(leaf, dtype=float), 4),
+            dtype = "float32"
+        ),
+        tree_at(lambda launched: launched.forces, launch, forces)
     )
     increments = around(
-        default_rng(plan.seed).normal(size=launch.velocities.shape) * sqrt(plan.step_s),
+        default_rng(plan.seed).normal(size=forces.shape) * sqrt(plan.step_s),
         4
     )
-    still = zeros_like(launch.velocities)
+    still = jnp.zeros_like(flock.positions)
+    key   = seeded(plan.seed)
     moved = stepped(
         air = Air(
             channels = zeros((4, 1, 1, 1, 1), dtype="float32"),
@@ -369,30 +394,35 @@ def paired(settings: Settings) -> dict[str, list]:
             origin   = (0.0, 0.0, 0.0, 0.0),
             spacing  = (1.0, 1.0, 1.0, 1.0)
         ),
-        composite = Composite.from_settings(settings),
-        flock     = tree.map(jnp.asarray, launch),
-        inbox     = Inbox.from_broadcast(launch, settings.radio.range_m, launch),
-        key       = seeded(plan.seed),
-        path      = lambda *_: tree.map(
-            jnp.asarray,
-            Flock(
-                commands   = increments,
-                forces     = still,
-                positions  = still,
-                velocities = still
-            )
+        composite = composite,
+        flock     = flock,
+        inbox     = Inbox.from_broadcast(flock, composite.radio.range_m, flock),
+        key       = key,
+        path      = lambda *_: Flock(
+            commands   = jnp.asarray(increments, dtype="float32"),
+            forces     = still,
+            positions  = still,
+            velocities = still
         ),
         plan = plan,
         t    = jnp.asarray(0.0)
     )
+
+    def rounded(state: Flock) -> dict[str, list]:
+        """
+        Lays out each array of `state` by its name, rounded to four
+        decimals.
+        """
+        return {
+            name: around(asarray(leaf, dtype=float), 4).tolist()
+            for name, leaf in asdict(state).items()
+        }
+
     return {
+        "draws": around(asarray(uniform(key, (plan.drones,)), dtype=float), 4).tolist(),
+        "flock"      : rounded(flock),
         "increments" : increments.tolist(),
-        "positions"  : launch.positions.tolist(),
-        "stepped"    : {
-            "positions"  : around(asarray(moved.positions, dtype=float), 4).tolist(),
-            "velocities" : around(asarray(moved.velocities, dtype=float), 4).tolist()
-        },
-        "velocities" : launch.velocities.tolist()
+        "stepped"    : rounded(moved)
     }
 
 

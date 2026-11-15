@@ -1,17 +1,26 @@
 import { describe, expect, it } from 'vitest'
 
-import * as common                       from '../../../lib/common.ts'
-import { Composite, type Model, ranked } from '../../../lib/front/composite.ts'
-import model                             from '../../../lib/rendered/composite.json' with { type: 'json' }
-import parity                            from '../../../lib/rendered/parity.json' with { type: 'json' }
+import * as common    from '../../../lib/common.ts'
+import { Composite }  from '../../../lib/front/composite.ts'
+import type { Model } from '../../../lib/front/slots.ts'
+import model          from '../../../lib/rendered/composite.json' with { type: 'json' }
+import parity         from '../../../lib/rendered/parity.json' with { type: 'json' }
 
 /**
- * Builds a copy of `parity`'s flock, launched where the package launched it.
+ * No increment and no push on any drone of `parity`'s flock.
+ */
+const STILL = new Float64Array(parity.flock.positions.length * 3)
+
+/**
+ * Builds a copy of `parity`'s flock, every drone having heard every other.
  */
 function launched(): Composite {
-  const copy = new Composite(parity.positions.length)
-  copy.positions.set(parity.positions.flat())
-  copy.velocities.set(parity.velocities.flat())
+  const copy = new Composite(parity.flock.positions.length)
+  copy.positions.set(parity.flock.positions.flat())
+  copy.velocities.set(parity.flock.velocities.flat())
+  copy.commands.set(parity.flock.commands.flat())
+  copy.forces.set(parity.flock.forces.flat())
+  copy.open()
   return copy
 }
 
@@ -23,47 +32,83 @@ const divergence = (held: Float64Array, stepped: number[][]): number =>
   Math.max(...stepped.flat().map((value, index) => Math.abs(held[index]! - value)))
 
 /**
- * Builds a push of 50 meters per second squared on the first drone along
- * `axis`, and none on any other drone.
+ * Builds a copy of `parity`'s flock under a roost whose disk reaches far past
+ * every drone.
  */
-function pushed(axis: number, length: number): Float64Array {
-  const push = new Float64Array(length)
-  push[axis] = 50
-  return push
+function inside(): Composite {
+  const copy = launched()
+  copy.roost.radius_m = 1e6
+  return copy
+}
+
+/**
+ * Steps `copy` once under `parity`'s increments and draws and no push.
+ */
+function once(copy: Composite): Composite {
+  copy.advance(parity.increments.flat(), parity.draws, STILL)
+  return copy
 }
 
 describe('Composite.advance', () => {
-  it('steps the flock the package steps from one state to the package’s flock, within a thousandth', () => {
-    const copy = launched()
-    copy.advance(parity.increments.flat(), new Float64Array(copy.positions.length))
-    expect(divergence(copy.positions, parity.stepped.positions)).toBeLessThan(1e-3)
-    expect(divergence(copy.velocities, parity.stepped.velocities)).toBeLessThan(1e-3)
-  })
+  it.for(['positions', 'velocities', 'commands', 'forces'] as const)(
+    'steps the %s the package steps from one state to the package’s, within a thousandth',
+    name => {
+      expect(divergence(once(launched())[name], parity.stepped[name])).toBeLessThan(1e-3)
+    }
+  )
 
-  it('turns a drone across its flight under a push along it no further than the push across it', () => {
-    const along  = launched()
-    const across = launched()
-    const still  = new Float64Array(along.positions.length)
-    along.advance(still, pushed(0, still.length))
-    across.advance(still, pushed(1, still.length))
-    const quiet = launched()
-    quiet.advance(still, still)
-    expect(along.velocities[0]).toBeCloseTo(quiet.velocities[0]!, 1)
-    expect(Math.abs(across.velocities[1]! - quiet.velocities[1]!)).toBeGreaterThan(0.5)
-  })
-
-  it('holds every drone at the cruise speed after a step', () => {
+  it('holds every command inside the plant’s horizontal and vertical bounds', () => {
     const copy = launched()
-    copy.advance(parity.increments.flat(), new Float64Array(copy.positions.length))
-    for (let at = 0; at < copy.velocities.length; at += 3) {
-      expect(Math.hypot(...copy.velocities.subarray(at, at + 3))).toBeCloseTo(model.plan.cruise_m_s, 6)
+    const fast = new Float64Array(copy.positions.length).fill(5000)
+    copy.advance(fast, new Float64Array(copy.count).fill(1), STILL)
+    for (let at = 0; at < copy.commands.length; at += 3) {
+      expect(Math.hypot(copy.commands[at]!, copy.commands[at + 1]!)).toBeCloseTo(model.plant.level_m_s, 9)
+      expect(copy.commands[at + 2]).toBeCloseTo(model.plant.climb_m_s, 9)
     }
   })
 
+  it('starts a resting drone’s zig off a zigging neighbor where its draw is zero, and never where it is one', () => {
+    const resting = parity.flock.forces.findIndex(([countdown]) => countdown === 0)
+    const off     = inside()
+    const on      = inside()
+    off.advance(STILL, new Float64Array(off.count).fill(1), STILL)
+    on.advance(STILL, new Float64Array(on.count), STILL)
+    expect(off.forces[resting * 3]).toBe(0)
+    expect(on.forces[resting * 3]).toBeGreaterThan(model.noise.refractory_s)
+  })
+
+  it('keeps every command finite where two drones sit on one point', () => {
+    const copy = launched()
+    copy.positions.copyWithin(3, 0, 3)
+    copy.open()
+    expect(once(copy).commands.every(Number.isFinite)).toBe(true)
+  })
+})
+
+describe('Composite.hear', () => {
+  it('forgets every sender once the radio’s hold passes with every packet lost, flying as a drone alone', () => {
+    const copy  = launched()
+    const calm  = new Float64Array(copy.count).fill(1)
+    const hold  = model.radio.hold_periods * Math.round(1 / (model.radio.rate_hz * model.plan.step_s))
+    for (let step = 0; step <= hold; step++) {
+      copy.hear(() => 0)
+      copy.advance(STILL, calm, STILL)
+    }
+    copy.hear(() => 0)
+    const alone = new Composite(1)
+    const at    = 5 * 3
+    for (const name of ['positions', 'velocities', 'commands', 'forces'] as const) {
+      alone[name].set(copy[name].subarray(at, at + 3))
+    }
+    alone.open()
+    copy.advance(STILL, calm, STILL)
+    alone.advance(new Float64Array(3), [1], new Float64Array(3))
+    expect([...copy.commands.subarray(at, at + 3)]).toEqual([...alone.commands])
+  })
 })
 
 describe('Composite.launch', () => {
-  it('launches each drone at the cruise speed within the scatter of the course', () => {
+  it('launches each drone flying and commanding the cruise speed within the scatter of the course', () => {
     const copy = new Composite(200)
     copy.launch(common.gaussian(common.mulberry(3)))
     const course = model.plan.course_deg * Math.PI / 180
@@ -72,6 +117,7 @@ describe('Composite.launch', () => {
       expect(Math.hypot(...copy.velocities.subarray(at, at + 3))).toBeCloseTo(model.plan.cruise_m_s, 6)
       expect(Math.cos(course) * east + Math.sin(course) * north).toBeGreaterThan(model.plan.cruise_m_s * 0.8)
     }
+    expect([...copy.commands]).toEqual([...copy.velocities])
   })
 
   it('launches a cloud longer along the course than across it and thinnest in height', () => {
@@ -85,24 +131,14 @@ describe('Composite.launch', () => {
     expect(spread(0)).toBeGreaterThan(spread(1))
     expect(spread(1)).toBeGreaterThan(spread(2))
   })
-
 })
 
 describe('Composite', () => {
-  it.for(['cohesion', 'contact', 'coupling', 'heading', 'noise'] as const)(
+  it.for(['cohesion', 'contact', 'coupling', 'heading', 'noise', 'roost', 'speed'] as const)(
     'refuses a model whose %s slot holds a component the copy does not fly',
     slot => {
       const other = { ...model, [slot]: { ...model[slot], kind: 'Other' } } as Model
       expect(() => new Composite(4, other)).toThrow(`The ${slot} slot holds Other`)
     }
   )
-})
-
-describe('ranked', () => {
-  it('writes the nearest drones in three dimensions from its base on, nearest first, leaving the drone out', () => {
-    const into   = new Int32Array(4).fill(-1)
-    const points = new Float64Array([0, 0, 0, 0, 0, 30, 10, 0, 0, 0, 0, 20, 0, 5, 0])
-    ranked(new Float64Array(3), 0, into, points, 1)
-    expect([...into]).toEqual([-1, 4, 2, 3])
-  })
 })

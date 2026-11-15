@@ -71,18 +71,20 @@ describe('Sky', () => {
 })
 
 describe('Sky in flight', () => {
-  it('keeps its flock about the middle of the sky however far it flies, a minute in', () => {
+  it('starts its flock about the middle of the sky and keeps every bird across it a minute in', () => {
     const { context, sky: drawn, stand } = sky()
-    const across                         = (): number => {
+    const placed                         = (): number[] => {
       vi.clearAllMocks()
       drawn.paint(context, geometry(), 1)
-      const placed = transforms(stand).filter(([scale]) => scale !== 1)
-      return placed.reduce((sum, [, , , , x]) => sum + Number(x), 0) / placed.length
+      return transforms(stand).filter(([scale]) => scale !== 1).map(([, , , , x]) => Number(x))
     }
-    const middle = geometry().w / 2
-    expect(Math.abs(across() - middle)).toBeLessThan(10)
+    const { w }  = geometry()
+    const before = placed()
+    expect(Math.abs(before.reduce((sum, x) => sum + x, 0) / before.length - w / 2)).toBeLessThan(w / 10)
     for (let frame = 0; frame < 3600; frame++) drawn.step(1 / 60, geometry())
-    expect(Math.abs(across() - middle)).toBeLessThan(10)
+    const after = placed()
+    expect(Math.min(...after)).toBeGreaterThan(0)
+    expect(Math.max(...after)).toBeLessThan(w)
   })
 
   it('parts the flock around the pointer over the sky, and pays no heed to it below the ridge', () => {

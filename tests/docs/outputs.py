@@ -15,7 +15,7 @@ repository holds:
 """
 
 from common.edits  import append, edit
-from dataclasses   import fields
+from dataclasses   import asdict, fields
 from json          import loads
 from numpy         import asarray, linalg
 from numpy.testing import assert_allclose
@@ -331,8 +331,8 @@ def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
 ):
     """
     Asserts that the composite's file holds the kind and the fields of each
-    slot's default and the plan's fields a site flock reads, and that the
-    copy the repository holds has not drifted.
+    slot's default scaled to the plan, and the plan's fields a site flock
+    reads, and that the copy the repository holds has not drifted.
     """
     outputs  = Outputs(checkout=checkout)
     settings = Settings()
@@ -346,9 +346,8 @@ def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
         )
     }
     assert written["contact"] == {
-        "sphere_m"    : 0.2,
-        "spread_m"    : 0.461,
-        "weight_m_s2" : 12.5
+        name: float(value)
+        for name, value in asdict(Composite.from_settings(settings).contact).items()
     }
     assert written["plan"] == settings.plan.model_dump(
         include = set(written["plan"]),
@@ -376,29 +375,42 @@ def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
     assert outputs.trials not in outputs.drifted
 
 
-def test_the_render_writes_one_step_of_a_small_flock_at_the_cruise(checkout: Checkout):
+def test_the_render_writes_one_step_of_a_small_flock_astride_the_rim(
+    checkout: Checkout
+):
     """
-    Asserts that the parity file holds a flock, its increments, and the
-    flock one step moves it to, each drone stepped by its old velocity and
-    held at the cruise speed, and that the copy the repository holds has
-    not drifted.
+    Asserts that the parity file holds a flock of twelve astride the rim of
+    the roost's disk with five zigs under way, its increments, a draw per
+    drone, and the flock one step moves it to, each drone stepped by its
+    old velocity and each zig counted down or started, and that the copy the
+    repository holds has not drifted.
     """
-    outputs = Outputs(checkout=checkout)
-    plan    = Settings().plan
-    paired  = loads(outputs.written[outputs.parity])
-    moved   = paired["stepped"]
+    outputs   = Outputs(checkout=checkout)
+    settings  = Settings()
+    composite = Composite.from_settings(settings)
+    paired    = loads(outputs.written[outputs.parity])
+    flock     = {name: asarray(value) for name, value in paired["flock"].items()}
+    moved     = {name: asarray(value) for name, value in paired["stepped"].items()}
+    plan      = settings.plan
+    outward   = linalg.norm(
+        flock["positions"][:, :2] - composite.roost.center_m,
+        axis = -1
+    )
 
     assert asarray(paired["increments"]).shape == (12, 3)
+    assert len(paired["draws"]) == 12
+    assert outward.min() < composite.roost.radius_m < outward.max()
     assert_allclose(
         moved["positions"],
-        asarray(paired["positions"]) + plan.step_s * asarray(paired["velocities"]),
+        flock["positions"] + plan.step_s * flock["velocities"],
         atol = 1e-3
     )
     assert_allclose(
-        linalg.norm(moved["velocities"], axis=-1),
-        plan.cruise_m_s,
+        moved["forces"][:5, 0],
+        flock["forces"][:5, 0] - plan.step_s,
         atol = 1e-3
     )
+    assert (moved["forces"][5:, 0] > composite.noise.refractory_s).any()
     assert outputs.parity not in outputs.drifted
 
 

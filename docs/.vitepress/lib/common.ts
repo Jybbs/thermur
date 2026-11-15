@@ -131,24 +131,40 @@ export function mulberry(seed: number): () => number {
 export function nearest(
   best  : Float32Array,
   index : number,
-  into  : Int16Array | Int32Array,
+  into  : Int32Array,
   xs    : ArrayLike<number>,
   ys    : ArrayLike<number>,
   base  : number = 0
 ): void {
-  const last = best.length - 1
   best.fill(Infinity)
   for (let other = 0; other < xs.length; other++) {
     const distance = (xs[other]! - xs[index]!) ** 2 + (ys[other]! - ys[index]!) ** 2
-    if (other === index || distance >= best[last]!) continue
-    let k = last
-    for (; k > 0 && best[k - 1]! > distance; k--) {
-      best[k]        = best[k - 1]!
-      into[base + k] = into[base + k - 1]!
-    }
-    best[k]        = distance
-    into[base + k] = other
+    if (other !== index) ranked(best, distance, into, other, base)
   }
+}
+
+/**
+ * Places `item` at `distance` among the nearest `best.length` items found so
+ * far, `best` holding their distances in order and `into` the items from
+ * `base` on, nearest first, leaving both alone where `distance` is no nearer
+ * than the last.
+ */
+export function ranked(
+  best     : Float32Array | Float64Array,
+  distance : number,
+  into     : Int32Array,
+  item     : number,
+  base     : number = 0
+): void {
+  const last = best.length - 1
+  if (distance >= best[last]!) return
+  let k = last
+  for (; k > 0 && best[k - 1]! > distance; k--) {
+    best[k]        = best[k - 1]!
+    into[base + k] = into[base + k - 1]!
+  }
+  best[k]        = distance
+  into[base + k] = item
 }
 
 /**

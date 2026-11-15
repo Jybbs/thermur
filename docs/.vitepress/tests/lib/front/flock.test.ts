@@ -16,11 +16,11 @@ const REGION: Box = { x0: 0, x1: 600, y0: 0, y1: 300 }
 const STILL: Heat = { heat: () => 0 }
 
 /**
- * Flies a flock of sixty birds drawn over a region 600 by 300 pixels through
- * `field` for `seconds`, two unless given.
+ * Flies a flock of `count` birds, sixty unless given, drawn over a region 600
+ * by 300 pixels through `field` for `seconds`, two unless given.
  */
-function flown(field: Heat = STILL, seconds = 2): Flock {
-  const flock = new Flock({ ...FLIGHT, count: 60, glyphs: 28 })
+function flown(field: Heat = STILL, seconds = 2, count = 60): Flock {
+  const flock = new Flock({ ...FLIGHT, count, glyphs: 28 })
   flock.region(REGION)
   flock.settle(seconds, field)
   return flock
@@ -42,16 +42,24 @@ describe('Flock', () => {
     expect([...flown().x]).toEqual([...flown().x])
   })
 
-  it('keeps the middle of the flock at the middle of its region however far it flies', () => {
-    const flock = flown(STILL, 20)
-    expect(mean(flock.x)).toBeCloseTo(300, 3)
-    expect(mean(flock.y)).toBeCloseTo(150, 3)
+  it('holds every bird inside its region under the roost while the flock wanders off the middle', () => {
+    const flock  = flown(STILL, 2, 30)
+    let farthest = 0
+    for (let lap = 0; lap < 6; lap++) {
+      flock.settle(10, STILL)
+      farthest = Math.max(farthest, Math.abs(mean(flock.x) - 300))
+      expect(Math.min(...flock.x)).toBeGreaterThan(REGION.x0)
+      expect(Math.max(...flock.x)).toBeLessThan(REGION.x1)
+    }
+    expect(farthest).toBeGreaterThan(60)
   })
 
-  it('draws each bird at the cruise speed or slower, seen from the side', () => {
-    const flock = flown()
+  it('draws each bird no faster than the plant’s bounds, seen from the side', () => {
+    const flock = flown(STILL, 20)
     flock.vx.forEach((vx, i) => {
-      expect(Math.hypot(vx, flock.vy[i]!)).toBeLessThanOrEqual(model.plan.cruise_m_s * flock.scale + 1e-3)
+      expect(Math.hypot(vx, flock.vy[i]!)).toBeLessThanOrEqual(
+        Math.hypot(model.plant.level_m_s, model.plant.climb_m_s) * flock.scale + 1e-3
+      )
     })
   })
 
@@ -66,6 +74,13 @@ describe('Flock', () => {
     expect(flock.apart(1, 0)).toBe(flock.apart(0, 1))
   })
 
+  it('writes the nearest birds in three dimensions, nearest first, leaving the bird out', () => {
+    const flock = flown(STILL, 0, 5)
+    const into  = new Int32Array(3).fill(-1)
+    flock.positions.set([0, 0, 0, 0, 0, 30, 10, 0, 0, 0, 0, 20, 0, 5, 0])
+    flock.nearest(new Float64Array(3), 0, into)
+    expect([...into]).toEqual([4, 2, 3])
+  })
 })
 
 describe('Flock’s birds', () => {

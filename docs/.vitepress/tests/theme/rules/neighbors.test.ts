@@ -180,7 +180,9 @@ describe('the strips', () => {
       .map(([words]) => String(words))
       .filter(words => words.startsWith('within range'))
     expect(inside.length).toBeGreaterThan(0)
-    for (const bird of inside) expect(Math.hypot(bird.x - marked.x, bird.y - marked.y)).toBeLessThanOrEqual(reach)
+    for (const bird of inside) {
+      expect(Math.hypot(bird.x - marked.x, bird.y - marked.y)).toBeLessThanOrEqual(reach)
+    }
     expect(counts.at(-1)).toBe(`within range, ${inside.length}`)
   })
 

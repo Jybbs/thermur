@@ -131,8 +131,7 @@ export class Falcon implements Part {
 
   /**
    * Counts the birds inside the fixed range of the marked one and finds its
-   * seven nearest, each by the distance between the drones the flock flies
-   * rather than between the birds drawn.
+   * seven nearest, each by the distance between the drones the flock flies.
    */
   #count(): void {
     const birds             = this.#flock!

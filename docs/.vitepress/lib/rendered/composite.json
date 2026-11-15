@@ -2,18 +2,18 @@
   "cohesion": {
     "kind": "Centered",
     "blind_deg": 90.0,
-    "sphere_m": 0.2,
-    "weight_m_s2": 12.5
+    "sphere_m": 6.88041670811737,
+    "weight_m_s2": 0.3633500856206213
   },
   "contact": {
     "kind": "HardSphere",
-    "sphere_m": 0.2,
-    "spread_m": 0.461,
-    "weight_m_s2": 12.5
+    "sphere_m": 6.88041670811737,
+    "spread_m": 15.85936051221054,
+    "weight_m_s2": 0.3633500856206213
   },
   "coupling": {
     "kind": "Constant",
-    "coupling_per_s": 0.904
+    "coupling_per_s": 0.026277478192083335
   },
   "heading": {
     "kind": "Consensus",
@@ -21,14 +21,14 @@
   },
   "noise": {
     "kind": "Zig",
-    "amplitude": 2.455,
-    "accel_m_s2": 12.5,
-    "back_s": 0.3,
+    "amplitude": 0.41856133937835693,
+    "accel_m_s2": 0.3633500856206213,
+    "back_s": 10.320625062176054,
     "branching": 1.0,
-    "cue_s": 0.05,
-    "reaction_s": 0.076,
-    "refractory_s": 1.0,
-    "side_s": 0.25
+    "cue_s": 1.7201041770293426,
+    "reaction_s": 2.6145583490846005,
+    "refractory_s": 34.40208354058685,
+    "side_s": 8.600520885146713
   },
   "plant": {
     "kind": "Plant",
@@ -57,19 +57,24 @@
     ],
     "height_m": 100.0,
     "radius_m": 1000.0,
-    "stiffness_per_s2": 2.5,
+    "stiffness_per_s2": 0.0021123725555282054,
     "turn": 0.94
   },
   "speed": {
     "kind": "Cruise",
     "cruise_m_s": 10.0,
-    "relaxation_s": 1.0
+    "relaxation_s": 34.40208354058685
   },
   "plan": {
     "axes": [
       5.6,
       2.8,
       1.0
+    ],
+    "center_m": [
+      1000.0,
+      1000.0,
+      100.0
     ],
     "course_deg": 180.0,
     "cruise_m_s": 10.0,
