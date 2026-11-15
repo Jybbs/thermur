@@ -40,6 +40,12 @@ export class Composite {
   readonly model      : Model
   readonly positions  : Float64Array
   /**
+   * The senders each drone ranked at the last step, nearest first by the
+   * positions it heard and `-1` past the last heard, the plan's `neighbors` of
+   * them for each drone in turn.
+   */
+  readonly ranks      : Int32Array
+  /**
    * The roost's disk and height the drones are held over, the package's own
    * until a drawing places it.
    */
@@ -48,7 +54,6 @@ export class Composite {
   readonly #before    : Float64Array
   readonly #best      : Float64Array
   readonly #broadcast : Broadcast
-  readonly #near      : Int32Array
   readonly #radio     : Radio
   readonly #rates     : Float64Array
   readonly #sides     : Float64Array
@@ -80,7 +85,7 @@ export class Composite {
     this.#sides     = new Float64Array(count)
     this.#sums      = new Float64Array(11)
     this.#best      = new Float64Array(neighbors)
-    this.#near      = new Int32Array(neighbors)
+    this.ranks      = new Int32Array(count * neighbors).fill(-1)
     this.#radio     = new Radio(count, model)
     this.#broadcast = (index, into, at): void => {
       const from = index * 3
@@ -95,19 +100,18 @@ export class Composite {
 
   /**
    * Ranks the senders the drone at `index` heard by the positions it heard into
-   * `#near`, nearest first and `-1` past the last heard, their distances in
-   * `#best`, returning its centrality, the length of the mean bearing to every
-   * sender it heard.
+   * its place in `ranks`, their distances in `#best`, returning its centrality,
+   * the length of the mean bearing to every sender it heard.
    */
   #rank(index: number): number {
     const { count, positions } = this
     const best  = this.#best
-    const near  = this.#near
     const inbox = this.#radio.inbox
     const at    = index * 3
+    const base  = index * best.length
     let cx = 0, cy = 0, cz = 0, held = 0
     best.fill(Infinity)
-    near.fill(-1)
+    this.ranks.fill(-1, base, base + best.length)
     for (let sender = 0; sender < count; sender++) {
       const pair = index * count + sender
       if (sender === index || !this.#radio.heard[pair]) continue
@@ -121,13 +125,13 @@ export class Composite {
       cy += dy / apart
       cz += dz / apart
       held++
-      ranked(best, distance, near, sender)
+      ranked(best, distance, this.ranks, sender, base)
     }
     return Math.hypot(cx, cy, cz) / Math.max(held, 1)
   }
 
   /**
-   * Sums over the neighbors `#rank` found for the drone at `index` into `#sums`
+   * Sums over the neighbors `#rank` ranked for the drone at `index` into `#sums`
    * the differences of their velocities from its command, the bearings past
    * the cohesion's hard sphere outside its blind angle, and the contact's
    * pushes along their bearings, then the counts outside the blind angle and
@@ -140,6 +144,7 @@ export class Composite {
     const inbox                          = this.#radio.inbox
     const sums                           = this.#sums
     const at                             = index * 3
+    const base                           = index * this.#best.length
     const cx                             = commands[at]!
     const cy                             = commands[at + 1]!
     const cz                             = commands[at + 2]!
@@ -148,8 +153,8 @@ export class Composite {
     sums.fill(0)
     this.#zigs[index]  = 0
     this.#sides[index] = 0
-    for (let k = 0; k < this.#near.length; k++) {
-      const sender = this.#near[k]!
+    for (let k = 0; k < this.#best.length; k++) {
+      const sender = this.ranks[base + k]!
       if (sender < 0) break
       const o        = (index * count + sender) * SENT
       const distance = this.#best[k]!

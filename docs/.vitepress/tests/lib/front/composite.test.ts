@@ -44,6 +44,20 @@ const divergence = (held: Float64Array, stepped: number[][]): number =>
   Math.max(...stepped.flat().map((value, index) => Math.abs(held[index]! - value)))
 
 /**
+ * Ranks the other drones of `positions` by their distance from the first,
+ * nearest first, the plan's `neighbors` of them.
+ */
+function nearest(positions: Float64Array): number[] {
+  const best = new Float64Array(model.plan.neighbors).fill(Infinity)
+  const into = new Int32Array(model.plan.neighbors).fill(-1)
+  for (let other = 1; other < positions.length / 3; other++) {
+    const offsets = [0, 1, 2].map(axis => positions[other * 3 + axis]! - positions[axis]!)
+    common.ranked(best, Math.hypot(...offsets), into, other)
+  }
+  return [...into]
+}
+
+/**
  * Builds a copy of the rim's flock under a roost whose disk reaches far past
  * every drone.
  */
@@ -91,6 +105,20 @@ describe('Composite.advance', () => {
     copy.open()
     copy.advance(RIM.increments.flat(), RIM.draws, STILL)
     expect(copy.commands.every(Number.isFinite)).toBe(true)
+  })
+})
+
+describe('Composite.ranks', () => {
+  it('ranks each drone’s senders by where its radio heard them rather than where they now fly', () => {
+    const copy  = launched()
+    const heard = nearest(copy.positions)
+    const moved = copy.positions.slice(3)
+    for (let other = 1; other < copy.count; other++) {
+      copy.positions.set(moved.subarray((copy.count - 1 - other) * 3, (copy.count - other) * 3), other * 3)
+    }
+    expect(nearest(copy.positions)).not.toEqual(heard)
+    copy.advance(STILL, new Float64Array(copy.count).fill(1), STILL)
+    expect([...copy.ranks.subarray(0, model.plan.neighbors)]).toEqual(heard)
   })
 })
 

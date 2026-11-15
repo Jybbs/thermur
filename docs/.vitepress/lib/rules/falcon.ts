@@ -70,15 +70,14 @@ export const RANGED = 1
 const REST = 0.5
 /**
  * The front page's own flock, flown larger in the same sky under the same
- * roost and plume, its birds each reading their seven nearest. One bird is
- * marked with a hairline to its seven and a dashed ring at a fixed range, and
+ * roost and plume, each bird reading the seven it heard nearest. One bird
+ * is marked with a hairline to its seven and a dashed ring at a fixed range, and
  * two strips along the foot count the birds inside the ring over the last
  * seconds against the seven by rank, which holds as the flock gathers and
  * splits. The pointer is the falcon in predator mode and marks the bird it
  * presses in select mode, where the flock flies on undisturbed.
  */
 export class Falcon implements Part {
-  readonly #best    = new Float64Array(common.NEIGHBORS)
   #clock            = 0
   readonly #falcon  = new PointerHeat()
   readonly #fire    = new Plume(RISE)
@@ -123,21 +122,23 @@ export class Falcon implements Part {
   }
 
   /**
-   * Reads the distance to the marked bird's seventh, in bird lengths.
+   * Reads the distance to the last of the marked bird's seven, in bird lengths,
+   * or 0 where it heard none.
    */
   get #seventh(): number {
-    return Math.sqrt(this.#best[common.NEIGHBORS - 1]!) * this.#flock!.scale / this.#length
+    const last = this.#nbr.findLast(index => index >= 0)
+    return last === undefined ? 0 : this.#flock!.apart(last, this.#shared.chosen) / this.#length
   }
 
   /**
-   * Counts the birds inside the fixed range of the marked one and finds its
-   * seven nearest, each by the distance between the drones the flock flies.
+   * Counts the birds inside the fixed range of the marked one, by the distance
+   * between the drones, and reads the seven its last step ranked.
    */
   #count(): void {
     const birds             = this.#flock!
     const { chosen, range } = this.#shared
     const reach             = range * this.#length
-    birds.nearest(this.#best, chosen, this.#nbr)
+    birds.heard(chosen, this.#nbr)
     let within = 0
     for (let index = 0; index < birds.x.length; index++) {
       if (index !== chosen && birds.apart(index, chosen) <= reach) within++
@@ -178,6 +179,7 @@ export class Falcon implements Part {
     ctx.beginPath()
     for (let rank = 0; rank < common.NEIGHBORS; rank++) {
       const index = this.#nbr[rank]!
+      if (index < 0) break
       ctx.moveTo(ox, oy)
       ctx.lineTo(ox + (x[index]! * zoom - ox) * grown, oy + (y[index]! * zoom - oy) * grown)
     }

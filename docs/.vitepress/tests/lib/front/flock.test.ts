@@ -37,6 +37,17 @@ const mean = (values: Float32Array): number => values.reduce((sum, value) => sum
 const near = (flock: Flock): number =>
   [...flock.x].filter((x, i) => Math.hypot(x - 300, flock.y[i]! - 150) < 40).length
 
+/**
+ * Reads `values` in ascending order, joined.
+ */
+const sorted = (values: Iterable<number>): string => [...values].toSorted((a, b) => a - b).join()
+
+/**
+ * Reads every bird of `flock` but the one at `index`, nearest it first.
+ */
+const nearest = (flock: Flock, index: number): number[] =>
+  [...flock.x.keys()].filter(other => other !== index).toSorted((a, b) => flock.apart(index, a) - flock.apart(index, b))
+
 describe('Flock', () => {
   it('flies the same flock on every run from one seed', () => {
     expect([...flown().x]).toEqual([...flown().x])
@@ -74,12 +85,16 @@ describe('Flock', () => {
     expect(flock.apart(1, 0)).toBe(flock.apart(0, 1))
   })
 
-  it('writes the nearest birds in three dimensions, nearest first, leaving the bird out', () => {
-    const flock = flown(STILL, 0, 5)
-    const into  = new Int32Array(3).fill(-1)
-    flock.positions.set([0, 0, 0, 0, 0, 30, 10, 0, 0, 0, 0, 20, 0, 5, 0])
-    flock.nearest(new Float64Array(3), 0, into)
-    expect([...into]).toEqual([4, 2, 3])
+  it('writes the senders each bird’s last step ranked, which for some birds are not its nearest seven', () => {
+    const flock  = flown(STILL, 2, 60)
+    const into   = new Int32Array(model.plan.neighbors)
+    const missed = [...flock.x.keys()].filter(index => {
+      flock.heard(index, into)
+      expect(into).not.toContain(index)
+      expect(Math.max(...into)).toBeLessThan(flock.x.length)
+      return sorted(into) !== sorted(nearest(flock, index).slice(0, into.length))
+    })
+    expect(missed.length).toBeGreaterThan(0)
   })
 })
 

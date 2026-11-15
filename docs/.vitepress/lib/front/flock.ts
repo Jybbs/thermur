@@ -49,17 +49,6 @@ export const FLIGHT = {
 } as const
 
 /**
- * Reads the squared distance between the points at `first` and `second`, the
- * points laid out as east, north, and height in `points`.
- */
-function squared(points: Float64Array, first: number, second: number): number {
-  const a = first * 3, b = second * 3
-  return (points[a]! - points[b]!) ** 2
-       + (points[a + 1]! - points[b + 1]!) ** 2
-       + (points[a + 2]! - points[b + 2]!) ** 2
-}
-
-/**
  * A flock flown by the package's composite under its default slots, seen from
  * the side with east across and height up, the view fixed on the roost, whose
  * center and height sit at the middle of the flock's region and whose disk
@@ -168,19 +157,24 @@ export class Flock {
    * drawing's pixels.
    */
   apart(first: number, second: number): number {
-    return this.scale * Math.sqrt(squared(this.positions, first, second))
+    const { positions } = this
+    const a = first * 3, b = second * 3
+    return this.scale * Math.hypot(
+      positions[a]! - positions[b]!,
+      positions[a + 1]! - positions[b + 1]!,
+      positions[a + 2]! - positions[b + 2]!
+    )
   }
 
   /**
-   * Writes the indices of the bird at `index`'s `best.length` nearest others
-   * into `into`, nearest first, by the distance between the drones the flock
-   * flies, leaving in `best` the squared distances in meters.
+   * Writes into `into` the senders the bird at `index` ranked at the last step,
+   * nearest first by the positions its radio heard them at, `-1` past the last
+   * it heard.
    */
-  nearest(best: Float64Array, index: number, into: Int32Array): void {
-    best.fill(Infinity)
-    for (let other = 0; other < this.x.length; other++) {
-      if (other !== index) common.ranked(best, squared(this.positions, index, other), into, other)
-    }
+  heard(index: number, into: Int32Array): void {
+    const { model, ranks } = this.#composite
+    const base             = index * model.plan.neighbors
+    for (let rank = 0; rank < into.length; rank++) into[rank] = ranks[base + rank]!
   }
 
   /**
