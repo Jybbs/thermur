@@ -92,7 +92,7 @@ function drawReading(
   const barY    = narrow ? top + 8 : top + 46
   const length  = narrow ? Math.min(150, width - barX - 16) : Math.min(220, width - readX - 120)
   const angle   = chart.text(chart.FACE.mono, 21, '', readX, top + 38, { 'font-weight': 500 })
-  const share   = chart.text(chart.FACE.mono, 11.5, '', readX + 76, top + 37, { fill: chart.TONE.muted })
+  const share   = chart.text(chart.FACE.mono, 11.5, '', readX + 86, top + 37, { fill: chart.TONE.muted })
   const bar     = chart.svg('rect', { fill: rule.color, height: 4, rx: 2, width: 0, x: barX, y: barY })
   const tick    = { 'opacity': 0.5, 'stroke': chart.TONE.ink, 'stroke-width': 1 }
   const whisker = chart.svg('line', { ...tick, y1: barY + 2, y2: barY + 2 })

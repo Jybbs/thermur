@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { type Mock, afterEach, describe, expect, it, vi } from 'vitest'
 
-import * as motion                from '../../../lib/rules/motion.ts'
-import { RELEASED, box, browser } from '../../common/browser.ts'
+import * as motion                             from '../../../lib/rules/motion.ts'
+import { type Browser, RELEASED, box, browser } from '../../common/browser.ts'
 
 /**
  * Sets the theme's settling time to `value`, as its stylesheet writes it.
@@ -72,16 +72,22 @@ describe('the motion a chart reads', () => {
   })
 })
 
+/**
+ * Watches the width of a fresh box over the stand-ins, returning the stand-ins,
+ * the box, the callback the width reaches, and what releases the watch.
+ */
+function watched(): { changed: Mock<(width: number) => void>, host: HTMLElement, release: () => void, stand: Browser } {
+  const stand   = browser()
+  const host    = box('rules-host')
+  const changed = vi.fn<(width: number) => void>()
+  return { changed, host, release: motion.widthOf(host, changed), stand }
+}
+
 describe('the width a chart is drawn at', () => {
   it('calls back with a width only once the box takes one it was not drawn at', () => {
-    const stand   = browser()
-    const host    = box('rules-host')
-    const widths  = [0, 640, 640.3, 390]
-    const changed = vi.fn<(width: number) => void>()
-    vi.spyOn(host, 'getBoundingClientRect').mockImplementation(() => ({ width: widths.shift() }) as DOMRect)
-    const release = motion.widthOf(host, changed)
-    for (let k = 0; k < 4; k++) {
-      stand.reflow(host)
+    const { changed, host, release, stand } = watched()
+    for (const width of [0, 640, 640.3, 390]) {
+      stand.reflow(host, width)
       stand.frames.run(1)
     }
     expect(changed.mock.calls).toEqual([[640], [390]])
@@ -89,33 +95,36 @@ describe('the width a chart is drawn at', () => {
     expect(stand.held()).toEqual(RELEASED)
   })
 
-  it('draws at a new width on the next frame, outside the observer’s callback', () => {
-    const stand   = browser()
-    const host    = box('rules-host')
-    const changed = vi.fn<(width: number) => void>()
-    vi.spyOn(host, 'getBoundingClientRect').mockReturnValue({ width: 640 } as DOMRect)
-    motion.widthOf(host, changed)
-    stand.reflow(host)
+  it('draws at a new width on the next frame, measuring nothing inside the observer’s callback', () => {
+    const measured                 = vi.spyOn(Element.prototype, 'getBoundingClientRect')
+    const { changed, host, stand } = watched()
+    stand.reflow(host, 640)
     expect(changed).not.toHaveBeenCalled()
     stand.frames.run(1)
     expect(changed).toHaveBeenCalledExactlyOnceWith(640)
+    expect(measured).not.toHaveBeenCalled()
   })
 
   it('draws once at the last width a frame sees, dropping the frame on release', () => {
-    const stand   = browser()
-    const host    = box('rules-host')
-    const widths  = [640, 390, 512]
-    const changed = vi.fn<(width: number) => void>()
-    vi.spyOn(host, 'getBoundingClientRect').mockImplementation(() => ({ width: widths.shift() }) as DOMRect)
-    const release = motion.widthOf(host, changed)
-    stand.reflow(host)
-    stand.reflow(host)
+    const { changed, host, release, stand } = watched()
+    stand.reflow(host, 640)
+    stand.reflow(host, 390)
     stand.frames.run(1)
     expect(changed.mock.calls).toEqual([[390]])
-    stand.reflow(host)
+    stand.reflow(host, 512)
     release()
     expect(stand.held()).toEqual(RELEASED)
     stand.frames.run(1)
     expect(changed).toHaveBeenCalledOnce()
+  })
+
+  it('draws at the width a box returns to within one frame after leaving it', () => {
+    const { changed, host, stand } = watched()
+    stand.reflow(host, 640)
+    stand.frames.run(1)
+    stand.reflow(host, 390)
+    stand.reflow(host, 640)
+    stand.frames.run(1)
+    expect(changed.mock.calls.at(-1)).toEqual([640])
   })
 })

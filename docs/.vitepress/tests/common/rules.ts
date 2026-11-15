@@ -30,7 +30,7 @@ export function charted(component: Component, width: number, reduced = false): C
   const host   = widget.element as HTMLElement
   const widen  = (next: number): void => {
     across = next
-    stand.reflow(host)
+    stand.reflow(host, next)
     stand.frames.run(1)
   }
   widen(width)

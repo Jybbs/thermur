@@ -29,14 +29,21 @@ const pointOf = (node: Element, x: string, y: string): number[] =>
   [Number(node.getAttribute(x)), Number(node.getAttribute(y))]
 
 /**
- * Finds the topmost painted disc in `knob` under the middle of its stop and
- * its label's ink, set 4 above the label's baseline, where a pointer aimed at
- * the stop's center lands, as the browser hits a circle by its fill.
+ * Measures how far the end of `node`'s words falls from its `x`, at the
+ * advance of 0.6 of its size that every glyph of the site's monospace face
+ * takes.
  */
-function centerOf(knob: SVGElement): SVGElement | undefined {
+const across = (node: Element): number => node.textContent.length * 0.6 * Number(node.getAttribute('font-size'))
+
+/**
+ * Finds the topmost painted disc in `knob` under the point `share` of the way
+ * from its stop's center to its label's ink, set 4 above the label's baseline,
+ * where a pointer aimed there lands, as the browser hits a circle by its fill.
+ */
+function centerOf(knob: SVGElement, share: number): SVGElement | undefined {
   const [rx, ry] = pointOf(knob.querySelector('circle')!, 'cx', 'cy')
   const [lx, ly] = pointOf(knob.querySelector('text')!, 'x', 'y')
-  const [x, y]   = [(rx! + lx!) / 2, (ry! + ly! - 4) / 2]
+  const [x, y]   = [rx! + (lx! - rx!) * share, ry! + (ly! - 4 - ry!) * share]
   return [...knob.querySelectorAll<SVGElement>('circle')].findLast(disc => {
     const [cx, cy] = pointOf(disc, 'cx', 'cy')
     return disc.getAttribute('fill') !== 'none' && Math.hypot(x - cx!, y - cy!) <= Number(disc.getAttribute('r'))
@@ -61,6 +68,17 @@ describe('the heading chart', () => {
       '117.9°', 'of 20° · 589% ± 59'
     ])
     expect(knobs(chart).map(knob => knob.getAttribute('aria-checked'))).toEqual(['true', 'false'])
+  })
+
+  it.for([672, 390])('leaves a clear gap between each angle and its share at %i px', width => {
+    const chart  = charted(RulesReach, width)
+    const angles = [...chart.host.querySelectorAll('text')].filter(text => /^\d+\.\d°$/u.test(text.textContent))
+    expect(angles).toHaveLength(5)
+    for (const angle of angles) {
+      const share = angle.nextElementSibling!
+      const gap   = Number(share.getAttribute('x')) - Number(angle.getAttribute('x')) - across(angle)
+      expect(gap).toBeGreaterThanOrEqual(0.6 * Number(share.getAttribute('font-size')))
+    }
   })
 
   it('sets the shorter names under the dial on a narrow column', () => {
@@ -101,11 +119,13 @@ describe('the stops on the dial’s rim', () => {
     expect(document.activeElement).toBe(knobs(chart)[to])
   })
 
-  it.for([0, 1])('picks the turn of stop %i from a click at its center, between the stop and its label', stop => {
+  it.for([0.25, 0.5, 0.75, 1])('picks each turn from a click %f of the way from its stop to its label', share => {
     const chart = charted(RulesReach, 672)
-    const knob  = knobs(chart)[stop]!
-    centerOf(knob)!.dispatchEvent(new Event('click', { bubbles: true }))
-    expect(knob.getAttribute('aria-checked')).toBe('true')
+    for (const stop of [1, 0]) {
+      const knob = knobs(chart)[stop]!
+      centerOf(knob, share)!.dispatchEvent(new Event('click', { bubbles: true }))
+      expect(knob.getAttribute('aria-checked')).toBe('true')
+    }
   })
 
   it('leaves every other key to the browser', () => {
