@@ -23,9 +23,9 @@ def test_a_failed_fetch_raises_its_own_error_and_prints_nothing(
 
     def refused(self: Sample, root: Path) -> Path:
         """
-        Raises the error a fetch raises on an archive with another digest.
+        Raises the error a fetch raises on a file with another digest.
         """
-        raise ValueError(f"`{self.archive}` hashes to another digest")
+        raise ValueError(f"`{self.file}` hashes to another digest")
 
     monkeypatch.setattr(Sample, "fetch", refused)
 
@@ -40,19 +40,19 @@ def test_the_sample_is_fetched_into_the_clone_and_named_relative_to_it(
     monkeypatch : MonkeyPatch
 ):
     """
-    Asserts that the command fetches the sample under the root of the clone
-    `Checkout.installed` resolves and prints the extracted output's path
+    Asserts that the command fetches the sample under the root of the
+    clone `Checkout.installed` resolves and prints the fetched file's path
     relative to that root, the form the `simulation` setting takes.
     """
     roots: list[Path] = []
 
     def fetched(self: Sample, root: Path) -> Path:
         """
-        Records the root a fetch is given and names the output it would
-        extract there.
+        Records the root a fetch is given and names the file it would write
+        there.
         """
         roots.append(root)
-        return root / self.folder / self.member
+        return root / self.path
 
     monkeypatch.setattr(Sample, "fetch", fetched)
     app(["fetch", "sample"], result_action="return_value")

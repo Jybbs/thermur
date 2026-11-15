@@ -37,6 +37,11 @@ export interface Flown {
  */
 export const CROWD: Murmur = { count: 340, settle: 0.5 }
 /**
+ * The share of the record's snapshots the last two hold, which the menus keep
+ * when they keep the last two.
+ */
+export const LATE = 2 / new Kept().model.times_s.length
+/**
  * The box a strip draws in, 8rem tall in a column 688 pixels wide.
  */
 export const STRIP = { h: 128, w: 688 } as const
