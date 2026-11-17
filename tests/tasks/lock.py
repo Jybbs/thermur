@@ -4,9 +4,11 @@ give it, each case running a copy of the task beside a lockfile of its
 own, the lockfile beside each task script declaring its own dependencies
 that every `lock` task checks, audits, or writes, and what the real mise
 answers for the committed lockfile online and for one missing a platform
-entry offline, where `lock:check` fails on a `mise lock` exiting nonzero or
-counting a skipped platform and on a lockfile in which a tool holds no entry
-for a platform another tool carries.
+entry offline, where `lock:check` fails on a `mise lock` exiting nonzero
+or counting a skipped platform and on a lockfile in which a tool holds no
+entry for a platform another tool carries. It also pins the `AUDIT_IGNORE`
+ids `lock:scan` sets aside through `bun audit --ignore`, against a stand-in
+`gh`.
 """
 
 from collections.abc  import Callable
@@ -15,12 +17,15 @@ from pathlib          import Path
 from pytest           import Config, MonkeyPatch, fixture, mark, param
 from re               import escape, sub
 from subprocess       import CompletedProcess, run
+from syrupy.assertion import SnapshotAssertion
 
-CHECKED = "mise lock    ✓ 72 targets checked"
-FAILED  = "mise ERROR error sending request"
-LYCHEE  = '[tools."aqua:lycheeverse/lychee"."platforms.linux-x64"]'
+CHECKED    = "mise lock    ✓ 72 targets checked"
+FAILED     = "mise ERROR error sending request"
+LYCHEE     = '[tools."aqua:lycheeverse/lychee"."platforms.linux-x64"]'
+MICROMATCH = "GHSA-952p-6rrq-rcjv"
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
-SUMMARY = "✓ Updated 14 platform entries ({skipped} skipped)"
+PICOMATCH = "GHSA-fc5q-39xc-vjpf"
+SUMMARY   = "✓ Updated 14 platform entries ({skipped} skipped)"
 
 
 def executed(copy: Path, task: str = "check") -> CompletedProcess:
@@ -47,8 +52,9 @@ def copy(
     """
     Copies the `lock` tasks, the library they source, `.mise/config.toml`,
     and `.mise/mise.lock` into `tmp_path`, keeping each file's mode,
-    names the copy as the root a task sources its library from, and puts a
-    stand-in `uv` that reports `uv.lock` current and a stand-in `bun` that
+    names the copy as the root a task sources its library from, clears the
+    `AUDIT_IGNORE` list `mise test` sets from `.mise/config.toml`, and puts
+    a stand-in `uv` that reports `uv.lock` current and a stand-in `bun` that
     reports `docs/bun.lock` current ahead on the path.
 
     Returns:
@@ -60,6 +66,7 @@ def copy(
     ):
         (pytestconfig.rootpath / path).copy(tmp_path / path, preserve_metadata=True)
 
+    monkeypatch.delenv("AUDIT_IGNORE", raising=False)
     monkeypatch.setenv("MISE_PROJECT_ROOT", str(tmp_path))
     stand_in("bun", "exit 0")
     stand_in("uv", "exit 0")
@@ -329,3 +336,83 @@ def test_each_lock_task_reaches_every_lockfile(
         f"uv {command.format(script=script)}" for command in ran
     ]
     assert programs["bun"].commands == [f"bun {bun_command}"]
+
+
+@mark.parametrize(
+    "ignored",
+    [
+        param([], id="empty-list"),
+        param([PICOMATCH], id="one-unfixed"),
+        param([PICOMATCH, MICROMATCH], id="two-unfixed")
+    ]
+)
+def test_the_scan_sets_aside_each_advisory_no_release_fixes(
+    copy        : Path,
+    ignored     : list[str],
+    monkeypatch : MonkeyPatch,
+    snapshot    : SnapshotAssertion,
+    stand_in    : Callable[[str, str], StandIn]
+):
+    """
+    Asserts that `lock:scan` reads each `AUDIT_IGNORE` id through `gh api`
+    and, while `gh` lists no `first_patched_version` for it, passes it to
+    `bun audit` as an `--ignore`, running the plain audit over an empty
+    list.
+    """
+    monkeypatch.setenv("AUDIT_IGNORE", " ".join(ignored))
+    programs = {program: stand_in(program, "exit 0") for program in ("bun", "gh")}
+
+    assert executed(copy, "scan").returncode == 0
+    assert "\n".join(programs["gh"].commands) == snapshot
+    assert programs["bun"].commands == [
+        "bun audit --cwd docs" + "".join(
+            f" --ignore={advisory}" for advisory in ignored
+        )
+    ]
+
+
+@mark.parametrize(
+    ("gh", "reported"),
+    [
+        param(
+            f'[ "$4" = /advisories/{MICROMATCH} ] && echo "micromatch 4.0.8"\nexit 0',
+            f"{MICROMATCH} is fixed in micromatch 4.0.8, so delete its"
+            " AUDIT_IGNORE entry in .mise/config.toml and lift to the patched release",
+            id = "fixed"
+        ),
+        param(
+            f'[ "$4" = /advisories/{MICROMATCH} ] && printf "a 1.0\\nb 2.0\\n"\nexit 0',
+            f"{MICROMATCH} is fixed in a 1.0, b 2.0, so delete its"
+            " AUDIT_IGNORE entry in .mise/config.toml and lift to the patched release",
+            id = "fixed-in-two-packages"
+        ),
+        param(
+            'echo "HTTP 404: Not Found" >&2\nexit 1',
+            "HTTP 404: Not Found",
+            id = "unreadable"
+        )
+    ]
+)
+def test_the_scan_fails_before_auditing_on_an_entry_it_cannot_set_aside(
+    copy        : Path,
+    gh          : str,
+    monkeypatch : MonkeyPatch,
+    reported    : str,
+    stand_in    : Callable[[str, str], StandIn]
+):
+    """
+    Asserts that an `AUDIT_IGNORE` id for which `gh` lists a patched release
+    fails `lock:scan`, which names the entry to delete and the release to
+    lift to, and that a `gh api` read failing fails it too, each before the
+    task audits `docs/bun.lock`.
+    """
+    monkeypatch.setenv("AUDIT_IGNORE", f"{PICOMATCH} {MICROMATCH}")
+    stand_in("gh", gh)
+    bun = stand_in("bun", "exit 0")
+
+    result = executed(copy, "scan")
+
+    assert (result.returncode, result.stderr.strip(), bun.commands) == (
+        1, reported,
+        []
+    )
