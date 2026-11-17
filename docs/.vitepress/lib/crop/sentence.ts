@@ -70,7 +70,7 @@ export function menusOf(kept: Kept): readonly Menu[] {
     {
       label   : 'Where along the ground',
       choices : [
-        { apply: along(0, 1), line: null, name: 'the whole domain' },
+        { apply: along(0, 1), line: null, name: 'the whole sample' },
         { apply: along(0, 0.5), line: `x_m = [0.0, ${half}]`, name: 'the western half' },
         { apply: along(0.5, 1), line: `x_m = [${half}, ${whole}]`, name: 'the eastern half' }
       ]

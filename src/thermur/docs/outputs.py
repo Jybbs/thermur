@@ -204,7 +204,7 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         writes them.
         """
         crop   = Crop().model_dump(include={"floor_m", "levels", "spacing_m"})
-        sample = Sample().model_dump(include={"length_m", "times_s"})
+        sample = Sample()
         threat = {
             "base_k"               : BASE_K,
             "gravity_m_s2"         : GRAVITY_M_S2,
@@ -230,7 +230,10 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 default = float,
                 indent  = 2
             ) + "\n",
-            self.crop      : dumps(crop | sample, indent=2) + "\n",
+            self.crop      : dumps(
+                crop | {"length_m": sample.length_m, "times_s": sample.times_s},
+                indent = 2
+            ) + "\n",
             self.identity  : Identity.shipped().model_dump_json(indent=2) + "\n",
             self.parity    : dumps(paired(composite, settings.plan), indent=2) + "\n",
             self.threat    : dumps(threat, indent=2) + "\n",

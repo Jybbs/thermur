@@ -13,7 +13,7 @@ export type CropModel = typeof source
 export const MOST_M = 1000
 
 /**
- * What the menus keep, each part gliding: the share of the domain's length from
+ * What the menus keep, each part gliding: the share of the sample's length from
  * its western end to `west` and to `east`, the height `top` reaches in meters,
  * and the `first` snapshot, with `reach` the height the record's defaults
  * reach.
