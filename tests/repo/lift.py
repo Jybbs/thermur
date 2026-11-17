@@ -504,14 +504,22 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     Asserts that `Site` reports the row `bun outdated --filter=*` prints for
     each package of the workspace, so a pin the kit declares lifts in the
     kit's manifest, and a pin two manifests declare at one release makes one
-    row lifting both, while a row at a release no manifest declares, such as
-    the `(peer)` row a range prints, makes none.
+    row lifting both, the `(peer)` row Bun prints at the installed release
+    included, while a row at a release no manifest declares, as a range
+    resolves to, makes none.
     """
     kit = loads(checkout.read(KIT))
     vue = override(checkout, {})["devDependencies"]["vue"]
     zag = kit["dependencies"]["@zag-js/vue"]
     (checkout.root / KIT).write_text(
-        dumps({**kit, "devDependencies": {"vue": vue}}, indent=4),
+        dumps(
+            {
+                **kit,
+                "dependencies"    : {**kit["dependencies"], "@zag-js/select": "^1.0.0"},
+                "devDependencies" : {"vue": vue}
+            },
+            indent = 4
+        ),
         encoding = "utf-8"
     )
     answer(
@@ -520,11 +528,11 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
             '"outdated --filter=*"' : printed(
                 value = "| Package | Current | Update | Latest | Workspace |\n"
                 "|---------|---------|--------|--------|-----------|\n"
+                f"| @zag-js/select | {zag} | 9.9.9 | 9.9.9 | @thermur/kit |\n"
                 f"| @zag-js/vue | {zag} | {zag} | 9.9.9 | @thermur/kit |\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 | @thermur/kit |\n"
-                f"| vue (peer) | {kit['peerDependencies']['vue'].lstrip('^')} "
-                "| 9.9.9 | 9.9.9 | @thermur/kit |"
+                f"| vue (peer) | {vue} | 9.9.9 | 9.9.9 | @thermur/kit |"
             ),
             '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
             '"audit --json"'        : printed({}),
@@ -540,7 +548,11 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     ]
     assert loads(checkout.read(KIT)) == {
         **kit,
-        "dependencies"    : {**kit["dependencies"], "@zag-js/vue": "9.9.9"},
+        "dependencies"    : {
+            **kit["dependencies"],
+            "@zag-js/select" : "^1.0.0",
+            "@zag-js/vue"    : "9.9.9"
+        },
         "devDependencies" : {"vue": "9.9.9"}
     }
     assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
