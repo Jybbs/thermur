@@ -578,6 +578,12 @@ class Site(Manager):
     to, against the release its `latest` tag names.
     """
 
+    closing: ClassVar[str] = '(?=")'
+    """
+    The pattern the text behind a pinned release matches, the quote closing
+    the manifest's string.
+    """
+
     release: ClassVar[str] = r"\d+\.\d+\.\d+(?:[-+][\w.+-]+)?"
     """
     The pattern an exact release matches, three dotted integers and an
@@ -615,6 +621,7 @@ class Site(Manager):
             [
                 Lag.declared(
                     places,
+                    behind    = self.closing,
                     current   = current,
                     newest    = newest,
                     pin       = name,
@@ -696,7 +703,10 @@ class Site(Manager):
         return {
             manifest: ahead
             for manifest in self.checkout.package.manifests
-            if search(rf'{ahead}{escape(current)}"', self.checkout.read(manifest))
+            if search(
+                f"{ahead}{escape(current)}{self.closing}",
+                self.checkout.read(manifest)
+            )
         }
 
 

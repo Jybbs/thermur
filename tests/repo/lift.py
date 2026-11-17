@@ -506,7 +506,8 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     kit's manifest, and a pin two manifests declare at one release makes one
     row lifting both, the `(peer)` row Bun prints at the installed release
     included, while a row at a release no manifest declares, as a range
-    resolves to, makes none.
+    resolves to, makes none, and a peer range opening on the pinned release
+    stays as it stood.
     """
     kit = loads(checkout.read(KIT))
     vue = override(checkout, {})["devDependencies"]["vue"]
@@ -515,8 +516,12 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
         dumps(
             {
                 **kit,
-                "dependencies"    : {**kit["dependencies"], "@zag-js/select": "^1.0.0"},
-                "devDependencies" : {"vue": vue}
+                "dependencies"     : {
+                    **kit["dependencies"],
+                    "@zag-js/select": "^1.0.0"
+                },
+                "devDependencies"  : {"vue": vue},
+                "peerDependencies" : {"vue": f"{vue} || ^4.0.0"}
             },
             indent = 4
         ),
@@ -548,12 +553,13 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     ]
     assert loads(checkout.read(KIT)) == {
         **kit,
-        "dependencies"    : {
+        "dependencies"     : {
             **kit["dependencies"],
             "@zag-js/select" : "^1.0.0",
             "@zag-js/vue"    : "9.9.9"
         },
-        "devDependencies" : {"vue": "9.9.9"}
+        "devDependencies"  : {"vue": "9.9.9"},
+        "peerDependencies" : {"vue": f"{vue} || ^4.0.0"}
     }
     assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
 
@@ -565,12 +571,12 @@ def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
     """
     Asserts that `Site` reports a package two manifests of the workspace pin
     at different releases as one row for each release, each lifting only the
-    manifest declaring it.
+    manifest declaring it, a release opening on the other's included.
     """
     kit = loads(checkout.read(KIT))
     vue = override(checkout, {})["devDependencies"]["vue"]
     (checkout.root / KIT).write_text(
-        dumps({**kit, "devDependencies": {"vue": "3.5.0"}}, indent=4),
+        dumps({**kit, "devDependencies": {"vue": f"{vue}0"}}, indent=4),
         encoding = "utf-8"
     )
     answer(
@@ -580,7 +586,7 @@ def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
                 value = "| Package | Current | Update | Latest | Workspace |\n"
                 "|---------|---------|--------|--------|-----------|\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
-                "| vue (dev) | 3.5.0 | 3.5.0 | 9.9.9 | @thermur/kit |"
+                f"| vue (dev) | {vue}0 | {vue}0 | 9.9.9 | @thermur/kit |"
             ),
             '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
             '"audit --json"'        : printed({}),
@@ -592,7 +598,7 @@ def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
 
     assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
         ("vue", vue, [PACKAGE]),
-        ("vue", "3.5.0", [KIT])
+        ("vue", f"{vue}0", [KIT])
     ]
     assert loads(checkout.read(KIT))["devDependencies"] == {"vue": "9.9.9"}
     assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
