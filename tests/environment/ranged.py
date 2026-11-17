@@ -35,18 +35,25 @@ from thermur.environment.schemas import Grid, ParametricThreat
 pytestmark = [mark.enable_socket, mark.allow_hosts(["127.0.0.1"])]
 
 
-class Lagging(list[tuple[int, int]]):
+class Lagging[T](list[T]):
     """
-    The ranges a server records, pausing for 0.3 s before each record, as a
+    The entries a server records, pausing for 0.3 s before each record, as a
     loaded runner holds back the thread serving a request.
     """
 
-    def extend(self, ranges: Iterable[tuple[int, int]]):
+    def append(self, entry: T):
         """
-        Records `ranges` after the pause.
+        Records `entry` after the pause.
         """
         sleep(0.3)
-        super().extend(ranges)
+        super().append(entry)
+
+    def extend(self, entries: Iterable[T]):
+        """
+        Records `entries` after the pause.
+        """
+        sleep(0.3)
+        super().extend(entries)
 
 
 @fixture
@@ -304,13 +311,15 @@ def test_a_part_holding_several_ranges_is_read_for_each(
 
 def test_a_range_is_recorded_before_its_answer_is_read(remote: Remote, served: Served):
     """
-    Asserts that `Served.sent` holds a range once the client has read its
-    answer, even where the server pauses before recording it.
+    Asserts that `Served.requests` and `Served.sent` hold a range once the
+    client has read its answer, even where the server pauses before each
+    record.
     """
-    served.sent = Lagging()
+    served.requests = Lagging()
+    served.sent     = Lagging()
 
     assert remote.fetch([(0, 4)]) == b"CDF\x02"
-    assert served.sent == [(0, 4)]
+    assert (served.requests, served.sent) == (["bytes=0-3"], [(0, 4)])
 
 
 def test_a_server_ignoring_the_range_is_refused(remote: Remote, served: Served):
@@ -345,15 +354,16 @@ def test_an_address_is_read_where_its_redirect_leads(threat: Path):
 
 
 @mark.parametrize(
-    "fault",
+    ("fault", "pieces"),
     [
-        param("dropped", id="part-left-out"),
-        param("merged", id="parts-merged"),
-        param("whole", id="whole-file")
+        param("dropped", [(0, 4), (8, 4)], id="part-left-out"),
+        param("merged", [(0, 4), (8, 4)], id="parts-merged"),
+        param("whole", [(0, 4)], id="whole-file")
     ]
 )
 def test_an_answer_with_a_fault_is_left_unrecorded(
     fault  : str,
+    pieces : list[tuple[int, int]],
     remote : Remote,
     served : Served
 ):
@@ -367,7 +377,7 @@ def test_an_answer_with_a_fault_is_left_unrecorded(
     served.faults[:] = [fault]
 
     with suppress(ValueError):
-        remote.fetch([(0, 4), (8, 4)])
+        remote.fetch(pieces)
 
     assert (served.requests, served.sent) == ([], [])
 
