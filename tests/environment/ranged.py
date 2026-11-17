@@ -12,17 +12,20 @@ over HTTP, served here from the loopback address by `Served`:
   kept open between requests
 - The retry of a failed request, and the refusal of a server that ignores
   the range or leaves a range out of its multipart answer
+- The record `Served` keeps of each range, written before the client can
+  read the range
 """
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from common.served   import Served
-from contextlib      import closing
+from contextlib      import closing, suppress
 from http.client     import HTTPException
 from io              import BytesIO
 from math            import prod
 from numpy           import arange, full, int16
 from pathlib         import Path
 from pytest          import FixtureRequest, fixture, mark, param, raises
+from time            import sleep
 from xarray          import Dataset, open_dataset
 from xarray.testing  import assert_identical
 
@@ -30,6 +33,20 @@ from thermur.environment.ranged  import Header, RangedBackend, Remote
 from thermur.environment.schemas import Grid, ParametricThreat
 
 pytestmark = [mark.enable_socket, mark.allow_hosts(["127.0.0.1"])]
+
+
+class Lagging(list[tuple[int, int]]):
+    """
+    The ranges a server records, pausing for 0.3 s before each record, as a
+    loaded runner holds back the thread serving a request.
+    """
+
+    def extend(self, ranges: Iterable[tuple[int, int]]):
+        """
+        Records `ranges` after the pause.
+        """
+        sleep(0.3)
+        super().extend(ranges)
 
 
 @fixture
@@ -285,6 +302,17 @@ def test_a_part_holding_several_ranges_is_read_for_each(
     assert remote.fetch([(0, 4), (8, 4)]) == data[:4] + data[8:12]
 
 
+def test_a_range_is_recorded_before_its_answer_is_read(remote: Remote, served: Served):
+    """
+    Asserts that `Served.sent` holds a range once the client has read its
+    answer, even where the server pauses before recording it.
+    """
+    served.sent = Lagging()
+
+    assert remote.fetch([(0, 4)]) == b"CDF\x02"
+    assert served.sent == [(0, 4)]
+
+
 def test_a_server_ignoring_the_range_is_refused(remote: Remote, served: Served):
     """
     Asserts that a server answering a range request with the whole file and
@@ -314,6 +342,34 @@ def test_an_address_is_read_where_its_redirect_leads(threat: Path):
     """
     with Served(path=threat).serving() as address:
         assert Remote.from_url(address).url == address.replace("/moved/", "/files/")
+
+
+@mark.parametrize(
+    "fault",
+    [
+        param("dropped", id="part-left-out"),
+        param("merged", id="parts-merged"),
+        param("whole", id="whole-file")
+    ]
+)
+def test_an_answer_with_a_fault_is_left_unrecorded(
+    fault  : str,
+    remote : Remote,
+    served : Served
+):
+    """
+    Asserts that an answer the server sends with a fault adds neither its
+    `Range` header nor its ranges to the record, whether the client reads
+    the answer or refuses it.
+    """
+    served.requests.clear()
+    served.sent.clear()
+    served.faults[:] = [fault]
+
+    with suppress(ValueError):
+        remote.fetch([(0, 4), (8, 4)])
+
+    assert (served.requests, served.sent) == ([], [])
 
 
 @mark.parametrize(
