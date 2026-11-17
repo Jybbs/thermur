@@ -187,7 +187,7 @@ The chart below reads the polarization each coupling rule held at each launch sp
 
 <!-- polarization -->
 
-The constant rule holds the polarization at 0.980 at the densest launch and 0.973 at the middle, falling to 0.947 at the sparsest, below the 0.96 of starling flocks. The anisotropic rule holds 0.9993, 0.997, and 0.987 and the distance-weighted rule 0.999, 0.996, and 0.981, whereas the metric rule, dropping every neighbor past 25 m, falls from 0.994 to 0.935 as the flock thins. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
+The constant rule holds the polarization at 0.980 at the densest launch and 0.973 at the middle, falling to 0.948 at the sparsest, below the 0.96 of starling flocks. The anisotropic rule holds 0.9993, 0.997, and 0.987 and the distance-weighted rule 0.999, 0.996, and 0.981, whereas the metric rule, dropping every neighbor past 25 m, falls from 0.994 to 0.935 as the flock thins. Between two measured spacings the chart draws the straight line between them, which no flight measured, and three spacings over four seeds leave each rule's curve coarse.
 
 ## Noise
 
@@ -250,7 +250,7 @@ The figures below are the means across seeds that `thermur fly cohesion_trial co
 | Cohesion | Elastic springs | *3.00 groups at 30 and 3.50 at 100, border density 0.59, peak 2.92* |
 | Cohesion | Fitted attraction | *2.50 groups at 30 and 3.75 at 100, border density 0.35, peak 2.44* |
 | Cohesion | Coupling off | *16.50 groups at 30, polarization 0.82 to 0.83* |
-| Coupling | Constant, the default | *Polarization 0.980 at the densest launch, 0.973 at the middle, and 0.947 at the sparsest* |
+| Coupling | Constant, the default | *Polarization 0.980 at the densest launch, 0.973 at the middle, and 0.948 at the sparsest* |
 | Coupling | Anisotropic | *Polarization 0.9993, 0.997, and 0.987* |
 | Coupling | Metric | *Polarization 0.994, 0.976, and 0.935* |
 | Coupling | Weighted by distance | *Polarization 0.999, 0.996, and 0.981* |

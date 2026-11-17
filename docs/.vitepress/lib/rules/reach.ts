@@ -5,7 +5,7 @@ import * as dial     from './dial.ts'
 import type { Rule } from './measured.ts'
 
 /**
- * The heading chart: a quarter dial with a ring per rule, each sweeping
+ * The heading chart: a dial with a ring per rule, each sweeping
  * through the angle the farthest fifth of the flock turns while the first
  * drone turns through the angle `go` picks, each ring a moment after the one
  * outside it, with its standard error drawn as a band along its edge. Each

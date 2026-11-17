@@ -257,3 +257,32 @@ describe('the rings past the first drone’s turn', () => {
     expect(bar).toBe(whole)
   })
 })
+
+describe('take A of the heading chart', () => {
+  it('draws the lighter band, the frame, and a disc under each stop past the first drone’s turn', () => {
+    const chart = charted(Past, 672)
+    const svg   = chart.host.querySelector('svg')!
+    const own   = (name: string): Element[] => [...svg.children].filter(node => node.localName === name)
+    const past  = [...chart.host.querySelectorAll('g.rules-fade')].findLast(group => group.querySelector('path'))!
+    const [, , , pastArc, pastBand] = [...past.querySelectorAll('path')]
+    expect(pastBand!.getAttribute('d')).toMatch(/^M/u)
+    expect(Number((pastArc as SVGElement).style.opacity)).toBe(0.4)
+    expect(Number(own('path')[0]!.getAttribute('d')!.split(' ').at(-1)!.split(',')[0])).toBeLessThan(centerOf(chart))
+    expect(own('line')).toHaveLength(6)
+    expect(own('circle')).toHaveLength(2)
+  })
+
+  it.for([[1024, 56], [672, 40]] as const)('sets the readings in a column as wide as the dial at %i px', ([width, gutter]) => {
+    const chart  = charted(RulesReach, width)
+    const tracks = [...chart.host.querySelectorAll('rect')].filter(rect => rect.style.opacity === '0.15')
+    expect(tracks).toHaveLength(5)
+    for (const track of tracks) expect(Number(track.getAttribute('width'))).toBe(Number(track.getAttribute('x')) - gutter)
+  })
+
+  it('fills half the chart with the dial where its radius stays under the cap', () => {
+    const chart  = charted(RulesReach, 672)
+    const tracks = [...chart.host.querySelectorAll('rect')].filter(rect => rect.style.opacity === '0.15')
+    expect(tracks).toHaveLength(5)
+    for (const track of tracks) expect(Number(track.getAttribute('x')) + Number(track.getAttribute('width'))).toBeGreaterThan(672 - 4)
+  })
+})

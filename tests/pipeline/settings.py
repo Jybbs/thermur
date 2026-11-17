@@ -122,10 +122,10 @@ def test_a_speed_slot_cruising_at_the_plan_s_speed_holds(installed: Checkout):
 def test_a_speed_slot_cruising_off_the_plan_s_speed_fails(installed: Checkout):
     """
     Asserts that a speed slot whose cruise speed differs from the speed the
-    plan launches and a fixed flight holds the flock at fails validation.
+    plan launches at fails validation in a flight whose speed is left free.
     """
     with raises(ValidationError, match="cruises at 12 m/s, where the plan launches"):
-        Tuned(speed={"cruise_m_s": 12.0, "fixed": True})
+        Tuned(speed={"cruise_m_s": 12.0})
 
 
 def test_a_speed_slot_too_stiff_for_the_step_fails(installed: Checkout):
