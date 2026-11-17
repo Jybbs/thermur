@@ -6,9 +6,10 @@ that every `lock` task checks, audits, or writes, and what the real mise
 answers for the committed lockfile online and for one missing a platform
 entry offline, where `lock:check` fails on a `mise lock` exiting nonzero
 or counting a skipped platform and on a lockfile in which a tool holds no
-entry for a platform another tool carries. It also pins the `AUDIT_IGNORE`
-ids `lock:scan` sets aside through `bun audit --ignore`, against a stand-in
-`gh`.
+entry for a platform another tool carries. It also pins which `AUDIT_IGNORE`
+ids `lock:scan` passes to `bun audit --ignore`, and how it fails before the
+audit on an id a release fixes, naming the entry and the patched version, or
+on an id `gh` cannot read, each against a stand-in `gh`.
 """
 
 from collections.abc  import Callable
@@ -52,10 +53,11 @@ def copy(
     """
     Copies the `lock` tasks, the library they source, `.mise/config.toml`,
     and `.mise/mise.lock` into `tmp_path`, keeping each file's mode,
-    names the copy as the root a task sources its library from, clears the
-    `AUDIT_IGNORE` list `mise test` sets from `.mise/config.toml`, and puts
-    a stand-in `uv` that reports `uv.lock` current and a stand-in `bun` that
-    reports `docs/bun.lock` current ahead on the path.
+    names the copy as the root a task sources its library from, clears
+    the `AUDIT_IGNORE` list `mise test` sets from `.mise/config.toml`, and
+    puts a stand-in `uv` that reports `uv.lock` current, a stand-in `bun`
+    that reports `docs/bun.lock` current, and a stand-in `gh` that lists no
+    patched release ahead on the path.
 
     Returns:
         The copy's root.
@@ -69,6 +71,7 @@ def copy(
     monkeypatch.delenv("AUDIT_IGNORE", raising=False)
     monkeypatch.setenv("MISE_PROJECT_ROOT", str(tmp_path))
     stand_in("bun", "exit 0")
+    stand_in("gh", "exit 0")
     stand_in("uv", "exit 0")
     return tmp_path
 
