@@ -5,9 +5,9 @@ then prints, writes, and tries:
 
 - The pins `Tools`, `Locked`, `Scripts`, `Builds`, `Site`, `Actions`,
   `Images`, and `Wrangler` report lagging, those `Site` reports including
-  each exact release `overrides` gives a package, each beside its newest
-  release's date and the advisories the lift clears, and the edits each
-  writes into the copy
+  each pin of every package of the site's workspace and each exact release
+  `overrides` gives a package, each beside its newest release's date and
+  the advisories the lift clears, and the edits each writes into the copy
 - The releases `Site` reads as exact, and the ranges it leaves alone
 - The table the lift prints, the holds naming no row, and the pins it
   lifts short of its holds
@@ -49,6 +49,7 @@ from thermur.repo.schemas  import Config, Lag, Manifest
 ADVISED = {"satori": [{"url": "https://github.com/advisories/GHSA-s"}]}
 BRIEF   = ".mise/tasks/gha/brief.py"
 CONFIG  = Path(".mise/config.toml")
+KIT     = Path("docs/kit/package.json")
 NOW     = datetime(2026, 10, 16, tzinfo=UTC)
 PACKAGE = Path("docs/package.json")
 PAGES   = Path(".github/workflows/pages.yml")
@@ -495,79 +496,94 @@ def test_scripts_reads_each_exact_pin_a_task_script_declares(
     )) is bool(latest and listed)
 
 
-def test_site_reads_each_release_overrides_holds_a_package_to(
+def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
     """
-    Asserts that `Site` reports each package `overrides` holds to a release
-    behind the one its `latest` tag names, after the rows `bun outdated`
-    prints and beside the date `bun info` gives that release, and that
-    writing its edit lifts the override. A prerelease of the newest release
-    lags it, while an override at or ahead of its newest release makes
-    no row, a release ahead of a newest prerelease included. `bun info`
-    never runs for a caret, an x-range, a bare major, a union opening on a
-    release, or a release Semantic Versioning rejects, and a package `bun
-    outdated` already lists makes one row, whose edit lifts its override
-    as well.
+    Asserts that `Site` reports the row `bun outdated --filter=*` prints for
+    each package of the workspace, so a pin the kit declares lifts in the
+    kit's manifest, and a pin two manifests declare at one release makes one
+    row lifting both, while a row at a release no manifest declares, such as
+    the `(peer)` row a range prints, makes none.
     """
-    vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
-    manifest = override(
-        checkout = checkout,
-        pins     = {
-            "chokidar"   : "2.0.0",
-            "esbuild"    : "1.0.0-01",
-            "fflate"     : "0.7.5",
-            "glob"       : "^14.0.0",
-            "knip"       : "6.x",
-            "minimatch"  : "11.0.8",
-            "picomatch"  : "4",
-            "semver"     : "7.5.2 || 7.6.0",
-            "tinyglobby" : "1.0.0-rc.1",
-            "vitepress"  : "2.0.0-alpha.20",
-            "vue"        : vue
-        }
+    kit = loads(checkout.read(KIT))
+    vue = override(checkout, {})["devDependencies"]["vue"]
+    zag = kit["dependencies"]["@zag-js/vue"]
+    (checkout.root / KIT).write_text(
+        dumps({**kit, "devDependencies": {"vue": vue}}, indent=4),
+        encoding = "utf-8"
     )
     answer(
         "bun",
         answers = {
-            "outdated"                 : printed(
-                value = "| Package | Current | Update | Latest |\n"
-                "|---------|---------|--------|--------|\n"
-                f"| vue (dev) | {vue} | {vue} | 9.9.9 |"
+            '"outdated --filter=*"' : printed(
+                value = "| Package | Current | Update | Latest | Workspace |\n"
+                "|---------|---------|--------|--------|-----------|\n"
+                f"| @zag-js/vue | {zag} | {zag} | 9.9.9 | @thermur/kit |\n"
+                f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
+                f"| vue (dev) | {vue} | {vue} | 9.9.9 | @thermur/kit |\n"
+                f"| vue (peer) | {kit['peerDependencies']['vue'].lstrip('^')} "
+                "| 9.9.9 | 9.9.9 | @thermur/kit |"
             ),
-            '"info chokidar version"'  : printed("2.0.0-beta.1"),
-            '"info fflate version"'    : printed("0.8.3"),
-            '"info minimatch version"' : printed("11.0.8"),
-            '"info tinyglobby version"' : printed("1.0.0"),
-            '"info vitepress version"'  : printed("1.6.4"),
-            '"info "*" time --json"'    : printed(
-                value = {
-                    "0.8.3" : "2026-05-16T00:14:03Z",
-                    "1.0.0" : "2026-03-02T00:00:00Z",
-                    "9.9.9" : "2026-10-13T00:00:00Z"
-                }
-            ),
-            '"audit --json"'            : printed({}),
+            '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"'        : printed({}),
             "*": "exit 1"
         }
     )
 
     lags = written(Site(checkout=checkout).lags, checkout.root)
 
-    assert [(lag.pin, lag.current, lag.newest, lag.published) for lag in lags] == [
-        ("vue", vue, "9.9.9", datetime(2026, 10, 13, tzinfo=UTC)),
-        ("fflate", "0.7.5", "0.8.3", datetime(2026, 5, 16, 0, 14, 3, tzinfo=UTC)),
-        ("tinyglobby", "1.0.0-rc.1", "1.0.0", datetime(2026, 3, 2, tzinfo=UTC))
+    assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
+        ("@zag-js/vue", zag, [KIT]),
+        ("vue", vue, [PACKAGE, KIT])
     ]
-    lifted = loads(checkout.read(PACKAGE))
-    assert lifted["overrides"] == {
-        **manifest["overrides"],
-        "fflate"     : "0.8.3",
-        "tinyglobby" : "1.0.0",
-        "vue"        : "9.9.9"
+    assert loads(checkout.read(KIT)) == {
+        **kit,
+        "dependencies"    : {**kit["dependencies"], "@zag-js/vue": "9.9.9"},
+        "devDependencies" : {"vue": "9.9.9"}
     }
-    assert lifted["devDependencies"]["vue"] == "9.9.9"
+    assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
+
+
+def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Site` reports a package two manifests of the workspace pin
+    at different releases as one row for each release, each lifting only the
+    manifest declaring it.
+    """
+    kit = loads(checkout.read(KIT))
+    vue = override(checkout, {})["devDependencies"]["vue"]
+    (checkout.root / KIT).write_text(
+        dumps({**kit, "devDependencies": {"vue": "3.5.0"}}, indent=4),
+        encoding = "utf-8"
+    )
+    answer(
+        "bun",
+        answers = {
+            '"outdated --filter=*"' : printed(
+                value = "| Package | Current | Update | Latest | Workspace |\n"
+                "|---------|---------|--------|--------|-----------|\n"
+                f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
+                "| vue (dev) | 3.5.0 | 3.5.0 | 9.9.9 | @thermur/kit |"
+            ),
+            '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"'        : printed({}),
+            "*": "exit 1"
+        }
+    )
+
+    lags = written(Site(checkout=checkout).lags, checkout.root)
+
+    assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
+        ("vue", vue, [PACKAGE]),
+        ("vue", "3.5.0", [KIT])
+    ]
+    assert loads(checkout.read(KIT))["devDependencies"] == {"vue": "9.9.9"}
+    assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
 
 
 @mark.parametrize(
@@ -628,9 +644,9 @@ def test_site_reads_each_package_bun_outdated_lists(
     bun    = answer(
         "bun",
         answers = {
-            "outdated"       : printed(table),
-            '"info "*'       : printed(times),
-            '"audit --json"' : f'case "$PWD" in */thermur-*) {lifted} && '
+            '"outdated --filter=*"' : printed(table),
+            '"info "*'              : printed(times),
+            '"audit --json"'        : f'case "$PWD" in */thermur-*) {lifted} && '
             f"{printed(after)} || {printed(audited)} ;; *) {printed(audited)} ;; esac",
             '"install --lockfile-only"': "test -f kit/package.json"
         }
@@ -647,6 +663,81 @@ def test_site_reads_each_package_bun_outdated_lists(
         ("vue", "9.9.9", datetime(2026, 10, 13, tzinfo=UTC), ())
     ]
     assert ("bun install --lockfile-only" in bun.commands) is bool(audited)
+
+
+def test_site_reads_each_release_overrides_holds_a_package_to(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Site` reports each package `overrides` holds to a release
+    behind the one its `latest` tag names, after the rows `bun outdated`
+    prints and beside the date `bun info` gives that release, and that
+    writing its edit lifts the override. A prerelease of the newest release
+    lags it, while an override at or ahead of its newest release makes
+    no row, a release ahead of a newest prerelease included. `bun info`
+    never runs for a caret, an x-range, a bare major, a union opening on a
+    release, or a release Semantic Versioning rejects, and a package `bun
+    outdated` already lists makes one row, whose edit lifts its override
+    as well.
+    """
+    vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
+    manifest = override(
+        checkout = checkout,
+        pins     = {
+            "chokidar"   : "2.0.0",
+            "esbuild"    : "1.0.0-01",
+            "fflate"     : "0.7.5",
+            "glob"       : "^14.0.0",
+            "knip"       : "6.x",
+            "minimatch"  : "11.0.8",
+            "picomatch"  : "4",
+            "semver"     : "7.5.2 || 7.6.0",
+            "tinyglobby" : "1.0.0-rc.1",
+            "vitepress"  : "2.0.0-alpha.20",
+            "vue"        : vue
+        }
+    )
+    answer(
+        "bun",
+        answers = {
+            '"outdated --filter=*"'     : printed(
+                value = "| Package | Current | Update | Latest |\n"
+                "|---------|---------|--------|--------|\n"
+                f"| vue (dev) | {vue} | {vue} | 9.9.9 |"
+            ),
+            '"info chokidar version"'   : printed("2.0.0-beta.1"),
+            '"info fflate version"'     : printed("0.8.3"),
+            '"info minimatch version"'  : printed("11.0.8"),
+            '"info tinyglobby version"' : printed("1.0.0"),
+            '"info vitepress version"'  : printed("1.6.4"),
+            '"info "*" time --json"'    : printed(
+                value = {
+                    "0.8.3" : "2026-05-16T00:14:03Z",
+                    "1.0.0" : "2026-03-02T00:00:00Z",
+                    "9.9.9" : "2026-10-13T00:00:00Z"
+                }
+            ),
+            '"audit --json"'            : printed({}),
+            "*": "exit 1"
+        }
+    )
+
+    lags = written(Site(checkout=checkout).lags, checkout.root)
+
+    assert [(lag.pin, lag.current, lag.newest, lag.published) for lag in lags] == [
+        ("vue", vue, "9.9.9", datetime(2026, 10, 13, tzinfo=UTC)),
+        ("fflate", "0.7.5", "0.8.3", datetime(2026, 5, 16, 0, 14, 3, tzinfo=UTC)),
+        ("tinyglobby", "1.0.0-rc.1", "1.0.0", datetime(2026, 3, 2, tzinfo=UTC))
+    ]
+    lifted = loads(checkout.read(PACKAGE))
+    assert lifted["overrides"] == {
+        **manifest["overrides"],
+        "fflate"     : "0.8.3",
+        "tinyglobby" : "1.0.0",
+        "vue"        : "9.9.9"
+    }
+    assert lifted["devDependencies"]["vue"] == "9.9.9"
 
 
 def test_the_lift_gathers_each_managers_lags_in_the_order_they_are_declared(

@@ -12,7 +12,7 @@ from datetime        import datetime
 from json            import dumps, loads
 from pathlib         import Path
 from pydantic        import BaseModel, Field
-from re              import escape, findall, fullmatch
+from re              import escape, findall, fullmatch, search
 from semver          import Version
 from subprocess      import CalledProcessError
 from tempfile        import TemporaryDirectory
@@ -573,9 +573,9 @@ class Scripts(Manager):
 
 class Site(Manager):
     """
-    Bun, reporting each package `docs/package.json` pins that `bun outdated`
-    lists, and each exact release `overrides` holds a package to, against
-    the release its `latest` tag names.
+    Bun, reporting each exact pin in a manifest of the site's workspace that
+    `bun outdated` lists, and each exact release `overrides` holds a package
+    to, against the release its `latest` tag names.
     """
 
     release: ClassVar[str] = r"\d+\.\d+\.\d+(?:[-+][\w.+-]+)?"
@@ -587,24 +587,26 @@ class Site(Manager):
     @property
     def lags(self) -> list[Lag]:
         """
-        Lists each package `bun outdated` prints a row for, then each
-        package it lists no row for that `overrides` holds to an exact
-        release behind its newest, beside the advisories the lift clears
-        on it.
+        Lists each package `bun outdated --filter=*` prints a row for at
+        a release some manifest of the workspace declares, leaving out a
+        range, then each package it lists no row for that `overrides` holds
+        to an exact release behind its newest, beside the advisories the
+        lift clears on it.
         """
         package = self.checkout.package
         listed  = {
-            name: (current, newest)
+            (name, current): newest
             for name, current, newest in findall(
                 rf"(?m)^\| (\S+)(?: \(\w+\))? +\| ({self.release}) +"
-                r"\| \S+ +\| (\S+) +\|$",
-                self.read("bun", "outdated", folder=package.folder)
+                r"\| \S+ +\| (\S+) +\|(?: [^|\n]+\|)?$",
+                self.read("bun", "outdated", "--filter=*", folder=package.folder)
             )
         }
-        pins = listed | {
-            name: (current, newest)
+        names = {name for name, _ in listed}
+        pins  = listed | {
+            (name, current): newest
             for name, current in package.overrides.items()
-            if name not in listed
+            if name not in names
             and fullmatch(self.release, current)
             and Version.is_valid(current)
             and Version.parse(newest := self.latest(name)) > current
@@ -612,13 +614,14 @@ class Site(Manager):
         return self.cleared(
             [
                 Lag.declared(
-                    {package.file: rf'"{escape(name)}"\s*:\s*"'},
+                    places,
                     current   = current,
                     newest    = newest,
                     pin       = name,
                     published = self.published(name, newest)
                 )
-                for name, (current, newest) in pins.items()
+                for (name, current), newest in pins.items()
+                if (places := self.declaring(current, name))
             ]
         )
 
@@ -682,6 +685,19 @@ class Site(Manager):
             )
             for lag in lags
         ]
+
+    def declaring(self, current: str, name: str) -> dict[Path, str]:
+        """
+        Maps each manifest of the site's workspace naming the release
+        `current` for the package `name` to the pattern the text ahead of
+        that release matches there.
+        """
+        ahead = rf'"{escape(name)}"\s*:\s*"'
+        return {
+            manifest: ahead
+            for manifest in self.checkout.package.manifests
+            if search(rf'{ahead}{escape(current)}"', self.checkout.read(manifest))
+        }
 
 
 class Tools(Manager):
