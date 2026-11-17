@@ -8,8 +8,11 @@ import type { Rule } from './measured.ts'
  * The heading chart: a quarter dial with a ring per rule, each sweeping
  * through the angle the farthest fifth of the flock turns while the first
  * drone turns through the angle `go` picks, each ring a moment after the one
- * outside it, with its standard error drawn as a band along its edge, the
- * ring, the band, and the bar each stopping at the first drone's turn. A stop
+ * outside it, with its standard error drawn as a band along its edge. Each
+ * ring and band is drawn in full up to the first drone's turn and lighter past
+ * it, out to the angle the farthest drones turned through, on a frame running
+ * past the vertical as far as the widest ring reaches, while the bar stops at
+ * the first drone's turn and the share is printed in full. A stop
  * per turn is drawn on the dial's rim, its dot showing while its turn is
  * picked, and `placed` is called with where each stop stands at each width,
  * so the radios that pick a turn can stand over them. Each rule's angle, its
@@ -60,11 +63,11 @@ export class Reach {
 
   /**
    * Lays the chart out at `width` and draws it whole, the frame, a ring and a
-   * reading per rule, and a stop on the rim per turn, then tells `placed`
-   * where the stops stand.
+   * reading per rule, and a stop on the rim per turn over a disc in the
+   * ground color, then tells `placed` where the stops stand.
    */
   #draw(width: number): void {
-    const layout = dial.layoutOf(this.#rules.length, this.#tuning, width)
+    const layout = dial.layoutOf(this.#rules, this.#tuning, width)
     const plot   = markup.svg('svg', {
       'aria-label' : 'The angle the farthest drones turn through, against the turn the first drone makes, '
                    + 'for each heading rule',
@@ -84,7 +87,7 @@ export class Reach {
         each.addEventListener('pointerleave', () => this.#lift(-1))
       }
     })
-    plot.append(this.#marker, ...this.#knobs)
+    plot.append(...this.#turns.map(turn => dial.drawHalo(layout, turn)), this.#marker, ...this.#knobs)
     this.#host.replaceChildren(plot)
     this.#choose(this.#index)
     this.#place()
@@ -128,8 +131,9 @@ export class Reach {
   }
 
   /**
-   * Sets each ring, band, and reading to the values the sweep stands at, and
-   * the marker to the first drone's turn.
+   * Sets each ring, band, and reading to the values the sweep stands at, the
+   * full ring and band up to the first drone's turn and the lighter ones past
+   * it, and the marker to the first drone's turn.
    */
   #place(): void {
     const layout = this.#layout
@@ -143,9 +147,13 @@ export class Reach {
       const error  = this.#rules[row]!.points[this.#index]!.error
       const radius = layout.radii[row]!
       const edge   = radius + layout.ring / 2 + 3
+      const low    = Math.max(0, shown - spread)
+      const high   = shown + spread
       markup.set(ring.arc, { d: dial.arc(layout, radius, 0, Math.min(shown, turned)) })
-      markup.set(ring.band, {
-        d: dial.arc(layout, edge, Math.min(Math.max(0, shown - spread), turned), Math.min(shown + spread, turned))
+      markup.set(ring.band, { d: dial.arc(layout, edge, Math.min(low, turned), Math.min(high, turned)) })
+      markup.set(ring.pastArc, { d: shown > turned ? dial.arc(layout, radius, turned, shown) : '' })
+      markup.set(ring.pastBand, {
+        d: high > turned ? dial.arc(layout, edge, Math.max(low, turned), high) : ''
       })
       markup.set(ring.bar, { width: Math.max(0, ring.width * Math.min(1, share)) })
       markup.set(ring.whisker, {

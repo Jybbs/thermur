@@ -1,10 +1,44 @@
 // @vitest-environment happy-dom
+import { idle }                                from '@thermur/kit'
 import { enableAutoUnmount }                   from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h }                  from 'vue'
 
+import { useStage }              from '../../../lib/canvas/mount.ts'
+import type { Rule }             from '../../../lib/rules/measured.ts'
+import { Reach }                 from '../../../lib/rules/reach.ts'
 import RulesReach                from '../../../theme/rules/reach.ts'
 import { RELEASED }              from '../../common/browser.ts'
 import { type Charted, charted } from '../../common/rules.ts'
+
+/**
+ * Two rules on the 20° and 90° turns, the second's farthest drones turning
+ * past the first drone on both, out to 44° and 144° with their errors.
+ */
+const PAST: readonly Rule[] = [
+  {
+    color  : '#bb7733',
+    label  : 'Within',
+    points : [{ error: 0.1, given: 20, mean: 0.5 }, { error: 0.1, given: 90, mean: 0.5 }],
+    short  : 'Within'
+  },
+  {
+    color  : '#5069ad',
+    label  : 'Past',
+    points : [{ error: 0.2, given: 20, mean: 2 }, { error: 0.1, given: 90, mean: 1.5 }],
+    short  : 'Past'
+  }
+]
+/**
+ * The heading chart drawn for `PAST`.
+ */
+const Past = defineComponent({
+  name: 'RulesReachPast',
+  setup() {
+    const host = useStage(box => new Reach(box, idle, PAST))
+    return () => h('figure', [h('div', { ref: host })])
+  }
+})
 
 /**
  * Reads the words of every line of text in the chart.
@@ -29,11 +63,58 @@ const dots = ({ host }: Charted): (string | undefined)[] =>
   [...host.querySelectorAll<SVGElement>('.rules-knob')].map(knob => knob.dataset.on)
 
 /**
- * Measures how far the end of `node`'s words falls from its `x`, at the
+ * Measures how far the end of `node`'s words falls from its start, at the
  * advance of 0.6 of its size that every glyph of the site's monospace face
  * takes.
  */
 const across = (node: Element): number => node.textContent.length * 0.6 * Number(node.getAttribute('font-size'))
+
+/**
+ * Finds where `node`'s words start, from its `x` and its anchor.
+ */
+const startOf = (node: Element): number =>
+  Number(node.getAttribute('x')) - (node.getAttribute('text-anchor') === 'end' ? across(node) : 0)
+
+/**
+ * Measures the room between the end of `angle` and the start of the nearest
+ * words after it on its line.
+ */
+const roomAfter = (angle: Element, texts: readonly Element[]): number => Math.min(...texts
+  .filter(text => text.getAttribute('y') === angle.getAttribute('y') && startOf(text) > startOf(angle))
+  .map(text => startOf(text))) - startOf(angle) - across(angle)
+
+/**
+ * Reads the widths of the track and the bar drawn in `color`.
+ */
+const barsOf = ({ host }: Charted, color: string): number[] => [...host.querySelectorAll('rect')]
+  .filter(rect => rect.getAttribute('fill') === color && rect.getAttribute('rx') === '2')
+  .map(rect => Number(rect.getAttribute('width')))
+
+/**
+ * Reads the path of the full ring and of the lighter ring past the first
+ * drone's turn, for each rule.
+ */
+const arcs = ({ host }: Charted): [string, string][] =>
+  [...host.querySelectorAll('g.rules-fade')]
+    .filter(group => group.querySelector('path'))
+    .map(group => {
+      const paths = [...group.querySelectorAll('path')].map(path => path.getAttribute('d') ?? '')
+      return [paths[1]!, paths[3]!]
+    })
+
+/**
+ * Finds the x of the dial's center, where the marker of the first drone's
+ * turn starts.
+ */
+const centerOf = ({ host }: Charted): number =>
+  Number([...host.querySelectorAll('path')].map(path => path.getAttribute('d')!).find(d => d.includes(' L'))!.slice(1).split(',')[0])
+
+/**
+ * Reads the x of every point the chart's paths pass through.
+ */
+const xsOf = ({ host }: Charted): number[] =>
+  [...[...host.querySelectorAll('path')].map(path => path.getAttribute('d') ?? '').join(' ').matchAll(/(-?[\d.]+),-?[\d.]+/gu)]
+    .map(([, x]) => Number(x))
 
 enableAutoUnmount(afterEach)
 
@@ -43,7 +124,7 @@ afterEach(() => {
 
 describe('the heading chart', () => {
   it('reads each rule’s reach at the smallest turn, named in full beside a wide dial', () => {
-    const chart = charted(RulesReach, 672)
+    const chart = charted(RulesReach, 1024)
     expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(readings(chart)).toEqual([
       '12.8°', 'of 20° · 64% ± 10',
@@ -56,15 +137,18 @@ describe('the heading chart', () => {
     expect(dots(chart)).toEqual(['true', 'false'])
   })
 
-  it.for([672, 390])('leaves a clear gap between each angle and its share at %i px', width => {
+  it.for([1024, 672, 390])('leaves a clear gap between each angle and the next words on its line at %i px', width => {
     const chart  = charted(RulesReach, width)
-    const angles = [...chart.host.querySelectorAll('text')].filter(text => /^\d+\.\d°$/u.test(text.textContent))
+    const texts  = [...chart.host.querySelectorAll('text')]
+    const angles = texts.filter(text => /^\d+\.\d°$/u.test(text.textContent))
     expect(angles).toHaveLength(5)
-    for (const angle of angles) {
-      const share = angle.nextElementSibling!
-      const gap   = Number(share.getAttribute('x')) - Number(angle.getAttribute('x')) - across(angle)
-      expect(gap).toBeGreaterThanOrEqual(0.6 * Number(share.getAttribute('font-size')))
-    }
+    for (const angle of angles) expect(roomAfter(angle, texts)).toBeGreaterThanOrEqual(7)
+  })
+
+  it('sets the shorter names beside each angle between the narrow and the wide widths', () => {
+    const chart = charted(RulesReach, 672)
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
+    expect(words(chart)).not.toContain('Consensus, the default')
   })
 
   it('sets the shorter names under the dial on a narrow column', () => {
@@ -124,13 +208,11 @@ describe('the rings', () => {
     expect(new Set(opacity())).toEqual(new Set(['1']))
   })
 
-  it.for([0, 1])('stops each ring at the first drone’s turn on stop %i, inside the dial’s quarter', stop => {
+  it.for([0, 1])('draws every measured ring inside the dial’s quarter on stop %i, none turning past the first drone', stop => {
     const chart = charted(RulesReach, 672)
     knobs(chart)[stop]!.dispatchEvent(new Event('click'))
-    const paths  = [...chart.host.querySelectorAll('path')].map(path => path.getAttribute('d')!)
-    const center = Number(paths.find(d => d.includes(' L'))!.slice(1).split(',')[0])
-    const xs     = [...paths.join(' ').matchAll(/(-?[\d.]+),-?[\d.]+/gu)].map(([, x]) => Number(x))
-    expect(Math.min(...xs)).toBeGreaterThanOrEqual(center - 1e-6)
+    expect(Math.min(...xsOf(chart))).toBeGreaterThanOrEqual(centerOf(chart) - 1e-6)
+    expect(arcs(chart).map(([, past]) => past)).toEqual(['', '', '', '', ''])
   })
 
   it.for([0, 1])('holds each bar’s whisker inside the chart on stop %i', stop => {
@@ -161,5 +243,17 @@ describe('the rings', () => {
     chart.stand.frames.run(2)
     chart.widget.unmount()
     expect(chart.stand.held()).toEqual(RELEASED)
+  })
+})
+
+describe('the rings past the first drone’s turn', () => {
+  it('draws a lighter ring past the first drone’s turn, on a frame running past the vertical', () => {
+    const chart          = charted(Past, 672)
+    const [within, past] = arcs(chart)
+    expect(within).toEqual([expect.stringMatching(/^M/u), ''])
+    expect(past![1]).toMatch(/^M/u)
+    expect(Math.min(...xsOf(chart))).toBeLessThan(centerOf(chart))
+    const [whole, bar] = barsOf(chart, '#5069ad')
+    expect(bar).toBe(whole)
   })
 })
