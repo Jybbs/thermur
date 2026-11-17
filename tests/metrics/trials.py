@@ -11,7 +11,7 @@ from numpy         import array
 from pytest        import mark, param
 from xarray        import Dataset, concat
 
-from thermur.controller.components import Constant, Elastic, Weighted
+from thermur.controller.components import Constant, Cruise, Elastic, InertialSpin, Weighted
 from thermur.controller.schemas    import Composite
 from thermur.metrics.trials        import Measure, REFERENCE, Trial, summarized
 from thermur.pipeline.settings     import Settings
@@ -170,6 +170,26 @@ def test_a_trial_flies_the_reference_then_each_candidate_then_each_control():
     assert composites["other"].coupling == Weighted()
     assert composites["uncoupled"].coupling == Constant(coupling_per_s=0.0)
     assert composites["other"].cohesion == composite.cohesion
+
+
+def test_a_trial_scales_each_candidate_and_control_as_the_reference_is_scaled():
+    """
+    Asserts that a trial flies each candidate and each control scaled from
+    a starling flock by the plan's similarity, as `Composite.from_settings`
+    scales the reference.
+    """
+    settings   = Settings()
+    similarity = settings.plan.similarity
+    composites = Trial(
+        candidates = {"inertial": InertialSpin()},
+        conditions = {"dense": {}},
+        controls   = {"fixed": {"speed": Cruise(fixed=True)}},
+        measures   = (),
+        slot       = "heading"
+    ).composites(Composite.from_settings(settings), similarity)
+
+    assert composites["inertial"].heading == InertialSpin().scaled(similarity)
+    assert composites["fixed"].speed == Cruise(fixed=True).scaled(similarity)
 
 
 def test_each_listed_trial_opens_a_slot_of_the_composite_once():

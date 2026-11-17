@@ -109,6 +109,25 @@ def test_a_speed_slot_inside_the_step_s_bound_or_a_fixed_speed_holds(
     assert Tuned(speed=speed).speed.relaxation_s == speed["relaxation_s"]
 
 
+def test_a_speed_slot_cruising_at_the_plan_s_speed_holds(installed: Checkout):
+    """
+    Asserts that a speed slot and a plan set to one cruise speed together
+    pass validation.
+    """
+    tuned = Tuned(plan={"cruise_m_s": 12.0}, speed={"cruise_m_s": 12.0})
+
+    assert tuned.speed.cruise_m_s == tuned.plan.cruise_m_s == 12.0
+
+
+def test_a_speed_slot_cruising_off_the_plan_s_speed_fails(installed: Checkout):
+    """
+    Asserts that a speed slot whose cruise speed differs from the speed the
+    plan launches and a fixed flight holds the flock at fails validation.
+    """
+    with raises(ValidationError, match="cruises at 12 m/s, where the plan launches"):
+        Tuned(speed={"cruise_m_s": 12.0, "fixed": True})
+
+
 def test_a_speed_slot_too_stiff_for_the_step_fails(installed: Checkout):
     """
     Asserts that a speed slot whose stiffness at some speed of the range the

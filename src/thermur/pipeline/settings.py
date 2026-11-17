@@ -151,6 +151,24 @@ class Settings(
 
         return self
 
+    @model_validator(mode="after")
+    def cruising(self) -> Self:
+        """
+        Holds the speed slot's cruise speed to `plan.cruise_m_s`, the speed
+        the plan launches the flock at and a fixed flight holds each drone
+        at.
+
+        Raises:
+            ValueError: Where the two cruise speeds differ.
+        """
+        if self.speed.cruise_m_s != self.plan.cruise_m_s:
+            raise ValueError(
+                f"The speed slot cruises at {self.speed.cruise_m_s:g} m/s, where "
+                f"the plan launches the flock at {self.plan.cruise_m_s:g} m/s"
+            )
+
+        return self
+
     @classmethod
     def settings_customise_sources(
         cls,

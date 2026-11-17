@@ -183,4 +183,9 @@ describe('Composite', () => {
       expect(() => new Composite(4, other)).toThrow(`The ${slot} slot holds Other`)
     }
   )
+
+  it('refuses a model whose speed slot holds the speed fixed', () => {
+    const fixed = { ...model, speed: { ...model.speed, fixed: true } }
+    expect(() => new Composite(4, fixed)).toThrow('The speed slot holds the speed fixed')
+  })
 })

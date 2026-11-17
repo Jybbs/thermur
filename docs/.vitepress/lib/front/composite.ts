@@ -67,6 +67,7 @@ export class Composite {
       const held = model[slot as keyof typeof KINDS].kind
       if (held !== kind) throw new Error(`The ${slot} slot holds ${held}, where the copy flies ${kind}`)
     }
+    if (model.speed.fixed) throw new Error('The speed slot holds the speed fixed, where the copy flies it free')
     const { neighbors } = model.plan
     this.count          = count
     this.model          = model
