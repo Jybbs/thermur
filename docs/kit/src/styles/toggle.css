@@ -1,0 +1,16 @@
+.kit-toggle {
+  align-items     : center;
+  border          : 1px solid var(--vp-c-divider);
+  border-radius   : 50%;
+  color           : var(--vp-c-text-2);
+  display         : inline-flex;
+  justify-content : center;
+  transition      : border-color var(--th-settle) var(--th-settle-curve);
+}
+
+.kit-toggle:hover { border-color: var(--vp-c-text-3); }
+
+.kit-toggle:focus-visible {
+  outline        : 2px solid var(--th-lead);
+  outline-offset : 2px;
+}

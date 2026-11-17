@@ -161,8 +161,9 @@ def test_a_trial_flies_the_reference_then_each_candidate_then_each_control():
     Asserts that a trial lays out the reference first, each candidate in the
     slot next, and each control with its slots changed last.
     """
-    composite  = Composite.from_settings(Settings())
-    composites = trial().composites(composite)
+    settings   = Settings()
+    composite  = Composite.from_settings(settings)
+    composites = trial().composites(composite, settings.plan.similarity)
 
     assert list(composites) == [REFERENCE, "other", "uncoupled"]
     assert composites[REFERENCE] is composite

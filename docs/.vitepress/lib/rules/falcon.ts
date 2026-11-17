@@ -62,7 +62,7 @@ export const MODES = ['predator', 'select'] as const
  * The place in the palette's chart series of the color the drawing gives the
  * fixed range: its ring, the birds inside it, and its count in the trace.
  */
-const RANGED = 1
+export const RANGED = 1
 /**
  * The opacity of a bird neither among the marked bird's seven nor inside the
  * range, drawn in the ink at the gradient's foot so it reads over either sky.
@@ -70,15 +70,14 @@ const RANGED = 1
 const REST = 0.5
 /**
  * The front page's own flock, flown larger in the same sky under the same
- * roost and plume, its birds each reading their seven nearest. One bird is
- * marked with a hairline to its seven and a dashed ring at a fixed range, and
- * two strips along the foot count the birds inside the ring over the last
- * seconds against the seven by rank, which holds as the flock gathers and
- * splits. The pointer is the falcon in predator mode and marks the bird it
- * presses in select mode, where the flock flies on undisturbed.
+ * roost and plume, each bird reading up to the seven it heard nearest. One
+ * bird is marked with a hairline to each sender it ranks and a dashed ring at
+ * a fixed range, and two strips along the foot count those senders over the
+ * last seconds against the birds inside the ring. The pointer is the falcon in
+ * predator mode and marks the bird it presses in select mode, where the flock
+ * flies on undisturbed.
  */
 export class Falcon implements Part {
-  readonly #best    = new Float32Array(common.NEIGHBORS)
   #clock            = 0
   readonly #falcon  = new PointerHeat()
   readonly #fire    = new Plume(RISE)
@@ -87,8 +86,9 @@ export class Falcon implements Part {
   #flock            : flock.Flock | null = null
   #floor            = 0
   readonly #marks   : Marks
-  readonly #nbr     = new Int16Array(common.NEIGHBORS)
-  readonly #read    : (seventh: number, scheme: Scheme) => void
+  readonly #nbr     = new Int32Array(common.NEIGHBORS)
+  #ranked           = 0
+  readonly #read    : (farthest: number, scheme: Scheme) => void
   readonly #shared  : Shared
   #stamp            = -Infinity
   readonly #strips  : paint.Strips
@@ -99,7 +99,7 @@ export class Falcon implements Part {
   constructor(
     identity : Identity,
     marks    : Marks,
-    read     : (seventh: number, scheme: Scheme) => void,
+    read     : (farthest: number, scheme: Scheme) => void,
     shared   : Shared,
     tones    : Tones,
     tuning   : Tuning
@@ -123,26 +123,27 @@ export class Falcon implements Part {
   }
 
   /**
-   * Reads the distance to the marked bird's seventh, in bird lengths.
+   * Reads the distance to the last sender the marked bird ranks, in bird
+   * lengths, or 0 where it ranked none.
    */
-  get #seventh(): number {
-    return Math.sqrt(this.#best[common.NEIGHBORS - 1]!) / this.#length
+  get #farthest(): number {
+    const last = this.#nbr[this.#ranked - 1]
+    return last === undefined ? 0 : this.#flock!.apart(last, this.#shared.chosen) / this.#length
   }
 
   /**
-   * Counts the birds inside the fixed range of the marked one and finds its
-   * seven nearest.
+   * Counts the birds inside the fixed range of the marked one, by the distance
+   * between the drones, and reads the senders its last step ranked.
    */
   #count(): void {
-    const { x, y }          = this.#flock!
+    const birds             = this.#flock!
     const { chosen, range } = this.#shared
     const reach             = range * this.#length
-    common.nearest(this.#best, chosen, this.#nbr, x, y)
-    let within = 0
-    for (let index = 0; index < x.length; index++) {
-      if (index !== chosen && Math.hypot(x[index]! - x[chosen]!, y[index]! - y[chosen]!) <= reach) within++
+    this.#ranked            = birds.heard(chosen, this.#nbr)
+    this.#within            = 0
+    for (let index = 0; index < birds.x.length; index++) {
+      if (index !== chosen && birds.apart(index, chosen) <= reach) this.#within++
     }
-    this.#within = within
   }
 
   /**
@@ -160,10 +161,10 @@ export class Falcon implements Part {
   }
 
   /**
-   * Draws the flock: the marked bird's hairlines out to its seven as far as
-   * they have grown, every other bird in the range's color inside the range,
-   * in the seven's among its seven, and faint in the ink elsewhere, and the
-   * marked bird over them.
+   * Draws the flock: the marked bird's hairlines out to the senders it ranks
+   * as far as they have grown, every other bird in the range's color inside
+   * the range, in the seven's among those senders, and faint in the ink
+   * elsewhere, and the marked bird over them.
    */
   #paintFlock(ctx: CanvasRenderingContext2D, g: Geometry, dpr: number, ranged: string): void {
     const birds                    = this.#flock!
@@ -176,7 +177,7 @@ export class Falcon implements Part {
     ctx.strokeStyle                = this.#tones.flock(g.scheme, ALONG.seven, 0.7)
     ctx.lineWidth                  = 1.2
     ctx.beginPath()
-    for (let rank = 0; rank < common.NEIGHBORS; rank++) {
+    for (let rank = 0; rank < this.#ranked; rank++) {
       const index = this.#nbr[rank]!
       ctx.moveTo(ox, oy)
       ctx.lineTo(ox + (x[index]! * zoom - ox) * grown, oy + (y[index]! * zoom - oy) * grown)
@@ -185,7 +186,7 @@ export class Falcon implements Part {
     for (let index = 0; index < x.length; index++) {
       if (index === chosen) continue
       const seven  = this.#nbr.includes(index)
-      const inside = Math.hypot(x[index]! - x[chosen]!, y[index]! - y[chosen]!) <= reach
+      const inside = birds.apart(index, chosen) <= reach
       const color  = inside ? ranged : this.#tones.flock(g.scheme, seven ? ALONG.seven : 0, seven ? 1 : REST)
       paint.bird(ctx, birds, color, dpr, index, this.#marks, seven ? 1.15 : 1, zoom)
     }
@@ -234,14 +235,13 @@ export class Falcon implements Part {
     this.#flock         = new flock.Flock({
       ...flock.FLIGHT,
       count,
-      glyphs : this.#marks.count,
-      roost  : flock.roost
+      glyphs : this.#marks.count
     })
     this.#flock.region(box)
     this.#flock.settle(this.#tuning.settle, this.#field)
     this.#shared.chosen = this.#middle()
     this.#count()
-    this.#strips.fill(this.#within)
+    this.#strips.fill(this.#within, this.#ranked)
   }
 
   paint(ctx: CanvasRenderingContext2D, g: Geometry, dpr: number): void {
@@ -267,7 +267,7 @@ export class Falcon implements Part {
     const now = performance.now()
     if (now - this.#stamp < this.#tuning.read && !g.still) return
     this.#stamp = now
-    this.#read(this.#seventh, g.scheme)
+    this.#read(this.#farthest, g.scheme)
   }
 
   press(g: Geometry): void {
@@ -278,8 +278,8 @@ export class Falcon implements Part {
 
   /**
    * Sways the plume, puts the falcon at the pointer while predator mode is on
-   * and the pointer is over the sky, moves the flock on, and samples the count
-   * inside the range.
+   * and the pointer is over the sky, moves the flock on, and samples the
+   * senders ranked and the count inside the range.
    */
   step(dt: number, g: Geometry): void {
     const { pointer }    = g
@@ -293,7 +293,7 @@ export class Falcon implements Part {
     while (this.#clock >= 1 / rate) {
       this.#clock -= 1 / rate
       this.#count()
-      this.#strips.sample(this.#within)
+      this.#strips.sample(this.#within, this.#ranked)
     }
   }
 }

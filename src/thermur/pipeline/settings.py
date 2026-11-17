@@ -13,13 +13,16 @@ from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
 from typing import Self
 
 from thermur.controller.components import (
+    Centered,
+    Consensus,
     Constant,
-    InertialSpin,
-    Marginal,
-    Morse,
-    SoftCore,
-    White
+    Cruise,
+    HardSphere,
+    Home,
+    Zig
 )
+from thermur.controller.schemas  import Radio
+from thermur.environment.plant   import Plant
 from thermur.environment.schemas import Crop, ParametricThreat
 from thermur.metrics.schemas     import Plan
 from thermur.repo.checkout       import Checkout
@@ -45,14 +48,14 @@ class Settings(
     another node has already read.
     """
 
-    cohesion: Morse = Morse()
+    cohesion: Centered = Centered()
     """
     The acceleration holding a drone at a spacing from its neighbors.
     """
 
-    contact: SoftCore = SoftCore()
+    contact: HardSphere = HardSphere()
     """
-    The acceleration pushing apart two drones that overlap.
+    The acceleration pushing a drone away from each of its neighbors.
     """
 
     coupling: Constant = Constant()
@@ -66,20 +69,36 @@ class Settings(
     to, and the fixed heights its fields are regridded onto.
     """
 
-    heading: InertialSpin = InertialSpin()
+    heading: Consensus = Consensus()
     """
     The acceleration turning a drone toward its neighbors.
     """
 
-    noise: White = White()
+    noise: Zig = Zig()
     """
-    The random increments driving each drone's velocity and force.
+    The random increments on each drone's command and the zig each drone
+    starts at the rim or takes up from its neighbors.
     """
 
     plan: Plan = Plan()
     """
     The flock's size, its launch, the flight's length and step, and the seeds
     it flies.
+    """
+
+    plant: Plant = Plant()
+    """
+    The lag and the bounds carrying a drone's velocity toward its command.
+    """
+
+    radio: Radio = Radio()
+    """
+    The link carrying each drone's state to the others.
+    """
+
+    roost: Home = Home()
+    """
+    The acceleration holding a drone over the roost.
     """
 
     simulation: Path | None = None
@@ -89,9 +108,9 @@ class Settings(
     or `None` to read the dataset `threat` builds.
     """
 
-    speed: Marginal = Marginal()
+    speed: Cruise = Cruise()
     """
-    The acceleration along a drone's velocity.
+    The acceleration relaxing a drone's speed toward the cruise speed.
     """
 
     threat: ParametricThreat = ParametricThreat()
@@ -102,12 +121,13 @@ class Settings(
     @model_validator(mode="after")
     def confined(self) -> Self:
         """
-        Holds one step of the integrator within the stability bound of the
-        speed slot's confinement at every speed in `plan.airspeeds_m_s`, the
-        step times the potential's curvature staying at or below two.
+        Holds one step of the integrator within the stability bound of
+        the speed slot, as `plan.similarity` scales it, at every speed in
+        `plan.airspeeds_m_s`, the step times the slot's stiffness staying at
+        or below two.
 
         Raises:
-            ValueError: Where `plan.step_s` times the curvature at a speed
+            ValueError: Where `plan.step_s` times the stiffness at a speed
                         in the range exceeds two, past which one step widens
                         the gap between two nearly equal speeds there rather
                         than narrowing it.
@@ -116,16 +136,16 @@ class Settings(
             return self
 
         plan      = self.plan
-        curvature = abs(
-            vmap(self.speed.stiffness, in_axes=(None, 0))(
+        stiffness = abs(
+            vmap(self.speed.scaled(plan.similarity).stiffness, in_axes=(None, 0))(
                 plan.cruise_m_s,
                 linspace(*plan.airspeeds_m_s, 64)
             )
         ).max()
-        if plan.step_s * curvature > 2:
+        if plan.step_s * stiffness > 2:
             raise ValueError(
-                f"A step of {plan.step_s:g} s times the confinement's curvature "
-                f"of {curvature:.3g} per second exceeds two within "
+                f"A step of {plan.step_s:g} s times the speed slot's stiffness "
+                f"of {stiffness:.3g} per second exceeds two within "
                 f"{plan.airspeeds_m_s[0]:g} to {plan.airspeeds_m_s[1]:g} m/s"
             )
 

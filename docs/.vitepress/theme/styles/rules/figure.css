@@ -17,22 +17,22 @@
 
 .rules-fade { transition: opacity var(--th-settle) var(--th-settle-curve); }
 
-.rules-knob {
-  cursor  : pointer;
-  outline : none;
-}
+.rules-over { position: relative; }
 
-.rules-knob:focus-visible circle:first-child,
-circle.rules-knob:focus-visible {
-  stroke       : var(--th-lead);
-  stroke-width : 3px;
-}
-
-.rules-knob[aria-checked='false'] .rules-knob-dot { opacity: 0; }
+.rules-knob[data-on='false'] .rules-knob-dot { opacity: 0; }
 
 .rules-knob-dot { transition: opacity var(--th-settle) var(--th-settle-curve); }
 
 .rules-track {
   cursor       : ew-resize;
   touch-action : none;
+}
+
+.rules-play {
+  background : transparent;
+  border     : 0;
+  height     : 1.75rem;
+  position   : absolute;
+  translate  : -50% -50%;
+  width      : 1.75rem;
 }

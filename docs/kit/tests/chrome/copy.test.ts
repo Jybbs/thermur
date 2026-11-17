@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { mount }                                           from '@vue/test-utils'
+import { mount }                     from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { defineComponent, h, watch }                       from 'vue'
+import { defineComponent, h, watch } from 'vue'
 
-import * as copy from '../../../lib/specimen/copy.ts'
+import * as copy from '../../src/chrome/copy.ts'
 
 /**
  * A component holding a copier, a button that copies `text` through it, and

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
+import { Slider }                          from '@thermur/kit'
 import { type VueWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it }                          from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import ThreatFront                         from '../../theme/threat.ts'
 import { type Browser, RELEASED, browser } from '../common/browser.ts'
@@ -27,7 +28,49 @@ function mounted(reduced = false): Mounted {
 /**
  * Reads the chips beneath the drawing, each its name and its value.
  */
-const chips = (widget: VueWrapper): string[] => widget.findAll('.threat-chip').map(chip => chip.text())
+const chips = (widget: VueWrapper): string[] => widget.findAll('.kit-chip').map(chip => chip.text())
+
+/**
+ * Moves the rail to `seconds` as a drag along it does.
+ */
+async function drag(widget: VueWrapper, seconds: number): Promise<void> {
+  widget.getComponent(Slider).vm.$emit('change', seconds)
+  await widget.vm.$nextTick()
+}
+
+/**
+ * Presses `key` on the rail's thumb, once the thumb holds the focus, and
+ * returns the event pressed.
+ */
+async function press(widget: VueWrapper, key: string): Promise<KeyboardEvent> {
+  await widget.vm.$nextTick()
+  const thumb   = widget.get('[role=slider]').element as HTMLElement
+  const pressed = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key })
+  thumb.focus()
+  thumb.dispatchEvent(pressed)
+  await widget.vm.$nextTick()
+  return pressed
+}
+
+/**
+ * The rail as a case reaches it, through its component.
+ */
+type Rail = Pick<VueWrapper, 'trigger' | 'vm'>
+
+/**
+ * The ways a press on the rail ends: the release that commits where it stands,
+ * and a cancel the browser sends.
+ */
+const RELEASES = [
+  {
+    end     : 'commit',
+    release : (rail: Rail): Promise<void> => {
+      rail.vm.$emit('commit', 30)
+      return rail.vm.$nextTick()
+    }
+  },
+  { end: 'pointercancel', release: (rail: Rail): Promise<void> => rail.trigger('pointercancel') }
+]
 
 enableAutoUnmount(afterEach)
 
@@ -40,11 +83,10 @@ describe('the drawing of the front', () => {
     const { widget } = mounted(true)
     expect(widget.get('[role=img]').attributes('aria-label')).toContain('a front of hot air')
     expect(widget.find('canvas').exists()).toBe(true)
-    expect(widget.get('input').attributes()).toMatchObject({
-      'aria-label' : 'Time since the first snapshot',
-      'max'        : '120',
-      'min'        : '0',
-      'type'       : 'range'
+    expect(widget.get('[role=slider]').attributes()).toMatchObject({
+      'aria-label'    : 'Time since the first snapshot',
+      'aria-valuemax' : '120',
+      'aria-valuemin' : '0'
     })
   })
 
@@ -80,9 +122,9 @@ describe('the drawing of the front', () => {
 describe('the rail', () => {
   it('moves a drawing standing still at once, the reader’s time read back in the chips', async () => {
     const { widget } = mounted(true)
-    await widget.get('input').setValue(90)
+    await drag(widget, 90)
     expect(chips(widget)[0]).toBe('Time90 s')
-    expect(widget.get('input').attributes('aria-valuetext')).toBe('90 seconds, the front 90 meters east')
+    expect(widget.get('[role=slider]').attributes('aria-valuetext')).toBe('90 seconds, the front 90 meters east')
   })
 
   it.for([
@@ -94,29 +136,26 @@ describe('the rail', () => {
     { key: 'End', time: 'Time120 s' }
   ])('takes $key to $time, moving nothing else on the page', async ({ key, time }) => {
     const { widget } = mounted(true)
-    const pressed    = new KeyboardEvent('keydown', { cancelable: true, key })
-    widget.get('input').element.dispatchEvent(pressed)
-    await widget.vm.$nextTick()
+    const pressed    = await press(widget, key)
     expect(chips(widget)[0]).toBe(time)
     expect(pressed.defaultPrevented).toBe(true)
   })
 
-  it('leaves every other key to the browser', () => {
+  it('leaves every other key to the browser', async () => {
     const { widget } = mounted(true)
-    const pressed    = new KeyboardEvent('keydown', { cancelable: true, key: 'Tab' })
-    widget.get('input').element.dispatchEvent(pressed)
+    const pressed    = await press(widget, 'Tab')
     expect(pressed.defaultPrevented).toBe(false)
     expect(chips(widget)[0]).toBe('Time60 s')
   })
 
-  it.for(['pointerup', 'pointercancel'])('holds the run under a press and lets go on %s', async end => {
+  it.for(RELEASES)('holds the run under a press and lets go on its $end', async ({ release }) => {
     const { stand, widget } = mounted()
-    const rail              = widget.get('input')
+    const rail              = widget.getComponent(Slider)
     await rail.trigger('pointerdown')
-    await rail.setValue(30)
+    await drag(widget, 30)
     stand.frames.run(400, 50)
     expect(chips(widget)[0]).toBe('Time30 s')
-    await rail.trigger(end)
+    await release(rail)
     stand.frames.run(70, 50)
     expect(chips(widget)[0]).toBe('Time30 s')
     stand.frames.run(20, 50)
@@ -128,16 +167,16 @@ describe('the rail over a drawing already drawn', () => {
   it('repaints a drawing standing still on a move once its face has loaded', async () => {
     const { widget } = mounted(true)
     await flushPromises()
-    await widget.get('input').setValue(90)
+    await drag(widget, 90)
     expect(chips(widget)[0]).toBe('Time90 s')
   })
 
   it('holds the run after a press that moved nothing', async () => {
     const { stand, widget } = mounted()
     stand.frames.run(10, 50)
-    const rail = widget.get('input')
+    const rail = widget.getComponent(Slider)
     await rail.trigger('pointerdown')
-    await rail.trigger('pointerup')
+    rail.vm.$emit('commit', Math.round(Number(rail.props('value'))))
     const held = chips(widget)[0]
     stand.frames.run(70, 50)
     expect(chips(widget)[0]).toBe(held)

@@ -1,10 +1,4 @@
-import { type Ref, type VNode, h } from 'vue'
-
-/**
- * Lays out the words a screen reader hears once a copy lands, out of sight.
- */
-export const heard = (said: Ref<string>): VNode =>
-  h('span', { 'aria-live': 'polite', 'class': 'visually-hidden' }, said.value)
+import { type VNode, h } from 'vue'
 
 /**
  * Lays out a key: a swatch painted `swatch`, `label` in capitals, and the hex

@@ -1,18 +1,29 @@
 """
 Holds `Outputs`, the files the `docs:render` task writes into the site
 and every Markdown page git tracks, which `repo:audit` holds the committed
-copies to, beside `tabled`, which lays a record's fields out as the table
-a page's region holds, and `specimens`, which lays out the identity as the
-regions of The Visual Identity.
+copies to, beside `tabled`, which lays a record's fields out as the table a
+page's region holds, `specimens`, which lays out the identity as the regions
+of The Visual Identity, and `pieces`, which lays out the kit's pieces as the
+region of The Kit.
 """
 
-from collections.abc import Collection, Iterable, Iterator, Mapping
-from functools       import cached_property
+from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
+from dataclasses     import asdict, fields, replace
+from equinox         import tree_at
+from functools       import cached_property, partial
+from jax             import Array, numpy as jnp, tree, vmap
+from jax.random      import fold_in, key as seeded, uniform
 from json            import dumps
+from math            import sqrt
+from numpy           import argsort, around, asarray, cross, geomspace, linalg, ndarray, zeros
+from numpy.random    import default_rng
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.docs.pages          import Page
+from thermur.controller.schemas import Composite, Flock, Inbox, Observation, Radio
+from thermur.docs.kit           import Piece
+from thermur.docs.pages         import Page
+from thermur.environment.air    import Air
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -23,6 +34,7 @@ from thermur.environment.schemas import (
     Sample
 )
 from thermur.identity.schemas  import Identity, Pair, Palette
+from thermur.metrics.flight    import stepped
 from thermur.metrics.schemas   import Plan
 from thermur.metrics.trials    import Trial
 from thermur.pipeline.settings import Settings
@@ -41,6 +53,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     The clone the task writes into, the working directory by default.
     """
 
+    composite: Path = Path("docs/.vitepress/lib/rendered/composite.json")
+    """
+    The file the site's flocks read each default slot's kind and parameters
+    from, beside the fields of the plan their launch and their step read.
+    """
+
     crop: Path = Path("docs/.vitepress/lib/rendered/crop.json")
     """
     The file the Data page's sketch of the part kept reads the crop's defaults
@@ -50,6 +68,14 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     identity: Path = Path("docs/.vitepress/lib/rendered/identity.json")
     """
     The file the site's theme and its preview cards read the identity from.
+    """
+
+    parity: Path = Path("docs/.vitepress/lib/rendered/parity.json")
+    """
+    The file the site's suite reads three small flocks from, each beside its
+    Brownian increments, the uniform draw each drone's zig reads, and the
+    flock one step of the package's composite moves it to, and a run of the
+    package's radio beside the draws each packet's loss reads.
     """
 
     threat: Path = Path("docs/.vitepress/lib/rendered/threat.json")
@@ -105,23 +131,29 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         by the page's path and then by the region's name, meaning the fields
         `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
         Data page, on The Interaction Rules the fields `Plan`, the contact,
-        and the speed declare beside those of each open slot's default and
-        each of its candidates, every one named for its component, and on
-        The Visual Identity the identity as `specimens` lays it out.
+        the plant, the radio, and the roost declare beside those of each
+        open slot's default and each of its candidates, every one named for
+        its component, on The Visual Identity the identity as `specimens`
+        lays it out, and on The Kit the pieces each declaration in the clone
+        records.
         """
         defaults = Settings()
         return {
             Path("docs/pages/reference/identity.md") : specimens(Identity.shipped()),
+            Path("docs/pages/reference/kit.md")      : {
+                "pieces": pieces(Piece.declared(self.checkout.root))
+            },
             Path("docs/pages/data/index.md")         : {
                 "crop"   : tabled(Crop),
                 "ranges" : tabled(Ranges),
                 "sample" : tabled(Sample),
                 "threat" : tabled(ParametricThreat)
             },
-            Path("docs/pages/methods/rules.md")      : {"plan": tabled(Plan)} | {
-                slot: tabled(type(getattr(defaults, slot)))
-                for slot in ("contact", "speed")
-            } | {
+            Path("docs/pages/methods/rules.md")      : {
+                slot.name: tabled(type(getattr(defaults, slot.name)))
+                for slot in fields(Composite)
+                if slot.name not in {trial.slot for trial in Trial.listed()}
+            } | {"plan": tabled(Plan)} | {
                 trial.slot: tabled(
                     kind = create_model(
                         trial.slot,
@@ -178,11 +210,31 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             "gravity_m_s2"         : GRAVITY_M_S2,
             "heat_capacity_j_kg_k" : HEAT_CAPACITY_J_KG_K
         } | ParametricThreat().model_dump()
+        settings  = Settings()
+        composite = Composite.from_settings(settings)
         return {
-            self.crop     : dumps(crop | sample, indent=2) + "\n",
-            self.identity : Identity.shipped().model_dump_json(indent=2) + "\n",
-            self.threat   : dumps(threat, indent=2) + "\n",
-            self.trials   : dumps(
+            self.composite : dumps(
+                {
+                    slot.name: {"kind": type(component).__name__} | asdict(component)
+                    for slot in fields(Composite)
+                    if (component := getattr(composite, slot.name))
+                }
+                | {
+                    "plan": settings.plan.model_dump(
+                        include = {
+                            "axes", "center_m", "course_deg", "cruise_m_s",
+                            "neighbors", "scatter_deg", "spacing_m", "step_s"
+                        }
+                    )
+                },
+                default = float,
+                indent  = 2
+            ) + "\n",
+            self.crop      : dumps(crop | sample, indent=2) + "\n",
+            self.identity  : Identity.shipped().model_dump_json(indent=2) + "\n",
+            self.parity    : dumps(paired(composite, settings.plan), indent=2) + "\n",
+            self.threat    : dumps(threat, indent=2) + "\n",
+            self.trials    : dumps(
                 {trial.slot: trial.conditions for trial in Trial.listed()},
                 indent = 2
             ) + "\n"
@@ -275,6 +327,82 @@ def fielded(
             )
 
 
+def flown(
+    composite : Composite,
+    draws     : ndarray | None,
+    flock     : Flock,
+    plan      : Plan
+) -> dict[str, object]:
+    """
+    Moves `flock` through one step of `composite` in still air under
+    Brownian increments drawn from the plan's seed, every drone having heard
+    every other within the radio's range, each drone's zig reading its draw
+    from `draws`, or from the key the step derives where `draws` is `None`.
+
+    Returns:
+        The radio's delay, the uniform draw each drone's zig reads, the
+        flock the step reads, and its increments, beside the flock the step
+        moves it to, rounded to four decimals.
+    """
+    air = Air(
+        channels = zeros((4, 1, 1, 1, 1), dtype="float32"),
+        names    = ("excess", "u", "v", "w"),
+        origin   = (0.0, 0.0, 0.0, 0.0),
+        spacing  = (1.0, 1.0, 1.0, 1.0)
+    )
+    increments = around(
+        default_rng(plan.seed).normal(size=flock.forces.shape) * sqrt(plan.step_s),
+        4
+    )
+    inbox = Inbox.from_broadcast(flock, composite.radio.range_m, flock)
+    key   = seeded(plan.seed)
+    still = jnp.zeros_like(flock.positions)
+    t     = jnp.asarray(0.0)
+    moved = stepped(
+        air       = air,
+        composite = composite,
+        flock     = flock,
+        inbox     = inbox,
+        key       = key,
+        path      = lambda *_: Flock(
+            commands   = jnp.asarray(increments, dtype="float32"),
+            forces     = still,
+            positions  = still,
+            spins      = still,
+            velocities = still
+        ),
+        plan = plan,
+        t    = t
+    )
+    if draws is None:
+        draws = around(asarray(uniform(key, (len(increments),)), dtype=float), 4)
+    else:
+        moved = tree_at(
+            lambda held: held.forces,
+            moved,
+            zigged(
+                composite   = composite,
+                draws       = draws,
+                observation = Observation.sensed(
+                    flock,
+                    inbox,
+                    air,
+                    t,
+                    plan.neighbors,
+                    plan.cruise_m_s
+                ),
+                step_s = plan.step_s
+            )
+        )
+    return {
+        "delay_s"    : composite.radio.delay_s,
+        "draws"      : draws.tolist(),
+        "flock"      : rounded(flock),
+        "increments" : increments.tolist(),
+        "stepped"    : rounded(moved)
+    }
+
+
 def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> str:
     """
     Lays out `rows` as a Markdown table beneath `header`, each heading in
@@ -287,6 +415,207 @@ def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> st
             *(f"| {' | '.join(row)} |" for row in rows)
         ]
     )
+
+
+def paired(composite: Composite, plan: Plan) -> dict[str, object]:
+    """
+    Moves three flocks of twelve drones from `plan` through one step of
+    `composite`, each with five zigs under way at its side, at its push
+    back, and in its refractory time. The first sits astride the rim of the
+    roost's disk on the side its course heads toward, its zigs read from the
+    key the step derives, and the other two sit on the roost's center, half
+    their drones drawing zero and the rest drawing across the chances a few
+    zigging neighbors give, the last under a radio whose delay outlasts the
+    zig's reaction and cue. Beside them, the radio carries the six drones of
+    the first flock nearest its first drone, all within the radio's range of
+    one another.
+
+    Returns:
+        Each flock as `flown` lays it out, by its name, beside the run of
+        the radio as `relayed` lays it out.
+    """
+    zig            = composite.noise
+    roost          = composite.roost
+    rest           = zig.refractory_s
+    forces         = zeros((12, 3))
+    forces[:5, :2] = [
+        [rest + zig.back_s + zig.side_s / 2, -1.0],
+        [rest + zig.back_s + zig.side_s / 2, 1.0],
+        [rest + zig.back_s / 2, -1.0],
+        [rest + zig.back_s / 2, -1.0],
+        [rest / 2, 1.0]
+    ]
+    draws       = zeros(len(forces))
+    draws[1::2] = around(geomspace(1e-4, 4e-3, len(forces) // 2), 4)
+    rim         = posed(
+        center_m  = (roost.center_m[0] - roost.radius_m, roost.center_m[1]),
+        composite = composite,
+        forces    = forces,
+        plan      = plan
+    )
+    middle = posed(
+        center_m  = roost.center_m,
+        composite = composite,
+        forces    = forces,
+        plan      = plan
+    )
+    near = argsort(linalg.norm(rim.positions - rim.positions[0], axis=-1))[:6]
+    late = tree_at(
+        lambda slots: slots.radio,
+        composite,
+        replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
+    )
+    return {
+        "flocks": {
+            "late"  : flown(
+                composite = late,
+                draws     = draws,
+                flock     = middle,
+                plan      = plan
+            ),
+            "rim"   : flown(
+                composite = composite,
+                draws     = None,
+                flock     = rim,
+                plan      = plan
+            ),
+            "roost" : flown(
+                composite = composite,
+                draws     = draws,
+                flock     = middle,
+                plan      = plan
+            )
+        },
+        "radio": relayed(tree.map(lambda leaf: leaf[near], rim), plan, composite.radio)
+    }
+
+
+def pieces(declared: Iterable[Piece]) -> str:
+    """
+    Lays out each of the kit's pieces in `declared` as a row naming the
+    piece, the names a widget imports it by, the Zag.js machine it runs on,
+    when a widget reads it, and what it replaces.
+    """
+    return markdown_table(
+        header = [
+            "Piece", "Imports", "Machine", "A Widget Reads It When", "It Replaces"
+        ],
+        rows = (
+            [
+                piece.name,
+                ", ".join(f"`{name}`" for name in piece.exports),
+                "None" if piece.machine is None else f"`{piece.machine}`",
+                piece.when, piece.replaces
+            ]
+            for piece in declared
+        )
+    )
+
+
+def posed(
+    center_m  : Sequence[float],
+    composite : Composite,
+    forces    : ndarray,
+    plan      : Plan
+) -> Flock:
+    """
+    Launches a flock of drones from `plan` a few meters apart around
+    `center_m`, one for each row of `forces`, which sets their zigs, each
+    commanding a velocity apart from the one it flies and off the cruise
+    speed and spinning toward the velocity it flies, its last drone moved
+    half the cohesion's hard sphere ahead of the one before it along that
+    drone's command. Every value is rounded to four decimals, so a copy of
+    the step reads the same flock the package moves.
+    """
+    launch = plan.changed(
+        center_m  = (*center_m, composite.roost.height_m),
+        drones    = len(forces),
+        spacing_m = 8.0
+    ).launched(seeded(plan.seed))
+    commands      = asarray(launch.commands, dtype=float) * [0.8, 1.2, 0.5]
+    positions     = asarray(launch.positions, dtype=float)
+    positions[-1] = positions[-2] + (
+        composite.cohesion.sphere_m / 2 * commands[-2] / linalg.norm(commands[-2])
+    )
+    return tree.map(
+        lambda leaf: jnp.asarray(
+            around(asarray(leaf, dtype=float), 4),
+            dtype = "float32"
+        ),
+        Flock(
+            commands  = commands,
+            forces    = forces,
+            positions = positions,
+            spins     = cross(
+                commands / linalg.norm(commands, axis=-1, keepdims=True),
+                launch.velocities / linalg.norm(
+                    launch.velocities,
+                    axis     = -1,
+                    keepdims = True
+                )
+            ),
+            velocities = launch.velocities
+        )
+    )
+
+
+def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
+    """
+    Carries the broadcasts of `flock` over `radio` from its opening for
+    `radio.delay_s` and six packet periods past it, each drone flying its
+    velocity, keeping at each step a packet falls on the uniform draws each
+    pair's loss reads, unrounded so a copy keeps each packet the link keeps,
+    and what each drone then heard of every other.
+
+    Returns:
+        The flock the radio opens on, the number of steps it runs, each
+        step a packet falls at, and at each such step the draws, whether
+        each drone hears each other, and the position it last heard each
+        other at.
+    """
+    key         = seeded(plan.seed)
+    period      = radio.period_steps(plan.step_s)
+    steps       = radio.delay_steps(plan.step_s) + 6 * period
+    inbox, sent = radio.opened(flock, 0, plan.step_s)
+    kept        = []
+    for step in range(steps):
+        inbox, sent = radio.heard(
+            flock = tree_at(
+                lambda flying: flying.positions,
+                flock,
+                flock.positions + step * plan.step_s * flock.velocities
+            ),
+            inbox  = inbox,
+            key    = key,
+            lag    = 0,
+            sent   = sent,
+            step   = jnp.asarray(step),
+            step_s = plan.step_s
+        )
+        if step % period == 0:
+            kept.append((uniform(fold_in(key, step), inbox.heard.shape), inbox))
+
+    return {
+        "draws"     : [asarray(draws, dtype=float).tolist() for draws, _ in kept],
+        "flock"     : rounded(flock),
+        "heard"     : [asarray(heard.heard, dtype=int).tolist() for _, heard in kept],
+        "packets"   : list(range(0, steps, period)),
+        "positions" : [
+            around(asarray(heard.positions, dtype=float), 4).tolist()
+            for _, heard in kept
+        ],
+        "steps"     : steps
+    }
+
+
+def rounded(state: Flock) -> dict[str, list]:
+    """
+    Lays out each array of `state` by its name, rounded to four decimals.
+    """
+    return {
+        name: around(asarray(leaf, dtype=float), 4).tolist()
+        for name, leaf in asdict(state).items()
+    }
 
 
 def specimens(identity: Identity) -> dict[str, str]:
@@ -374,4 +703,24 @@ def tabled(kind: type) -> str:
             [f"`{name}`", f"`{default}`", *[bound] * bounds, holds]
             for name, default, bound, holds in rows
         )
+    )
+
+
+def zigged(
+    composite   : Composite,
+    draws       : ndarray,
+    observation : Observation,
+    step_s      : float
+) -> Array:
+    """
+    Advances each drone's zig by one step of `step_s` as `Composite.excited`
+    does, from what each drone sensed in `observation` and the uniform draw
+    `draws` holds for it in place of one from a key.
+    """
+    return vmap(
+        partial(composite.noise.excited, delay_s=composite.radio.delay_s, step_s=step_s)
+    )(
+        draw        = jnp.asarray(draws, dtype="float32"),
+        observation = observation,
+        turn        = vmap(composite.roost)(observation)
     )

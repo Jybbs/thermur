@@ -1,24 +1,25 @@
 """
 Holds the stand-ins the controller's and the flight's cases share, meaning
-one drone's view, a flock laid out by hand, a still parcel of air, and a
-short plan.
+one drone's view, a flock laid out by hand, a parcel of air holding one
+wind, and a short plan.
 """
 
-from jax.numpy        import array, asarray, full, ones, zeros
-from jax.numpy.linalg import norm
-from xarray           import Dataset
+from jax.numpy import array, asarray, full, linalg, ones, zeros
+from xarray    import Dataset
 
-from thermur.controller.schemas import Flock, Observation
+from thermur.controller.schemas import Flock, Observation, unit
 from thermur.environment.air    import Air
 from thermur.metrics.schemas    import Plan
 
 
-def flock_of(positions: object, velocities: object) -> Flock:
+def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
     """
     Builds a flock at `positions` and `velocities`, holding no force and
-    no spin.
+    no spin, each drone commanding `commands`, or its own velocity where
+    `commands` is `None`.
     """
     return Flock(
+        commands   = asarray(velocities if commands is None else commands),
         forces     = zeros(asarray(positions).shape),
         positions  = asarray(positions),
         spins      = zeros(asarray(positions).shape),
@@ -44,16 +45,25 @@ def short(**changes: object) -> Plan:
     )
 
 
-def still_air(excess: float = 0.0) -> Air:
+def still_air(
+    excess : float = 0.0,
+    wind   : tuple[float, float, float] = (0.0, 0.0, 0.0)
+) -> Air:
     """
-    Builds air holding one `excess` at every point of a small grid.
+    Builds air holding one `excess` and one `wind`, east, north, and up, at
+    every point of a small grid.
     """
     return Air.from_dataset(
         Dataset(
             {
-                "excess": (
+                name: (
                     ("Time", "height", "south_north", "west_east"),
-                    full((2, 2, 2, 2), excess)
+                    full((2, 2, 2, 2), value)
+                )
+                for name, value in zip(
+                    ("excess", "u", "v", "w"),
+                    (excess, *wind),
+                    strict = True
                 )
             },
             coords = {
@@ -73,24 +83,30 @@ def viewed(  # prose: ignore[unsorted-positionals]
     **fields : object
 ) -> Observation:
     """
-    Builds one drone's view of neighbors at `offsets`, each flying as
-    the drone does and aligning at a rate of one, unless `fields` says
-    otherwise.
+    Builds one drone's view of neighbors at `offsets`, each flying as the
+    drone does, resting, and aligning at a rate of one, the drone at the
+    center of the default launch and its radio holding those neighbors
+    alone, unless `fields` says otherwise.
     """
-    spots = array(offsets)
-    own   = array(velocity)
+    spots     = array(offsets)
+    own       = array(velocity)
+    distances = linalg.norm(spots, axis=-1)
     return Observation(
         **{
-            "air"       : {"excess": asarray(excess)},
-            "cruise"    : norm(own),
-            "delayed"   : own * ones((len(offsets), 3)),
-            "distances" : (spots**2).sum(-1) ** 0.5,
-            "force"     : zeros(3),
-            "neighbors" : own * ones((len(offsets), 3)),
-            "offsets"   : spots,
-            "spin"      : zeros(3),
-            "velocity"  : own,
-            "weights"   : ones(len(offsets)),
+            "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
+            "centrality" : linalg.norm(unit(spots).sum(0))
+            / max(int((distances > 0).sum()), 1),
+            "cruise"     : linalg.norm(own),
+            "delayed"    : own * ones((len(offsets), 3)),
+            "distances"  : distances,
+            "force"      : zeros(3),
+            "forces"     : zeros((len(offsets), 3)),
+            "neighbors"  : own * ones((len(offsets), 3)),
+            "offsets"    : spots,
+            "position"   : array(Plan().center_m),
+            "spin"       : zeros(3),
+            "velocity"   : own,
+            "weights"    : ones(len(offsets)),
             **fields
         }
     )

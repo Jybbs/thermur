@@ -1,3 +1,5 @@
+import source from './rendered/composite.json' with { type: 'json' }
+
 /**
  * A rectangle, in pixels across and down from a top left corner, from `x0` to
  * `x1` across and from `y0` to `y1` down.
@@ -29,9 +31,9 @@ interface Ridge {
 
 /**
  * The number of nearest neighbors each bird reads, the topological count the
- * starling studies measured.
+ * package's plan sets.
  */
-export const NEIGHBORS = 7
+export const NEIGHBORS = source.plan.neighbors
 
 /**
  * Reads the value `map` holds under `key`, building it through `build` and
@@ -58,6 +60,26 @@ export const channels = (hex: string): number[] =>
 export const clamp = (value: number, from = 0, to = 1): number => Math.min(to, Math.max(from, value))
 
 /**
+ * Builds a generator of standard normal draws from the uniform draws `random`
+ * returns, each pair of uniform draws giving two normal ones through the
+ * Box-Muller transform.
+ */
+export function gaussian(random: () => number): () => number {
+  let spare = Number.NaN
+  return () => {
+    if (!Number.isNaN(spare)) {
+      const drawn = spare
+      spare       = Number.NaN
+      return drawn
+    }
+    const radius = Math.sqrt(-2 * Math.log(1 - random()))
+    const angle  = 2 * Math.PI * random()
+    spare        = radius * Math.sin(angle)
+    return radius * Math.cos(angle)
+  }
+}
+
+/**
  * Reads the height at `x` of the ridge whose waves of `amplitude` cancel at
  * `base`, its waves weighted 0.55, 0.3, and 0.15 from the longest to the
  * shortest.
@@ -71,13 +93,18 @@ export function heightAt({ amplitude, base, periods, phases }: Ridge, x: number)
 }
 
 /**
+ * Reads the value `share` of the way from `from` to `to`.
+ */
+export const lerp = (from: number, to: number, share: number): number => from + (to - from) * share
+
+/**
  * Lays `share` of the color `over` across the color `base`, channel by channel
  * in sRGB, the share held between 0 and 1.
  */
 export function mix(base: string, over: string, share: number): string {
   const [from, to] = [channels(base), channels(over)]
   const weight     = clamp(share)
-  const mixed      = from.map((channel, index) => Math.round(channel + (to[index]! - channel) * weight))
+  const mixed      = from.map((channel, index) => Math.round(lerp(channel, to[index]!, weight)))
   return `#${mixed.map(channel => channel.toString(16).padStart(2, '0')).join('')}`
 }
 
@@ -104,24 +131,40 @@ export function mulberry(seed: number): () => number {
 export function nearest(
   best  : Float32Array,
   index : number,
-  into  : Int16Array | Int32Array,
+  into  : Int32Array,
   xs    : ArrayLike<number>,
   ys    : ArrayLike<number>,
   base  : number = 0
 ): void {
-  const last = best.length - 1
   best.fill(Infinity)
   for (let other = 0; other < xs.length; other++) {
     const distance = (xs[other]! - xs[index]!) ** 2 + (ys[other]! - ys[index]!) ** 2
-    if (other === index || distance >= best[last]!) continue
-    let k = last
-    for (; k > 0 && best[k - 1]! > distance; k--) {
-      best[k]        = best[k - 1]!
-      into[base + k] = into[base + k - 1]!
-    }
-    best[k]        = distance
-    into[base + k] = other
+    if (other !== index) ranked(best, distance, into, other, base)
   }
+}
+
+/**
+ * Places `item` at `distance` among the nearest `best.length` items found so
+ * far, `best` holding their distances in order and `into` the items from
+ * `base` on, nearest first, leaving both alone where `distance` is no nearer
+ * than the last.
+ */
+export function ranked(
+  best     : Float32Array | Float64Array,
+  distance : number,
+  into     : Int32Array,
+  item     : number,
+  base     : number = 0
+): void {
+  const last = best.length - 1
+  if (distance >= best[last]!) return
+  let k = last
+  for (; k > 0 && best[k - 1]! > distance; k--) {
+    best[k]        = best[k - 1]!
+    into[base + k] = into[base + k - 1]!
+  }
+  best[k]        = distance
+  into[base + k] = item
 }
 
 /**

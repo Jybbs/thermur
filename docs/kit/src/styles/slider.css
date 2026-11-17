@@ -1,0 +1,66 @@
+.kit-slider {
+  align-items : center;
+  display     : inline-flex;
+  gap         : 0.625rem;
+}
+
+.kit-slider-control {
+  align-items : center;
+  display     : flex;
+  flex        : 1 1 auto;
+  height      : 1.25rem;
+  min-width   : 5rem;
+}
+
+.kit-slider-track {
+  background    : var(--vp-c-divider);
+  border-radius : 999px;
+  height        : 4px;
+  position      : relative;
+  width         : 100%;
+}
+
+.kit-slider-range {
+  background    : var(--th-lead);
+  border-radius : inherit;
+  height        : 100%;
+}
+
+.kit-slider-thumb {
+  background    : var(--vp-c-bg);
+  border        : 2px solid var(--th-lead);
+  border-radius : 50%;
+  cursor        : grab;
+  height        : 14px;
+  width         : 14px;
+}
+
+.kit-slider-thumb:focus-visible {
+  outline        : 2px solid var(--th-lead);
+  outline-offset : 2px;
+}
+
+.kit-slider-label {
+  color       : var(--vp-c-text-3);
+  font-size   : 0.66rem;
+  line-height : 1.6;
+  white-space : nowrap;
+}
+
+.kit-slider-over { position: absolute; }
+
+.kit-slider-over .kit-slider-control {
+  cursor : ew-resize;
+  height : 100%;
+}
+
+.kit-slider-over .kit-slider-track,
+.kit-slider-over .kit-slider-thumb {
+  background : transparent;
+  border     : 0;
+}
+
+.kit-slider-over .kit-slider-thumb {
+  height : 1.875rem;
+  width  : 1.75rem;
+}

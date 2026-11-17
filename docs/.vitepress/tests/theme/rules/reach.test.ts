@@ -2,9 +2,9 @@
 import { enableAutoUnmount }                   from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import RulesReach                       from '../../../theme/rules/reach.ts'
-import { RELEASED }                       from '../../common/browser.ts'
-import { type Charted, charted, press } from '../../common/rules.ts'
+import RulesReach                from '../../../theme/rules/reach.ts'
+import { RELEASED }              from '../../common/browser.ts'
+import { type Charted, charted } from '../../common/rules.ts'
 
 /**
  * Reads the words of every line of text in the chart.
@@ -18,15 +18,15 @@ const words = ({ host }: Charted): string[] =>
 const readings = (chart: Charted): string[] => words(chart).filter(line => /^\d+\.\d°$|^of /u.test(line))
 
 /**
- * Finds the stops on the dial's rim, one per turn.
+ * Finds the radios standing over the stops on the dial's rim, one per turn.
  */
-const knobs = ({ host }: Charted): SVGElement[] => [...host.querySelectorAll<SVGElement>('[role="radio"]')]
+const knobs = ({ host }: Charted): HTMLInputElement[] => [...host.querySelectorAll<HTMLInputElement>('input[type=radio]')]
 
 /**
- * Reads the point `node` sets through its attributes `x` and `y`.
+ * Reads which stops drawn on the rim show their dot.
  */
-const pointOf = (node: Element, x: string, y: string): number[] =>
-  [Number(node.getAttribute(x)), Number(node.getAttribute(y))]
+const dots = ({ host }: Charted): (string | undefined)[] =>
+  [...host.querySelectorAll<SVGElement>('.rules-knob')].map(knob => knob.dataset.on)
 
 /**
  * Measures how far the end of `node`'s words falls from its `x`, at the
@@ -34,21 +34,6 @@ const pointOf = (node: Element, x: string, y: string): number[] =>
  * takes.
  */
 const across = (node: Element): number => node.textContent.length * 0.6 * Number(node.getAttribute('font-size'))
-
-/**
- * Finds the topmost painted disc in `knob` under the point `share` of the way
- * from its stop's center to its label's ink, set 4 above the label's baseline,
- * where a pointer aimed there lands, as the browser hits a circle by its fill.
- */
-function centerOf(knob: SVGElement, share: number): SVGElement | undefined {
-  const [rx, ry] = pointOf(knob.querySelector('circle')!, 'cx', 'cy')
-  const [lx, ly] = pointOf(knob.querySelector('text')!, 'x', 'y')
-  const [x, y]   = [rx! + (lx! - rx!) * share, ry! + (ly! - 4 - ry!) * share]
-  return [...knob.querySelectorAll<SVGElement>('circle')].findLast(disc => {
-    const [cx, cy] = pointOf(disc, 'cx', 'cy')
-    return disc.getAttribute('fill') !== 'none' && Math.hypot(x - cx!, y - cy!) <= Number(disc.getAttribute('r'))
-  })
-}
 
 enableAutoUnmount(afterEach)
 
@@ -59,15 +44,16 @@ afterEach(() => {
 describe('the heading chart', () => {
   it('reads each rule’s reach at the smallest turn, named in full beside a wide dial', () => {
     const chart = charted(RulesReach, 672)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Inertial spin, the default', 'Consensus', 'Delayed', 'Nonmutual', 'Quartic']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(readings(chart)).toEqual([
-      '76.6°', 'of 20° · 383% ± 118',
-      '99.9°', 'of 20° · 500% ± 75',
-      '7.3°', 'of 20° · 37% ± 5',
-      '46.7°', 'of 20° · 233% ± 70',
-      '117.9°', 'of 20° · 589% ± 59'
+      '12.8°', 'of 20° · 64% ± 10',
+      '6.2°', 'of 20° · 31% ± 5',
+      '13.1°', 'of 20° · 66% ± 9',
+      '10.1°', 'of 20° · 50% ± 10',
+      '8.6°', 'of 20° · 43% ± 11'
     ])
-    expect(knobs(chart).map(knob => knob.getAttribute('aria-checked'))).toEqual(['true', 'false'])
+    expect(knobs(chart).map(knob => knob.checked)).toEqual([true, false])
+    expect(dots(chart)).toEqual(['true', 'false'])
   })
 
   it.for([672, 390])('leaves a clear gap between each angle and its share at %i px', width => {
@@ -84,55 +70,47 @@ describe('the heading chart', () => {
   it('sets the shorter names under the dial on a narrow column', () => {
     const chart = charted(RulesReach, 672)
     chart.widen(390)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Inertial spin', 'Consensus', 'Delayed', 'Nonmutual', 'Quartic']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(chart.host.querySelector('svg')!.getAttribute('width')).toBe('390')
   })
 
 })
 
 describe('the stops on the dial’s rim', () => {
-  it('sweeps to the turn picked on the rim, reading each rule’s reach of it', () => {
+  it('sweeps to the turn picked on the rim, reading each rule’s reach of it', async () => {
     const chart = charted(RulesReach, 672)
-    knobs(chart)[1]!.dispatchEvent(new Event('click'))
+    knobs(chart)[1]!.click()
+    await chart.widget.vm.$nextTick()
     expect(readings(chart)).toEqual([
-      '95.6°', 'of 90° · 106% ± 23',
-      '75.2°', 'of 90° · 84% ± 12',
-      '7.2°', 'of 90° · 8% ± 2',
-      '55.5°', 'of 90° · 62% ± 17',
-      '97.3°', 'of 90° · 108% ± 17'
+      '12.7°', 'of 90° · 14% ± 2',
+      '6.5°', 'of 90° · 7% ± 1',
+      '13.0°', 'of 90° · 14% ± 2',
+      '10.3°', 'of 90° · 12% ± 2',
+      '7.4°', 'of 90° · 8% ± 3'
     ])
-    expect(knobs(chart).map(knob => knob.getAttribute('tabindex'))).toEqual(['-1', '0'])
+    expect(knobs(chart).map(knob => knob.checked)).toEqual([false, true])
+    expect(dots(chart)).toEqual(['false', 'true'])
   })
 
-  it.for([
-    { from: 0, key: 'ArrowRight', to: 1 },
-    { from: 0, key: 'ArrowUp', to: 1 },
-    { from: 0, key: 'ArrowLeft', to: 1 },
-    { from: 1, key: 'ArrowDown', to: 0 },
-    { from: 1, key: 'Enter', to: 1 },
-    { from: 1, key: ' ', to: 1 }
-  ])('moves the pick from stop $from to stop $to on $key, focus and all', ({ from, key, to }) => {
+  it('names the group of radios and each radio for its turn, one name shared so the arrow keys move between them', () => {
     const chart = charted(RulesReach, 672)
-    knobs(chart)[from]!.dispatchEvent(new Event('click'))
-    expect(press(knobs(chart)[from]!, key)).toBe(true)
-    expect(knobs(chart)[to]!.getAttribute('aria-checked')).toBe('true')
-    expect(document.activeElement).toBe(knobs(chart)[to])
+    const group = chart.host.querySelector('[role=radiogroup]')!
+    expect(document.querySelector(`[id="${group.getAttribute('aria-labelledby')!}"]`)?.textContent).toBe('The first drone turns')
+    expect([...chart.host.querySelectorAll('.kit-radios-item')].map(item => item.textContent)).toEqual(['20°', '90°'])
+    expect(new Set(knobs(chart).map(knob => knob.name)).size).toBe(1)
   })
 
-  it.for([0.25, 0.5, 0.75, 1])('picks each turn from a click %f of the way from its stop to its label', share => {
+  it('stands each radio over its stop on the rim, again at each width', async () => {
     const chart = charted(RulesReach, 672)
-    for (const stop of [1, 0]) {
-      const knob = knobs(chart)[stop]!
-      centerOf(knob, share)!.dispatchEvent(new Event('click', { bubbles: true }))
-      expect(knob.getAttribute('aria-checked')).toBe('true')
-    }
+    await chart.widget.vm.$nextTick()
+    const places = (): string[] => [...chart.host.querySelectorAll<HTMLElement>('.kit-radios-item')]
+      .map(item => `${item.style.left} ${item.style.top}`)
+    const wide   = places()
+    chart.widen(390)
+    await chart.widget.vm.$nextTick()
+    expect(wide.every(place => /^[\d.]+px [\d.]+px$/u.test(place))).toBe(true)
+    expect(places()).not.toEqual(wide)
   })
-
-  it('leaves every other key to the browser', () => {
-    const chart = charted(RulesReach, 672)
-    expect(press(knobs(chart)[0]!, 'Tab')).toBe(false)
-  })
-
 })
 
 describe('the rings', () => {
@@ -171,15 +149,15 @@ describe('the rings', () => {
     const chart = charted(RulesReach, 672)
     chart.stand.frames.run(1, 300)
     const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
-    expect(Number(outer!.slice(0, -1)) / 76.6).toBeGreaterThan(Number(inner!.slice(0, -1)) / 7.3)
+    expect(Number(outer!.slice(0, -1)) / 12.8).toBeGreaterThan(Number(inner!.slice(0, -1)) / 13.1)
     chart.stand.frames.run(20, 400)
-    expect(readings(chart)[0]).toBe('76.6°')
+    expect(readings(chart)[0]).toBe('12.8°')
   })
 
   it('leaves no listener, observer, or frame behind once it unmounts mid-sweep', () => {
     document.documentElement.style.setProperty('--th-settle', '240ms')
     const chart = charted(RulesReach, 672)
-    knobs(chart)[1]!.dispatchEvent(new Event('click'))
+    knobs(chart)[1]!.click()
     chart.stand.frames.run(2)
     chart.widget.unmount()
     expect(chart.stand.held()).toEqual(RELEASED)

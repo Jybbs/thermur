@@ -4,7 +4,7 @@
 #MISE description = "Type-check the site's TypeScript through `tsc`, failing on a single-file component, which `tsc` cannot read"
 #MISE dir         = "{{config_root}}/docs"
 
-components=$(find .vitepress -name '*.vue')
+components=$(find .vitepress kit -name '*.vue' -not -path '*/node_modules/*')
 [[ -z "$components" ]] || {
   echo "tsc reads no single-file component, so each is a .ts module returning h(): $components" >&2
   exit 1
