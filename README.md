@@ -434,6 +434,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | **Task** | **What It Does** |
 |---|---|
 | `mise test` | Runs the test suite through pytest, passing any further arguments to it |
+| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, or the whole suite where a changed file lies outside the Python it traces, passing any further arguments to pytest |
 | `mise coverage` | Runs the suite under coverage, failing below 95%, and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
@@ -458,6 +459,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise typecheck` | Type-checks the site's TypeScript through `tsc` |
 | `mise cruft` | Reports every unused file, export, and dependency in the site, and every import cycle, through knip |
 | `mise run site:test` | Runs the site's Vitest suite, passing any further arguments to it |
+| `mise run site:affected` | Runs the site's tests that the changes since the merge base with `main` reach, through Vitest's `--changed`, or the whole suite where a changed file matches a rerun trigger, passing any further arguments to Vitest |
 | `mise run site:coverage` | Runs the site's suite under coverage, failing below 95% on statements, branches, functions, or lines |
 
 [`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) takes a contributor from a clone to a merged pull request, then sets out the code's style, the checks each pull request runs, and the labels each issue and pull request takes.

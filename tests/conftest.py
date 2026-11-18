@@ -8,7 +8,7 @@ profiles each run a set number of examples.
 """
 
 from collections.abc    import Callable
-from common.edits       import executable
+from common.edits       import executable, git
 from common.environment import CLEARED
 from common.stand_ins   import StandIn
 from hypothesis         import settings
@@ -82,14 +82,7 @@ def clone(checkout: Checkout) -> Checkout:
     a case reads the commit checked out there.
     """
     for command in (["add", "--all"], ["commit", "--message=Copy", "--quiet"]):
-        checkout.run(
-            "git",
-            "-c",
-            "user.email=thermur@example.com",
-            "-c",
-            "user.name=Thermur",
-            *command
-        )
+        git(checkout, *command)
 
     return checkout
 

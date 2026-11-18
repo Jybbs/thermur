@@ -1,8 +1,9 @@
 """
 Holds the edits a case makes to its copy of the checkout before a check
 reads it, meaning text added to the end of a file, one string replaced in a
-file, and a task file written fresh, beside the writer of an executable file
-each of them and the stand-ins share.
+file, a task file written fresh, and a git command run under a fixed author,
+beside the writer of an executable file each of them and the stand-ins
+share.
 """
 
 from pathlib import Path
@@ -43,6 +44,21 @@ def executable(path: Path, text: str) -> Path:
     path.write_text(text, encoding="utf-8")
     path.chmod(0o755)
     return path
+
+
+def git(checkout: Checkout, *arguments: str):
+    """
+    Runs git with `arguments` at the root of `checkout` under a fixed
+    author, failing the case where git fails.
+    """
+    checkout.run(
+        "git",
+        "-c",
+        "user.email=thermur@example.com",
+        "-c",
+        "user.name=Thermur",
+        *arguments
+    )
 
 
 def task(checkout: Checkout, name: str, text: str) -> Path:
