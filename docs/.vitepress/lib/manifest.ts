@@ -30,7 +30,7 @@ function required(manifest: Record<string, unknown>, key: string, file: string):
       : undefined,
     manifest
   )
-  if (typeof value !== 'string') throw new Error(`no ${key} in ${file}`)
+  if (typeof value !== 'string') throw new TypeError(`no ${key} in ${file}`)
   return value
 }
 
@@ -39,9 +39,9 @@ function required(manifest: Record<string, unknown>, key: string, file: string):
  * the root of the repository holding the module at `metaUrl`.
  *
  * Raises:
- *   Error: Where the manifest holds no string at a key the site reads, or a
- *     homepage that does not end in a slash, which the base and every address
- *     joined onto the homepage depend on.
+ *   TypeError : Where the manifest holds no string at a key the site reads.
+ *   Error     : Where the homepage does not end in a slash, which the base and
+ *     every address joined onto the homepage depend on.
  */
 export function projectFacts(metaUrl: string): ProjectFacts {
   const file     = path.join(repoRoot(metaUrl), 'pyproject.toml')

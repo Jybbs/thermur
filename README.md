@@ -417,7 +417,7 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 - **Python**: 3.15, installed by mise at the version `.mise/config.toml` pins
 - **Node and Bun**: installed by mise at the versions `.mise/config.toml` pins, for the docs site under `docs/`
 - **Storage**: 81MB for sample data, 6TB for full dataset
-- **OS**: Linux on x86-64 or arm64, or macOS 15 or later on Apple silicon, each a platform `.mise/mise.lock` records every pinned tool for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash. No other macOS installs the wheels `uv.lock` resolves, because [netCDF4](https://pypi.org/project/netCDF4/1.7.5/#files)'s macOS wheels need macOS 15 and [JAX](https://docs.jax.dev/en/latest/installation.html) publishes macOS wheels for Apple silicon alone
+- **OS**: Linux on x86-64 or arm64, or macOS 15 or later on Apple silicon, each a platform `.mise/mise.lock` records every pinned tool for, or Windows through WSL2, since the tasks under `.mise/tasks/` run in bash. No other macOS installs the wheels `uv.lock` resolves, because [netCDF4](https://pypi.org/project/netCDF4/1.7.5.1.post1/#files)'s macOS wheels need macOS 15 and [JAX](https://docs.jax.dev/en/latest/installation.html) publishes macOS wheels for Apple silicon alone
 
 ### Installation
 

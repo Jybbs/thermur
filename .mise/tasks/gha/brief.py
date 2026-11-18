@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --exact --locked --script
 # MISE description = "Write the workflow run's summary and exit with the gate's verdict"
 # /// script
-# dependencies    = ["minijinja==2.24.0"]
+# dependencies    = ["minijinja==3.1.0"]
 # requires-python = ">=3.15"
 # ///
 """

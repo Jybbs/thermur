@@ -1911,11 +1911,17 @@ class Edit(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     The release the lift writes in place of `current`.
     """
 
+    behind: str = r"(?!\.?\d)"
+    """
+    The pattern the text behind the release matches, by default anything
+    but a further digit of a release.
+    """
+
     def write(self, root: Path):
         """
         Writes `newest` in place of each `current` the file under `root`
-        names behind text `ahead` matches, where no further digit of a
-        release follows it. `^` and `$` in `ahead` match at each line.
+        names between text `ahead` matches and text `behind` matches. `^`
+        and `$` in either pattern match at each line.
 
         Raises:
             ValueError: Where the file names `current` nowhere behind such
@@ -1923,7 +1929,7 @@ class Edit(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         """
         path        = root / self.file
         text, count = subn(
-            rf"({self.ahead}){escape(self.current)}(?!\.?\d)",
+            rf"({self.ahead}){escape(self.current)}{self.behind}",
             lambda found: found[1] + self.newest,
             path.read_text(encoding="utf-8"),
             flags = MULTILINE
@@ -2162,13 +2168,14 @@ class Lag(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True)
         current    : str,
         newest     : str,
         pin        : str,
-        advisories : tuple[str, ...]       = (),
+        advisories : tuple[str, ...] = (),
+        behind     : str             = Edit.model_fields["behind"].default,
         published  : datetime | str | None = None
     ) -> Self:
         """
         Builds the lag of a pin each file `places` names declares behind
-        text the pattern beside it matches, each edit writing `newest` in
-        place of `current`.
+        text the pattern beside it matches and ahead of text `behind`
+        matches, each edit writing `newest` in place of `current`.
         """
         return cls(
             advisories = advisories,
@@ -2176,6 +2183,7 @@ class Lag(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True)
             edits      = tuple(
                 Edit(
                     ahead   = ahead,
+                    behind  = behind,
                     current = current,
                     file    = file,
                     newest  = newest
