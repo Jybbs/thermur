@@ -591,7 +591,8 @@ class PinCheck(Check):
     declares each name one version, since uv resolves the build requirements
     of hatchling and of each package it builds from source outside
     `uv.lock`, and each package a manifest of the site's workspace installs
-    is declared at one release, so `bun add` writes no range beside them.
+    is declared at one release. The audit fails on any range in a site
+    manifest, such as the caret range `bun add` writes without `--exact`.
     A range under `peerDependencies`, such as the kit's on `vue`, stays
     exempt, since a peer range states the releases a package works beside
     rather than one Bun installs.

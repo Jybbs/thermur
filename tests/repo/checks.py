@@ -528,6 +528,15 @@ def test_a_build_requirement_naming_a_range_is_named(
             '"vue" : ">=3"',
             None,
             id = "peer-range"
+        ),
+        param(
+            "docs/kit/package.json",
+            '"peerDependencies" : {{',
+            '"optionalDependencies" : {{ "fsevents": "~2.3.3" }},\n    '
+            '"peerDependencies" : {{',
+            "`fsevents` in the `optionalDependencies` of `docs/kit/package.json` reads "
+            "`~2.3.3`, which is not an exact pin",
+            id = "optional-tilde"
         )
     ]
 )

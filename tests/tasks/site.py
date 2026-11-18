@@ -1,9 +1,10 @@
 """
-Pins the arguments each `site` task hands the tool it runs, meaning the
-copy under `docs/node_modules/.bin` each runs, every argument a reader adds,
-the annotations the lint and the cruft report print under GitHub Actions,
-the single-file component the type check refuses, and the built site, the
-README, and the contributor guide the link check reads offline.
+Pins the arguments each `site` task hands the tool it runs, meaning the copy
+under `docs/node_modules/.bin` each runs, every argument a reader adds, the
+annotations the lint and the cruft report print under GitHub Actions, the
+single-file component the type check refuses, the built site, the README,
+and the contributor guide the link check reads offline, and the environment
+every `bun` command in the clone runs under.
 """
 
 from collections.abc  import Callable
@@ -173,6 +174,36 @@ def test_the_cruft_report_runs_both_passes_and_fails_where_either_fails(
     )
 
 
+def test_a_bun_command_runs_no_install_script_and_caches_under_the_clone(
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config
+):
+    """
+    Asserts that the environment mise sets for every command in the clone,
+    a `bun` typed by hand included, skips each package's install scripts
+    and puts Bun's install cache under `.cache/bun`, clearing both variables
+    first so neither reaches the command from the shell running the suite.
+    """
+    for name in ("BUN_INSTALL_CACHE_DIR", "NPM_CONFIG_IGNORE_SCRIPTS"):
+        monkeypatch.delenv(name, raising=False)
+    printed = run(
+        [
+            "mise", "x",
+            "--", "sh",
+            "-c", 'printf "%s\\n" "$NPM_CONFIG_IGNORE_SCRIPTS" "$BUN_INSTALL_CACHE_DIR"'
+        ],
+        capture_output = True,
+        check          = True,
+        cwd            = pytestconfig.rootpath / "docs",
+        text           = True
+    )
+
+    assert printed.stdout.splitlines() == [
+        "true",
+        str(pytestconfig.rootpath / ".cache/bun")
+    ]
+
+
 def test_the_install_installs_from_the_lockfile_and_prunes(
     pytestconfig : Config,
     site         : Path,
@@ -186,6 +217,26 @@ def test_the_install_installs_from_the_lockfile_and_prunes(
     ran(site, pytestconfig, "install")
 
     assert bun.commands == ["bun install --frozen-lockfile", "bun prune"]
+
+
+@mark.parametrize("component", [".vitepress/Card.vue", "kit/Card.vue"])
+def test_the_type_check_refuses_a_single_file_component(
+    component    : str,
+    pytestconfig : Config,
+    site         : Path
+):
+    """
+    Asserts that the type check fails before `tsc` runs, naming each
+    single-file component under `.vitepress` or the kit, since `tsc` reads
+    none, and leaving one under the kit's own packages alone.
+    """
+    (site / "kit/node_modules").mkdir()
+    (site / "kit/node_modules/Packaged.vue").write_text("", encoding="utf-8")
+    (site / component).write_text("", encoding="utf-8")
+    checked = ran(site, pytestconfig, "typecheck")
+
+    assert (checked.returncode, checked.stdout) == (1, "")
+    assert checked.stderr.rstrip().endswith(component)
 
 
 def test_the_link_check_reads_the_built_site_and_the_guides_offline(
@@ -213,23 +264,3 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
         str(dist),
         "../.github/README.md", "../.github/CONTRIBUTING.md"
     ]
-
-
-@mark.parametrize("component", [".vitepress/Card.vue", "kit/Card.vue"])
-def test_the_type_check_refuses_a_single_file_component(
-    component    : str,
-    pytestconfig : Config,
-    site         : Path
-):
-    """
-    Asserts that the type check fails before `tsc` runs, naming each
-    single-file component under `.vitepress` or the kit, since `tsc` reads
-    none, and leaving one under the kit's own packages alone.
-    """
-    (site / "kit/node_modules").mkdir()
-    (site / "kit/node_modules/Packaged.vue").write_text("", encoding="utf-8")
-    (site / component).write_text("", encoding="utf-8")
-    checked = ran(site, pytestconfig, "typecheck")
-
-    assert (checked.returncode, checked.stdout) == (1, "")
-    assert checked.stderr.rstrip().endswith(component)
