@@ -62,6 +62,7 @@
   },
   "speed": {
     "kind": "Cruise",
+    "fixed": false,
     "cruise_m_s": 10.0,
     "relaxation_s": 34.40208354058685
   },

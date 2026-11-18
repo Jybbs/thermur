@@ -1,8 +1,21 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "scan"
-#MISE description = "Hold every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories"
+#MISE description = "Hold every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories, setting aside each `AUDIT_IGNORE` id no release fixes yet"
 
 source "$MISE_PROJECT_ROOT/.mise/lib/lockfiles.sh"
 
 each_lockfile uv audit --preview-features audit-command
-bun audit --cwd docs
+
+set --
+for id in ${AUDIT_IGNORE:-}; do
+  patched="$(gh api \
+    --jq '.vulnerabilities[] | "\(.package.name) \(.first_patched_version // empty)"' \
+    "/advisories/$id")"
+  if [[ -n $patched ]]; then
+    echo "$id is fixed in ${patched//$'\n'/, }, so delete its AUDIT_IGNORE entry in" \
+      ".mise/config.toml and lift to the patched release" >&2
+    exit 1
+  fi
+  set -- "$@" "--ignore=$id"
+done
+bun audit --cwd docs "$@"

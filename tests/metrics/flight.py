@@ -47,14 +47,17 @@ from thermur.controller.components import (
     Constant,
     Delayed,
     HardSphere,
+    InertialSpin,
+    Marginal,
     Overdamped,
     Persistent,
     White
 )
-from thermur.controller.schemas import Composite, Heading, Inbox, Radio, across
+from thermur.controller.schemas import Composite, Flock, Inbox, Radio, across
 from thermur.environment.plant  import Plant
 from thermur.environment.wrf    import WrfOutput
 from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response, stepped
+from thermur.metrics.schemas    import Plan
 from thermur.pipeline.settings  import Settings
 
 AIR = still_air()
@@ -68,11 +71,38 @@ STILL = Composite(
     plant    = Plant(),
     radio    = Radio(delay_s=0.0, loss=0.0),
     roost    = Centroid(stiffness_per_s2=0.0),
-    speed    = Centroid(stiffness_per_s2=0.0)
+    speed    = Marginal(fixed=True)
 )
 """
 The composite whose command rate is zero on every flock, every drone hearing
 each other at once.
+"""
+
+PUSHED = Composite(
+    cohesion = Centroid(stiffness_per_s2=0.0),
+    contact  = HardSphere(sphere_m=5.0, weight_m_s2=250.0),
+    coupling = Constant(coupling_per_s=0.0),
+    heading  = InertialSpin(friction=1.0, inertia_s=0.02),
+    noise    = White(amplitude=0.0),
+    plant    = Plant(),
+    radio    = Radio(delay_s=0.0, loss=0.0),
+    roost    = Centroid(stiffness_per_s2=0.0),
+    speed    = Marginal(amplitude=0.0)
+)
+"""
+The composite under which two drones 3 m apart, inside each other's hard
+sphere, push each other apart at 250 m/s^2, and the friction stops a spin
+within one step of 0.02 s, with no noise, no alignment, and no roost.
+"""
+
+EAST = array([[10.0, 0.0, 0.0]] * 9)
+"""
+The velocities of nine drones flying east at 10 m/s.
+"""
+
+SPOTS = array([[1000.0, 1000.0 + 200.0 * row, 100.0] for row in range(9)])
+"""
+A line of nine drones 200 m apart across the course, inside the still air.
 """
 
 
@@ -108,6 +138,25 @@ def flight(composite: Composite) -> Flight:
     Flies the short plan under the default composite through still air.
     """
     return Flight.flown(composite, AIR, short())
+
+
+def pushed(flock: Flock) -> Array:
+    """
+    Steps a flock laid out by hand once under `PUSHED` through still air,
+    from where it stands and under no Brownian increment, reading each
+    drone's command at the step's end.
+    """
+    still = zeros(flock.positions.shape)
+    return stepped(
+        air       = AIR,
+        composite = PUSHED,
+        flock     = flock,
+        inbox     = Inbox.from_broadcast(flock, PUSHED.radio.range_m, flock),
+        key       = key(0),
+        path      = lambda *_: flock_of(still, still),
+        plan      = Plan(drones=len(flock.positions)),
+        t         = array(0.0)
+    ).commands
 
 
 class Drawn(White):
@@ -359,6 +408,18 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
     assert ratio_on_hull(lattice, where(inside, 0.5, 1.0)) < 1.0
 
 
+def test_a_push_across_the_command_keeps_each_drone_s_speed():
+    """
+    Asserts that two drones a contact pushes apart across their command keep
+    the 10 m/s they commanded, the speed being the stepped command's part
+    along the heading rather than its length of `sqrt(10^2 + 5^2)`.
+    """
+    commands = pushed(flock_of(SPOTS.at[1, 1].set(SPOTS[0, 1] + 3.0), EAST))
+
+    assert_allclose(linalg.norm(commands[:2], axis=-1), 10.0, rtol=1e-5)
+    assert abs(commands[1, 1]) > 1.0
+
+
 @mark.parametrize(
     ("delay_s", "lag_s"),
     [
@@ -480,32 +541,6 @@ def test_a_replay_ranks_every_composite_it_is_given(
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
 
 
-@mark.parametrize(
-    ("heading", "held"),
-    [param(Overdamped(), True, id="confined"), param(Consensus(), False, id="free")]
-)
-def test_a_heading_holding_the_speed_keeps_every_drone_at_the_cruise(
-    composite : Composite,
-    heading   : Heading,
-    held      : bool
-):
-    """
-    Asserts that every drone commands `cruise_m_s` at every kept frame under
-    a heading holding the speed, and that the commanded speeds spread under
-    one leaving it free.
-    """
-    speeds = linalg.norm(
-        Flight.flown(
-            replace(composite, heading=heading),
-            AIR,
-            short()
-        ).frames.commands,
-        axis = -1
-    )
-
-    assert allclose(speeds, 10.0, rtol=1e-4) == held
-
-
 def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     """
     Asserts that a flight whose drones command a swing of one meter per
@@ -534,6 +569,36 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     )
 
 
+@mark.parametrize(
+    ("fixed", "held"),
+    [param(True, True, id="fixed"), param(False, False, id="free")]
+)
+def test_a_fixed_speed_keeps_every_drone_at_the_cruise(
+    composite : Composite,
+    fixed     : bool,
+    held      : bool
+):
+    """
+    Asserts that every drone whose climb or descent stays inside the plant's
+    bounds commands `cruise_m_s` at every kept frame under a speed slot
+    holding the speed fixed, and that the commanded speeds spread under one
+    leaving it free, inside the range the confinement holds.
+    """
+    plan     = short()
+    commands = Flight.flown(
+        replace(composite, speed=Marginal(fixed=fixed)),
+        AIR,
+        plan
+    ).frames.commands
+    speeds = linalg.norm(commands, axis=-1)
+    inside = (-composite.plant.descent_m_s < commands[..., 2]) & (
+        commands[..., 2] < composite.plant.climb_m_s
+    )
+
+    assert allclose(speeds[inside], plan.cruise_m_s, rtol=1e-4) == held
+    assert plan.airspeeds_m_s[0] < speeds.min() <= speeds.max() < plan.airspeeds_m_s[1]
+
+
 def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
     """
     Asserts that shells of drones turning at times proportional to their
@@ -555,6 +620,20 @@ def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
     )
 
     assert_allclose((speed, reach), (20.0, 1.0), rtol=1e-6)
+
+
+def test_a_spin_the_friction_stops_within_the_step_leaves_the_heading():
+    """
+    Asserts that each command turns at the spin the step reaches, so a
+    spin of 1 rad/s the friction stops within one step leaves every drone
+    commanding east, where turning at the spin the step starts from would
+    swing it 0.2 m/s north.
+    """
+    commands = pushed(
+        flock = replace(flock_of(SPOTS, EAST), spins=array([[0.0, 0.0, 1.0]] * 9))
+    )
+
+    assert_allclose(commands, EAST, atol=1e-4)
 
 
 def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():

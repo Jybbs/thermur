@@ -2,13 +2,16 @@
 Pins the graph's contract, covering the fingerprints Hamilton's cache reads
 for arrays, datasets, records, components, and paths, the NetCDF saver and
 loaders, the modules a graph reads by default, which nodes a rerun reads
-back from the cache and as which type, what a new `uv.lock` or a new path
-setting computes again, which calls the graph refuses, where the recorder
-files a run, and what a recorded run keeps.
+back from the cache and as which type, what a new `uv.lock`, a new path
+setting, or an edit to a component's code computes again, the digest each
+step reads, which calls the graph refuses, where the recorder files a run,
+and what a recorded run keeps.
 """
 
 from collections.abc import Callable
 from common.cached   import Pitch
+from common.drones   import small
+from common.edits    import edit
 from common.runs     import computed
 from common.settings import Tuned
 from dataclasses     import make_dataclass
@@ -18,6 +21,7 @@ from equinox         import Module
 from functools       import partial
 from gc              import collect
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
+from hamilton.function_modifiers     import cache
 from importlib      import import_module
 from jax            import Array, numpy
 from json           import loads
@@ -303,6 +307,33 @@ def test_the_saver_writes_a_file_its_loader_reads_back_whole(
     with read:
         assert metadata == {"path": path}
         assert_identical(read, data)
+
+
+def test_a_component_s_code_change_computes_the_flight_again(
+    clone       : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that an edit to a component's code, leaving every field of the
+    composite unchanged, computes `flight` again rather than reading back
+    the flight the old code flew, with each digest reading the clone's
+    source.
+    """
+    monkeypatch.setattr(
+        "thermur.pipeline.schemas.files",
+        lambda package: clone.root / "src" / package
+    )
+    Graph(checkout=clone, settings=small()).compute("flight")
+    edit(
+        clone,
+        "src/thermur/controller/components.py",
+        new = "full(observation.distances.shape, 1.0 * self.coupling_per_s)",
+        old = "full(observation.distances.shape, self.coupling_per_s)"
+    )
+    graph = Graph(checkout=clone, settings=small())
+    graph.compute("flight")
+
+    assert {"composite", "flight"} <= computed(graph)
 
 
 def test_a_failed_save_raises_its_own_error_where_the_run_began(
@@ -644,6 +675,26 @@ def test_each_run_records_the_lock_digest_as_it_began(
     record = loads(graph.recorder.cache.read(graph.recorder.run_id))
 
     assert record["config"]["lock_digest"] == clone.lock_digest
+
+
+def test_each_step_calling_code_reads_its_own_subpackage_s_digest(clone: Checkout):
+    """
+    Asserts that each step a subpackage's steps module declares reads that
+    subpackage's digest, other than a step computed again on every run,
+    since a fingerprint reads none of the code a step calls on its inputs.
+    """
+    nodes = Graph(checkout=clone).driver.graph.nodes
+    steps = {
+        node.name: f"{node.originating_functions[0].__module__.split(".")[1]}_digest"
+        for node in nodes.values()
+        if not node.user_defined and node.tags.get(cache.BEHAVIOR_KEY) != "recompute"
+    }
+
+    assert {
+        name: digest
+        for name, digest in steps.items()
+        if digest not in nodes[name].input_types
+    } == {}
 
 
 def test_the_cache_keeps_nothing_of_a_saver(

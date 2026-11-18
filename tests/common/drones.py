@@ -1,27 +1,31 @@
 """
-Holds the stand-ins the controller's and the flight's cases share, meaning
-one drone's view, a flock laid out by hand, a parcel of air holding one
-wind, and a short plan.
+Holds the stand-ins the controller's, the environment's, the flight's, and
+the graph's cases share, meaning one drone's view, a flock laid out by hand,
+a parcel of air holding one wind, a short plan, and the settings of a small
+flight.
 """
 
 from jax.numpy import array, asarray, full, linalg, ones, zeros
 from xarray    import Dataset
 
-from thermur.controller.schemas import Flock, Observation, unit
-from thermur.environment.air    import Air
-from thermur.metrics.schemas    import Plan
+from thermur.controller.schemas  import Flock, Observation, unit
+from thermur.environment.air     import Air
+from thermur.environment.schemas import Crop, Grid, ParametricThreat
+from thermur.metrics.schemas     import Plan
+from thermur.pipeline.settings   import Settings
 
 
 def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
     """
-    Builds a flock at `positions` and `velocities`, holding no force, each
-    drone commanding `commands`, or its own velocity where `commands` is
-    `None`.
+    Builds a flock at `positions` and `velocities`, holding no force and
+    no spin, each drone commanding `commands`, or its own velocity where
+    `commands` is `None`.
     """
     return Flock(
         commands   = asarray(velocities if commands is None else commands),
         forces     = zeros(asarray(positions).shape),
         positions  = asarray(positions),
+        spins      = zeros(asarray(positions).shape),
         velocities = asarray(velocities)
     )
 
@@ -41,6 +45,27 @@ def short(**changes: object) -> Plan:
             "turning_window_s" : 0.5,
             **changes
         }
+    )
+
+
+def small() -> Settings:
+    """
+    Builds the settings of a short flight through the parametric threat
+    on a small grid, which the crop's fixed heights from 20 m to 100 m sit
+    inside.
+    """
+    return Settings(
+        crop   = Crop(floor_m=20.0, levels=5, spacing_m=20.0),
+        plan   = short(center_m=(160.0, 40.0, 60.0)),
+        threat = ParametricThreat(
+            edge_m = 10.0,
+            grid   = Grid(
+                columns   = 8,
+                levels    = 10,
+                rows      = 2,
+                snapshots = 2
+            )
+        )
     )
 
 
@@ -95,6 +120,7 @@ def viewed(  # prose: ignore[unsorted-positionals]
             "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
             "centrality" : linalg.norm(unit(spots).sum(0))
             / max(int((distances > 0).sum()), 1),
+            "cruise"     : linalg.norm(own),
             "delayed"    : own * ones((len(offsets), 3)),
             "distances"  : distances,
             "force"      : zeros(3),
@@ -102,6 +128,7 @@ def viewed(  # prose: ignore[unsorted-positionals]
             "neighbors"  : own * ones((len(offsets), 3)),
             "offsets"    : spots,
             "position"   : array(Plan().center_m),
+            "spin"       : zeros(3),
             "velocity"   : own,
             "weights"    : ones(len(offsets)),
             **fields

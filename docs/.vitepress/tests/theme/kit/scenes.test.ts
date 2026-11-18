@@ -67,8 +67,8 @@ describe('the controls scene', () => {
 
   it('lays its front out at the width the plate stands at', () => {
     const { stand, widget } = staged('controls')
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 320 } as DOMRect)
-    stand.reflow()
+    stand.reflow(undefined, 320)
+    stand.frames.run(1)
     expect(widget.get('.kit-catalog-front').attributes('viewBox')).toBe('0 0 320 112')
   })
 
@@ -160,8 +160,8 @@ describe('the motion scene’s glide', () => {
 describe('the drawing scene', () => {
   it('draws the heat ramp at the width it stands at, again only as that width changes', () => {
     const { stand, widget } = staged('drawing')
-    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 480 } as DOMRect)
-    stand.reflow()
+    stand.reflow(undefined, 480)
+    stand.frames.run(1)
     expect(widget.get('.kit-catalog-width svg').attributes('width')).toBe('480')
     expect(widget.get('.kit-catalog-width text').text()).toBe('DRAWN AT 480 PX')
     widget.unmount()
