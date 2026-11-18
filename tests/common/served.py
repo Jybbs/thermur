@@ -52,12 +52,14 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
 
     requests: list[str] = []
     """
-    The `Range` header of each request answered with a status of 206.
+    The `Range` header of each request answered with no fault, recorded
+    before the body is written.
     """
 
     sent: list[tuple[int, int]] = []
     """
-    The offset and the length of each range sent whole, in the order sent.
+    The offset and the length of each range sent whole, in the order sent,
+    recorded before the body is written.
     """
 
     @property
@@ -158,10 +160,10 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
                     self.close_connection = True
                     return
 
-                self.wfile.write(body)
                 if fault is None:
                     served.requests.append(header)
                     served.sent.extend((start, end - start + 1) for start, end in spans)
+                self.wfile.write(body)
 
             def do_HEAD(self):
                 """
