@@ -17,5 +17,5 @@ lychee \
   --root-dir "$dist" \
   "$@" \
   "$dist" \
-  ../README.md \
+  ../.github/README.md \
   ../.github/CONTRIBUTING.md

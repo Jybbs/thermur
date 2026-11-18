@@ -27,6 +27,7 @@ from thermur.repo.schemas import (
     Action,
     Citation,
     Config,
+    Dependencies,
     Document,
     GithubSettings,
     Guide,
@@ -71,7 +72,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     @cached_property
     def bibliography(self) -> Bibliography:
         """
-        Validates `docs/references.bib`.
+        Validates `docs/pages/references.bib`.
         """
         return Bibliography.read(self.root)
 
@@ -135,6 +136,15 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Validates `.mise/config.toml`.
         """
         return Config.read(self.root)
+
+    @cached_property
+    def dependencies(self) -> dict[Path, Dependencies]:
+        """
+        Validates each manifest of the site's workspace, by its path.
+        """
+        return {
+            path: Dependencies.read(self.root, path) for path in self.package.manifests
+        }
 
     @cached_property
     def github_settings(self) -> GithubSettings:

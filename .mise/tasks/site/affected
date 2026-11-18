@@ -3,4 +3,4 @@
 #MISE description = "Run the site's tests that the changes since the merge base with `main` reach, or the whole suite where a changed file matches a rerun trigger, passing any further arguments to Vitest"
 #MISE dir         = "{{config_root}}/docs"
 
-node_modules/.bin/vitest run --changed main --config .vitepress/vitest.config.ts "$@"
+node_modules/.bin/vitest run --changed main --config .vitepress/config/vitest.config.ts "$@"

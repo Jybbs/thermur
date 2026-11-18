@@ -12,7 +12,7 @@ test('every folder joins onto the root of the repository holding the module', ({
   expect(paths.cacheDir(metaUrl, 'vitest')).toBe(path.join(root, '.cache', 'vitest'))
   expect(paths.fontsDir(metaUrl)).toBe(path.join(root, 'src', 'thermur', 'identity', 'fonts'))
   expect(paths.pagesDir(metaUrl)).toBe(path.join(root, 'docs', 'pages'))
-  expect(paths.publicDir(metaUrl)).toBe(path.join(root, 'docs', 'public'))
+  expect(paths.publicDir(metaUrl)).toBe(path.join(root, 'docs', 'pages', 'public'))
 })
 
 test('a module under no manifest names the module it searched from', () => {

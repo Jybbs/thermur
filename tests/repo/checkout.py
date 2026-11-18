@@ -33,14 +33,16 @@ def test_a_clone_carries_the_checkouts_changes_and_its_programs_modes(
     removal of a tracked file, while every program under `.mise/bin/` stays
     executable.
     """
-    append(clone, "README.md", "\nAn uncommitted line.\n")
+    append(clone, ".github/README.md", "\nAn uncommitted line.\n")
     append(clone, "notes.md", "An untracked note.\n")
     (clone.root / "LICENSE").unlink()
 
     copied = clone.clone(tmp_path_factory.mktemp("scratch") / "clone")
 
     assert copied.commit == clone.commit
-    assert copied.read(Path("README.md")) == clone.read(Path("README.md"))
+    assert copied.read(Path(".github/README.md")) == clone.read(
+        Path(".github/README.md")
+    )
     assert copied.read(Path("notes.md")) == "An untracked note.\n"
     assert not (copied.root / "LICENSE").exists()
     assert all(access(copied.root / path, X_OK) for path in copied.scripts)
@@ -75,13 +77,13 @@ def test_copy_writes_a_link_as_a_link_over_what_the_folder_holds(
     Asserts that copying a link into a folder already holding a link at its
     path leaves the copied link there rather than raising.
     """
-    (checkout.root / "linked.md").symlink_to("README.md")
+    (checkout.root / "linked.md").symlink_to(".github/README.md")
     folder = tmp_path_factory.mktemp("copied")
     (folder / "linked.md").symlink_to("LICENSE")
 
     checkout.copy([Path("linked.md")], folder)
 
-    assert (folder / "linked.md").readlink() == Path("README.md")
+    assert (folder / "linked.md").readlink() == Path(".github/README.md")
 
 
 def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
@@ -339,9 +341,12 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
 def test_the_bibliography_reads_each_study_the_file_holds(checkout: Checkout):
     """
     Asserts that the bibliography holds one study for each entry
-    `docs/references.bib` opens.
+    `docs/pages/references.bib` opens.
     """
-    entries = findall(r"(?m)^@\w+\{(\w+),", checkout.read(Path("docs/references.bib")))
+    entries = findall(
+        r"(?m)^@\w+\{(\w+),",
+        checkout.read(Path("docs/pages/references.bib"))
+    )
 
     assert list(checkout.bibliography.studies) == entries
 

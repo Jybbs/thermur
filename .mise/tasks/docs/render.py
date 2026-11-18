@@ -7,7 +7,7 @@ task, meaning the identity into `docs/`, and each region a Markdown page
 carries and the footnote definition of each study it cites into that page.
 It prints the path of each file it rewrote, then each region whose page does
 not carry its markers once each and each marker under a study's key that
-`docs/references.bib` holds no entry for.
+`docs/pages/references.bib` holds no entry for.
 """
 
 from sys import stderr

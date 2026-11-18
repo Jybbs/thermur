@@ -10,8 +10,9 @@ Holds the records the `repo` tasks read and report:
   its `Category` rows, each issue `Template`, and the `Citation` with its
   `Person` rows out of the YAML, each `Ruleset` with its `Rule` and `Actor`
   rows and the `Parameters` of `Status` rows each rule takes out of the JSON
-  under `.github/rulesets/`, the site's `Package` out of `docs/package.json`,
-  and the `Guide` out of the contributor guide's tables
+  under `.github/rulesets/`, the site's `Package` out of `docs/package.json`
+  and the `Dependencies` out of each manifest of its workspace, and the
+  `Guide` out of the contributor guide's tables
 - The `Creators`, `Policy`, `Scope`, `SquashMessage`, `SquashTitle`, and
   `State` enums each closed-set value in `.github/settings.toml` takes, and the
   `ActorType`, `BypassMode`, `Enforcement`, `MergeMethod`, `RuleType`, and
@@ -26,7 +27,7 @@ Holds the records the `repo` tasks read and report:
 """
 
 from collections     import Counter
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Iterator, Mapping, Sequence
 from datetime        import datetime
 from enum            import StrEnum, auto
 from http            import HTTPMethod
@@ -646,6 +647,49 @@ class Manifest(Document, title="pyproject.toml"):
             ),
             Request(body={"names": self.keywords}, endpoint="topics", method="PUT")
         ]
+
+
+class Dependencies(Document):
+    """
+    The specifier each package a manifest of the site's workspace installs
+    is declared at, leaving out `peerDependencies`, whose range names the
+    releases a package works beside rather than one Bun installs.
+    """
+
+    dependencies: frozendict[str, str] = frozendict()
+    """
+    The specifier of each package `dependencies` names.
+    """
+
+    dev: frozendict[str, str] = Field(frozendict(), validation_alias="devDependencies")
+    """
+    The specifier of each package `devDependencies` names.
+    """
+
+    optional: frozendict[str, str] = Field(
+        frozendict(),
+        validation_alias = "optionalDependencies"
+    )
+    """
+    The specifier of each package `optionalDependencies` names.
+    """
+
+    overrides: frozendict[str, str] = frozendict()
+    """
+    The specifier each rule of `overrides` gives, by the key naming its
+    package, so a nested rule fails validation and a scoped key such as
+    `a>b` reads in whole as a name.
+    """
+
+    @property
+    def specifiers(self) -> Iterator[tuple[str, str, str]]:
+        """
+        Yields the key of each table, the package it names, and the
+        specifier it gives that package, table by table.
+        """
+        for field, info in type(self).model_fields.items():
+            for name, specifier in getattr(self, field).items():
+                yield info.validation_alias or field, name, specifier
 
 
 class Package(Document, title="docs/package.json"):

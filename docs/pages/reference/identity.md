@@ -74,7 +74,7 @@ The line is written from `Tagline` in `thermur.identity` by `mise render`.
 
 ## The Marks
 
-The mark lays every bird of the original logo along the flock's gradient, and the small mark keeps only its larger birds for a favicon or a badge. The wordmark sets the name in the display face, its last letters breaking into birds that warm toward the fire. Each is drawn once for a light page and once for a dark one, and each file sits under `docs/public/`.
+The mark lays every bird of the original logo along the flock's gradient, and the small mark keeps only its larger birds for a favicon or a badge. The wordmark sets the name in the display face, its last letters breaking into birds that warm toward the fire. Each is drawn once for a light page and once for a dark one, and each file sits under `docs/pages/public/`.
 
 <!-- marks -->
 

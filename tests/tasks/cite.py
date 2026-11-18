@@ -47,7 +47,7 @@ def test_a_key_naming_no_entry_prints_no_definition(
 
     assert exited.value.code == 1
     assert capsys.readouterr() == (
-        "", "`smith2020` names no entry in `docs/references.bib`\n"
+        "", "`smith2020` names no entry in `docs/pages/references.bib`\n"
     )
 
 

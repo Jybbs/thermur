@@ -1,9 +1,10 @@
 """
-Pins the arguments each `site` task hands the tool it runs, meaning the
-copy under `docs/node_modules/.bin` each runs, every argument a reader adds,
-the annotations the lint and the cruft report print under GitHub Actions,
-the single-file component the type check refuses, and the built site, the
-README, and the contributor guide the link check reads offline.
+Pins the arguments each `site` task hands the tool it runs, meaning the copy
+under `docs/node_modules/.bin` each runs, every argument a reader adds, the
+annotations the lint and the cruft report print under GitHub Actions, the
+single-file component the type check refuses, the built site, the README,
+and the contributor guide the link check reads offline, and the environment
+every `bun` command in the clone runs under.
 """
 
 from collections.abc  import Callable
@@ -54,7 +55,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "lint",
             "true",
             [
-                "oxlint", "--config", ".vitepress/.oxlintrc.json", "--format",
+                "oxlint", "--config", ".vitepress/config/.oxlintrc.json", "--format",
                 "github", "--marker", ".vitepress", "kit"
             ],
             id = "lint-actions"
@@ -63,7 +64,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "lint",
             None,
             [
-                "oxlint", "--config", ".vitepress/.oxlintrc.json", "--format",
+                "oxlint", "--config", ".vitepress/config/.oxlintrc.json", "--format",
                 "default", "--marker", ".vitepress", "kit"
             ],
             id = "lint-unset"
@@ -72,10 +73,8 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "cruft",
             "true",
             [
-                "knip", "--config", ".vitepress/knip.ts", "--reporter",
-                "github-actions", "--marker", "knip",
-                "--config", ".vitepress/knip.ts", "--cycles",
-                "--reporter", "github-actions", "--marker"
+                "knip", "--reporter", "github-actions", "--marker", "knip",
+                "--cycles", "--reporter", "github-actions", "--marker"
             ],
             id = "cruft-actions"
         ),
@@ -83,8 +82,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "cruft",
             "",
             [
-                "knip", "--config", ".vitepress/knip.ts", "--reporter", "symbols",
-                "--marker", "knip", "--config", ".vitepress/knip.ts",
+                "knip", "--reporter", "symbols", "--marker", "knip",
                 "--cycles", "--reporter", "symbols", "--marker"
             ],
             id = "cruft-empty"
@@ -94,7 +92,10 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
         param(
             "test",
             None,
-            ["vitest", "run", "--config", ".vitepress/vitest.config.ts", "--marker"],
+            [
+                "vitest", "run", "--config",
+                ".vitepress/config/vitest.config.ts", "--marker"
+            ],
             id = "test"
         ),
         param(
@@ -102,7 +103,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             None,
             [
                 "vitest", "run", "--changed", "main",
-                "--config", ".vitepress/vitest.config.ts", "--marker"
+                "--config", ".vitepress/config/vitest.config.ts", "--marker"
             ],
             id = "affected"
         ),
@@ -111,7 +112,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             None,
             [
                 "vitest", "run", "--config",
-                ".vitepress/vitest.config.ts", "--coverage", "--marker"
+                ".vitepress/config/vitest.config.ts", "--coverage", "--marker"
             ],
             id = "coverage"
         ),
@@ -168,10 +169,39 @@ def test_the_cruft_report_runs_both_passes_and_fails_where_either_fails(
     assert (reported.returncode, reported.stdout.splitlines()) == (
         1,
         [
-            "--config .vitepress/knip.ts --reporter symbols --marker",
-            "--config .vitepress/knip.ts --cycles --reporter symbols --marker"
+            "--reporter symbols --marker", "--cycles --reporter symbols --marker"
         ]
     )
+
+
+def test_a_bun_command_runs_no_install_script_and_caches_under_the_clone(
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config
+):
+    """
+    Asserts that the environment mise sets for every command in the clone,
+    a `bun` typed by hand included, skips each package's install scripts
+    and puts Bun's install cache under `.cache/bun`, clearing both variables
+    first so neither reaches the command from the shell running the suite.
+    """
+    for name in ("BUN_INSTALL_CACHE_DIR", "NPM_CONFIG_IGNORE_SCRIPTS"):
+        monkeypatch.delenv(name, raising=False)
+    printed = run(
+        [
+            "mise", "x",
+            "--", "sh",
+            "-c", 'printf "%s\\n" "$NPM_CONFIG_IGNORE_SCRIPTS" "$BUN_INSTALL_CACHE_DIR"'
+        ],
+        capture_output = True,
+        check          = True,
+        cwd            = pytestconfig.rootpath / "docs",
+        text           = True
+    )
+
+    assert printed.stdout.splitlines() == [
+        "true",
+        str(pytestconfig.rootpath / ".cache/bun")
+    ]
 
 
 def test_the_install_installs_from_the_lockfile_and_prunes(
@@ -187,6 +217,26 @@ def test_the_install_installs_from_the_lockfile_and_prunes(
     ran(site, pytestconfig, "install")
 
     assert bun.commands == ["bun install --frozen-lockfile", "bun prune"]
+
+
+@mark.parametrize("component", [".vitepress/Card.vue", "kit/Card.vue"])
+def test_the_type_check_refuses_a_single_file_component(
+    component    : str,
+    pytestconfig : Config,
+    site         : Path
+):
+    """
+    Asserts that the type check fails before `tsc` runs, naming each
+    single-file component under `.vitepress` or the kit, since `tsc` reads
+    none, and leaving one under the kit's own packages alone.
+    """
+    (site / "kit/node_modules").mkdir()
+    (site / "kit/node_modules/Packaged.vue").write_text("", encoding="utf-8")
+    (site / component).write_text("", encoding="utf-8")
+    checked = ran(site, pytestconfig, "typecheck")
+
+    assert (checked.returncode, checked.stdout) == (1, "")
+    assert checked.stderr.rstrip().endswith(component)
 
 
 def test_the_link_check_reads_the_built_site_and_the_guides_offline(
@@ -212,25 +262,5 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
         str(dist),
         "--marker",
         str(dist),
-        "../README.md", "../.github/CONTRIBUTING.md"
+        "../.github/README.md", "../.github/CONTRIBUTING.md"
     ]
-
-
-@mark.parametrize("component", [".vitepress/Card.vue", "kit/Card.vue"])
-def test_the_type_check_refuses_a_single_file_component(
-    component    : str,
-    pytestconfig : Config,
-    site         : Path
-):
-    """
-    Asserts that the type check fails before `tsc` runs, naming each
-    single-file component under `.vitepress` or the kit, since `tsc` reads
-    none, and leaving one under the kit's own packages alone.
-    """
-    (site / "kit/node_modules").mkdir()
-    (site / "kit/node_modules/Packaged.vue").write_text("", encoding="utf-8")
-    (site / component).write_text("", encoding="utf-8")
-    checked = ran(site, pytestconfig, "typecheck")
-
-    assert (checked.returncode, checked.stdout) == (1, "")
-    assert checked.stderr.rstrip().endswith(component)

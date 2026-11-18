@@ -3,7 +3,8 @@ Holds `Page`, one Markdown file parsed the way the site parses a page. The
 `docs:render` task runs it over every Markdown file git tracks, so a page
 carries only the marker of each study it cites, such as `[^cavagna2010]`,
 and the pair of HTML comments bounding each region, while the task writes
-each definition from `docs/references.bib` and the body of each region.
+each definition from `docs/pages/references.bib` and the body of each
+region.
 """
 
 from collections.abc          import Mapping

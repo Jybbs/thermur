@@ -1,7 +1,7 @@
 import { configDefaults, defineConfig } from 'vitest/config'
 
-import { cacheDir } from './lib/paths.ts'
-import { shared }   from './lib/vite.ts'
+import { cacheDir } from '../lib/paths.ts'
+import { shared }   from '../lib/vite.ts'
 
 export default defineConfig({
   ...shared(),
@@ -16,7 +16,7 @@ export default defineConfig({
       '**/.gitignore',
       '**/.mise/**',
       '**/.vitepress/**/*.{css,snap}',
-      '**/.vitepress/*.config.ts',
+      '**/.vitepress/config/**',
       '**/.vitepress/{lib,theme}/**/*.ts',
       '**/fonts/**',
       '**/kit/src/*/*.json',

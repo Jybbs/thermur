@@ -10,7 +10,6 @@ from collections.abc    import Callable
 from common.edits       import executable, git
 from common.environment import CLEARED
 from common.stand_ins   import StandIn
-from json               import loads
 from os                 import environ, pathsep
 from pathlib            import Path
 from pytest             import (
@@ -144,22 +143,28 @@ def pins(pytestconfig: Config) -> dict[str, str]:
         The `actions/checkout` commit, the minor `requires-python` sets as
         the floor, the runner image the first job runs on, the `minijinja`
         release `uv.lock` resolves, the `node` major, `python`, and `uv`
-        mise pins, the `@types/node` and `vitest` releases the site pins,
-        and each build requirement and constraint, by its package's name.
+        mise pins, the `@types/node`, `knip`, and `vitest` releases the
+        site pins, the `glob` release its `overrides` holds, the
+        `@zag-js/toggle` release the kit pins as `toggle`, and each build
+        requirement and constraint, by its package's name.
     """
     worktree = Checkout(root=pytestconfig.rootpath)
     manifest = worktree.manifest
-    site     = loads(worktree.read(Path("docs/package.json")))["devDependencies"]
+    site     = worktree.dependencies[worktree.package.file].dev
     tools    = from_toml(worktree.read(Path(".mise/config.toml")))["tools"]
+    kit      = worktree.dependencies[Path("docs/kit/package.json")].dependencies
     return {
         "checkout"  : dict(step.pin for _, step in worktree.steps if step.pin)[
             "actions/checkout"
         ],
         "floor"     : manifest.floor,
+        "glob"      : worktree.package.overrides["glob"],
         "image"     : next(job for _, _, job in worktree.jobs).image,
+        "knip"      : site["knip"],
         "minijinja" : worktree.lock.versions["minijinja"],
         "node"      : worktree.config.node,
         "python"    : tools["python"],
+        "toggle"    : kit["@zag-js/toggle"],
         "types"     : site["@types/node"],
         "uv"        : tools["uv"],
         "vitest"    : site["vitest"],

@@ -26,7 +26,7 @@ export function pagesDir(metaUrl: string): string {
 }
 
 export function publicDir(metaUrl: string): string {
-  return path.join(docsDir(metaUrl), 'public')
+  return path.join(pagesDir(metaUrl), 'public')
 }
 
 /**
