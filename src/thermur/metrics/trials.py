@@ -17,13 +17,18 @@ from thermur.controller.components import (
     Anisotropic,
     Centroid,
     Constant,
+    Cruise,
     Delayed,
     Elastic,
     Fitted,
+    InertialSpin,
     Intrinsic,
+    Marginal,
     Metric,
+    Nonmutual,
     Overdamped,
     Persistent,
+    Quartic,
     Vectorial,
     Weighted
 )
@@ -46,8 +51,8 @@ measured against.
 
 SIZES = {"large": {"drones": 200}, "middle": {"drones": 100}, "small": {"drones": 30}}
 """
-The flock sizes the cohesion and noise trials fly, as changes to the plan by
-the condition's name.
+The flock sizes the cohesion, noise, and speed trials fly, as changes to the
+plan by the condition's name.
 """
 
 
@@ -137,19 +142,28 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         """
         return f"{self.slot}_trial"
 
-    def composites(self, composite: Composite) -> dict[str, Composite]:
+    def composites(
+        self,
+        composite  : Composite,
+        similarity : float
+    ) -> dict[str, Composite]:
         """
         Lays out each composite the trial flies by name, the reference
-        first, then each candidate in the slot, then each control.
+        first, then each candidate in the slot, then each control, each
+        candidate and control scaled from a starling flock by `similarity`
+        as `Composite.from_settings` scales the reference.
         """
         return {
             REFERENCE: composite,
             **{
-                name: replace(composite, **{self.slot: candidate})
+                name: replace(composite, **{self.slot: candidate.scaled(similarity)})
                 for name, candidate in self.candidates.items()
             },
             **{
-                name: replace(composite, **slots)
+                name: replace(
+                    composite,
+                    **{slot: held.scaled(similarity) for slot, held in slots.items()}
+                )
                 for name, slots in self.controls.items()
             }
         }
@@ -194,7 +208,7 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             and the `log_likelihood` and `coefficient` of each model on each
             candidate's flight.
         """
-        composites = self.composites(composite)
+        composites = self.composites(composite, plan.similarity)
         long       = plan.changed(duration_s=self.duration_s)
         short      = plan.changed(
             duration_s  = 10.0,
@@ -264,7 +278,13 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
                 slot = "coupling"
             ),
             cls(
-                candidates = {"delayed": Delayed(), "overdamped": Overdamped()},
+                candidates = {
+                    "delayed"    : Delayed(),
+                    "inertial"   : InertialSpin(),
+                    "nonmutual"  : Nonmutual(),
+                    "overdamped" : Overdamped(),
+                    "quartic"    : Quartic()
+                },
                 conditions = {
                     "large"       : {"frame_every": 5, "turn_deg": 90.0},
                     "small"       : {"frame_every": 5, "turn_deg": 20.0},
@@ -307,6 +327,16 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
                     Measure(condition="middle", goal=inf, statistic="turn_rate_per_s")
                 ),
                 slot = "noise"
+            ),
+            cls(
+                candidates = {"marginal": Marginal()},
+                conditions = SIZES,
+                controls   = {"fixed": {"speed": Cruise(fixed=True)}},
+                measures   = tuple(
+                    Measure(condition=size, goal=POLARIZATION, statistic="polarization")
+                    for size in SIZES
+                ),
+                slot = "speed"
             )
         ]
 

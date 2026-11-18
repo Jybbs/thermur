@@ -4,17 +4,29 @@ table of the clone's `pyproject.toml` sets for every run beneath a
 `THERMUR_` variable and a value passed in.
 """
 
+from jax               import vmap
+from jax.numpy         import linspace
 from pathlib           import Path
+from pydantic          import model_validator
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 from pydantic_settings.sources import PyprojectTomlConfigSettingsSource
+from typing import Self
 
-from thermur.controller.components import Centered, Consensus, Constant, Cruise, HardSphere, Home, Zig
-from thermur.controller.schemas    import Radio
-from thermur.environment.plant     import Plant
-from thermur.environment.schemas   import Crop, ParametricThreat
-from thermur.metrics.schemas       import Plan
-from thermur.repo.checkout         import Checkout
-from thermur.repo.schemas          import Manifest
+from thermur.controller.components import (
+    Centered,
+    Consensus,
+    Constant,
+    Cruise,
+    HardSphere,
+    Home,
+    Zig
+)
+from thermur.controller.schemas  import Radio
+from thermur.environment.plant   import Plant
+from thermur.environment.schemas import Crop, ParametricThreat
+from thermur.metrics.schemas     import Plan
+from thermur.repo.checkout       import Checkout
+from thermur.repo.schemas        import Manifest
 
 
 class Settings(
@@ -105,6 +117,57 @@ class Settings(
     """
     The front of hot air the graph reads where `simulation` names no output.
     """
+
+    @model_validator(mode="after")
+    def confined(self) -> Self:
+        """
+        Holds one step of the integrator within the stability bound of
+        the speed slot, as `plan.similarity` scales it, at every speed in
+        `plan.airspeeds_m_s`, the step times the slot's stiffness staying at
+        or below two.
+
+        Raises:
+            ValueError: Where `plan.step_s` times the stiffness at a speed
+                        in the range exceeds two, past which one step widens
+                        the gap between two nearly equal speeds there rather
+                        than narrowing it.
+        """
+        if self.speed.fixed:
+            return self
+
+        plan      = self.plan
+        stiffness = abs(
+            vmap(self.speed.scaled(plan.similarity).stiffness, in_axes=(None, 0))(
+                plan.cruise_m_s,
+                linspace(*plan.airspeeds_m_s, 64)
+            )
+        ).max()
+        if plan.step_s * stiffness > 2:
+            raise ValueError(
+                f"A step of {plan.step_s:g} s times the speed slot's stiffness "
+                f"of {stiffness:.3g} per second exceeds two within "
+                f"{plan.airspeeds_m_s[0]:g} to {plan.airspeeds_m_s[1]:g} m/s"
+            )
+
+        return self
+
+    @model_validator(mode="after")
+    def cruising(self) -> Self:
+        """
+        Holds the speed slot's cruise speed to `plan.cruise_m_s`, the speed
+        the plan launches the flock at and a fixed flight holds each drone
+        at.
+
+        Raises:
+            ValueError: Where the two cruise speeds differ.
+        """
+        if self.speed.cruise_m_s != self.plan.cruise_m_s:
+            raise ValueError(
+                f"The speed slot cruises at {self.speed.cruise_m_s:g} m/s, where "
+                f"the plan launches the flock at {self.plan.cruise_m_s:g} m/s"
+            )
+
+        return self
 
     @classmethod
     def settings_customise_sources(

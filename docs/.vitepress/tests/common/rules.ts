@@ -1,5 +1,4 @@
 import { type VueWrapper, mount } from '@vue/test-utils'
-import { vi }                     from 'vitest'
 import type { Component }         from 'vue'
 
 import { type Browser, browser } from './browser.ts'
@@ -18,18 +17,16 @@ export interface Charted {
 /**
  * Mounts `component` into the document at `width` pixels across, its motion
  * running or standing still for a reader who prefers reduced motion, and
- * returns it beside what moves every box to another width and draws it again.
+ * returns it beside what moves every box to another width and draws it again
+ * on the next frame.
  */
 export function charted(component: Component, width: number, reduced = false): Charted {
-  const stand = browser(reduced)
-  let across  = width
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(() =>
-    ({ height: 300, left: 0, top: 0, width: across }) as DOMRect)
+  const stand  = browser(reduced)
   const widget = mount(component, { attachTo: document.body })
   const host   = widget.element as HTMLElement
   const widen  = (next: number): void => {
-    across = next
-    stand.reflow()
+    stand.reflow(undefined, next)
+    stand.frames.run(1)
   }
   widen(width)
   return { host, stand, widen, widget }

@@ -81,8 +81,13 @@ describe('Composite.advance', () => {
 
   it('holds every command inside the plant’s horizontal and vertical bounds', () => {
     const copy = launched()
-    const fast = new Float64Array(copy.positions.length).fill(5000)
-    copy.advance(fast, new Float64Array(copy.count).fill(1), STILL)
+    const fast = new Float64Array(copy.positions.length)
+    for (let at = 0; at < fast.length; at += 3) {
+      const pace = Math.hypot(copy.commands[at]!, copy.commands[at + 1]!, copy.commands[at + 2]!)
+      for (let axis = at; axis < at + 3; axis++) fast[axis] = 5000 * copy.commands[axis]! / pace
+      fast[at + 2] = fast[at + 2]! + 5000
+    }
+    copy.advance(STILL, new Float64Array(copy.count).fill(1), fast)
     for (let at = 0; at < copy.commands.length; at += 3) {
       expect(Math.hypot(copy.commands[at]!, copy.commands[at + 1]!)).toBeCloseTo(model.plant.level_m_s, 9)
       expect(copy.commands[at + 2]).toBeCloseTo(model.plant.climb_m_s, 9)
@@ -178,4 +183,9 @@ describe('Composite', () => {
       expect(() => new Composite(4, other)).toThrow(`The ${slot} slot holds Other`)
     }
   )
+
+  it('refuses a model whose speed slot holds the speed fixed', () => {
+    const fixed = { ...model, speed: { ...model.speed, fixed: true } }
+    expect(() => new Composite(4, fixed)).toThrow('The speed slot holds the speed fixed')
+  })
 })
