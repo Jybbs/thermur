@@ -6,10 +6,9 @@ the second drone's action as it stands.
 
 from common.drones import flock_of, still_air, viewed
 from equinox       import filter_jit, tree_at
-from hypothesis    import assume, given, strategies
 from jax           import Array, lax, tree, vmap
-from jax.numpy     import array, concatenate, exp, linspace, newaxis, sqrt, zeros
-from jax.random    import key, normal
+from jax.numpy     import argsort, array, concatenate, exp, flatnonzero, linalg, linspace, newaxis, sqrt, zeros
+from jax.random    import key, normal, split
 from numpy.testing import assert_allclose
 from pytest        import mark, param
 
@@ -45,7 +44,8 @@ from thermur.controller.schemas import (
     Noise,
     Observation,
     across,
-    nearest
+    nearest,
+    unit
 )
 from thermur.environment.air   import Air
 from thermur.environment.plant import Plant
@@ -102,13 +102,22 @@ def acted(
 
 
 @mark.parametrize("composite", COMPOSITES.values(), ids=COMPOSITES.keys())
-@given(
-    distance  = strategies.floats(0.0, 500.0),
-    direction = strategies.tuples(*[strategies.floats(-1.0, 1.0)] * 3).filter(
-        lambda vector: sum(value**2 for value in vector) > 0.01
-    ),
-    pick = strategies.integers(0, DRONES - 2),
-    seed = strategies.integers(0, 2**16)
+@mark.parametrize(
+    ("seed", "pick", "distance", "direction"),
+    [
+        param(0, 0, 1.0, (1.0, 0.0, 0.0), id="nearest-1-m-past-along-x"),
+        param(0, -1, 501.0, (-1.0, 0.0, 0.0), id="farthest-501-m-past-against-x"),
+        param(1, 0, 1.0, (0.0, 0.0, 1.0), id="nearest-1-m-past-straight-up"),
+        param(
+            2**16,
+            -1,
+            501.0,
+            (0.0, 0.0, -1.0),
+            id = "farthest-501-m-past-straight-down"
+        ),
+        param(42, 0, 251.0, (-1.0, -1.0, -1.0), id="nearest-251-m-past-on-a-diagonal"),
+        param(2**15, -1, 1.0, (0.1, 0.01, 0.0), id="farthest-1-m-past-short-vector")
+    ]
 )
 def test_moving_a_drone_the_last_drone_cannot_hear_leaves_an_action_as_it_stands(
     composite : Composite,
@@ -118,25 +127,24 @@ def test_moving_a_drone_the_last_drone_cannot_hear_leaves_an_action_as_it_stands
     seed      : int
 ):
     """
-    Pins locality under the default composite and every candidate, moving a
-    drone beyond the radio's range of the last drone to a point farther from
-    it than both that range and its farthest neighbor, and asserting that
-    the last drone's acceleration and the amplitude of its noise hold.
+    Pins locality under the default composite and every candidate.
+
+    Moves the nearest or the farthest of the drones outside the last drone's
+    radio range along `direction`, to `distance` past the farther of that
+    range and the last drone's farthest neighbor, and asserts that the last
+    drone's acceleration and the amplitude of its noise hold.
     """
-    positions  = 40 * normal(key(seed), (DRONES, 3))
-    velocities = 10 * normal(key(seed + 1), (DRONES, 3))
-    apart      = sqrt(((positions - positions[-1]) ** 2).sum(-1))
-    unheard    = [
-        drone for drone in range(DRONES - 1) if apart[drone] > composite.radio.range_m
-    ]
-    assume(unheard)
-    reach = max(
+    position_key, velocity_key = split(key(seed))
+    positions  = 40 * normal(position_key, (DRONES, 3))
+    velocities = 10 * normal(velocity_key, (DRONES, 3))
+    apart      = linalg.norm(positions - positions[-1], axis=-1)
+    reach      = max(
         float(apart[nearest(NEIGHBORS, positions)[-1]].max()),
         composite.radio.range_m
     )
-    heading = array(direction) / sqrt((array(direction) ** 2).sum())
-    moved   = positions.at[unheard[pick % len(unheard)]].set(
-        positions[-1] + (reach + 1.0 + distance) * heading
+    unheard = flatnonzero(apart[:-1] > composite.radio.range_m)
+    moved   = positions.at[unheard[argsort(apart[unheard])][pick]].set(
+        positions[-1] + (reach + distance) * unit(array(direction))
     )
 
     assert_allclose(

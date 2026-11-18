@@ -53,7 +53,6 @@ Repository = "https://github.com/Jybbs/thermur"
 [dependency-groups]
 dev = [
     "apache-hamilton[experiments]",
-    "hypothesis",
     "minijinja",
     "prose-formatter",
     "pytest",
