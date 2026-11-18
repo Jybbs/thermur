@@ -4,21 +4,25 @@ Pins the core's records, meaning the properties of a `Flock`, what the
 `Composite` sums its slots.
 """
 
-from common.drones import flock_of, still_air, viewed
-from dataclasses   import fields, replace
-from jax           import vmap
-from jax.numpy     import array, eye, full, ones, zeros
-from jax.random    import key
-from lineax        import DiagonalLinearOperator
-from math          import inf
-from numpy.testing import assert_allclose, assert_array_equal
-from pytest        import mark, raises
+from collections.abc import Callable
+from common.drones   import flock_of, still_air, viewed
+from dataclasses     import fields, replace
+from jax             import tree, vmap
+from jax.numpy       import array, eye, full, ones, ones_like, zeros
+from jax.random      import key
+from lineax          import FunctionLinearOperator
+from math            import inf
+from numpy.testing   import assert_allclose, assert_array_equal
+from pytest          import mark, param, raises
 
 from thermur.controller.components import (
     Centroid,
     Consensus,
     Constant,
+    Cruise,
     HardSphere,
+    InertialSpin,
+    Marginal,
     Overdamped,
     Persistent,
     White,
@@ -33,9 +37,15 @@ from thermur.controller.schemas import (
     Radio,
     across,
     nearest,
+    torque,
     unit
 )
 from thermur.pipeline.settings  import Settings
+
+EASTWARD = flock_of(zeros((8, 3)), array([10.0, 0.0, 0.0]) * ones((8, 3)))
+"""
+Eight drones stacked at the origin, each flying east at 10 m/s.
+"""
 
 
 def composite(**slots: Component) -> Composite:
@@ -45,33 +55,33 @@ def composite(**slots: Component) -> Composite:
     return replace(Composite.from_settings(Settings()), **slots)
 
 
-def test_a_bare_component_declares_no_action():
+@mark.parametrize(
+    "act",
+    [
+        param(lambda view: Component()(view), id="component"),
+        param(lambda view: Noise().amplitudes(view), id="noise")
+    ]
+)
+def test_a_bare_component_declares_no_action(act: Callable[[Observation], object]):
     """
     Asserts that the abstract slot and the abstract noise each raise until a
     subclass fills them.
     """
     with raises(NotImplementedError):
-        Component()(viewed([[1.0, 0.0, 0.0]]))
-
-    with raises(NotImplementedError):
-        Noise().amplitudes(viewed([[1.0, 0.0, 0.0]]))
+        act(viewed([[1.0, 0.0, 0.0]]))
 
 
-def test_a_confined_heading_accelerates_only_across_the_velocity():
+def test_a_fixed_speed_leaves_no_acceleration_along_the_velocity():
     """
-    Asserts that a slot pushing along the velocity turns no drone under a
-    heading holding the speed, and reaches it under one leaving the speed
-    free.
+    Asserts that a speed slot holding the speed fixed takes out the part
+    along the velocity that a free one and a heading leaving the speed free
+    each add.
     """
-    ahead = viewed([[20.0, 0.0, 0.0]] * 7)
-    slots = {
-        "cohesion" : Centroid(),
-        "noise"    : White(),
-        "contact"  : HardSphere(sphere_m=30.0)
-    }
+    faster = viewed([[20.0, 0.0, 0.0]] * 7, neighbors=array([[20.0, 0.0, 0.0]] * 7))
+    fixed  = composite(heading=Consensus(), speed=Marginal(fixed=True))(faster)[0][0]
 
-    assert_allclose(composite(heading=Overdamped(), **slots)(ahead)[0], 0.0, atol=1e-4)
-    assert abs(float(composite(heading=Consensus(), **slots)(ahead)[0])) > 1.0
+    assert float(composite(heading=Consensus(), speed=Marginal())(faster)[0][0]) > 1.0
+    assert_allclose(fixed, 0.0, atol=1e-4)
 
 
 def test_a_flock_reads_its_polarization_at_each_extreme():
@@ -145,6 +155,30 @@ def test_a_radio_faster_than_the_step_delivers_at_every_step():
     )
 
 
+def test_a_steering_heading_leaves_the_speed_to_the_speed_slot():
+    """
+    Asserts that a cohesion and a contact pushing along the velocity change
+    no speed under a steering heading or a heading leaving the speed free,
+    so the acceleration along it is the speed slot's alone.
+    """
+    ahead = viewed([[20.0, 0.0, 0.0]] * 7, neighbors=array([[12.0, 0.0, 0.0]] * 7))
+    slots = {
+        "cohesion" : Centroid(),
+        "contact"  : HardSphere(sphere_m=30.0),
+        "noise"    : White(),
+        "speed"    : Marginal()
+    }
+    weighted = replace(ahead, weights=composite().coupling(ahead))
+    pushed   = composite(**slots, heading=Overdamped())(ahead)[0][0]
+
+    assert_allclose(pushed, Marginal()(weighted)[0], rtol=1e-5)
+    assert_allclose(
+        composite(**slots, heading=Consensus())(ahead)[0][0],
+        Marginal()(weighted)[0] + Consensus()(weighted)[0],
+        rtol = 1e-5
+    )
+
+
 def test_across_removes_the_part_along_each_velocity():
     """
     Asserts that `across` leaves each acceleration with no part along its
@@ -180,32 +214,75 @@ def test_cruising_keeps_each_command_s_direction_at_the_speed():
 
 def test_diffusion_drives_the_command_and_the_force_and_never_a_position():
     """
-    Asserts that the operator the Brownian path enters through holds zero on
-    each position and each velocity and each amplitude the noise gives.
+    Asserts that the operator the Brownian path enters through scales the
+    increment across each command by the noise's amplitude and the one along
+    it by the speed slot's, scales the force's by the noise's, and reaches
+    no position or velocity.
     """
-    flock  = flock_of(zeros((8, 3)), ones((8, 3)))
     sensed = Observation.sensed(
-        flock,
-        Inbox.from_broadcast(flock, inf, flock),
+        EASTWARD,
+        Inbox.from_broadcast(EASTWARD, inf, EASTWARD),
         still_air(),
         0.0,
-        7
+        7,
+        10.0
     )
+    increment = tree.map(ones_like, EASTWARD)
+    slots     = {"heading": Overdamped(), "speed": Marginal(amplitude=0.5)}
 
-    white      = composite(noise=White(amplitude=2.0)).diffusion(0.0, flock, sensed)
+    white = composite(**slots, noise=White(amplitude=2.0)).diffusion(
+        0.0,
+        EASTWARD,
+        sensed
+    )
     persistent = composite(
+        **slots,
         noise = Persistent(persistence_s=0.5, strength_m_s2=3.0)
     ).diffusion(
-        0.0, flock, sensed
+        0.0, EASTWARD, sensed
     )
 
-    assert isinstance(white, DiagonalLinearOperator)
-    assert_allclose(white.diagonal.positions, 0.0)
-    assert_allclose(white.diagonal.velocities, 0.0)
-    assert_allclose(white.diagonal.commands, 2.0)
-    assert_allclose(white.diagonal.forces, 0.0)
-    assert_allclose(persistent.diagonal.commands, 0.0)
-    assert_allclose(persistent.diagonal.forces, 6.0)
+    kicked = white.mv(increment)
+    forced = persistent.mv(increment)
+
+    assert isinstance(white, FunctionLinearOperator)
+    assert_allclose(kicked.positions, 0.0)
+    assert_allclose(kicked.velocities, 0.0)
+    assert_allclose(kicked.commands, [[0.5, 2.0, 2.0]] * 8)
+    assert_allclose(kicked.forces, 0.0)
+    assert_allclose(kicked.spins, 0.0)
+    assert_allclose(forced.commands, [[0.5, 0.0, 0.0]] * 8)
+    assert_allclose(forced.forces, 6.0)
+
+
+def test_diffusion_under_a_spin_drives_the_spin_rather_than_the_heading():
+    """
+    Asserts that under the inertial spin the increment across the command
+    reaches the spin as its torque, scaled by the square root of the
+    friction over the inertia, and leaves the command only the increment
+    along it.
+    """
+    kicked = composite(
+        heading = InertialSpin(friction=0.25, inertia_s=2.0),
+        noise   = White(amplitude=2.0),
+        speed   = Marginal(amplitude=0.5)
+    ).diffusion(
+        0.0,
+        EASTWARD,
+        Observation.sensed(
+            EASTWARD,
+            Inbox.from_broadcast(EASTWARD, inf, EASTWARD),
+            still_air(),
+            0.0,
+            7,
+            10.0
+        )
+    ).mv(
+        flock_of(zeros((8, 3)), array([1.0, 0.0, 1.0]) * ones((8, 3)))
+    )
+
+    assert_allclose(kicked.commands, [[0.5, 0.0, 0.0]] * 8)
+    assert_allclose(kicked.spins, [[0.0, -0.5 * 2.0 / 10.0 / 2.0, 0.0]] * 8, rtol=1e-5)
 
 
 def test_drift_moves_each_position_by_its_velocity_and_the_wind():
@@ -225,15 +302,18 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
         Inbox.from_broadcast(flock, inf, flock),
         still_air(wind=(1.0, -2.0, 0.5)),
         0.0,
-        7
+        7,
+        12.0
     )
     slots = composite(noise=Persistent(persistence_s=2.0))
 
-    rates = slots.drift(0.0, flock, sensed)
+    rates               = slots.drift(0.0, flock, sensed)
+    accelerations, spun = vmap(slots)(sensed)
 
     assert_allclose(rates.positions, flock.velocities + array([1.0, -2.0, 0.5]))
     assert_allclose(rates.forces, 0.0)
-    assert_allclose(rates.commands, vmap(slots)(sensed))
+    assert_allclose(rates.commands, accelerations)
+    assert_allclose(rates.spins, spun)
     assert_allclose(rates.velocities, [[0.0, 2.0, 0.0]] * 8, rtol=1e-6)
 
 
@@ -278,7 +358,8 @@ def test_exciting_the_flock_copies_a_zig_sooner_by_the_radio_s_delay():
             Inbox.from_broadcast(flock, built.radio.range_m, flock),
             still_air(),
             0.0,
-            2
+            2,
+            10.0
         ),
         0.1
     )
@@ -320,7 +401,8 @@ def test_exciting_the_flock_counts_down_and_starts_a_zig_at_the_rim():
             Inbox.from_broadcast(flock, built.radio.range_m, flock),
             still_air(),
             0.0,
-            2
+            2,
+            10.0
         ),
         0.1
     )
@@ -380,15 +462,42 @@ def test_the_heading_turns_a_drone_at_the_rate_its_coupling_sets(rate: float):
     """
     Asserts that the composite hands its heading the rate the coupling sets,
     so a drone whose neighbor flies one meter per second across it turns at
-    that rate times the difference under the heading holding the speed.
+    that rate times the difference under the heading holding the speed, and
+    the inertial spin takes that pull as a torque over its inertia.
     """
-    view = viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]]))
+    view     = viewed([[10.0, 0.0, 0.0]], neighbors=array([[10.0, 1.0, 0.0]]))
+    coupling = Constant(coupling_per_s=rate)
+    fixed    = Marginal(fixed=True)
 
     assert_allclose(
-        composite(coupling=Constant(coupling_per_s=rate), heading=Overdamped())(view),
+        composite(coupling=coupling, heading=Overdamped(), speed=fixed)(view)[0],
         [0.0, rate, 0.0],
         atol = 1e-6
     )
+    assert_allclose(
+        composite(coupling=coupling, heading=InertialSpin(inertia_s=2.0))(view)[1],
+        [0.0, 0.0, rate / 10.0 / 2.0],
+        atol = 1e-6
+    )
+
+
+@mark.parametrize(
+    ("acceleration", "velocity", "expected"),
+    [
+        ([0.0, 2.0, 0.0], [2.0, 0.0, 0.0], [0.0, 0.0, 1.0]),
+        ([0.0, 2.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0])
+    ]
+)
+def test_torque_turns_a_velocity_at_its_rate_and_holds_a_stopped_drone(
+    acceleration : list[float],
+    velocity     : list[float],
+    expected     : list[float]
+):
+    """
+    Asserts that `torque` returns the angular velocity at which an
+    acceleration across a velocity turns it, and none for a stopped drone.
+    """
+    assert_allclose(torque(array(acceleration), array(velocity)), expected)
 
 
 @mark.parametrize(
@@ -412,8 +521,8 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
     """
     Asserts that an observation ranks the neighbors by the distance the
     drone heard and holds each one's offset, distance, velocity and delayed
-    velocity as the drone heard them, beside the drone's own position and
-    command and the air at its position.
+    velocity as the drone heard them, beside the drone's own position,
+    command, and spin, the cruise speed, and the air at its position.
     """
     positions  = array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [3.0, 0.0, 0.0]])
     velocities = array([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0]])
@@ -425,7 +534,8 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
         Inbox.from_broadcast(flock_of(positions, 2 * velocities), inf, sent),
         still_air(5.0),
         0.0,
-        2
+        2,
+        10.0
     )
 
     assert_allclose(sensed.offsets[0], [[0.5, 0.0, 0.0], [2.5, 0.0, 0.0]])
@@ -434,7 +544,9 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
     assert_allclose(sensed.delayed[0], [[4.0, 0.0, 0.0], [6.0, 0.0, 0.0]])
     assert_array_equal(sensed.position, positions)
     assert_array_equal(sensed.velocity, flock.commands)
+    assert_array_equal(sensed.spin, flock.spins)
     assert_allclose(sensed.air["excess"], 5.0)
+    assert_allclose(sensed.cruise, [10.0, 10.0, 10.0])
 
 
 def test_sensing_ranks_neighbors_by_the_positions_the_drone_heard():
@@ -455,29 +567,41 @@ def test_sensing_ranks_neighbors_by_the_positions_the_drone_heard():
         Inbox.from_broadcast(flock, inf, sent),
         still_air(),
         0.0,
-        2
+        2,
+        10.0
     )
 
     assert_allclose(sensed.offsets[0], [[2.0, 0.0, 0.0], [4.0, 0.0, 0.0]])
     assert_allclose(sensed.distances[0], [2.0, 4.0])
 
 
-@mark.parametrize("slot", ["roost", "speed"])
-def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(slot: str):
+@mark.parametrize(
+    ("slot", "idle"),
+    [
+        param("roost", Centroid(stiffness_per_s2=0.0), id="roost"),
+        param("speed", Cruise(cruise_m_s=8.0), id="speed")
+    ]
+)
+def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(
+    slot : str,
+    idle : Component
+):
     """
     Asserts that the composite's command rate carries the roost's turn and
-    pull and the speed control beside every other slot, for a drone slow,
-    high, and past the rim of the roost.
+    pull and the speed slot's acceleration beside every other slot, against
+    a composite holding that slot idle, for a drone slower than the cruise
+    speed, high, and past the rim of the roost.
     """
     view = viewed(
         [[20.0, 0.0, 0.0]] * 7,
         (8.0, 0.0, 0.0),
+        cruise   = array(10.0),
         position = array([-10.0, 1700.0, 130.0])
     )
     settings = Settings()
 
     assert_allclose(
-        composite()(view) - composite(**{slot: Centroid(stiffness_per_s2=0.0)})(view),
+        composite()(view)[0] - composite(**{slot: idle})(view)[0],
         getattr(settings, slot).scaled(settings.plan.similarity)(view),
         atol = 1e-5
     )
@@ -497,7 +621,8 @@ def test_sensing_reads_a_neighbor_out_of_range_as_one_on_the_drone():
         Inbox.from_broadcast(flock, 10.0, flock),
         still_air(),
         0.0,
-        2
+        2,
+        10.0
     )
 
     assert_allclose(sensed.offsets[0], [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
@@ -533,7 +658,8 @@ def test_sensing_reads_centrality_over_every_held_sender():
         Inbox.from_broadcast(flock, 10.0, flock),
         still_air(),
         0.0,
-        1
+        1,
+        10.0
     )
 
     assert_allclose(sensed.centrality[0], 1 / 3, rtol=1e-6)
@@ -645,7 +771,7 @@ def test_the_radio_hears_at_launch_only_the_drones_within_its_range():
 
     assert_array_equal(inbox.heard[0], [True, True, False])
     assert_allclose(
-        Observation.sensed(flock, inbox, still_air(), 0.0, 2).offsets[0],
+        Observation.sensed(flock, inbox, still_air(), 0.0, 2, 10.0).offsets[0],
         [[5.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     )
 

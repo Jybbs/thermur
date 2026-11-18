@@ -42,5 +42,16 @@
     "small": {
       "drones": 30
     }
+  },
+  "speed": {
+    "large": {
+      "drones": 200
+    },
+    "middle": {
+      "drones": 100
+    },
+    "small": {
+      "drones": 30
+    }
   }
 }

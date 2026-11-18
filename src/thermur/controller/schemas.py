@@ -2,20 +2,22 @@
 Holds the records of the numerical core, meaning the `Flock` a flight steps,
 the `Radio` carrying each drone's state to the others and the `Inbox` it
 keeps, the `Observation` that is the one input a slot reads, the abstract
-`Component` filling a slot, and the `Composite` summing the slots the
-settings nest by name.
+`Component` filling a slot with the `Heading`, `Noise`, and `Speed` bases,
+and the `Composite` summing the slots the settings nest by name.
 """
 
 from dataclasses import fields
 from equinox     import Module, field, tree_at
 from functools   import partial
-from jax         import Array, lax, tree, vmap
+from jax         import Array, ShapeDtypeStruct, lax, tree, vmap
 from jax.numpy     import (
     broadcast_to,
+    cross,
     einsum,
     expand_dims,
     eye,
     finfo,
+    full,
     isfinite,
     linalg,
     maximum,
@@ -25,7 +27,7 @@ from jax.numpy     import (
     zeros_like
 )
 from jax.random    import bernoulli, fold_in, uniform
-from lineax        import DiagonalLinearOperator
+from lineax        import FunctionLinearOperator
 from math          import inf
 from numpy         import arange, argsort, asarray, ndarray, newaxis, take_along_axis
 from pydantic      import Field
@@ -60,6 +62,12 @@ class Flock(Module):
     positions: Array
     """
     Each drone's east, north, and height above the ground, in meters.
+    """
+
+    spins: Array
+    """
+    Each drone's spin, the angular velocity at which its command turns, in
+    radians per second, zero under a heading slot holding none.
     """
 
     velocities: Array
@@ -100,9 +108,19 @@ class Flock(Module):
         """
         return linalg.norm(self.headings.mean(-2), axis=-1)
 
-    def cruising(self, speed_m_s: float) -> Self:
+    @property
+    def shapes(self) -> Self:
         """
-        Scales each drone's command to `speed_m_s`, keeping its direction.
+        Lays out the shape and the type of each array, the structure a
+        Brownian path over the flock or an operator onto it reads.
+        """
+        return tree.map(lambda leaf: ShapeDtypeStruct(leaf.shape, leaf.dtype), self)
+
+    def cruising(self, speed_m_s: float | Array) -> Self:
+        """
+        Scales each drone's command to `speed_m_s`, one speed for every
+        drone or one per drone as `(..., n_drones, 1)`, keeping its
+        direction.
         """
         return tree_at(
             lambda flock: flock.commands,
@@ -338,6 +356,11 @@ class Observation(Module):
     near zero inside the flock and rising toward one at its border.
     """
 
+    cruise: Array
+    """
+    The speed the flight sets each drone to cruise at, in meters per second.
+    """
+
     delayed: Array
     """
     Each neighbor's velocity `Heading.lag_s` before the state its radio last
@@ -376,6 +399,12 @@ class Observation(Module):
     position: Array
     """
     The drone's own east, north, and height above the ground, in meters.
+    """
+
+    spin: Array
+    """
+    The drone's own spin, the angular velocity at which its command turns,
+    in radians per second.
     """
 
     velocity: Array
@@ -419,11 +448,12 @@ class Observation(Module):
     @classmethod
     def sensed(  # prose: ignore[unsorted-positionals]
         cls,
-        flock : Flock,
-        inbox : Inbox,
-        air   : Air,
-        t     : Array,
-        count : int
+        flock  : Flock,
+        inbox  : Inbox,
+        air    : Air,
+        t      : Array,
+        count  : int,
+        cruise : float
     ) -> Self:
         """
         Builds what every drone senses from its `count` nearest neighbors,
@@ -437,11 +467,12 @@ class Observation(Module):
         mean over the neighbors.
 
         Args:
-            flock : The state each drone senses.
-            inbox : The states each drone last heard of every other.
-            air   : The channels each drone reads at its position.
-            t     : The time, in seconds since the simulation started.
-            count : The number of neighbors each drone senses.
+            flock  : The state each drone senses.
+            inbox  : The states each drone last heard of every other.
+            air    : The channels each drone reads at its position.
+            t      : The time, in seconds since the simulation started.
+            count  : The number of neighbors each drone senses.
+            cruise : The speed each drone cruises at, in meters per second.
 
         Returns:
             The observation of the flock, one row per drone.
@@ -472,6 +503,7 @@ class Observation(Module):
                 where(held[..., newaxis], unit(apart), 0.0).sum(1),
                 axis = -1
             ) / maximum(held.sum(1), 1),
+            cruise    = full(drones, cruise),
             delayed   = told(inbox.delayed, flock.commands),
             distances = linalg.norm(offsets, axis=-1),
             force     = flock.forces,
@@ -479,6 +511,7 @@ class Observation(Module):
             neighbors = told(inbox.velocities, flock.commands),
             offsets   = offsets,
             position  = positions,
+            spin      = flock.spins,
             velocity  = flock.commands,
             weights   = zeros_like(indices, dtype="float32")
         )
@@ -509,19 +542,59 @@ class Component(Module):
 
 class Heading(Component):
     """
-    The slot turning a drone toward its neighbors, returning an acceleration
-    in meters per second squared.
-    """
-
-    confined: ClassVar[bool] = True
-    """
-    Whether a flight holds each drone at the cruise speed.
+    The slot turning a drone toward its neighbors, whose call returns the
+    pull of its neighbors in meters per second squared.
     """
 
     lag_s: ClassVar[float] = 0.0
     """
     The age of the neighbor states the slot reads, in seconds.
     """
+
+    steering: ClassVar[bool] = True
+    """
+    Whether the pull only turns the drone's command, leaving its speed to
+    the speed slot.
+    """
+
+    def kicked(self, increment: Array, observation: Observation) -> tuple[Array, Array]:
+        """
+        Passes a Brownian increment of the drone's command, across it, to
+        the command whole, leaving the spin unchanged.
+
+        Args:
+            increment   : The increment of the command across it, in meters
+                          per second.
+            observation : What the drone senses.
+
+        Returns:
+            The increment of the drone's command, in meters per second, and
+            of its spin, in radians per second.
+        """
+        return increment, zeros_like(observation.spin)
+
+    def steered(self, force: Array, observation: Observation) -> tuple[Array, Array]:
+        """
+        Adds `force` to the pull, keeping the part of the sum across the
+        drone's command where the slot steers and otherwise the part of
+        `force` alone, holding the spin at zero.
+
+        Args:
+            force       : The other slots' acceleration on the drone, in
+                          meters per second squared.
+            observation : What the drone senses, its weights set.
+
+        Returns:
+            The rate of the drone's command, in meters per second squared,
+            and of its spin, in radians per second squared.
+        """
+        pull    = self(observation)
+        command = observation.velocity
+        return (
+            across(pull + force, command) if self.steering
+            else pull + across(force, command),
+            zeros_like(observation.spin)
+        )
 
 
 class Noise(Component):
@@ -577,6 +650,28 @@ class Noise(Component):
         return zeros_like(observation.force)
 
 
+@documented
+class Speed(Component):
+    """
+    The slot setting the rate of a drone's command along it, returning it in
+    meters per second squared.
+    """
+
+    fixed: bool = field(default=False, static=True)
+    """
+    Whether a flight holds each drone at the cruise speed, leaving no speed
+    to fluctuate.
+    """
+
+    def kicked(self, increment: Array, observation: Observation) -> Array:
+        """
+        Scales the part of a unit Brownian increment along the drone's
+        command into the increment of its speed, in meters per second, none
+        for a slot driving no noise of its own.
+        """
+        return zeros_like(increment)
+
+
 class Composite(Module):
     """
     The slots the settings nest by name, summed for every drone into the
@@ -625,57 +720,78 @@ class Composite(Module):
     The acceleration holding a drone over the roost.
     """
 
-    speed: Component
+    speed: Speed
     """
-    The acceleration relaxing a drone's speed toward the cruise speed.
+    The acceleration along a drone's command.
     """
 
-    def __call__(self, observation: Observation) -> Array:
+    def __call__(self, observation: Observation) -> tuple[Array, Array]:
         """
-        Sums the slots for one drone, the heading reading the weights the
-        coupling sets, and takes the part across the drone's command where
-        the heading holds the speed fixed.
+        Turns the cohesion, the contact, the noise, and the roost through
+        the heading, which reads the weights the coupling sets, then adds
+        the speed slot's acceleration, or keeps only the part across the
+        drone's command where the speed slot holds the speed fixed.
 
         Returns:
-            The rate of the drone's command, in meters per second squared.
+            The rate of the drone's command, in meters per second squared,
+            and the rate of change of its spin, in radians per second
+            squared.
         """
         weighted = tree_at(
             lambda sensed: sensed.weights,
             observation,
             self.coupling(observation)
         )
-        total = sum(
-            (
-                self.cohesion(observation),
-                self.contact(observation),
-                self.heading(weighted),
-                self.noise(observation),
-                self.roost(observation),
-                self.speed(observation)
-            )
+        turned, spun = self.heading.steered(
+            self.cohesion(observation)
+            + self.contact(observation)
+            + self.noise(observation)
+            + self.roost(observation),
+            weighted
         )
-        return across(total, observation.velocity) if self.heading.confined else total
+        return (
+            across(turned, observation.velocity) if self.speed.fixed
+            else turned + self.speed(weighted),
+            spun
+        )
 
     def diffusion(
         self,
         _           : Array,
         flock       : Flock,
         observation : Observation
-    ) -> DiagonalLinearOperator:
+    ) -> FunctionLinearOperator:
         """
-        Lays out the amplitude of every Brownian increment, each driving
-        a command or a force and none a position or a velocity, as the
-        diagonal operator a diffrax `ControlTerm` reads.
+        Maps the Brownian increments onto every drone's state, none reaching
+        a position or a velocity, as the operator a diffrax `ControlTerm`
+        reads.
+
+        The noise slot scales the increments of the force and the part of
+        each command increment across the command, which the heading splits
+        between the command and the spin, and the speed slot scales the part
+        along it.
         """
         command, force = vmap(self.noise.amplitudes)(observation)
-        return DiagonalLinearOperator(
-            Flock(
-                commands   = broadcast_to(command[:, newaxis], flock.commands.shape),
-                forces     = broadcast_to(force[:, newaxis], flock.forces.shape),
-                positions  = zeros_like(flock.positions),
-                velocities = zeros_like(flock.velocities)
+
+        def kicked(increment: Flock) -> Flock:
+            """
+            Scales and splits one set of increments, one per array of the
+            flock.
+            """
+            commands, spins = vmap(self.heading.kicked)(
+                command[:, newaxis] * across(increment.commands, observation.velocity),
+                observation
             )
-        )
+            return Flock(
+                commands = commands
+                + vmap(self.speed.kicked)(increment.commands, observation),
+                forces     = force[:, newaxis] * increment.forces,
+                positions  = zeros_like(increment.positions),
+                spins      = spins,
+                velocities = zeros_like(increment.velocities)
+            )
+
+        return FunctionLinearOperator(kicked, flock.shapes)
 
     def drift(self, _: Array, flock: Flock, observation: Observation) -> Flock:
         """
@@ -683,10 +799,12 @@ class Composite(Module):
         of a diffrax `ODETerm`, each drone moving over the ground at its
         velocity through the air plus the wind at its position.
         """
+        commands, spun = vmap(self)(observation)
         return Flock(
-            commands   = vmap(self)(observation),
+            commands   = commands,
             forces     = vmap(self.noise.relaxation)(observation),
             positions  = flock.velocities + observation.wind,
+            spins      = spun,
             velocities = self.plant.tracked(flock.commands, flock.velocities)
         )
 
@@ -737,9 +855,15 @@ def across(accelerations: Array, velocities: Array) -> Array:
     """
     Removes the part of each acceleration along its drone's velocity.
     """
+    return accelerations - along(accelerations, velocities)
+
+
+def along(accelerations: Array, velocities: Array) -> Array:
+    """
+    Projects each acceleration onto its drone's velocity.
+    """
     direction = unit(velocities)
-    along     = (accelerations * direction).sum(-1, keepdims=True)
-    return accelerations - along * direction
+    return (accelerations * direction).sum(-1, keepdims=True) * direction
 
 
 def nearest(count: int, points: Array) -> ndarray:
@@ -773,6 +897,18 @@ def nearest(count: int, points: Array) -> ndarray:
             for row in found
         ]
     ).reshape(*clouds.shape[:-1], count).astype("int32")
+
+
+def torque(accelerations: Array, velocities: Array) -> Array:
+    """
+    Computes the angular velocity at which each acceleration turns its
+    drone's velocity, the cross product of the velocity and the acceleration
+    over the squared speed, a stopped drone turning at none.
+    """
+    return cross(velocities, accelerations) / maximum(
+        (velocities**2).sum(-1, keepdims=True),
+        finfo(velocities.dtype).tiny
+    )
 
 
 def unit(vectors: Array) -> Array:

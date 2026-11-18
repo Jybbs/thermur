@@ -98,6 +98,11 @@ Flies the flock, or computes the steps of the graph named.
 │ --noise.side-s FLOAT          The time the drone pushes to its side, in      │
 │                               seconds, at a starling's scale. [default:      │
 │                               0.25]                                          │
+│ --plan.airspeeds-m-s FLOAT    The slowest and the fastest speed at which a   │
+│   FLOAT                       drone's speed stays stable under one step of   │
+│   --plan.empty-airspeeds-m-s  the integrator, in meters per second, the      │
+│                               range the centers of starling flocks fly at.   │
+│                               [default: (6.9, 15.2)]                         │
 │ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │
 │   FLOAT --plan.empty-axes     in proportion, the thin horizontal shape       │
 │                               measured on starling flocks, whose long axis   │
@@ -112,8 +117,8 @@ Flies the flock, or computes the steps of the graph named.
 │                               1000.0, 100.0)]                                │
 │ --plan.course-deg FLOAT       The launch heading in degrees counterclockwise │
 │                               from east, by default west. [default: 180.0]   │
-│ --plan.cruise-m-s FLOAT       The speed a flight holds each drone at, in     │
-│                               meters per second. [default: 10.0]             │
+│ --plan.cruise-m-s FLOAT       The speed each drone launches and cruises at,  │
+│                               in meters per second. [default: 10.0]          │
 │ --plan.drones INT             The size of the flock. [default: 100]          │
 │ --plan.duration-s FLOAT       The length of the flight, in seconds.          │
 │                               [default: 120.0]                               │
@@ -230,6 +235,9 @@ Flies the flock, or computes the steps of the graph named.
 │                               data/samples/wrf_sample.nc the thermur fetch   │
 │                               sample command writes, or None to read the     │
 │                               dataset threat builds.                         │
+│ --speed.fixed                 Whether a flight holds each drone at the       │
+│   --speed.no-fixed            cruise speed, leaving no speed to fluctuate.   │
+│                               [default: False]                               │
 │ --speed.cruise-m-s FLOAT      The speed the drone relaxes toward, in meters  │
 │                               per second, by default the model's cruise      │
 │                               speed of 10 meters per second, which the plan  │
