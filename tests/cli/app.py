@@ -5,6 +5,7 @@ the version, the help of either group, nor the fetch imports JAX or xarray.
 """
 
 from collections.abc    import Callable
+from common.children    import runs
 from importlib          import import_module, reload
 from importlib.metadata import version
 from pytest             import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
@@ -63,6 +64,7 @@ def test_neither_the_version_nor_a_group_s_help_imports_jax_or_xarray():
         ]
     )
 
+    runs("thermur.cli", "thermur.cli.cut", "thermur.cli.fetch")
     started = run(
         [executable, "-c", script],
         capture_output = True,
@@ -88,6 +90,7 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
         ]
     )
 
+    runs("thermur.cli", "thermur.cli.fetch", "thermur.environment.schemas")
     started = run(
         [executable, "-c", script],
         capture_output = True,

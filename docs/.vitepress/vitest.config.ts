@@ -17,7 +17,9 @@ export default defineConfig({
       '**/.mise/**',
       '**/.vitepress/**/*.{css,snap}',
       '**/.vitepress/*.config.ts',
+      '**/.vitepress/{lib,theme}/**/*.ts',
       '**/fonts/**',
+      '**/kit/src/*/*.json',
       '**/public/**'
     ],
     include             : ['.vitepress/tests/**/*.test.ts', 'kit/tests/**/*.test.{ts,tsx}'],

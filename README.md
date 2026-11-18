@@ -434,7 +434,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | **Task** | **What It Does** |
 |---|---|
 | `mise test` | Runs the test suite through pytest, passing any further arguments to it |
-| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, or the whole suite where a changed file lies outside the Python it traces, passing any further arguments to pytest |
+| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, tracing no child process a test starts, or the whole suite where a file other than the Python under `src` or `tests` changed, passing any further arguments to pytest |
 | `mise coverage` | Runs the suite under coverage, failing below 95%, and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |

@@ -85,16 +85,22 @@ def test_each_task_hands_its_program_every_argument(
 @fixture
 def branch(tmp_path: Path) -> Checkout:
     """
-    Commits `src/thermur/flock.py` to `main` in a git repository under
-    `tmp_path`, then switches to a branch cut from that commit, where a case
-    makes its change.
+    Commits `src/thermur/flock.py`, an empty `uv.lock`, and a `.gitignore`
+    ignoring `.cache/` to `main` in a git repository under `tmp_path`,
+    then switches to a branch cut from that commit, where a case makes its
+    change.
 
     Returns:
         The `Checkout` rooted at the repository.
     """
     repository = Checkout(root=tmp_path)
     (tmp_path / "src/thermur").mkdir(parents=True)
-    (tmp_path / "src/thermur/flock.py").write_text("", encoding="utf-8")
+    for path, text in {
+        ".gitignore"           : "/.cache/\n",
+        "src/thermur/flock.py" : "",
+        "uv.lock"              : ""
+    }.items():
+        (tmp_path / path).write_text(text, encoding="utf-8")
     for command in (
         ["init", "--initial-branch=main", "--quiet"],
         ["add", "--all"],
@@ -122,6 +128,12 @@ def branch(tmp_path: Path) -> Checkout:
             id = "python-committed"
         ),
         param({"docs/pages/index.md": "main"}, "--testmon-forceselect", id="main-only"),
+        param({".cache/testmon/data": "tree"}, "--testmon-forceselect", id="ignored"),
+        param(
+            {".mise/tasks/docs/render.py": "commit"},
+            "--testmon-noselect",
+            id = "task-python"
+        ),
         param(
             {"tests/fixtures/flock/case.txt": "tree"},
             "--testmon-noselect",
@@ -159,7 +171,8 @@ def test_the_affected_tests_select_unless_a_change_lies_outside_the_python(
     since the merge base with `main` is Python under `src` or `tests`,
     and with `--testmon-noselect` where any other file changed, whether
     committed on the branch, staged, or left in the working tree. A file
-    committed to `main` after the branch was cut counts as no change.
+    committed to `main` after the branch was cut counts as no change, and so
+    does a file git ignores.
     """
     stand_in("pytest", 'printf "%s\\n" "$TESTMON_DATAFILE" "$@"')
     for path, where in edits.items():
