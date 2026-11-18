@@ -23,7 +23,7 @@ def flight(
     """
     Flies the flock the settings describe through the air.
     """
-    return Flight.flown(composite, air, settings.plan)
+    return Flight.flown(air, composite, settings.plan)
 
 
 def frames(flight: Flight, metrics_digest: str) -> Dataset:
@@ -53,4 +53,4 @@ def flown_trial(
     """
     Flies one open slot's candidates against the reference.
     """
-    return trial.flown(composite, air, settings.plan)
+    return trial.flown(air, composite, settings.plan)

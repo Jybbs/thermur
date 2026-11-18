@@ -45,7 +45,12 @@ passes, with its issue read for whether a fix has shipped:
 """
 
 
-def lazily(importer: str | None, name: str, fromlist: tuple[str, ...] | None) -> bool:  # prose: ignore[unsorted-positionals]
+def lazily(
+    importer : str | None,
+    name     : str,
+    fromlist : tuple[str, ...] | None,
+    /
+) -> bool:
     """
     Lets every import load lazily except one that a module of a package in
     `EAGER` makes, which loads as it runs.

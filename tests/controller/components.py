@@ -84,12 +84,12 @@ def acted(
     """
     flock  = flock_of(positions, velocities)
     sensed = Observation.sensed(
+        air,
+        NEIGHBORS,
+        Plan().cruise_m_s,
         flock,
         Inbox.from_broadcast(flock, composite.radio.range_m, flock),
-        air,
-        0.0,
-        NEIGHBORS,
-        Plan().cruise_m_s
+        0.0
     )
     accelerations, spun = vmap(composite)(sensed)
     return concatenate(
@@ -233,7 +233,7 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
         ),
         param(
             Cruise(cruise_m_s=10.0, relaxation_s=2.0),
-            viewed([[10.0, 0.0, 0.0]], (0.0, 6.0, 0.0)),
+            viewed([[10.0, 0.0, 0.0]], velocity=(0.0, 6.0, 0.0)),
             [0.0, 2.0, 0.0],
             id = "cruise"
         ),
@@ -823,7 +823,7 @@ def test_home_turns_a_drone_from_the_rim_by_its_time_to_reach_it(
     the rim, at most the bound, and by the bound outside the disk.
     """
     assert_allclose(
-        Home()(viewed([[1.0, 0.0, 0.0]], velocity, position=array(position))),
+        Home()(viewed([[1.0, 0.0, 0.0]], velocity=velocity, position=array(position))),
         expected,
         atol = 1e-4,
         rtol = 1e-4
@@ -876,8 +876,8 @@ def test_home_damps_a_drone_s_height_critically(
         Home(height_m=100.0, stiffness_per_s2=0.25)(
             viewed(
                 [[1.0, 0.0, 0.0]],
-                (10.0, 0.0, climb),
-                air = {"excess": array(0.0), "u": array(0.0), "v": array(0.0)}
+                velocity = (10.0, 0.0, climb),
+                air      = {"excess": array(0.0), "u": array(0.0), "v": array(0.0)}
                 | {"w": array(updraft)},
                 position = array([1000.0, 1000.0, height])
             )

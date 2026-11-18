@@ -647,16 +647,16 @@ wheels = [
 
 [[package]]
 name = "prose-formatter"
-version = "0.10.2"
+version = "0.11.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a0/99/fdff07dd36a70c1e2e72e07cbc5316dad68829d1ae7d672166cbde766352/prose_formatter-0.10.2.tar.gz", hash = "sha256:b0ece453493c826915262721f78655884988bd936c687b2eab2ebb082bf103c2", size = 1382019, upload-time = "2026-10-18T22:05:12.282Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/21/d9dbcfa810b11a6f31a32ea83ee01bd0dd8b266ab990d5d2264cc901d7c0/prose_formatter-0.11.0.tar.gz", hash = "sha256:1a1296d07146cf7e3b1b7d08b91428e65f557d2631218ba59c2a7210e93704c9", size = 1408231, upload-time = "2026-11-08T02:25:07.209Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/f9/9399b6c50dadccf52b0f6e023da202136aa51afcd5765a9b78c1dcba9593/prose_formatter-0.10.2-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:7fe64324b06d70c091b2b862ed34d7157f0468ac04f11511bbed96c0ad117662", size = 4153104, upload-time = "2026-10-18T22:05:00.071Z" },
-    { url = "https://files.pythonhosted.org/packages/9a/6d/104f8dec2c89374bff36e5ed77b3ded0569cba9b96576aabd1ec36724922/prose_formatter-0.10.2-py3-none-macosx_11_0_arm64.whl", hash = "sha256:663f347ee5ec0d32c800fb189f34876c4230fe9df199460035daa910cb4d55f2", size = 3773583, upload-time = "2026-10-18T22:05:01.864Z" },
-    { url = "https://files.pythonhosted.org/packages/90/06/c04dba49406ad800d938e356aae68f008e467c7a628d1b1c239b18cc40e9/prose_formatter-0.10.2-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:abdf54270947df6e9df2484946b6379bed61b4ee3d62aa85f5f4e95d11a11a77", size = 3985312, upload-time = "2026-10-18T22:05:03.326Z" },
-    { url = "https://files.pythonhosted.org/packages/a5/41/da347b3044c24de3f6ebd060875bb7f5f5ff82c0261ac87a0db5db8a77a9/prose_formatter-0.10.2-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9e7401dd9de81bab8976337a623e3c6137f5e0db669013d7ecdfbae2acc44e19", size = 4280706, upload-time = "2026-10-18T22:05:05.407Z" },
-    { url = "https://files.pythonhosted.org/packages/78/5c/2c4d0767c551db253e52c0a704e63fa514a5c692b9b893b227b6d42ab640/prose_formatter-0.10.2-py3-none-win_amd64.whl", hash = "sha256:73a51526bd027c90293a5fd2f954b30fd02c6bc65d7fcb75255a8b29a0e963ad", size = 4010687, upload-time = "2026-10-18T22:05:08.789Z" },
-    { url = "https://files.pythonhosted.org/packages/81/35/17c94f788f06f13dd32220770e3ad63eb1ab50279026f4b71cd3cfee674a/prose_formatter-0.10.2-py3-none-win_arm64.whl", hash = "sha256:018391354e958b236afd69a862e39f1b6225d0b31d81d6c27292b76f0f1a475f", size = 3789236, upload-time = "2026-10-18T22:05:10.541Z" },
+    { url = "https://files.pythonhosted.org/packages/61/b8/9b49496595a9738b540866ec314412075b11ab06c36f35274161cae6eee7/prose_formatter-0.11.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:08834103d38cfc402be872f502cc96015e55936a35500065425de53c82b567a8", size = 4266015, upload-time = "2026-11-08T02:24:55.221Z" },
+    { url = "https://files.pythonhosted.org/packages/32/4a/7a5a1a8df5fa1951a93fa9b2b2727655f698757dab3f99bae1188ab0e8be/prose_formatter-0.11.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:f54f04eeeb858dc378e6525972eb7729a7bec9292735ff950dc4cbd32e0efeac", size = 3843126, upload-time = "2026-11-08T02:24:57.283Z" },
+    { url = "https://files.pythonhosted.org/packages/47/bb/85ab5448921b093d7a0df09210dcb9839d5033aed415e900f2c38821461a/prose_formatter-0.11.0-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:fffdce0e4bc22769181efeeffa5aec27ccfc68f2355ae5bdd634882e00ea5b69", size = 4082989, upload-time = "2026-11-08T02:24:59.054Z" },
+    { url = "https://files.pythonhosted.org/packages/54/64/85d00e67c0d988f338860701c76e19ef3bc560a9342978c85e9988f24c17/prose_formatter-0.11.0-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:d8a8b26207987c9ca73d1ccdff9bc4ae934c9dd53abf8bdb41736c091a12312f", size = 4349238, upload-time = "2026-11-08T02:25:01.285Z" },
+    { url = "https://files.pythonhosted.org/packages/3e/1d/d497a7605017654e1ee5d0e5cef926c02b4cbdc8b72e2deec7182a60f55e/prose_formatter-0.11.0-py3-none-win_amd64.whl", hash = "sha256:b21c50503c57a421ea59c0def3a5f9b431332d1d8974dc03732fb3eb546c7548", size = 4064002, upload-time = "2026-11-08T02:25:03.226Z" },
+    { url = "https://files.pythonhosted.org/packages/00/05/9e631c6a9ef8012f47476456c83291df51e2d84e6319fd05d896ad754fec/prose_formatter-0.11.0-py3-none-win_arm64.whl", hash = "sha256:fd0c8ab2a9291c4a57e528c89b7c02113763c6817f2d39c8980627c445401675", size = 3815102, upload-time = "2026-11-08T02:25:05.507Z" },
 ]
 
 [[package]]
