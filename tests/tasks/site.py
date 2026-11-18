@@ -98,6 +98,15 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             id = "test"
         ),
         param(
+            "affected",
+            None,
+            [
+                "vitest", "run", "--changed", "main",
+                "--config", ".vitepress/vitest.config.ts", "--marker"
+            ],
+            id = "affected"
+        ),
+        param(
             "coverage",
             None,
             [

@@ -59,6 +59,7 @@ dev = [
     "pytest-cov",
     "pytest-randomly",
     "pytest-socket",
+    "pytest-testmon",
     "syrupy"
 ]
 

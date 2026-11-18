@@ -2,15 +2,18 @@
 Pins the `thermur` command line, meaning the version it reports, the help
 it prints for itself, for each group, and for each command, and that neither
 the version, the help of either group, nor the fetch imports JAX or xarray.
+It also pins that `spawned`, which those import cases run their children
+through, passes `runs` each `thermur` module its child loaded and returns
+only the lines the script printed.
 """
 
 from collections.abc    import Callable
+from common             import children
+from common.children    import spawned
 from importlib          import import_module, reload
 from importlib.metadata import version
 from pytest             import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
-from subprocess         import run
 from syrupy.assertion   import SnapshotAssertion
-from sys                import executable
 
 
 @fixture
@@ -40,6 +43,19 @@ def printed(
     return call
 
 
+def test_a_spawned_script_runs_the_modules_its_child_loaded(monkeypatch: MonkeyPatch):
+    """
+    Asserts that `spawned` calls `runs` on a `thermur` module its child
+    loaded and returns only the lines the script printed.
+    """
+    received = []
+    monkeypatch.setattr(children, "runs", lambda *modules: received.extend(modules))
+    assert spawned("from thermur.repo import checkout\nprint(checkout.__name__)") == [
+        "thermur.repo.checkout"
+    ]
+    assert "thermur.repo.checkout" in received
+
+
 def test_neither_the_version_nor_a_group_s_help_imports_jax_or_xarray():
     """
     Asserts that a fresh interpreter printing the version, and the help of
@@ -63,14 +79,7 @@ def test_neither_the_version_nor_a_group_s_help_imports_jax_or_xarray():
         ]
     )
 
-    started = run(
-        [executable, "-c", script],
-        capture_output = True,
-        check          = True,
-        text           = True
-    )
-
-    assert started.stdout.splitlines()[-1] == "[]"
+    assert spawned(script)[-1] == "[]"
 
 
 def test_running_the_fetch_imports_neither_jax_nor_xarray():
@@ -88,14 +97,7 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
         ]
     )
 
-    started = run(
-        [executable, "-c", script],
-        capture_output = True,
-        check          = True,
-        text           = True
-    )
-
-    assert started.stdout.splitlines()[-1] == "[]"
+    assert spawned(script)[-1] == "[]"
 
 
 @mark.parametrize(

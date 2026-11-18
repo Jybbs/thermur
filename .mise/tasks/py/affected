@@ -1,0 +1,14 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "affected"
+#MISE description = "Run the tests testmon selects for the changes since the merge base with `main`, tracing no child process a test starts, or the whole suite where a file other than the Python under `src` or `tests` changed, passing any further arguments to `pytest`"
+
+traced=(':(exclude,glob)src/**/*.py' ':(exclude,glob)tests/**/*.py')
+untraced=$(
+  git diff --merge-base --name-only main -- "${traced[@]}" &&
+    git ls-files --exclude-standard --others -- "${traced[@]}"
+)
+selection=--testmon-forceselect
+[[ -z "$untraced" ]] || selection=--testmon-noselect
+
+mkdir -p .cache/testmon
+TESTMON_DATAFILE=.cache/testmon/data pytest "$selection" "$@"
