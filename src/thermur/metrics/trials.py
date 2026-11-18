@@ -196,7 +196,7 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             & table.candidate.isin(list(self.candidates))
         )
 
-    def flown(self, composite: Composite, air: Air, plan: Plan) -> Dataset:  # prose: ignore[unsorted-positionals]
+    def flown(self, air: Air, composite: Composite, plan: Plan) -> Dataset:
         """
         Flies every composite under every condition over one set of seeds,
         then replays one short flight of each through each composite's
@@ -220,14 +220,14 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             [
                 concat(
                     [
-                        Flight.flown(item, air, long.changed(**changes)).statistics
+                        Flight.flown(air, item, long.changed(**changes)).statistics
                         for changes in self.conditions.values()
                     ],
                     DataArray(list(self.conditions), dims="condition")
                 ).assign(
                     **(
-                        Flight.flown(item, air, short)
-                              .likelihoods(composites, air).data_vars
+                        Flight.flown(air, item, short)
+                              .likelihoods(air, composites).data_vars
                     )
                 )
                 for item in composites.values()

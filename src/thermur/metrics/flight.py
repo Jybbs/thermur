@@ -406,7 +406,7 @@ class Flight(Module):
             ).T
         )
 
-    def drifts(self, composite: Composite, air: Air) -> Array:  # prose: ignore[unsorted-positionals]
+    def drifts(self, air: Air, composite: Composite) -> Array:
         """
         Replays each frame but the last through `composite` at the frame's
         own time, every drone hearing the frame each other drone sent
@@ -426,12 +426,12 @@ class Flight(Module):
             Computes the drift across each command of one flock at `t`.
             """
             sensed = Observation.sensed(
-                flock,
-                Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
-                air,
-                t,
-                self.plan.neighbors,
-                self.plan.cruise_m_s
+                air    = air,
+                count  = self.plan.neighbors,
+                cruise = self.plan.cruise_m_s,
+                flock  = flock,
+                inbox  = Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
+                t      = t
             )
             return across(vmap(composite)(sensed)[0], flock.commands)
 
@@ -453,7 +453,7 @@ class Flight(Module):
         )
 
     @classmethod
-    def flown(cls, composite: Composite, air: Air, plan: Plan) -> Self:  # prose: ignore[unsorted-positionals]
+    def flown(cls, air: Air, composite: Composite, plan: Plan) -> Self:
         """
         Flies one flock per seed under `vmap`, compiling once for the batch,
         with each launch and each Brownian path deriving from `plan.seed`.
@@ -500,7 +500,7 @@ class Flight(Module):
             self.frames
         )
 
-    def likelihoods(self, composites: dict[str, Composite], air: Air) -> Dataset:  # prose: ignore[unsorted-positionals]
+    def likelihoods(self, air: Air, composites: dict[str, Composite]) -> Dataset:
         """
         Ranks `composites` by how well each one's drift explains the frames'
         one-step increments, each frame one integrator step apart, through
@@ -518,7 +518,7 @@ class Flight(Module):
             across(diff(commands, axis=1) / self.plan.frame_s, commands[:, :-1])
         )
         drifts = {name: asarray(
-            self.drifts(item, air)
+            self.drifts(air, item)
         ) for name, item in composites.items()}
         variances = [((rates - drift) ** 2).sum(
             -1
@@ -614,9 +614,10 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         ) if plan.turn_deg else moved
         return (turned, heard, sent), None
 
-    def frame(  # prose: ignore[unsorted-positionals]
+    def frame(
         state : tuple[Flock, Inbox, Flock],
-        start : Array
+        start : Array,
+        /
     ) -> tuple[tuple[Flock, Inbox, Flock], Flock]:
         """
         Advances the flock through `frame_every` steps, keeping the last.
@@ -721,8 +722,15 @@ def stepped(
     Returns:
         The flock at `t + plan.step_s`.
     """
-    sensed = Observation.sensed(flock, inbox, air, t, plan.neighbors, plan.cruise_m_s)
-    terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
+    sensed = Observation.sensed(
+        air    = air,
+        count  = plan.neighbors,
+        cruise = plan.cruise_m_s,
+        flock  = flock,
+        inbox  = inbox,
+        t      = t
+    )
+    terms = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
     moved, *_ = Euler().step(terms, t, t + plan.step_s, flock, sensed, None, False)
     turned    = tree_at(
         lambda held: held.commands,
