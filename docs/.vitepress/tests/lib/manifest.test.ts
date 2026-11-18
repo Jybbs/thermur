@@ -19,7 +19,7 @@ test.for([
   ['project.urls.Homepage', MANIFEST.replace('Homepage   = "https://example.org/flock/"', '')],
   ['project.urls.Repository', MANIFEST.replace('Repository = "https://github.com/example/flock"', '')],
   ['project.version', MANIFEST.replace('version     = "2.7.1"', '')]
-] as const)('a manifest without %s names the key it lacks', ([key, manifest], { repository }) => {
+] as const)('a manifest without %s fails with a TypeError naming the key it lacks', ([key, manifest], { repository }) => {
   repository.write('pyproject.toml', manifest)
   expect(() => projectFacts(repository.metaUrl)).toThrow(TypeError)
   expect(() => projectFacts(repository.metaUrl)).toThrow(`no ${key} in `)
