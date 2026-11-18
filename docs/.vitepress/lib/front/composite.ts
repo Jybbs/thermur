@@ -23,15 +23,16 @@ const KINDS = {
  * steps it. Each step the radio delivers, at its rate and late by its delay,
  * the broadcasts its link keeps from the drones within its range, then each
  * drone ranks the senders it heard by the positions it heard, sums the
- * centered cohesion, the hard-sphere contact, the consensus at the constant
- * coupling, the zig, the roost, and the cruise into the rate of its command,
- * and moves through one Euler step of the plan's `step_s`, its velocity
- * carried toward its command by the plant, its command held to the plant's
- * bounds, and its zig started, copied, or counted down. Each drone's east,
- * north, and height sit in meters at three places of `positions`, and its
- * velocity, command, and zig state likewise in `velocities`, `commands`, and
- * `forces`. Every array a step reads and writes is built once, so a step
- * allocates nothing.
+ * consensus at the constant coupling, the part across its command of the
+ * centered cohesion, the hard-sphere contact, the zig, and the roost, and the
+ * cruise into the rate of its command, and moves through one Euler step of the
+ * plan's `step_s`, its velocity carried toward its command by the plant, its
+ * command's speed set to the stepped command's part along its last one and
+ * held to the plant's bounds, and its zig started, copied, or counted down.
+ * Each drone's east, north, and height sit in meters at three places of
+ * `positions`, and its velocity, command, and zig state likewise in
+ * `velocities`, `commands`, and `forces`. Every array a step reads and writes
+ * is built once, so a step allocates nothing.
  */
 export class Composite {
   readonly commands   : Float64Array
@@ -66,6 +67,7 @@ export class Composite {
       const held = model[slot as keyof typeof KINDS].kind
       if (held !== kind) throw new Error(`The ${slot} slot holds ${held}, where the copy flies ${kind}`)
     }
+    if (model.speed.fixed) throw new Error('The speed slot holds the speed fixed, where the copy flies free')
     const { neighbors } = model.plan
     this.count          = count
     this.model          = model
@@ -185,7 +187,10 @@ export class Composite {
 
   /**
    * Sums the slots for the drone at `index` and the push `pushes` holds for it
-   * into `#rates`, keeping the roost's part in `#turns`.
+   * into `#rates`, keeping the roost's part in `#turns`. The consensus pull
+   * enters whole and the cohesion, the contact, the zig, and the roost only
+   * across the command, as the package's spinless heading steers them, and the
+   * cruise relaxes the command's speed toward the cruise speed along it.
    */
   #sense(index: number, pushes: ArrayLike<number>): void {
     const { cohesion, contact, coupling, heading, noise, plan, speed } = this.model
@@ -195,8 +200,8 @@ export class Composite {
     const sums       = this.#sums
     this.#gather(index)
     home(at, commands, this.#turns, this.roost, positions, this.model.roost)
-    const vx        = commands[at]!, vy = commands[at + 1]!
-    const pace      = Math.hypot(vx, vy, commands[at + 2]!)
+    const vx        = commands[at]!, vy = commands[at + 1]!, vz = commands[at + 2]!
+    const pace      = Math.max(Math.hypot(vx, vy, vz), TINY)
     const countdown = forces[at]!
     const zig       = zigging(noise, countdown)
       ? forces[at + 1]! * noise.accel_m_s2 * (noise.refractory_s + noise.back_s < countdown ? 1 : -1)
@@ -205,20 +210,26 @@ export class Composite {
     const together  = centrality * cohesion.weight_m_s2 / Math.max(sums[9]!, 1)
     const away      = -contact.weight_m_s2 / Math.max(sums[10]!, 1)
     const aligned   = coupling.coupling_per_s * (1 + heading.centering / plan.neighbors)
-    const cruise    = (speed.cruise_m_s - pace) / Math.max(pace, TINY) / speed.relaxation_s
+    const rates     = this.#rates
     for (let axis = 0; axis < 3; axis++) {
-      this.#rates[at + axis] = together * sums[3 + axis]! + away * sums[6 + axis]! + aligned * sums[axis]!
-                             + cruise * commands[at + axis]! + this.#turns[at + axis]! + pushes[at + axis]!
+      rates[at + axis] = together * sums[3 + axis]! + away * sums[6 + axis]! + this.#turns[at + axis]!
     }
-    this.#rates[at]     = this.#rates[at]! - zig * vy
-    this.#rates[at + 1] = this.#rates[at + 1]! + zig * vx
+    rates[at]          = rates[at]! - zig * vy
+    rates[at + 1]      = rates[at + 1]! + zig * vx
+    const shed         = (rates[at]! * vx + rates[at + 1]! * vy + rates[at + 2]! * vz) / pace ** 2
+    const cruise       = (speed.cruise_m_s - pace) / pace / speed.relaxation_s
+    for (let axis = 0; axis < 3; axis++) {
+      rates[at + axis] = rates[at + axis]! + aligned * sums[axis]! + pushes[at + axis]!
+                       + (cruise - shed) * commands[at + axis]!
+    }
   }
 
   /**
    * Moves every drone through one step under the Brownian `increments` on each
    * command, the uniform `draws` each drone's zig reads, and the accelerations
    * `pushes` adds to the slots, `increments` and `pushes` laid out as
-   * `positions` is.
+   * `positions` is. The noise's amplitude scales the part of each increment
+   * across the command, and the cruise drives no increment along it.
    */
   advance(increments: ArrayLike<number>, draws: ArrayLike<number>, pushes: ArrayLike<number>): void {
     const { noise, plan, plant }              = this.model
@@ -233,23 +244,25 @@ export class Composite {
         this.#before[axis] = (this.#before[axis]! - velocities[axis]!) / plant.lag_s
       }
       capped(this.#before, at, plant.climbing_m_s2, plant.level_m_s2, -plant.descending_m_s2)
+      const cx     = commands[at]!, cy = commands[at + 1]!, cz = commands[at + 2]!
+      const length = Math.max(Math.hypot(cx, cy, cz), TINY)
+      const kick   = (increments[at]! * cx + increments[at + 1]! * cy + increments[at + 2]! * cz) / length ** 2
       for (let axis = at; axis < at + 3; axis++) {
+        const along        = kick * commands[axis]!
         positions[axis]    = positions[axis]! + step * velocities[axis]!
         velocities[axis]   = velocities[axis]! + step * this.#before[axis]!
         this.#before[axis] = commands[axis]!
-        commands[axis]     = commands[axis]! + step * rates[axis]! + noise.amplitude * increments[axis]!
+        commands[axis]     = commands[axis]! + step * rates[axis]!
+                           + noise.amplitude * (increments[axis]! - along)
       }
+      const kept = (commands[at]! * cx + commands[at + 1]! * cy + commands[at + 2]! * cz) / length
+                 / Math.max(Math.hypot(commands[at]!, commands[at + 1]!, commands[at + 2]!), TINY)
+      for (let axis = at; axis < at + 3; axis++) commands[axis] = commands[axis]! * kept
       capped(commands, at, plant.climb_m_s, plant.level_m_s, -plant.descent_m_s)
     }
     for (let index = 0; index < this.count; index++) {
       excited(
-        this.forces,
-        index * 3,
-        this.#before,
-        draws[index]!,
-        this.model,
-        this.#sides[index]!,
-        this.#turns,
+        this.forces, index * 3, this.#before, draws[index]!, this.model, this.#sides[index]!, this.#turns,
         this.#zigs[index]!
       )
     }
