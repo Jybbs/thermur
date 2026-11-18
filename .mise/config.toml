@@ -1,5 +1,10 @@
 min_version = "2026.9.18"
 
+[doctor.checks.gh]
+description = "`gh` is installed and signed in to GitHub"
+hint        = "Run `gh auth login`, which signs `gh` in to GitHub for the `gh api` calls `mise scan` makes."
+run         = "gh auth status"
+
 [doctor.checks.packages]
 description = "`.venv` holds what `uv.lock` resolves"
 hint        = "Run `mise x -- uv sync`, which installs what `uv.lock` resolves into `.venv`."
@@ -11,6 +16,7 @@ hint        = "Run `mise x -- uv venv --clear` and then `mise x -- uv sync`, whi
 run         = '''test .venv/bin/python -ef "$(mise which python)"'''
 
 [env]
+AUDIT_IGNORE                 = "GHSA-fc5q-39xc-vjpf" # A ReDoS in picomatch, which only the development tooling installs and no release fixes
 HAMILTON_AUTOLOAD_EXTENSIONS = "0"
 HYPOTHESIS_STORAGE_DIRECTORY = "{{config_root}}/.cache/hypothesis"
 PROSE_CACHE_DIR              = "{{config_root}}/.cache/prose"

@@ -16,7 +16,7 @@ export interface Browser {
   motion  : { listeners: Set<() => void>, matches: boolean }
   mutate  : (attribute?: string) => void
   pen     : CanvasRenderingContext2D
-  reflow  : (target?: Element) => void
+  reflow  : (target?: Element, width?: number) => void
   resize  : (width: number, height: number) => void
   see     : (seen: boolean) => void
   wrote   : (key: string) => unknown[]
@@ -206,15 +206,16 @@ function listeners(): () => number {
 }
 
 /**
- * Calls back each observer stand-in of `kind` that watches, or that watches
- * `target` where one is given, with `entries`, leaving out a mutation observer
- * whose filter omits `attribute` where one is given.
+ * Calls back each observer stand-in of `kind` watching `target`, or every one,
+ * with `entries`, or one content box `width` pixels across per box it watches,
+ * leaving out a mutation observer whose filter omits `attribute`.
  */
-function notify(kind: string, entries: unknown[], target?: Element, attribute?: string): void {
+function notify(kind: string, entries: unknown[], target?: Element, attribute?: string, width?: number): void {
   for (const watcher of Watcher.active) {
     const watching = target === undefined || watcher.targets.has(target)
     const filtered = attribute === undefined || watcher.filter?.includes(attribute) !== false
-    if (watcher.kind === kind && watching && filtered) watcher.callback(entries)
+    const boxes    = width === undefined ? entries : [...watcher.targets].map(watched => ({ contentRect: { width }, target: watched }))
+    if (watcher.kind === kind && watching && filtered) watcher.callback(boxes)
   }
 }
 
@@ -278,7 +279,7 @@ export function browser(reduced = false): Browser {
     frames : queued,
     motion : motion,
     mutate : attribute => notify('MutationObserver', [], undefined, attribute),
-    reflow : target => notify('ResizeObserver', [], target),
+    reflow : (target, width = 0) => notify('ResizeObserver', [], target, undefined, width),
     see    : seen => notify('IntersectionObserver', [{ isIntersecting: seen }]),
     held   : () => ({
       canvases  : document.querySelectorAll('canvas').length,

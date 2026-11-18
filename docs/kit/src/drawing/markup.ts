@@ -70,20 +70,27 @@ export const text = (
   svg('text', { 'fill': TONE.ink, 'font-family': face, 'font-size': size, x, y, ...more }, words)
 
 /**
- * Calls `changed` with the host's width, rounded to a pixel, whenever the host
- * takes a nonzero width other than the one it was last drawn at, returning
- * what releases the observer.
+ * Calls `changed` with the host's width as the observer reports it, rounded to
+ * a pixel, on the animation frame after the host takes a nonzero width other
+ * than the one it was last drawn at, so the callback measures no layout and a
+ * redraw that resizes the host runs outside it, and returns what releases the
+ * observer and any frame still waiting.
  */
 export function widthOf(host: HTMLElement, changed: (width: number) => void): () => void {
   let drawn      = 0
-  const observer = new ResizeObserver(() => {
-    const width = Math.round(host.getBoundingClientRect().width)
+  let handle     = 0
+  const observer = new ResizeObserver(([entry]) => {
+    const width = Math.round(entry!.contentRect.width)
     if (width === drawn || width === 0) return
-    drawn = width
-    changed(width)
+    drawn  = width
+    cancelAnimationFrame(handle)
+    handle = requestAnimationFrame(() => changed(width))
   })
   observer.observe(host)
-  return () => observer.disconnect()
+  return () => {
+    observer.disconnect()
+    cancelAnimationFrame(handle)
+  }
 }
 
 /**

@@ -26,14 +26,14 @@ def flight(
     return Flight.flown(composite, air, settings.plan)
 
 
-def frames(flight: Flight) -> Dataset:
+def frames(flight: Flight, metrics_digest: str) -> Dataset:
     """
     Lays the flight's kept frames out as a table.
     """
     return flight.dataset
 
 
-def statistics(flight: Flight) -> Dataset:
+def statistics(flight: Flight, metrics_digest: str) -> Dataset:
     """
     Lays the flight's statistics out as a table.
     """

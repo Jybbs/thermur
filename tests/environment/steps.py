@@ -4,38 +4,26 @@ again on every run, the air the graph lays out from it, and when a rerun
 reads that air back from the cache.
 """
 
+from common.drones            import small
 from common.runs              import computed
 from hamilton.caching.adapter import CachingBehavior
 from numpy.testing            import assert_allclose, assert_array_equal
 from pathlib import Path
 from pytest  import fixture
 
-from thermur.environment.air     import Air
-from thermur.environment.schemas import Crop, Grid, ParametricThreat
-from thermur.environment.wrf     import WrfOutput
-from thermur.pipeline.graph      import Graph
-from thermur.pipeline.settings   import Settings
-from thermur.repo.checkout       import Checkout
+from thermur.environment.air   import Air
+from thermur.environment.wrf   import WrfOutput
+from thermur.pipeline.graph    import Graph
+from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
 
 
 @fixture
 def settings() -> Settings:
     """
-    Builds settings reading the threat on a small grid, which the crop's
-    fixed heights from 20 m to 100 m sit inside.
+    Builds the settings of the small flight `common.drones` declares.
     """
-    return Settings(
-        crop   = Crop(floor_m=20.0, levels=5, spacing_m=20.0),
-        threat = ParametricThreat(
-            edge_m = 10.0,
-            grid   = Grid(
-                columns   = 8,
-                levels    = 10,
-                rows      = 2,
-                snapshots = 2
-            )
-        )
-    )
+    return small()
 
 
 def graphed(clone: Checkout, settings: Settings) -> Graph:
@@ -109,7 +97,7 @@ def test_the_graph_lays_out_the_air_of_the_output_the_settings_choose(
     """
     Asserts that the `air` step returns the air of the output the settings
     choose, here the threat's, and that the output it reads is opened again
-    on every run while the air reads the environment's digest.
+    on every run.
     """
     graph = graphed(clone, settings)
 
@@ -120,4 +108,3 @@ def test_the_graph_lays_out_the_air_of_the_output_the_settings_choose(
     assert_allclose(air.channels, expected.channels)
     cache = graph.driver.cache
     assert cache.behaviors[cache.last_run_id]["wrf_output"] is CachingBehavior.RECOMPUTE
-    assert "environment_digest" in graph.driver.graph.nodes["air"].input_types

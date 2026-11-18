@@ -91,6 +91,52 @@ def test_a_key_no_field_declares_fails(installed: Checkout):
     ]
 
 
+@mark.parametrize(
+    "speed",
+    [
+        param({"relaxation_s": 1e-3}, id="stable"),
+        param({"fixed": True, "relaxation_s": 1e-4}, id="fixed")
+    ]
+)
+def test_a_speed_slot_inside_the_step_s_bound_or_a_fixed_speed_holds(
+    installed : Checkout,
+    speed     : dict[str, object]
+):
+    """
+    Asserts that a speed slot stable under the step, or one holding the
+    speed fixed, which leaves the stiffness unread, passes validation.
+    """
+    assert Tuned(speed=speed).speed.relaxation_s == speed["relaxation_s"]
+
+
+def test_a_speed_slot_cruising_at_the_plan_s_speed_holds(installed: Checkout):
+    """
+    Asserts that a speed slot and a plan set to one cruise speed together
+    pass validation.
+    """
+    tuned = Tuned(plan={"cruise_m_s": 12.0}, speed={"cruise_m_s": 12.0})
+
+    assert tuned.speed.cruise_m_s == tuned.plan.cruise_m_s == 12.0
+
+
+def test_a_speed_slot_cruising_off_the_plan_s_speed_fails(installed: Checkout):
+    """
+    Asserts that a speed slot whose cruise speed differs from the speed the
+    plan launches at fails validation in a flight whose speed is left free.
+    """
+    with raises(ValidationError, match="cruises at 12 m/s, where the plan launches"):
+        Tuned(speed={"cruise_m_s": 12.0})
+
+
+def test_a_speed_slot_too_stiff_for_the_step_fails(installed: Checkout):
+    """
+    Asserts that a speed slot whose stiffness at some speed of the range the
+    plan names, times the step, exceeds two fails validation.
+    """
+    with raises(ValidationError, match="exceeds two within 6.9 to 15.2 m/s"):
+        Tuned(speed={"relaxation_s": 1e-4})
+
+
 def test_a_variable_sets_a_component_as_json(
     installed   : Checkout,
     monkeypatch : MonkeyPatch
