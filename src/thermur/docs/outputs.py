@@ -387,12 +387,12 @@ def flown(
                 composite   = composite,
                 draws       = draws,
                 observation = Observation.sensed(
-                    air,
-                    plan.neighbors,
-                    plan.cruise_m_s,
-                    flock,
-                    inbox,
-                    t
+                    air    = air,
+                    count  = plan.neighbors,
+                    cruise = plan.cruise_m_s,
+                    flock  = flock,
+                    inbox  = inbox,
+                    t      = t
                 ),
                 step_s = plan.step_s
             )

@@ -722,8 +722,15 @@ def stepped(
     Returns:
         The flock at `t + plan.step_s`.
     """
-    sensed = Observation.sensed(air, plan.neighbors, plan.cruise_m_s, flock, inbox, t)
-    terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
+    sensed = Observation.sensed(
+        air    = air,
+        count  = plan.neighbors,
+        cruise = plan.cruise_m_s,
+        flock  = flock,
+        inbox  = inbox,
+        t      = t
+    )
+    terms = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
     moved, *_ = Euler().step(terms, t, t + plan.step_s, flock, sensed, None, False)
     turned    = tree_at(
         lambda held: held.commands,
