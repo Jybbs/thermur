@@ -21,7 +21,7 @@ export interface Flame {
 /**
  * The text of each SVG the public folder holds, by its path from here.
  */
-const publicSvgs = import.meta.glob<string>('../../../public/*.svg', {
+const publicSvgs = import.meta.glob<string>('../../../pages/public/*.svg', {
   eager  : true,
   import : 'default',
   query  : '?raw'
@@ -49,7 +49,7 @@ export class Marks {
    * dark scheme's mark the public folder holds.
    */
   static traced(tones: Tones, identity: Identity): Marks {
-    return new Marks(glyphsOf(publicSvgs[`../../../public/${identity.marks.mark.dark}`]!), tones)
+    return new Marks(glyphsOf(publicSvgs[`../../../pages/public/${identity.marks.mark.dark}`]!), tones)
   }
 
   /**

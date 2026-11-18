@@ -54,7 +54,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "lint",
             "true",
             [
-                "oxlint", "--config", ".vitepress/.oxlintrc.json", "--format",
+                "oxlint", "--config", ".vitepress/config/.oxlintrc.json", "--format",
                 "github", "--marker", ".vitepress", "kit"
             ],
             id = "lint-actions"
@@ -63,7 +63,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "lint",
             None,
             [
-                "oxlint", "--config", ".vitepress/.oxlintrc.json", "--format",
+                "oxlint", "--config", ".vitepress/config/.oxlintrc.json", "--format",
                 "default", "--marker", ".vitepress", "kit"
             ],
             id = "lint-unset"
@@ -72,10 +72,8 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "cruft",
             "true",
             [
-                "knip", "--config", ".vitepress/knip.ts", "--reporter",
-                "github-actions", "--marker", "knip",
-                "--config", ".vitepress/knip.ts", "--cycles",
-                "--reporter", "github-actions", "--marker"
+                "knip", "--reporter", "github-actions", "--marker", "knip",
+                "--cycles", "--reporter", "github-actions", "--marker"
             ],
             id = "cruft-actions"
         ),
@@ -83,8 +81,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             "cruft",
             "",
             [
-                "knip", "--config", ".vitepress/knip.ts", "--reporter", "symbols",
-                "--marker", "knip", "--config", ".vitepress/knip.ts",
+                "knip", "--reporter", "symbols", "--marker", "knip",
                 "--cycles", "--reporter", "symbols", "--marker"
             ],
             id = "cruft-empty"
@@ -94,7 +91,10 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
         param(
             "test",
             None,
-            ["vitest", "run", "--config", ".vitepress/vitest.config.ts", "--marker"],
+            [
+                "vitest", "run", "--config",
+                ".vitepress/config/vitest.config.ts", "--marker"
+            ],
             id = "test"
         ),
         param(
@@ -102,7 +102,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             None,
             [
                 "vitest", "run", "--changed", "main",
-                "--config", ".vitepress/vitest.config.ts", "--marker"
+                "--config", ".vitepress/config/vitest.config.ts", "--marker"
             ],
             id = "affected"
         ),
@@ -111,7 +111,7 @@ def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
             None,
             [
                 "vitest", "run", "--config",
-                ".vitepress/vitest.config.ts", "--coverage", "--marker"
+                ".vitepress/config/vitest.config.ts", "--coverage", "--marker"
             ],
             id = "coverage"
         ),
@@ -168,8 +168,7 @@ def test_the_cruft_report_runs_both_passes_and_fails_where_either_fails(
     assert (reported.returncode, reported.stdout.splitlines()) == (
         1,
         [
-            "--config .vitepress/knip.ts --reporter symbols --marker",
-            "--config .vitepress/knip.ts --cycles --reporter symbols --marker"
+            "--reporter symbols --marker", "--cycles --reporter symbols --marker"
         ]
     )
 
@@ -212,7 +211,7 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
         str(dist),
         "--marker",
         str(dist),
-        "../README.md", "../.github/CONTRIBUTING.md"
+        "../.github/README.md", "../.github/CONTRIBUTING.md"
     ]
 
 

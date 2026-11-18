@@ -8,6 +8,6 @@ reporter=symbols
 [[ -z "${GITHUB_ACTIONS:-}" ]] || reporter=github-actions
 
 status=0
-node_modules/.bin/knip --config .vitepress/knip.ts --reporter "$reporter" "$@" || status=$?
-node_modules/.bin/knip --config .vitepress/knip.ts --cycles --reporter "$reporter" "$@" || status=$?
+node_modules/.bin/knip --reporter "$reporter" "$@" || status=$?
+node_modules/.bin/knip --cycles --reporter "$reporter" "$@" || status=$?
 exit "$status"

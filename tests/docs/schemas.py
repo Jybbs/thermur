@@ -1,8 +1,8 @@
 """
-Pins what `docs/references.bib` reads into, meaning the footnote definition
-each kind of study takes, the key each study's first author and year hold
-it to, the fields an entry may not leave out, and the bibliography the
-repository ships.
+Pins what `docs/pages/references.bib` reads into, meaning the footnote
+definition each kind of study takes, the key each study's first author and
+year hold it to, the fields an entry may not leave out, and the bibliography
+the repository ships.
 """
 
 from collections.abc import Callable
@@ -41,7 +41,10 @@ def read(tmp_path: Path) -> Callable[..., Bibliography]:
         """
         Writes the file under `tmp_path` and validates it.
         """
-        (file := tmp_path / "docs/references.bib").parent.mkdir(exist_ok=True)
+        (file := tmp_path / "docs/pages/references.bib").parent.mkdir(
+            exist_ok = True,
+            parents  = True
+        )
         file.write_text(
             text or ARTICLE.format(
                 **{
@@ -361,14 +364,14 @@ def test_citing_keys_joins_their_definitions_in_the_order_given(
         f"{studies['vicsek2014'].definition}\n\n{studies['viragh2014'].definition}"
     )
     assert bibliography.unknown("smith2020", "viragh2014", "jones2019") == [
-        "`smith2020` names no entry in `docs/references.bib`",
-        "`jones2019` names no entry in `docs/references.bib`"
+        "`smith2020` names no entry in `docs/pages/references.bib`",
+        "`jones2019` names no entry in `docs/pages/references.bib`"
     ]
 
 
 def test_the_shipped_bibliography_lists_each_study_in_key_order(pytestconfig: Config):
     """
-    Asserts that every entry in the repository's `docs/references.bib`
+    Asserts that every entry in the repository's `docs/pages/references.bib`
     validates, sits in the order of its key, carries a key in the form
     `Study.form` sets, and reads as a definition holding no run of spaces,
     the mark of a LaTeX special left unescaped.

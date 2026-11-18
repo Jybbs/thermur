@@ -59,17 +59,17 @@ def test_a_bibliography_failing_validation_is_named_on_its_path(
     checkout : Checkout
 ):
     """
-    Asserts that an entry in `docs/references.bib` leaving out its priority
-    is reported on the file by each check reading the bibliography, rather
-    than raised.
+    Asserts that an entry in `docs/pages/references.bib` leaving out its
+    priority is reported on the file by each check reading the bibliography,
+    rather than raised.
     """
-    edit(checkout, "docs/references.bib", new="", old="    priority = {prio1},\n")
+    edit(checkout, "docs/pages/references.bib", new="", old="    priority = {prio1},\n")
 
     assert check(checkout=checkout).findings == [
         Finding(
-            file    = Path("docs/references.bib"),
+            file    = Path("docs/pages/references.bib"),
             message = "`studies.attanasi2014.article.priority` in "
-            "`docs/references.bib`: Field required"
+            "`docs/pages/references.bib`: Field required"
         )
     ]
 
@@ -87,17 +87,17 @@ def test_a_check_declaring_nothing_makes_no_finding(checkout: Checkout):
     ("path", "old", "new", "message"),
     [
         param(
-            "README.md",
+            ".github/README.md",
             "python-{floor}+",
             "python-3.13+",
-            f"The Python badge in `README.md` reads `3.13`, where {FLOOR}",
+            f"The Python badge in `.github/README.md` reads `3.13`, where {FLOOR}",
             id = "python-badge"
         ),
         param(
-            "README.md",
+            ".github/README.md",
             "badge/python-{floor}+",
             "badge/py-3.14+",
-            f"The Python badge in `README.md` is missing, where {FLOOR}",
+            f"The Python badge in `.github/README.md` is missing, where {FLOOR}",
             id = "python-badge-missing"
         ),
         param(
@@ -125,10 +125,10 @@ def test_a_check_declaring_nothing_makes_no_finding(checkout: Checkout):
             id = "required-version"
         ),
         param(
-            "README.md",
+            ".github/README.md",
             "License-MIT-",
             "License-Apache--2.0-",
-            "The License badge in `README.md` reads `Apache-2.0`, where the "
+            "The License badge in `.github/README.md` reads `Apache-2.0`, where the "
             "`license` in `pyproject.toml` reads `MIT`",
             id = "license-badge"
         ),
@@ -496,6 +496,82 @@ def test_a_build_requirement_naming_a_range_is_named(
 
 
 @mark.parametrize(
+    ("path", "old", "new", "message"),
+    [
+        param(
+            "docs/package.json",
+            '"knip"                : "{knip}"',
+            '"knip"                : "^{knip}"',
+            "`knip` in the `devDependencies` of `docs/package.json` reads "
+            "`^{knip}`, which is not an exact pin",
+            id = "dev-caret"
+        ),
+        param(
+            "docs/package.json",
+            '"glob"      : "{glob}"',
+            '"glob"      : ">={glob}"',
+            "`glob` in the `overrides` of `docs/package.json` reads `>={glob}`, "
+            "which is not an exact pin",
+            id = "override-range"
+        ),
+        param(
+            "docs/kit/package.json",
+            '"@zag-js/toggle"      : "{toggle}"',
+            '"@zag-js/toggle"      : "1.x"',
+            "`@zag-js/toggle` in the `dependencies` of `docs/kit/package.json` reads "
+            "`1.x`, which is not an exact pin",
+            id = "workspace-wildcard"
+        ),
+        param(
+            "docs/kit/package.json",
+            '"vue" : "^3.5.0"',
+            '"vue" : ">=3"',
+            None,
+            id = "peer-range"
+        )
+    ]
+)
+def test_a_site_manifest_naming_a_range_is_named(
+    checkout : Checkout,
+    path     : str,
+    old      : str,
+    new      : str,
+    message  : str | None,
+    pins     : dict[str, str]
+):
+    """
+    Asserts that a range a manifest of the site's workspace gives a
+    package Bun installs is named on that manifest, whereas a range under
+    `peerDependencies` and the `workspace:` protocol pass.
+    """
+    edit(checkout, path, new=new.format_map(pins), old=old.format_map(pins))
+
+    assert PinCheck(checkout=checkout).findings == (
+        [Finding(file=Path(path), message=message.format_map(pins))] if message else []
+    )
+
+
+def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
+    """
+    Asserts that a contributor guide whose label table loses its header
+    reads as describing no label, so every label the registry declares is
+    named as missing from it.
+    """
+    edit(
+        checkout,
+        ".github/CONTRIBUTING.md",
+        new = "| **Name** | **Covers** |",
+        old = "| **Label** | **Covers** |"
+    )
+
+    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
+        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where its description in `.github/labels.toml` reads `{label.description}`"
+        for label in checkout.labels.rows
+    ]
+
+
+@mark.parametrize(
     ("path", "old", "new", "messages"),
     [
         param(
@@ -508,7 +584,7 @@ def test_a_build_requirement_naming_a_range_is_named(
         param(
             "pyproject.toml",
             'license         = "MIT"\nname            = "thermur"\n'
-            'readme          = "README.md"\nrequires-python = ">={floor}"\n',
+            'readme          = ".github/README.md"\nrequires-python = ">={floor}"\n',
             'name            = "thermur"\n',
             [
                 "`project.requires-python` in `pyproject.toml`: Field required",
@@ -632,26 +708,6 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     ]
 
 
-def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
-    """
-    Asserts that a contributor guide whose label table loses its header
-    reads as describing no label, so every label the registry declares is
-    named as missing from it.
-    """
-    edit(
-        checkout,
-        ".github/CONTRIBUTING.md",
-        new = "| **Name** | **Covers** |",
-        old = "| **Label** | **Covers** |"
-    )
-
-    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
-        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
-        f"where its description in `.github/labels.toml` reads `{label.description}`"
-        for label in checkout.labels.rows
-    ]
-
-
 def test_a_hatchling_pin_in_another_spelling_passes(
     checkout : Checkout,
     pins     : dict[str, str]
@@ -720,7 +776,27 @@ def test_a_marker_naming_no_entry_is_named_at_its_line(checkout: Checkout):
         Finding(
             file    = page,
             message = f"Line 5 of `{page}` cites `smith2020`, which names no entry in "
-            "`docs/references.bib`"
+            "`docs/pages/references.bib`"
+        )
+    ]
+
+
+def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
+    """
+    Asserts that a wheel `packages` entry naming a folder that holds no
+    module, which hatchling skips while still writing the wheel, is named.
+    """
+    edit(
+        checkout = checkout,
+        new      = 'packages = ["src/config", "src/thermur"]',
+        old      = 'packages = ["src/thermur"]',
+        path     = "pyproject.toml"
+    )
+
+    assert WheelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path("pyproject.toml"),
+            message = "The wheel `packages` entry `src/config` holds no module"
         )
     ]
 
@@ -768,38 +844,19 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
-def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
-    """
-    Asserts that a wheel `packages` entry naming a folder that holds no
-    module, which hatchling skips while still writing the wheel, is named.
-    """
-    edit(
-        checkout = checkout,
-        new      = 'packages = ["src/config", "src/thermur"]',
-        old      = 'packages = ["src/thermur"]',
-        path     = "pyproject.toml"
-    )
-
-    assert WheelCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path("pyproject.toml"),
-            message = "The wheel `packages` entry `src/config` holds no module"
-        )
-    ]
-
-
 def test_a_page_whose_definitions_drift_is_named(checkout: Checkout):
     """
     Asserts that a page citing a study whose definition it leaves out is
     named as drifted from the bibliography.
     """
-    append(checkout, "README.md", "\nOrdered flocks[^cavagna2010].\n")
+    append(checkout, ".github/README.md", "\nOrdered flocks[^cavagna2010].\n")
 
     assert RenderCheck(checkout=checkout).findings == [
         Finding(
-            file    = Path("README.md"),
-            message = "The footnote definitions in `README.md` have drifted from their "
-            "entries in `docs/references.bib`, and `mise render` writes them again"
+            file    = Path(".github/README.md"),
+            message = "The footnote definitions in `.github/README.md` have drifted "
+            "from their entries in `docs/pages/references.bib`, and `mise render` "
+            "writes them again"
         )
     ]
 
@@ -853,7 +910,8 @@ def test_a_page_whose_region_and_definitions_drift_is_named_for_each(
         Finding(
             file    = Path(page),
             message = f"The footnote definitions in `{page}` have drifted from their "
-            "entries in `docs/references.bib`, and `mise render` writes them again"
+            "entries in `docs/pages/references.bib`, and `mise render` writes them "
+            "again"
         )
     ]
 
@@ -882,6 +940,28 @@ def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checko
 
     assert [finding.file for finding in LockfileCheck(checkout=checkout).findings] == [
         Path(".mise/bin/pytest")
+    ]
+
+
+def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
+    """
+    Asserts that a Python task is held to the `uv run` its shebang runs and
+    not to one its docstring mentions.
+    """
+    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
+    task(
+        checkout = checkout,
+        name     = "repo/sweep.py",
+        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
+    )
+    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
+
+    assert LockfileCheck(checkout=checkout).findings == [
+        Finding(
+            file    = path,
+            message = f"`{path}` runs `uv run` without `--exact --locked` opening its "
+            "arguments"
+        )
     ]
 
 
@@ -938,25 +1018,23 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
+def test_a_region_missing_its_pair_of_markers_is_named(checkout: Checkout):
     """
-    Asserts that a Python task is held to the `uv run` its shebang runs and
-    not to one its docstring mentions.
+    Asserts that a region whose page carries its opening marker twice is
+    named as refused, and the page as current, since the render leaves the
+    region as it stands.
     """
-    docstring = '"""\nWraps `uv run pytest`.\n"""\n'
-    task(
-        checkout = checkout,
-        name     = "repo/sweep.py",
-        text     = f"#!/usr/bin/env -S uv run --exact --locked\n{docstring}"
+    page = "docs/pages/data/index.md"
+    edit(
+        checkout,
+        page,
+        new = "<!-- crop -->\n\n## The Parametric",
+        old = "## The Parametric"
     )
-    path = task(checkout, "repo/tally.py", "#!/usr/bin/env -S uv run\n")
 
-    assert LockfileCheck(checkout=checkout).findings == [
-        Finding(
-            file    = path,
-            message = f"`{path}` runs `uv run` without `--exact --locked` opening its "
-            "arguments"
-        )
+    assert [finding.message for finding in RenderCheck(checkout=checkout).findings] == [
+        f"`{page}` does not carry the opening and then the closing marker of its "
+        "`crop` region once each, so `mise render` leaves the region as it stands"
     ]
 
 
@@ -1128,23 +1206,23 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_region_missing_its_pair_of_markers_is_named(checkout: Checkout):
+def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
     """
-    Asserts that a region whose page carries its opening marker twice is
-    named as refused, and the page as current, since the render leaves the
-    region as it stands.
+    Asserts that renaming a label in the registry alone names the
+    release-notes categories, the bug and spec templates in that order, and
+    the guide, each still naming the old label, then the new label filed
+    under no category and missing from the guide.
     """
-    page = "docs/pages/data/index.md"
-    edit(
-        checkout,
-        page,
-        new = "<!-- crop -->\n\n## The Parametric",
-        old = "## The Parametric"
-    )
+    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
+    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
 
-    assert [finding.message for finding in RenderCheck(checkout=checkout).findings] == [
-        f"`{page}` does not carry the opening and then the closing marker of its "
-        "`crop` region once each, so `mise render` leaves the region as it stands"
+    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
+        Path(".github/release.yml"),
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md"),
+        Path(".github/CONTRIBUTING.md"),
+        Path(".github/release.yml"),
+        Path(".github/CONTRIBUTING.md")
     ]
 
 
@@ -1231,26 +1309,6 @@ def test_a_cache_key_ending_on_anything_but_its_hash_is_named(
     ]
 
 
-def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
-    """
-    Asserts that renaming a label in the registry alone names the
-    release-notes categories, the bug and spec templates in that order, and
-    the guide, each still naming the old label, then the new label filed
-    under no category and missing from the guide.
-    """
-    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
-    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
-
-    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
-        Path(".github/release.yml"),
-        Path(".github/ISSUE_TEMPLATE/bug.md"),
-        Path(".github/ISSUE_TEMPLATE/spec.md"),
-        Path(".github/CONTRIBUTING.md"),
-        Path(".github/release.yml"),
-        Path(".github/CONTRIBUTING.md")
-    ]
-
-
 def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
     """
     Asserts that a ruleset carrying a key the rulesets API does not take
@@ -1278,6 +1336,25 @@ def test_a_second_pull_request_gate_keeps_the_required_check(checkout: Checkout)
     edit(checkout, CI, new="name    : 📡 Report", old="name    : 📡 Readout")
 
     assert RulesetCheck(checkout=checkout).findings == []
+
+
+def test_a_site_manifest_failing_validation_is_named_on_its_path(checkout: Checkout):
+    """
+    Asserts that a nested rule under `overrides` in the kit's manifest,
+    which reads as no specifier, is named on that manifest rather than
+    raising out of the audit.
+    """
+    edit(
+        checkout,
+        "docs/kit/package.json",
+        new = '"peerDependencies" : {\n        "vue" : "^3.5.0"\n    },\n'
+        '    "overrides"        : { "vue": { "a": "1.0.0" } }',
+        old = '"peerDependencies" : {\n        "vue" : "^3.5.0"\n    }'
+    )
+
+    assert [finding.file for finding in PinCheck(checkout=checkout).findings] == [
+        Path("docs/kit/package.json")
+    ]
 
 
 @mark.parametrize(
@@ -1507,7 +1584,7 @@ def test_a_file_disagreeing_with_the_label_registry_is_named(
         param(
             '">={floor}"',
             '">=3.99"',
-            ["README.md", "pyproject.toml", ".mise/config.toml"],
+            [".github/README.md", "pyproject.toml", ".mise/config.toml"],
             id = "python-floor"
         ),
         param(

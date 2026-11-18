@@ -134,7 +134,7 @@ flowchart TB
 
 ## 📐 Mathematical Framework
 
-The system bridges biological observation with robotic control through a unified theorem that maintains critical state dynamics while guaranteeing thermal safety. For complete derivations, see [`docs/mathematical-framework.md`](docs/mathematical-framework.md).
+The system bridges biological observation with robotic control through a unified theorem that maintains critical state dynamics while guaranteeing thermal safety. For complete derivations, see [`docs/mathematical-framework.md`](../docs/mathematical-framework.md).
 
 ### Unified Murmuration Control Theorem
 
@@ -438,7 +438,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise coverage` | Runs the suite under coverage, failing below 95%, and writes the HTML report under `.cache/coverage/html` |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
-| `mise audit` | Holds the Python version, the uv release, the license, and the site's pins on Vitest's coverage provider and on Node's types to one value across the files restating them, the files `mise render` writes to the declarations they are written from, every footnote marker under a study's key to an entry in `docs/references.bib`, every `bun install` a task runs to the lockfile and no task to `bunx`, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists, and the command beside each, to the rows of each pull-request workflow and the tasks they run, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every check a ruleset requires to the gate a pull-request workflow ends on, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
+| `mise audit` | Holds the Python version, the uv release, the license, and the site's pins on Vitest's coverage provider and on Node's types to one value across the files restating them, the files `mise render` writes to the declarations they are written from, every footnote marker under a study's key to an entry in `docs/pages/references.bib`, every `bun install` a task runs to the lockfile and no task to `bunx`, `CITATION.cff` to the manifest's version, license, repository, and authors, every file naming a label to `.github/labels.toml`, the checks `.github/CONTRIBUTING.md` lists, and the command beside each, to the rows of each pull-request workflow and the tasks they run, every `uv run` a task runs to `--exact --locked`, every task to what `mise tasks validate` accepts, each task script's pins to the versions `uv.lock` resolves, the programs under `.mise/bin/` to one script, the build requirements and every package the site's manifests install to exact pins, the wheel's `packages` and scripts to modules it carries, every workflow to one gate and its summary page to that gate, every check a ruleset requires to the gate a pull-request workflow ends on, every action from another repository to one commit, every job to one runner image, every input a step passes a composite action to one its manifest declares, each composite action's manifest to no YAML anchor, the tool subsets `🐦‍⬛ Warm` saves, and each cache key to end on a hash of files whose change runs `🐦‍⬛ Warm` |
 | `mise ci` | Runs `mise doctor project`, then every task a row of the pull-request workflows runs, the way the rows run them, finishing every one even where one fails |
 | `mise labels` | Creates or updates every label `.github/labels.toml` declares on GitHub after a prompt, then lists each live label it omits |
 | `mise rulesets` | Applies the rulesets under `.github/rulesets/` and every setting `.github/settings.toml` declares to GitHub after a prompt, beside the description, the homepage, and the topics `pyproject.toml` declares, and lists each live ruleset no file names |
@@ -449,9 +449,9 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 | `mise fetch` | Downloads the WRF-SFIRE sample from the address its pinned digest keys and checks it against that digest before moving it into `data/samples/` |
 | `mise browse` | Opens Hamilton's experiment viewer over the runs `thermur fly` records under `data/runs/`, passing any further arguments to it |
-| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/references.bib` |
+| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/pages/references.bib` |
 | `mise measure` | Writes the means and standard errors the docs site's charts of the interaction rules draw, out of the coupling and heading trials of the run under `data/runs/` it is given |
-| `mise cite` | Prints the footnote definition of each study whose key it is given, out of `docs/references.bib`, for pasting into an issue, a pull request, or a comment |
+| `mise cite` | Prints the footnote definition of each study whose key it is given, out of `docs/pages/references.bib`, for pasting into an issue, a pull request, or a comment |
 | `mise press` | Builds the docs site into `docs/.vitepress/dist`, failing on a link between pages that leads nowhere |
 | `mise serve` | Serves the docs site, reloading a page as it is edited |
 | `mise links` | Checks every link, asset, and heading fragment in the built site, the README, and the contributor guide offline through lychee |
@@ -462,7 +462,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise run site:affected` | Runs the site's tests that the changes since the merge base with `main` reach, through Vitest's `--changed`, or the whole suite where a changed file matches a rerun trigger, passing any further arguments to Vitest |
 | `mise run site:coverage` | Runs the site's suite under coverage, failing below 95% on statements, branches, functions, or lines |
 
-[`.github/CONTRIBUTING.md`](.github/CONTRIBUTING.md) takes a contributor from a clone to a merged pull request, then sets out the code's style, the checks each pull request runs, and the labels each issue and pull request takes.
+[`.github/CONTRIBUTING.md`](CONTRIBUTING.md) takes a contributor from a clone to a merged pull request, then sets out the code's style, the checks each pull request runs, and the labels each issue and pull request takes.
 
 ---
 
@@ -478,6 +478,7 @@ thermur/
 │   ├── ISSUE_TEMPLATE/             # The spec and bug templates
 │   ├── labels.toml                 # Every label with its color and description
 │   ├── PULL_REQUEST_TEMPLATE.md    # The sections every pull request carries
+│   ├── README.md                   # This page, which GitHub shows ahead of any README at the root
 │   ├── release.yml                 # The release-notes category each label files under
 │   ├── rulesets/                   # The protection on main and on every tag, which mise rulesets applies
 │   ├── scripts/summaries/          # The template each workflow's gate writes its summary from
@@ -498,9 +499,9 @@ thermur/
 ├── docs/
 │   ├── .vitepress/                 # The docs site's configuration, theme, and Vitest suite
 │   ├── pages/                      # Every page the docs site at https://thermur.fyi/ builds
-│   ├── public/                     # The logo's files and the headers Cloudflare Pages serves the site with
-│   ├── package.json                # The docs site's packages, each an exact pin, beside bun.lock and bunfig.toml
-│   ├── references.bib              # Every study a page can cite, each with its annotation and priority
+│   │   ├── public/                 # The logo's files and the headers Cloudflare Pages serves the site with
+│   │   └── references.bib          # Every study a page can cite, each with its annotation and priority
+│   ├── package.json                # The docs site's packages, each an exact pin, and knip's settings, beside bun.lock
 │   └── mathematical-framework.md   # Complete mathematical formulation
 │
 ├── src/thermur/

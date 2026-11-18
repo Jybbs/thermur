@@ -13,6 +13,7 @@ from packaging.utils import canonicalize_name
 from pathlib         import Path
 from pydantic        import BaseModel, ValidationError
 from re              import findall, finditer, search
+from semver          import Version
 from typing          import ClassVar
 from yaml            import NodeEvent, parse
 
@@ -164,8 +165,8 @@ class CommitCheck(Check):
 class FootnoteCheck(Check):
     """
     Every footnote marker a Markdown page carries under a study's key names
-    a study `docs/references.bib` holds, since the render task writes a
-    definition only for a study the file holds.
+    a study `docs/pages/references.bib` holds, since the render task writes
+    a definition only for a study the file holds.
     """
 
     def scan(self) -> Iterator[Finding]:
@@ -589,14 +590,19 @@ class PinCheck(Check):
     The hatchling build requirement and every build constraint `[tool.uv]`
     declares each name one version, since uv resolves the build requirements
     of hatchling and of each package it builds from source outside
-    `uv.lock`.
+    `uv.lock`, and each package a manifest of the site's workspace installs
+    is declared at one release, so `bun add` writes no range beside them.
+    A range under `peerDependencies`, such as the kit's on `vue`, stays
+    exempt, since a peer range states the releases a package works beside
+    rather than one Bun installs.
     """
 
     def scan(self) -> Iterator[Finding]:
         """
         Names a `[build-system]` holding no exact pin on hatchling, under
         any spelling its normalized name allows, then each build constraint
-        naming a range.
+        naming a range, then each specifier in a manifest of the site's
+        workspace that is neither a release nor the `workspace:` protocol.
         """
         manifest = self.checkout.manifest
         if not any(
@@ -617,6 +623,17 @@ class PinCheck(Check):
                     message = f"The build constraint `{constraint}` in `[tool.uv]` "
                     "is not an exact pin"
                 )
+
+        for path, declared in self.checkout.dependencies.items():
+            for table, name, specifier in declared.specifiers:
+                if not (
+                    Version.is_valid(specifier) or specifier.startswith("workspace:")
+                ):
+                    yield Finding(
+                        file    = path,
+                        message = f"`{name}` in the `{table}` of `{path}` reads "
+                        f"`{specifier}`, which is not an exact pin"
+                    )
 
 
 class ProvisionCheck(Check):
@@ -692,11 +709,11 @@ class ProvisionCheck(Check):
 class RenderCheck(Check):
     """
     Every file the render task writes reads what the declaration it is
-    written from would write now, so the site, which calls no Python, never
-    reads a stale copy of the identity, every region a page carries reads
-    the declaration it is written from, and every Markdown page carries
-    the footnote definition of each study it cites as `docs/references.bib`
-    gives it.
+    written from would write now, so the site, which calls no Python,
+    never reads a stale copy of the identity, every region a page
+    carries reads the declaration it is written from, and every Markdown
+    page carries the footnote definition of each study it cites as
+    `docs/pages/references.bib` gives it.
     """
 
     def scan(self) -> Iterator[Finding]:

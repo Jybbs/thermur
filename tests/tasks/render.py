@@ -2,7 +2,7 @@
 Pins what `docs:render` prints and exits with, meaning the path of each
 file it rewrote, nothing where every file is current, and each region
 whose page lacks its pair of markers and each marker naming no entry in
-`docs/references.bib`, either of which fails the task.
+`docs/pages/references.bib`, either of which fails the task.
 """
 
 from collections.abc import Callable
@@ -38,7 +38,7 @@ def test_a_marker_naming_no_entry_fails_the_render(
     assert capsys.readouterr() == (
         f"{page}\n",
         f"Line 3 of `{page}` cites `smith2020`, which names no entry in "
-        "`docs/references.bib`\n"
+        "`docs/pages/references.bib`\n"
     )
     assert (
         checkout.read(page)

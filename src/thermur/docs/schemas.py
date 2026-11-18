@@ -1,6 +1,6 @@
 """
-Holds the records `docs/references.bib` validates into, meaning the
-`Bibliography` of every study the file holds, each an `Article`, a
+Holds the records `docs/pages/references.bib` validates into, meaning
+the `Bibliography` of every study the file holds, each an `Article`, a
 `Preprint`, or a `Report` built on `Study`, beside the `Priority` JabRef
 files a study under. The `docs:render` task writes each page's footnote
 definitions from them, and the `docs:cite` task prints the definitions it is
@@ -39,8 +39,8 @@ class Priority(StrEnum):
 
 class Study(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    One study's entry in `docs/references.bib`, holding the fields its
-    footnote definition reads beside the annotation and the priority the
+    One study's entry in `docs/pages/references.bib`, holding the fields
+    its footnote definition reads beside the annotation and the priority the
     file records for it.
     """
 
@@ -257,10 +257,10 @@ class Report(Study):
         return f"{self.type} {self.number}"
 
 
-class Bibliography(Document, extra="forbid", title="docs/references.bib"):
+class Bibliography(Document, extra="forbid", title="docs/pages/references.bib"):
     """
-    Every study `docs/references.bib` holds, under the key a footnote cites
-    it by.
+    Every study `docs/pages/references.bib` holds, under the key a footnote
+    cites it by.
     """
 
     studies: frozendict[str, Annotated[Article | Preprint | Report, Field(

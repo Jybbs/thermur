@@ -4,8 +4,8 @@
 # USAGE arg "<key>..." help="The key of each study to cite, such as cavagna2010"
 """
 Prints the footnote definition of each study whose key in
-`docs/references.bib` it is given, as the `docs:cite` task, for pasting
-beneath an issue, a pull request, or a comment, whose text no render
+`docs/pages/references.bib` it is given, as the `docs:cite` task, for
+pasting beneath an issue, a pull request, or a comment, whose text no render
 reaches.
 """
 

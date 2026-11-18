@@ -108,14 +108,14 @@ def test_a_missing_or_edited_copy_drifts_and_is_written_again(checkout: Checkout
     """
     outputs = Outputs(checkout=checkout)
     page    = Path("docs/pages/index.md")
-    readme  = (checkout.root / "README.md").stat().st_mtime_ns
+    readme  = (checkout.root / ".github/README.md").stat().st_mtime_ns
     (checkout.root / outputs.identity).unlink()
     append(checkout, str(page), "\nTurns travel[^attanasi2014].\n")
 
     assert outputs.drifted == [outputs.identity, page]
     assert outputs.write() == [outputs.identity, page]
     assert outputs.write() == []
-    assert (checkout.root / "README.md").stat().st_mtime_ns == readme
+    assert (checkout.root / ".github/README.md").stat().st_mtime_ns == readme
     assert (
         checkout.read(page)
                 .endswith(f"\n\n{checkout.bibliography.cite('attanasi2014')}\n")
@@ -276,7 +276,7 @@ def test_each_marker_naming_no_entry_is_listed_on_its_page(checkout: Checkout):
         Finding(
             file    = page,
             message = f"Line 3 of `{page}` cites `smith2020`, which names no entry in "
-            "`docs/references.bib`"
+            "`docs/pages/references.bib`"
         )
     ]
     assert outputs.drifted == [page]

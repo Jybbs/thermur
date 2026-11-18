@@ -30,7 +30,6 @@ export default defineConfig({
 
   vite: {
     ...vite.shared(),
-    css       : { transformer: 'lightningcss' },
-    publicDir : paths.publicDir(import.meta.url)
+    css: { transformer: 'lightningcss' }
   }
 })
