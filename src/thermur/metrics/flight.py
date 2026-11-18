@@ -7,8 +7,8 @@ flock per seed, beside each statistic its frames give, which the `flight`,
 from collections.abc import Callable
 from diffrax         import AbstractPath, ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
 from equinox         import Module, field, tree_at
-from jax             import Array, ShapeDtypeStruct, jit, lax, tree, vmap
-from jax.numpy       import where
+from jax             import Array, jit, lax, tree, vmap
+from jax.numpy       import cross, where
 from jax.random      import fold_in, key as seeded, split
 from numpy         import (
     angle,
@@ -430,9 +430,10 @@ class Flight(Module):
                 Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
                 air,
                 t,
-                self.plan.neighbors
+                self.plan.neighbors,
+                self.plan.cruise_m_s
             )
-            return across(vmap(composite)(sensed), flock.commands)
+            return across(vmap(composite)(sensed)[0], flock.commands)
 
         def taken(indices: ndarray) -> Flock:
             """
@@ -569,7 +570,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         0.0,
         plan.duration_s + plan.step_s,
         key   = path_key,
-        shape = tree.map(lambda leaf: ShapeDtypeStruct(leaf.shape, leaf.dtype), launch),
+        shape = launch.shapes,
         tol   = plan.resolution_s
     )
     radio = composite.radio
@@ -698,9 +699,13 @@ def stepped(
     Moves one flock through one step of the composite, sensing once from
     what each drone heard, advancing through one `Euler().step` over the
     drift and the Brownian increments `path` gives between `t` and `t +
-    plan.step_s`, then holding each command to the plant's bounds, to the
-    cruise speed where the heading holds it, and stepping the noise slot's
-    state.
+    plan.step_s`, then applying the discrete updates:
+
+    - The turn of each command at the change in spin the step reaches
+    - The speed, the cruise speed where the speed slot holds it and
+      otherwise the stepped command's part along the drone's last command
+    - The plant's bounds on each command
+    - The step of the noise slot's state
 
     Args:
         air       : The channels each drone reads.
@@ -716,15 +721,21 @@ def stepped(
     Returns:
         The flock at `t + plan.step_s`.
     """
-    sensed = Observation.sensed(flock, inbox, air, t, plan.neighbors)
+    sensed = Observation.sensed(flock, inbox, air, t, plan.neighbors, plan.cruise_m_s)
     terms  = MultiTerm(ODETerm(composite.drift), ControlTerm(composite.diffusion, path))
     moved, *_ = Euler().step(terms, t, t + plan.step_s, flock, sensed, None, False)
-    moved     = tree_at(
+    turned    = tree_at(
         lambda held: held.commands,
         moved,
-        composite.plant.held(moved.commands)
+        moved.commands
+        + plan.step_s * cross(moved.spins - flock.spins, flock.commands)
+    ).cruising(
+        plan.cruise_m_s if composite.speed.fixed
+        else (moved.commands * unit(flock.commands)).sum(-1, keepdims=True)
     )
-    if composite.heading.confined:
-        moved = moved.cruising(plan.cruise_m_s)
-
-    return composite.excited(moved, key, sensed, plan.step_s)
+    held = tree_at(
+        lambda kept_flock: kept_flock.commands,
+        turned,
+        composite.plant.held(turned.commands)
+    )
+    return composite.excited(held, key, sensed, plan.step_s)

@@ -17,14 +17,15 @@ from thermur.pipeline.settings   import Settings
 
 def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
     """
-    Builds a flock at `positions` and `velocities`, holding no force, each
-    drone commanding `commands`, or its own velocity where `commands` is
-    `None`.
+    Builds a flock at `positions` and `velocities`, holding no force and
+    no spin, each drone commanding `commands`, or its own velocity where
+    `commands` is `None`.
     """
     return Flock(
         commands   = asarray(velocities if commands is None else commands),
         forces     = zeros(asarray(positions).shape),
         positions  = asarray(positions),
+        spins      = zeros(asarray(positions).shape),
         velocities = asarray(velocities)
     )
 
@@ -119,6 +120,7 @@ def viewed(  # prose: ignore[unsorted-positionals]
             "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
             "centrality" : linalg.norm(unit(spots).sum(0))
             / max(int((distances > 0).sum()), 1),
+            "cruise"     : linalg.norm(own),
             "delayed"    : own * ones((len(offsets), 3)),
             "distances"  : distances,
             "force"      : zeros(3),
@@ -126,6 +128,7 @@ def viewed(  # prose: ignore[unsorted-positionals]
             "neighbors"  : own * ones((len(offsets), 3)),
             "offsets"    : spots,
             "position"   : array(Plan().center_m),
+            "spin"       : zeros(3),
             "velocity"   : own,
             "weights"    : ones(len(offsets)),
             **fields

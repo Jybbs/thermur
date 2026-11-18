@@ -15,7 +15,7 @@ from jax             import Array, numpy as jnp, tree, vmap
 from jax.random      import fold_in, key as seeded, uniform
 from json            import dumps
 from math            import sqrt
-from numpy           import argsort, around, asarray, geomspace, linalg, ndarray, zeros
+from numpy           import argsort, around, asarray, cross, geomspace, linalg, ndarray, zeros
 from numpy.random    import default_rng
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
@@ -131,11 +131,11 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         by the page's path and then by the region's name, meaning the fields
         `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
         Data page, on The Interaction Rules the fields `Plan`, the contact,
-        the plant, the radio, the roost, and the speed control declare
-        beside those of each open slot's default and each of its candidates,
-        every one named for its component, on The Visual Identity the
-        identity as `specimens` lays it out, and on The Kit the pieces each
-        declaration in the clone records.
+        the plant, the radio, and the roost declare beside those of each
+        open slot's default and each of its candidates, every one named for
+        its component, on The Visual Identity the identity as `specimens`
+        lays it out, and on The Kit the pieces each declaration in the clone
+        records.
         """
         defaults = Settings()
         return {
@@ -371,6 +371,7 @@ def flown(
             commands   = jnp.asarray(increments, dtype="float32"),
             forces     = still,
             positions  = still,
+            spins      = still,
             velocities = still
         ),
         plan = plan,
@@ -385,8 +386,15 @@ def flown(
             zigged(
                 composite   = composite,
                 draws       = draws,
-                observation = Observation.sensed(flock, inbox, air, t, plan.neighbors),
-                step_s      = plan.step_s
+                observation = Observation.sensed(
+                    flock,
+                    inbox,
+                    air,
+                    t,
+                    plan.neighbors,
+                    plan.cruise_m_s
+                ),
+                step_s = plan.step_s
             )
         )
     return {
@@ -517,9 +525,10 @@ def posed(
     Launches a flock of drones from `plan` a few meters apart around
     `center_m`, one for each row of `forces`, which sets their zigs, each
     commanding a velocity apart from the one it flies and off the cruise
-    speed, its last drone moved half the cohesion's hard sphere ahead of the
-    one before it along that drone's command. Every value is rounded to four
-    decimals, so a copy of the step reads the same flock the package moves.
+    speed and spinning toward the velocity it flies, its last drone moved
+    half the cohesion's hard sphere ahead of the one before it along that
+    drone's command. Every value is rounded to four decimals, so a copy of
+    the step reads the same flock the package moves.
     """
     launch = plan.changed(
         center_m  = (*center_m, composite.roost.height_m),
@@ -537,9 +546,17 @@ def posed(
             dtype = "float32"
         ),
         Flock(
-            commands   = commands,
-            forces     = forces,
-            positions  = positions,
+            commands  = commands,
+            forces    = forces,
+            positions = positions,
+            spins     = cross(
+                commands / linalg.norm(commands, axis=-1, keepdims=True),
+                launch.velocities / linalg.norm(
+                    launch.velocities,
+                    axis     = -1,
+                    keepdims = True
+                )
+            ),
             velocities = launch.velocities
         )
     )
