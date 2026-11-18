@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "hatchling.build"
-requires      = ["hatchling==1.32.4"]
+requires      = ["hatchling==1.33.0"]
 
 [project]
 authors         = [{ name = "James Parkington" }]
@@ -53,13 +53,13 @@ Repository = "https://github.com/Jybbs/thermur"
 [dependency-groups]
 dev = [
     "apache-hamilton[experiments]",
-    "hypothesis",
     "minijinja",
     "prose-formatter",
     "pytest",
     "pytest-cov",
     "pytest-randomly",
     "pytest-socket",
+    "pytest-testmon",
     "syrupy"
 ]
 
@@ -120,14 +120,14 @@ testpaths                = ["tests"]
 
 [tool.uv]
 build-constraint-dependencies = [
-    "cython==3.3.0",
+    "cython==3.3.1",
     "packaging==26.3",
     "pathspec==1.1.1",
-    "pluggy==1.6.0",
+    "pluggy==1.7.0",
     "setuptools==84.2.1",
-    "tomlkit==0.15.1",
+    "tomlkit==0.15.2",
     "trove-classifiers==2026.9.21.13"
 ]
 python-downloads              = "never"
 python-preference             = "only-system"
-required-version              = "==0.12.22"
+required-version              = "==0.13.8"

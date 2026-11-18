@@ -5,6 +5,7 @@ the environment starts, and which modules' imports the filter lets load
 lazily.
 """
 
+from common.children    import runs
 from importlib          import reload
 from importlib.metadata import distribution
 from pkgutil            import resolve_name
@@ -33,6 +34,7 @@ def test_an_interpreter_starts_under_the_mode_the_entry_point_sets(
     one started under `-S`, which skips `site`, begins in the mode Python
     starts in.
     """
+    runs("thermur.startup.imports")
     started = run(
         [
             executable,
@@ -56,6 +58,7 @@ def test_a_fresh_interpreter_finds_the_engine_opening_an_output():
     interpreter of the environment, since an engine enters the registry only
     as xarray's own import of its module runs, which `EAGER` holds to.
     """
+    runs("thermur.startup.imports")
     started = run(
         [executable, "-c", "import xarray; print(*xarray.backends.list_engines())"],
         capture_output = True,

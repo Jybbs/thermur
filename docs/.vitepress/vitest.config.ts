@@ -1,4 +1,4 @@
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 import { cacheDir } from './lib/paths.ts'
 import { shared }   from './lib/vite.ts'
@@ -9,6 +9,19 @@ export default defineConfig({
 
   test: {
     expect              : { requireAssertions: true },
+    forceRerunTriggers  : [
+      ...configDefaults.forceRerunTriggers,
+      '**/*.{bib,css,lock,md,snap,toml}',
+      '**/.github/**',
+      '**/.gitignore',
+      '**/.mise/**',
+      '**/.vitepress/**/*.{css,snap}',
+      '**/.vitepress/*.config.ts',
+      '**/.vitepress/{lib,theme}/**/*.ts',
+      '**/fonts/**',
+      '**/kit/src/*/*.json',
+      '**/public/**'
+    ],
     include             : ['.vitepress/tests/**/*.test.ts', 'kit/tests/**/*.test.{ts,tsx}'],
     pool                : 'threads',
     resolveSnapshotPath : (testPath, extension) => testPath + extension,
