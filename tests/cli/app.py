@@ -2,9 +2,13 @@
 Pins the `thermur` command line, meaning the version it reports, the help
 it prints for itself, for each group, and for each command, and that neither
 the version, the help of either group, nor the fetch imports JAX or xarray.
+It also pins that `spawned`, which those import cases run their children
+through, passes `runs` each `thermur` module its child loaded and returns
+only the lines the script printed.
 """
 
 from collections.abc    import Callable
+from common             import children
 from common.children    import spawned
 from importlib          import import_module, reload
 from importlib.metadata import version
@@ -37,6 +41,19 @@ def printed(
         return capsys.readouterr().out
 
     return call
+
+
+def test_a_spawned_script_runs_the_modules_its_child_loaded(monkeypatch: MonkeyPatch):
+    """
+    Asserts that `spawned` calls `runs` on a `thermur` module its child
+    loaded and returns only the lines the script printed.
+    """
+    received = []
+    monkeypatch.setattr(children, "runs", lambda *modules: received.extend(modules))
+    assert spawned("from thermur.repo import checkout\nprint(checkout.__name__)") == [
+        "thermur.repo.checkout"
+    ]
+    assert "thermur.repo.checkout" in received
 
 
 def test_neither_the_version_nor_a_group_s_help_imports_jax_or_xarray():

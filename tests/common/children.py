@@ -1,13 +1,13 @@
 """
-Holds `runs`, which a test starting a child process calls on each module
-the child runs, since pytest-testmon traces only the test's own process, and
-`spawned`, which runs a script in a child and calls `runs` on the `thermur`
-modules that child loaded.
+Holds `runs`, which a test starting a child process calls on each module the
+child runs, since pytest-testmon traces only the test's own process. Beside
+it, `spawned` runs a script in a child and calls `runs` on each `thermur`
+module that child loaded.
 """
 
 from importlib.util import find_spec
 from runpy          import run_path
-from subprocess     import run
+from subprocess     import PIPE, run
 from sys            import executable
 
 
@@ -36,13 +36,13 @@ def spawned(script: str) -> list[str]:
     started = run(
         [
             executable, "-c",
-            f"{script}; import sys; print(*sorted(name for name, module in "
+            f"{script}\nimport sys\nprint(*sorted(name for name, module in "
             "sys.modules.items() if name.startswith('thermur') "
             "and getattr(module, '__file__', None)))"
         ],
-        capture_output = True,
-        check          = True,
-        text           = True
+        check  = True,
+        stdout = PIPE,
+        text   = True
     )
     *printed, loaded = started.stdout.splitlines()
     runs(*loaded.split())
