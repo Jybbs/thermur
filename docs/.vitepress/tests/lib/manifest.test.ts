@@ -19,8 +19,9 @@ test.for([
   ['project.urls.Homepage', MANIFEST.replace('Homepage   = "https://example.org/flock/"', '')],
   ['project.urls.Repository', MANIFEST.replace('Repository = "https://github.com/example/flock"', '')],
   ['project.version', MANIFEST.replace('version     = "2.7.1"', '')]
-] as const)('a manifest without %s names the key it lacks', ([key, manifest], { repository }) => {
+] as const)('a manifest without %s fails with a TypeError naming the key it lacks', ([key, manifest], { repository }) => {
   repository.write('pyproject.toml', manifest)
+  expect(() => projectFacts(repository.metaUrl)).toThrow(TypeError)
   expect(() => projectFacts(repository.metaUrl)).toThrow(`no ${key} in `)
 })
 
@@ -33,4 +34,5 @@ test('a manifest writing its urls as a value names the key read through them', (
 test('a homepage without its closing slash fails by name', ({ repository }) => {
   repository.write('pyproject.toml', MANIFEST.replace('/flock/"', '/flock"'))
   expect(() => projectFacts(repository.metaUrl)).toThrow('must end in a slash')
+  expect(() => projectFacts(repository.metaUrl)).not.toThrow(TypeError)
 })
