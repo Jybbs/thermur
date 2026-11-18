@@ -38,7 +38,7 @@ Every pull request runs `🐦‍⬛ CI` except one touching only the site's own 
 | **Check** | **Runs Locally** | **Fails When** |
 |---|---|---|
 | `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, `docs/bun.lock`, or the lockfile beside a task script drifts from its manifest, or `.mise/mise.lock` lacks a pinned tool for the running platform |
-| `⛈️ Advisories` | `mise scan` | A package `uv.lock`, `docs/bun.lock`, or a task script's lockfile resolves carries a published advisory, or the advisory service cannot be reached |
+| `⛈️ Advisories` | `mise scan` | A package `uv.lock`, `docs/bun.lock`, or a task script's lockfile resolves carries a published advisory the project has not set aside, an `AUDIT_IGNORE` entry in `.mise/config.toml` names an advisory a release now fixes, or the advisory service cannot be reached |
 | `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the line it concerns |
 | `☂️ Coverage` | `mise coverage` | A test fails under coverage, the suite fails to collect, or the package's coverage falls below 95% |
 | `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` makes a finding at the error level, such as a file restating a value otherwise than its source, or this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
