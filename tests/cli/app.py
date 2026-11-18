@@ -5,13 +5,11 @@ the version, the help of either group, nor the fetch imports JAX or xarray.
 """
 
 from collections.abc    import Callable
-from common.children    import runs
+from common.children    import spawned
 from importlib          import import_module, reload
 from importlib.metadata import version
 from pytest             import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
-from subprocess         import run
 from syrupy.assertion   import SnapshotAssertion
-from sys                import executable
 
 
 @fixture
@@ -64,15 +62,7 @@ def test_neither_the_version_nor_a_group_s_help_imports_jax_or_xarray():
         ]
     )
 
-    runs("thermur.cli", "thermur.cli.cut", "thermur.cli.fetch")
-    started = run(
-        [executable, "-c", script],
-        capture_output = True,
-        check          = True,
-        text           = True
-    )
-
-    assert started.stdout.splitlines()[-1] == "[]"
+    assert spawned(script)[-1] == "[]"
 
 
 def test_running_the_fetch_imports_neither_jax_nor_xarray():
@@ -90,15 +80,7 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
         ]
     )
 
-    runs("thermur.cli", "thermur.cli.fetch", "thermur.environment.schemas")
-    started = run(
-        [executable, "-c", script],
-        capture_output = True,
-        check          = True,
-        text           = True
-    )
-
-    assert started.stdout.splitlines()[-1] == "[]"
+    assert spawned(script)[-1] == "[]"
 
 
 @mark.parametrize(
