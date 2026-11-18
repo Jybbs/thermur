@@ -426,12 +426,12 @@ class Flight(Module):
             Computes the drift across each command of one flock at `t`.
             """
             sensed = Observation.sensed(
-                air,
-                self.plan.neighbors,
-                self.plan.cruise_m_s,
-                flock,
-                Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
-                t
+                air    = air,
+                count  = self.plan.neighbors,
+                cruise = self.plan.cruise_m_s,
+                flock  = flock,
+                inbox  = Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
+                t      = t
             )
             return across(vmap(composite)(sensed)[0], flock.commands)
 
