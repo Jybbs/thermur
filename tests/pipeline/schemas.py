@@ -1,13 +1,15 @@
 """
 Pins the pipeline's records, meaning what a `Run` reads from its clone and
 what it refuses, which folders `Subpackage` lists and the steps module each
-holds, and which edits change a subpackage's digest.
+holds, and which edits change a subpackage's digest, its own or those of the
+modules it imports.
 """
 
-from pathlib  import Path
-from platform import platform
-from pydantic import ValidationError
-from pytest   import Config, MonkeyPatch, mark, param, raises
+from common.edits import append
+from pathlib      import Path
+from platform     import platform
+from pydantic     import ValidationError
+from pytest       import Config, MonkeyPatch, mark, param, raises
 
 from thermur.pipeline.schemas  import Run, Subpackage
 from thermur.pipeline.settings import Settings
@@ -65,6 +67,54 @@ def test_a_digest_changes_wherever_the_code_does(
 
     before, after = (
         Subpackage(folder=folder).digest("lock") for folder in (original, edited)
+    )
+
+    assert (after != before) is changes
+
+
+@mark.parametrize(
+    ("path", "text", "changes"),
+    [
+        param("imported/module.py", "LIMIT = 1\n", True, id="imported-module"),
+        param("deeper/module.py", "LIMIT = 1\n", True, id="module-imported-in-turn"),
+        param("imported/norms.toml", "factor = 3\n", True, id="imported-data-file"),
+        param(
+            "deeper/norms.toml",
+            "factor = 3\n",
+            True,
+            id = "data-file-imported-in-turn"
+        ),
+        param("unimported/module.py", "LIMIT = 1\n", False, id="unimported-module")
+    ]
+)
+def test_a_digest_follows_the_package_imports_of_its_modules(
+    changes  : bool,
+    path     : str,
+    text     : str,
+    tmp_path : Path
+):
+    """
+    Asserts that a subpackage's digest changes with a module of another
+    subpackage one of its modules imports, a module that module imports
+    in turn, and a data file beside either, and holds through an edit to a
+    module none of them imports.
+    """
+    package = tmp_path / "original/thermur"
+    for name in ("deeper", "imported", "reader", "unimported"):
+        (package / name).mkdir(parents=True)
+        (package / name / "module.py").write_text(MODULE)
+    (package / "imported/norms.toml").write_text("factor = 2\n")
+    (package / "imported/module.py").write_text(
+        f"from thermur.deeper import module\n{MODULE}"
+    )
+    (package / "reader/module.py").write_text(
+        "import os\nimport thermur.imported.module\n"
+    )
+    edited = package.parent.copy(tmp_path / "edited") / "thermur"
+    append(Checkout(root=edited), path, text)
+
+    before, after = (
+        Subpackage(folder=root / "reader").digest("lock") for root in (package, edited)
     )
 
     assert (after != before) is changes

@@ -182,12 +182,16 @@ class Graph(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     Hamilton calls each step a node and runs a node only once the nodes
     named by its parameters have run. A node reads the settings as
     `settings`, the digest of `uv.lock` as `lock_digest`, and the digest of
-    a subpackage's source as `<subpackage>_digest`.
+    a subpackage's source, beside every module of the package it imports, as
+    `<subpackage>_digest`.
 
     The cache keeps each result under a key hashed from the node's own
     source and the fingerprint of each input, so a rerun computes only the
-    nodes whose source or inputs changed, and a node reading a digest is
-    computed again once the code it calls changes.
+    nodes whose source or inputs changed. A fingerprint reads a value's
+    fields and none of its code, so each step calling code, short of one
+    computed again on every run, reads its own subpackage's digest and is
+    computed again once any code it reaches changes, in whichever subpackage
+    that code sits.
     """
 
     checkout: Checkout = Field(default_factory=Checkout.installed)
