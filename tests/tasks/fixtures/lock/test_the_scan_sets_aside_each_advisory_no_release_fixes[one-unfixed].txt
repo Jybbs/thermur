@@ -1,0 +1,1 @@
+gh api --jq '.vulnerabilities[] | "\(.package.name) \(.first_patched_version // empty)"' /advisories/GHSA-fc5q-39xc-vjpf
