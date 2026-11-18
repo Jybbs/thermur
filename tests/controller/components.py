@@ -7,7 +7,7 @@ the second drone's action as it stands.
 from common.drones import flock_of, still_air, viewed
 from equinox       import filter_jit, tree_at
 from jax           import Array, lax, tree, vmap
-from jax.numpy     import append, array, exp, flatnonzero, linalg, sqrt
+from jax.numpy     import append, argsort, array, exp, flatnonzero, linalg, sqrt
 from jax.random    import key, normal, split
 from numpy.testing import assert_allclose
 from pytest        import mark, param
@@ -84,12 +84,18 @@ def acted(
 @mark.parametrize(
     ("seed", "pick", "distance", "direction"),
     [
-        param(0, 0, 1.0, (1.0, 0.0, 0.0), id="first-1-m-past-along-x"),
-        param(0, -1, 501.0, (-1.0, 0.0, 0.0), id="last-501-m-past-against-x"),
-        param(1, 0, 1.0, (0.0, 0.0, 1.0), id="first-1-m-past-straight-up"),
-        param(2**16, -1, 501.0, (0.0, 0.0, -1.0), id="last-501-m-past-straight-down"),
-        param(42, 0, 251.0, (-1.0, -1.0, -1.0), id="first-251-m-past-on-a-diagonal"),
-        param(2**15, -1, 1.0, (0.1, 0.01, 0.0), id="last-1-m-past-short-vector")
+        param(0, 0, 1.0, (1.0, 0.0, 0.0), id="nearest-1-m-past-along-x"),
+        param(0, -1, 501.0, (-1.0, 0.0, 0.0), id="farthest-501-m-past-against-x"),
+        param(1, 0, 1.0, (0.0, 0.0, 1.0), id="nearest-1-m-past-straight-up"),
+        param(
+            2**16,
+            -1,
+            501.0,
+            (0.0, 0.0, -1.0),
+            id = "farthest-501-m-past-straight-down"
+        ),
+        param(42, 0, 251.0, (-1.0, -1.0, -1.0), id="nearest-251-m-past-on-a-diagonal"),
+        param(2**15, -1, 1.0, (0.1, 0.01, 0.0), id="farthest-1-m-past-short-vector")
     ]
 )
 def test_moving_a_drone_the_last_drone_cannot_hear_leaves_an_action_as_it_stands(
@@ -102,7 +108,7 @@ def test_moving_a_drone_the_last_drone_cannot_hear_leaves_an_action_as_it_stands
     """
     Pins locality under the default composite and every candidate.
 
-    Moves the first or the last of the drones outside the last drone's
+    Moves the nearest or the farthest of the drones outside the last drone's
     radio range along `direction`, to `distance` past the farther of that
     range and the last drone's farthest neighbor, and asserts that the last
     drone's acceleration and the amplitude of its noise hold.
@@ -115,7 +121,8 @@ def test_moving_a_drone_the_last_drone_cannot_hear_leaves_an_action_as_it_stands
         float(apart[nearest(NEIGHBORS, positions)[-1]].max()),
         composite.radio.range_m
     )
-    moved = positions.at[flatnonzero(apart[:-1] > composite.radio.range_m)[pick]].set(
+    unheard = flatnonzero(apart[:-1] > composite.radio.range_m)
+    moved   = positions.at[unheard[argsort(apart[unheard])][pick]].set(
         positions[-1] + (reach + distance) * unit(array(direction))
     )
 
