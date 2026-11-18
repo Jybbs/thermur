@@ -220,12 +220,12 @@ def test_diffusion_drives_the_command_and_the_force_and_never_a_position():
     no position or velocity.
     """
     sensed = Observation.sensed(
+        still_air(),
+        7,
+        10.0,
         EASTWARD,
         Inbox.from_broadcast(EASTWARD, inf, EASTWARD),
-        still_air(),
-        0.0,
-        7,
-        10.0
+        0.0
     )
     increment = tree.map(ones_like, EASTWARD)
     slots     = {"heading": Overdamped(), "speed": Marginal(amplitude=0.5)}
@@ -270,12 +270,12 @@ def test_diffusion_under_a_spin_drives_the_spin_rather_than_the_heading():
         0.0,
         EASTWARD,
         Observation.sensed(
+            still_air(),
+            7,
+            10.0,
             EASTWARD,
             Inbox.from_broadcast(EASTWARD, inf, EASTWARD),
-            still_air(),
-            0.0,
-            7,
-            10.0
+            0.0
         )
     ).mv(
         flock_of(zeros((8, 3)), array([1.0, 0.0, 1.0]) * ones((8, 3)))
@@ -298,12 +298,12 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
         array([0.0, 12.0, 0.0]) * ones((8, 3))
     )
     sensed = Observation.sensed(
+        still_air(wind=(1.0, -2.0, 0.5)),
+        7,
+        12.0,
         flock,
         Inbox.from_broadcast(flock, inf, flock),
-        still_air(wind=(1.0, -2.0, 0.5)),
-        0.0,
-        7,
-        12.0
+        0.0
     )
     slots = composite(noise=Persistent(persistence_s=2.0))
 
@@ -354,12 +354,12 @@ def test_exciting_the_flock_copies_a_zig_sooner_by_the_radio_s_delay():
         flock,
         key(0),
         Observation.sensed(
+            still_air(),
+            2,
+            10.0,
             flock,
             Inbox.from_broadcast(flock, built.radio.range_m, flock),
-            still_air(),
-            0.0,
-            2,
-            10.0
+            0.0
         ),
         0.1
     )
@@ -397,12 +397,12 @@ def test_exciting_the_flock_counts_down_and_starts_a_zig_at_the_rim():
         flock,
         key(0),
         Observation.sensed(
+            still_air(),
+            2,
+            10.0,
             flock,
             Inbox.from_broadcast(flock, built.radio.range_m, flock),
-            still_air(),
-            0.0,
-            2,
-            10.0
+            0.0
         ),
         0.1
     )
@@ -530,12 +530,12 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
     sent       = flock_of(positions - array([0.5, 0.0, 0.0]), 3 * velocities)
 
     sensed = Observation.sensed(
+        still_air(5.0),
+        2,
+        10.0,
         flock,
         Inbox.from_broadcast(flock_of(positions, 2 * velocities), inf, sent),
-        still_air(5.0),
-        0.0,
-        2,
-        10.0
+        0.0
     )
 
     assert_allclose(sensed.offsets[0], [[0.5, 0.0, 0.0], [2.5, 0.0, 0.0]])
@@ -563,12 +563,12 @@ def test_sensing_ranks_neighbors_by_the_positions_the_drone_heard():
     )
 
     sensed = Observation.sensed(
+        still_air(),
+        2,
+        10.0,
         flock,
         Inbox.from_broadcast(flock, inf, sent),
-        still_air(),
-        0.0,
-        2,
-        10.0
+        0.0
     )
 
     assert_allclose(sensed.offsets[0], [[2.0, 0.0, 0.0], [4.0, 0.0, 0.0]])
@@ -594,7 +594,7 @@ def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(
     """
     view = viewed(
         [[20.0, 0.0, 0.0]] * 7,
-        (8.0, 0.0, 0.0),
+        velocity = (8.0, 0.0, 0.0),
         cruise   = array(10.0),
         position = array([-10.0, 1700.0, 130.0])
     )
@@ -617,12 +617,12 @@ def test_sensing_reads_a_neighbor_out_of_range_as_one_on_the_drone():
     flock     = flock_of(positions, ones((3, 3)), 2 * ones((3, 3)))
 
     sensed = Observation.sensed(
+        still_air(),
+        2,
+        10.0,
         flock,
         Inbox.from_broadcast(flock, 10.0, flock),
-        still_air(),
-        0.0,
-        2,
-        10.0
+        0.0
     )
 
     assert_allclose(sensed.offsets[0], [[1.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
@@ -654,12 +654,12 @@ def test_sensing_reads_centrality_over_every_held_sender():
     )
 
     sensed = Observation.sensed(
+        still_air(),
+        1,
+        10.0,
         flock,
         Inbox.from_broadcast(flock, 10.0, flock),
-        still_air(),
-        0.0,
-        1,
-        10.0
+        0.0
     )
 
     assert_allclose(sensed.centrality[0], 1 / 3, rtol=1e-6)
@@ -771,7 +771,7 @@ def test_the_radio_hears_at_launch_only_the_drones_within_its_range():
 
     assert_array_equal(inbox.heard[0], [True, True, False])
     assert_allclose(
-        Observation.sensed(flock, inbox, still_air(), 0.0, 2, 10.0).offsets[0],
+        Observation.sensed(still_air(), 2, 10.0, flock, inbox, 0.0).offsets[0],
         [[5.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
     )
 

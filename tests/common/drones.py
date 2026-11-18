@@ -100,10 +100,10 @@ def still_air(
     )
 
 
-def viewed(  # prose: ignore[unsorted-positionals]
+def viewed(
     offsets  : list[list[float]],
-    velocity : tuple[float, float, float] = (10.0, 0.0, 0.0),
     excess   : float = 0.0,
+    velocity : tuple[float, float, float] = (10.0, 0.0, 0.0),
     **fields : object
 ) -> Observation:
     """

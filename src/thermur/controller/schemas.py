@@ -446,14 +446,14 @@ class Observation(Module):
         return stack([self.air[name] for name in ("u", "v", "w")], axis=-1)
 
     @classmethod
-    def sensed(  # prose: ignore[unsorted-positionals]
+    def sensed(
         cls,
+        air    : Air,
+        count  : int,
+        cruise : float,
         flock  : Flock,
         inbox  : Inbox,
-        air    : Air,
-        t      : Array,
-        count  : int,
-        cruise : float
+        t      : Array
     ) -> Self:
         """
         Builds what every drone senses from its `count` nearest neighbors,
@@ -467,12 +467,12 @@ class Observation(Module):
         mean over the neighbors.
 
         Args:
-            flock  : The state each drone senses.
-            inbox  : The states each drone last heard of every other.
             air    : The channels each drone reads at its position.
-            t      : The time, in seconds since the simulation started.
             count  : The number of neighbors each drone senses.
             cruise : The speed each drone cruises at, in meters per second.
+            flock  : The state each drone senses.
+            inbox  : The states each drone last heard of every other.
+            t      : The time, in seconds since the simulation started.
 
         Returns:
             The observation of the flock, one row per drone.

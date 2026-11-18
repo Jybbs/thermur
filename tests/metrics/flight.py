@@ -126,8 +126,8 @@ def default(composite: Composite, request: FixtureRequest) -> Flight:
     """
     settings = Settings()
     return Flight.flown(
-        composite,
         WrfOutput.from_settings(settings).air,
+        composite,
         settings.plan.model_copy(update={"duration_s": request.param})
     )
 
@@ -137,7 +137,7 @@ def flight(composite: Composite) -> Flight:
     """
     Flies the short plan under the default composite through still air.
     """
-    return Flight.flown(composite, AIR, short())
+    return Flight.flown(AIR, composite, short())
 
 
 def pushed(flock: Flock) -> Array:
@@ -252,11 +252,11 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
 
     assert not allclose(
         Flight.flown(
-            replace(starling, heading=Delayed(lag_s=steps * plan.step_s)),
             AIR,
+            replace(starling, heading=Delayed(lag_s=steps * plan.step_s)),
             plan
         ).frames.velocities,
-        Flight.flown(replace(starling, heading=shorter), AIR, plan).frames.velocities,
+        Flight.flown(AIR, replace(starling, heading=shorter), plan).frames.velocities,
         atol = 1e-3
     )
 
@@ -340,8 +340,8 @@ def test_a_flight_holds_every_command_within_the_plant_s_speed_bounds():
     """
     plant    = Plant()
     commands = Flight.flown(
-        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
         AIR,
+        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
         short(turn_deg=0.0)
     ).frames.commands
     assert (linalg.norm(commands[..., :2], axis=-1) <= plant.level_m_s + 1e-4).all()
@@ -359,8 +359,8 @@ def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     of the batch flies a flock of its own, and that another `seed` flies
     another batch.
     """
-    again   = Flight.flown(composite, AIR, short())
-    another = Flight.flown(composite, AIR, short(seed=1))
+    again   = Flight.flown(AIR, composite, short())
+    another = Flight.flown(AIR, composite, short(seed=1))
 
     assert_array_equal(again.frames.positions, flight.frames.positions)
     assert (flight.frames.positions[0] != flight.frames.positions[1]).any()
@@ -454,12 +454,12 @@ def test_a_replay_reads_each_neighbor_the_radio_s_delay_and_the_lag_back(
     behind = velocities[clip(arange(19) - 2, 0, None)] - velocities[:-1]
 
     assert_allclose(
-        flight.drifts(replace(STILL, coupling=Constant()), AIR),
+        flight.drifts(AIR, replace(STILL, coupling=Constant())),
         0.0,
         atol = 1e-5
     )
     assert_allclose(
-        flight.drifts(delayed, AIR),
+        flight.drifts(AIR, delayed),
         broadcast_to(
             asarray(
                 across(7 * Constant().coupling_per_s * behind, velocities[:-1])
@@ -517,8 +517,8 @@ def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
     assert (
         asarray(
             Flight.flown(
-                replace(composite, noise=Persistent()),
                 AIR,
+                replace(composite, noise=Persistent()),
                 short()
             ).frames.forces
         ) != 0
@@ -533,9 +533,9 @@ def test_a_replay_ranks_every_composite_it_is_given(
     Asserts that replaying the frames gives one drift a frame but the last,
     and one log-likelihood and one coefficient for each composite named.
     """
-    ranked = flight.likelihoods({"one": composite, "two": composite}, AIR)
+    ranked = flight.likelihoods(AIR, {"one": composite, "two": composite})
 
-    assert flight.drifts(composite, AIR).shape == (2, 19, 12, 3)
+    assert flight.drifts(AIR, composite).shape == (2, 19, 12, 3)
     assert list(ranked.model.values) == ["one", "two"]
     assert isfinite(ranked.log_likelihood).all()
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
@@ -563,7 +563,7 @@ def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
     )
 
     assert_allclose(
-        flight.likelihoods({"still": STILL}, AIR).log_likelihood,
+        flight.likelihoods(AIR, {"still": STILL}).log_likelihood,
         [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
         rtol = 1e-5
     )
@@ -586,8 +586,8 @@ def test_a_fixed_speed_keeps_every_drone_at_the_cruise(
     """
     plan     = short()
     commands = Flight.flown(
-        replace(composite, speed=Marginal(fixed=fixed)),
         AIR,
+        replace(composite, speed=Marginal(fixed=fixed)),
         plan
     ).frames.commands
     speeds = linalg.norm(commands, axis=-1)
@@ -705,8 +705,8 @@ def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
     """
     forces = asarray(
         Flight.flown(
-            replace(composite, noise=Drawn()),
             AIR,
+            replace(composite, noise=Drawn()),
             short(frame_every=1)
         ).frames.forces
     )
@@ -775,7 +775,7 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
     velocity, and the turn's speed and reach read as finite values.
     """
     plan  = short(duration_s=4.0, turn_at_s=1.0, turn_deg=90.0)
-    flown = Flight.flown(composite, AIR, plan)
+    flown = Flight.flown(AIR, composite, plan)
 
     speed, reach = flown.turn_response
 
@@ -875,16 +875,16 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
         for range_m in (50.0, 1e4)
     }
 
-    assert not allclose(flight.drifts(reach[50.0], AIR), flight.drifts(reach[1e4], AIR))
+    assert not allclose(flight.drifts(AIR, reach[50.0]), flight.drifts(AIR, reach[1e4]))
     assert not allclose(
         Flight.flown(
-            Composite.from_settings(Settings(radio=Radio(range_m=5.0))),
             AIR,
+            Composite.from_settings(Settings(radio=Radio(range_m=5.0))),
             short()
         ).frames.positions,
         Flight.flown(
-            Composite.from_settings(Settings(radio=Radio(range_m=1e4))),
             AIR,
+            Composite.from_settings(Settings(radio=Radio(range_m=1e4))),
             short()
         ).frames.positions
     )

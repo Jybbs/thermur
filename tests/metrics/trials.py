@@ -76,7 +76,7 @@ def test_a_flown_trial_tables_every_flight_beside_its_ranks():
         duration_s = 2.0,
         measures   = (Measure(statistic="spacing_m"),),
         slot       = "cohesion"
-    ).flown(Composite.from_settings(Settings()), still_air(), short())
+    ).flown(still_air(), Composite.from_settings(Settings()), short())
 
     assert dict(flown.sizes)["candidate"] == 2
     assert flown.spacing_m.dims == ("candidate", "condition", "seed")
