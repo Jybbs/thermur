@@ -4,12 +4,16 @@ spec, over a clone of the checkout whose one lag lifts the `uv` mise pins:
 
 - The table it prints, and the status `2` it exits with where a hold names
   no row, before it tries or writes anything
+- The write leaving a pin `pyproject.toml` records a hold on where it
+  stands without the flag, and the notice on stderr naming each recorded
+  hold that no row names
 - The trial it runs under `--try`, failing with the major lift whose hold
   lets the rest pass, and the write it runs under `--write`, only once the
   trial passes where both are given
 """
 
 from collections.abc  import Callable
+from common.edits     import hold
 from common.lags      import BREAKING, uv_lag
 from common.stand_ins import StandIn
 from contextlib       import nullcontext
@@ -129,3 +133,44 @@ def test_a_hold_naming_no_row_stops_the_task_before_anything_runs(
         2, "No row of the table names `alpha` and `zeta`\n",
         []
     )
+
+
+def test_a_recorded_hold_stands_without_the_flag_and_a_stale_one_is_named(
+    capsys : CaptureFixture[str],
+    clone  : Checkout,
+    lifted : Callable[..., None],
+    mise   : StandIn
+):
+    """
+    Asserts that the table marks a pin `pyproject.toml` records a hold on
+    beside its reason, that `--write` with no `--hold` leaves the pin where
+    it stands, and that the task names on stderr a recorded hold naming no
+    row and goes on.
+    """
+    hold(clone, {"uv": "It breaks", "zeta": "Gone"})
+
+    lifted(usage_write="true")
+
+    printed = capsys.readouterr()
+    assert printed.out.splitlines()[2].endswith("| It breaks |")
+    assert printed.err == (
+        "`[tool.thermur.holds]` in `pyproject.toml` holds `zeta`, which no row "
+        "of the table names\n"
+    )
+    assert Config.read(clone.root).uv == clone.config.uv
+
+
+def test_recorded_holds_each_naming_a_row_print_nothing_on_stderr(
+    capsys : CaptureFixture[str],
+    clone  : Checkout,
+    lifted : Callable[..., None]
+):
+    """
+    Asserts that the task prints nothing on stderr where every hold
+    `pyproject.toml` records names a row of the table.
+    """
+    hold(clone, {"uv": "It breaks"})
+
+    lifted()
+
+    assert capsys.readouterr().err == ""
