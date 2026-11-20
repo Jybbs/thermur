@@ -21,7 +21,7 @@ from dataclasses  import asdict, fields
 from jax          import numpy as jnp
 from jax.random   import key as seeded, uniform
 from json         import loads
-from numpy        import asarray, linalg
+from numpy        import asarray, eye, linalg
 from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
@@ -443,7 +443,7 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     assert (roost["stepped"][resting, 0] > zig.refractory_s).all()
     assert (roost["stepped"][resting, 1] == -1).any()
     assert paired["flocks"]["late"]["delay_s"] > zig.reaction_s + zig.cue_s
-    assert asarray(radio["heard"][0]).all()
+    assert (asarray(radio["heard"][0]) == 1 - eye(6)).all()
     assert len(radio["packets"]) == len(radio["draws"]) == len(radio["positions"])
     assert outputs.parity not in outputs.drifted
 

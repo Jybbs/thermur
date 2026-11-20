@@ -56,11 +56,13 @@ describe('Radio.hear', () => {
     'hears by the packet at step %i what the package’s radio hears from the same draws, within a thousandth',
     ([step, packet]) => {
       const { link, unread } = carried(step)
-      const apart            = RUN.positions[packet]!.flat().flatMap((heard, pair) =>
-        heard.map((value, axis) => Math.abs(link.inbox[pair * SENT + axis]! - value))
-      )
+      const heard            = RUN.heard[packet]!.flat()
+      const apart            = RUN.positions[packet]!.flat()
+        .map((held, pair) => held.map((value, axis) => Math.abs(link.inbox[pair * SENT + axis]! - value)))
+        .filter((_, pair) => heard[pair] === 1)
+        .flat()
       expect(unread).toBe(0)
-      expect([...link.heard]).toEqual(RUN.heard[packet]!.flat())
+      expect([...link.heard]).toEqual(heard)
       expect(Math.max(...apart)).toBeLessThan(1e-3)
     }
   )

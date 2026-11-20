@@ -22,10 +22,11 @@ export const SENT = 8
  * the link's rate, each packet arriving the link's delay late, only from a
  * sender within the link's range as it was sent, and only where the link does
  * not lose it, and each drone forgets a sender once the link's hold passes with
- * no packet from it. What drone `r` last heard of drone `s` sits at
- * `(r * count + s) * SENT` of `inbox`, laid out as `SENT` gives, and whether
- * it still hears that sender at `r * count + s` of `heard`. Every array a step
- * reads and writes is built once, so a step allocates nothing.
+ * no packet from it, a drone never hearing itself. What drone `r` last heard of
+ * drone `s` sits at `(r * count + s) * SENT` of `inbox`, laid out as `SENT`
+ * gives, and whether it still hears that sender at `r * count + s` of `heard`.
+ * Every array a step reads and writes is built once, so a step allocates
+ * nothing.
  */
 export class Radio {
   readonly heard     : Uint8Array
@@ -69,6 +70,7 @@ export class Radio {
     for (let receiver = 0; receiver < count; receiver++) {
       const r = base + receiver * SENT
       for (let sender = 0; sender < count; sender++) {
+        if (sender === receiver) continue
         const pair = receiver * count + sender
         const s    = base + sender * SENT
         const dx   = sent[s]! - sent[r]!, dy = sent[s + 1]! - sent[r + 1]!, dz = sent[s + 2]! - sent[r + 2]!

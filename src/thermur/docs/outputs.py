@@ -12,7 +12,7 @@ from dataclasses     import asdict, fields, replace
 from equinox         import tree_at
 from functools       import cached_property, partial
 from jax             import Array, numpy as jnp, tree, vmap
-from jax.random      import fold_in, key as seeded, uniform
+from jax.random      import key as seeded, uniform
 from json            import dumps
 from math            import sqrt
 from numpy           import argsort, around, asarray, cross, geomspace, linalg, ndarray, zeros
@@ -566,17 +566,23 @@ def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
     """
     Carries the broadcasts of `flock` over `radio` from its opening for
     `radio.delay_s` and six packet periods past it, each drone flying its
-    velocity, keeping at each step a packet falls on the uniform draws each
-    pair's loss reads, unrounded so a copy keeps each packet the link keeps,
-    and what each drone then heard of every other.
+    velocity, keeping at each step a packet falls on the uniform draw each
+    pair's loss reads, by receiver and then by every other drone, unrounded
+    so a copy keeps each packet the link keeps, and what each drone then
+    heard of every other, laid out by receiver and sender from each table.
 
     Returns:
         The flock the radio opens on, the number of steps it runs, each
         step a packet falls at, and at each such step the draws, whether
         each drone hears each other, and the position it last heard each
-        other at.
+        other at, zero for a drone it does not hear.
     """
-    key         = seeded(plan.seed)
+    key    = seeded(plan.seed)
+    drones = len(flock.positions)
+    rows   = jnp.arange(drones)[:, None]
+    others = jnp.broadcast_to(jnp.arange(drones), (drones, drones))[
+        ~jnp.eye(drones, dtype=bool)
+    ].reshape(drones, drones - 1)
     period      = radio.period_steps(plan.step_s)
     steps       = radio.delay_steps(plan.step_s) + 6 * period
     inbox, sent = radio.opened(flock, 0, plan.step_s)
@@ -596,16 +602,28 @@ def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
             step_s = plan.step_s
         )
         if step % period == 0:
-            kept.append((uniform(fold_in(key, step), inbox.heard.shape), inbox))
+            kept.append((radio.draws(key, rows, others, jnp.asarray(step)), inbox))
+
+    def spread(held: Inbox, table: Array) -> ndarray:
+        """
+        Lays out what each slot of `held` holds of its sender in `table` by
+        receiver and sender, zero for a sender no slot hears.
+        """
+        heard = held.heard.reshape(*held.heard.shape, *(1,) * (table.ndim - 2))
+        return asarray(
+            jnp.zeros((drones, drones, *table.shape[2:]), table.dtype)
+            .at[rows, held.senders]
+            .add(jnp.where(heard, table, 0))
+        )
 
     return {
-        "draws"     : [asarray(draws, dtype=float).tolist() for draws, _ in kept],
-        "flock"     : rounded(flock),
-        "heard"     : [asarray(heard.heard, dtype=int).tolist() for _, heard in kept],
-        "packets"   : list(range(0, steps, period)),
+        "draws"   : [asarray(draws, dtype=float).tolist() for draws, _ in kept],
+        "flock"   : rounded(flock),
+        "heard"   : [spread(held, held.heard.astype(int)).tolist() for _, held in kept],
+        "packets" : list(range(0, steps, period)),
         "positions" : [
-            around(asarray(heard.positions, dtype=float), 4).tolist()
-            for _, heard in kept
+            around(spread(held, held.positions).astype(float), 4).tolist()
+            for _, held in kept
         ],
         "steps"     : steps
     }
