@@ -50,11 +50,11 @@ def lazily(
     `EAGER` makes, which loads as it runs.
 
     Args:
-        importer : The name of the module the import runs in, or `None`
-                   where it runs in no module.
-        name     : The name of the module the import loads.
-        fromlist : The names a `from` import binds, or `None` for a plain
-                   `import`.
+        importer: The name of the module the import runs in, or `None` where
+                  it runs in no module.
+        name: The name of the module the import loads.
+        fromlist: The names a `from` import binds, or `None` for a plain
+                  `import`.
     """
     return importer is None or importer.partition(".")[0] not in EAGER
 
