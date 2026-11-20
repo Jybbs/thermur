@@ -32,6 +32,12 @@ describe('the helpers that write a drawing’s markup', () => {
     expect(muted.style.getPropertyValue('fill')).toBe('var(--vp-c-text-2)')
   })
 
+  it('sets a caption over a control in the muted tone, in the class the kit’s label rule sets', () => {
+    const caption = markup.text(markup.FACE.mono, 10.5, 'LAUNCH SPACING', 0, 0, markup.CAPTION)
+    expect(caption.getAttribute('class')).toBe('kit-caption')
+    expect(caption.style.getPropertyValue('fill')).toBe('var(--vp-c-text-2)')
+  })
+
   it('places a control over a drawing in pixels, leaving an unset size to its stylesheet', () => {
     expect(markup.placed({ left: 12, top: 3.5 })).toEqual({ height: undefined, left: '12px', top: '3.5px', width: undefined })
     expect(markup.placed({ height: 28, left: 0, top: 10, width: 200 })).toMatchObject({ height: '28px', width: '200px' })

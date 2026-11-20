@@ -5,7 +5,7 @@ installed clone, and what the model refuses, over a stand-in field and the
 coupling slot, beside the fire data's settings each source sets.
 """
 
-from common.edits    import append, edit
+from common.edits    import append, edit, hold
 from common.settings import Tuned
 from pathlib         import Path
 from pydantic        import ValidationError
@@ -91,6 +91,16 @@ def test_a_key_no_field_declares_fails(installed: Checkout):
     ]
 
 
+def test_a_speed_slot_cruising_at_the_plan_s_speed_holds(installed: Checkout):
+    """
+    Asserts that a speed slot and a plan set to one cruise speed together
+    pass validation.
+    """
+    tuned = Tuned(plan={"cruise_m_s": 12.0}, speed={"cruise_m_s": 12.0})
+
+    assert tuned.speed.cruise_m_s == tuned.plan.cruise_m_s == 12.0
+
+
 @mark.parametrize(
     "speed",
     [
@@ -107,16 +117,6 @@ def test_a_speed_slot_inside_the_step_s_bound_or_a_fixed_speed_holds(
     speed fixed, which leaves the stiffness unread, passes validation.
     """
     assert Tuned(speed=speed).speed.relaxation_s == speed["relaxation_s"]
-
-
-def test_a_speed_slot_cruising_at_the_plan_s_speed_holds(installed: Checkout):
-    """
-    Asserts that a speed slot and a plan set to one cruise speed together
-    pass validation.
-    """
-    tuned = Tuned(plan={"cruise_m_s": 12.0}, speed={"cruise_m_s": 12.0})
-
-    assert tuned.speed.cruise_m_s == tuned.plan.cruise_m_s == 12.0
 
 
 def test_a_speed_slot_cruising_off_the_plan_s_speed_fails(installed: Checkout):
@@ -158,6 +158,17 @@ def test_a_variable_sets_the_simulation(installed: Checkout, monkeypatch: Monkey
     monkeypatch.setenv("THERMUR_SIMULATION", "data/samples/wrf_sample.nc")
 
     assert Tuned().simulation == Path("data/samples/wrf_sample.nc")
+
+
+def test_the_holds_table_sets_no_field_and_fails_nothing(installed: Checkout):
+    """
+    Asserts that the `[tool.thermur.holds]` table `lock:lift` reads reaches
+    no field, so a recorded hold leaves the settings as the rest of the
+    table sets them.
+    """
+    hold(installed, {"radius_m": "Gone"})
+
+    assert Tuned().radius_m == 7.0
 
 
 def test_the_settings_are_frozen(installed: Checkout):

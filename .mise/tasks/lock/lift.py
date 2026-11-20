@@ -8,8 +8,9 @@
 Prints every pin the checkout declares that lags its newest release as one
 Markdown table, as the `lock:lift` task, then tries the lift in a scratch
 clone under `--try` and writes it under `--write`, leaving each pin a
-`--hold` names where it stands. mise passes each flag the usage spec above
-declares through a `usage_` variable.
+`--hold` names or `[tool.thermur.holds]` in `pyproject.toml` records where
+it stands. mise passes each flag the usage spec above declares through a
+`usage_` variable.
 """
 
 from datetime import UTC, datetime
@@ -23,10 +24,11 @@ from thermur.repo.schemas  import join_names
 
 def main():
     """
-    Prints the table, then exits with status `2` where a hold names no row
-    of it. Under `--try`, it exits with status `1` where the trial fails,
-    meaning a command of the write, `uv sync`, or `mise ci` exits nonzero in
-    the scratch clone, naming the pin a major lift moves whose hold lets the
+    Prints the table, then exits with status `2` where a hold names no
+    row of it, and names on stderr each recorded hold naming no row. Under
+    `--try`, it exits with status `1` where the trial fails, meaning a
+    command of the write, `uv sync`, or `mise ci` exits nonzero in the
+    scratch clone, naming the pin a major lift moves whose hold lets the
     rest pass. Under `--write`, it then writes the lift into the checkout.
     """
     lift = Lift(checkout=Checkout(), holds=tuple(environ.get("usage_hold", "").split()))
@@ -38,6 +40,14 @@ def main():
             file = stderr
         )
         raise SystemExit(2)
+
+    if stale := lift.stale:
+        print(
+            "`[tool.thermur.holds]` in `pyproject.toml` holds "
+            + join_names([f"`{hold}`" for hold in stale])
+            + ", which no row of the table names",
+            file = stderr
+        )
 
     if environ.get("usage_try") == "true" and not lift.passes():
         held = lift.isolate()
