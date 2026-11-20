@@ -305,7 +305,9 @@ class Flight(Module):
         Finds the frequency at which the spontaneous correlation
         $C(k,\\omega)$ of the velocity fluctuations peaks, at the smallest
         wave vector along the flock's mean heading the flock's own length
-        resolves, zero where the fluctuations relax with no wave.
+        resolves, after removing each mode's time mean, so the peak is the
+        lowest frequency the flight resolves where the fluctuations relax
+        with no wave.
         """
         flock      = self.settled
         velocities = asarray(flock.velocities)
@@ -321,8 +323,16 @@ class Flight(Module):
                 2j * pi * along / (4 * along.std((1, 2), keepdims=True))
             )[..., newaxis]
         ).mean(2)
-        rates = fft.fftfreq(modes.shape[1], self.plan.frame_s)
-        return abs(rates[argmax((abs(fft.fft(modes, axis=1)) ** 2).sum(-1), axis=1)])
+        amplitudes = linalg.norm(
+            fft.fft(modes - modes.mean(1, keepdims=True), axis=1),
+            axis = -1
+        )
+        return abs(
+            fft.fftfreq(amplitudes.shape[1], self.plan.frame_s)[argmax(
+                amplitudes,
+                axis = 1
+            )]
+        )
 
     @property
     def statistics(self) -> Dataset:

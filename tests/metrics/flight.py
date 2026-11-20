@@ -692,6 +692,30 @@ def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
     assert_allclose(flight.spectral_peak_hz, 4 / 3, rtol=1e-5)
 
 
+def test_a_relaxing_mode_over_a_static_deformation_peaks_in_the_lowest_bin():
+    """
+    Asserts that a line of drones whose velocities across the course hold
+    a static deformation five times the size of a fluctuation relaxing
+    with no wave reads its spectral peak at the lowest frequency the flight
+    resolves, since the deformation is the mode's time mean and leaves the
+    zero bin once that mean is removed.
+    """
+    spots  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
+    along  = spots[:, 0] - spots[:, 0].mean()
+    wave   = 2 * pi * along / (4 * along.std())
+    swing  = 5 * cos(wave) + exp(-arange(20)[:, None] / 3) * sin(wave)
+    flight = laid(
+        positions  = spots,
+        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
+    )
+
+    assert_allclose(
+        flight.spectral_peak_hz,
+        1 / (flight.settled.velocities.shape[1] * flight.plan.frame_s),
+        rtol = 1e-5
+    )
+
+
 def test_each_seed_of_the_batch_flies_as_it_does_alone(
     composite : Composite,
     flight    : Flight
