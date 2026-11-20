@@ -401,9 +401,9 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         the task runs from, so uv reaches the root's own `.venv`.
 
         Args:
-            capture : Whether the output is captured rather than printed.
-            check   : Whether a nonzero exit raises.
-            folder  : The folder to run in, relative to the root.
+            capture: Whether the output is captured rather than printed.
+            check: Whether a nonzero exit raises.
+            folder: The folder to run in, relative to the root.
 
         Raises:
             CalledProcessError: Where `check` is set and the command exits
