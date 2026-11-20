@@ -57,7 +57,8 @@ from thermur.metrics.schemas    import Plan
 class Flight(Module):
     """
     The kept frames of one flock per seed, `(n_seeds, n_frames, n_drones,
-    3)`, beside the composite and the plan that flew them.
+    3)`, beside the composite and the plan that flew them, and under a plan
+    setting a turn, the frames of the same flocks flown with no turn.
 
     Each statistic reads the frames on the host, one value per seed unless
     it says otherwise.
@@ -76,6 +77,13 @@ class Flight(Module):
     plan: Plan = field(static=True)
     """
     The plan the flight flew to.
+    """
+
+    unturned: Flock | None = None
+    """
+    The flock at each kept frame flown from the same launch, Brownian path,
+    and radio draws with the first drone left unturned, or `None` under a
+    plan setting no turn.
     """
 
     @property
@@ -371,10 +379,11 @@ class Flight(Module):
     @property
     def turn_response(self) -> tuple[ndarray, ndarray]:
         """
-        Reads how the first drone's turn reaches the flock, averaging the
-        rotation of each drone's heading since the turn began over shells of
-        equal count at growing distance from the first drone, which leaves
-        out each drone's own noise.
+        Reads how the first drone's turn reaches the flock, averaging
+        the rotation of each drone's heading away from its heading in the
+        unturned flight over shells of equal count at growing distance from
+        the first drone, which leaves out each drone's own noise and every
+        rotation the turn did not cause.
 
         Returns:
             The speed of the response across the flock, from a line through
@@ -387,8 +396,11 @@ class Flight(Module):
         if not plan.turn_deg:
             return (nan * ones(plan.seeds),) * 2
 
-        start = plan.framed(plan.turn_at_s)
-        since = asarray(self.frames.headings)[:, start - 1 :, :, :2] @ array([1, 1j])
+        start            = plan.framed(plan.turn_at_s)
+        turned, unturned = (
+            asarray(flock.headings)[:, start - 1 :, :, :2] @ array([1, 1j])
+            for flock in (self.frames, self.unturned)
+        )
         return tuple(
             asarray(
                 [
@@ -398,7 +410,7 @@ class Flight(Module):
                         rotation  = rotation
                     )
                     for rotation, cloud in zip(
-                        since / since[:, :1],
+                        turned / unturned,
                         asarray(self.frames.positions)[:, start - 1],
                         strict = True
                     )
@@ -456,24 +468,36 @@ class Flight(Module):
     def flown(cls, air: Air, composite: Composite, plan: Plan) -> Self:
         """
         Flies one flock per seed under `vmap`, compiling once for the batch,
-        with each launch and each Brownian path deriving from `plan.seed`.
+        with each launch and each Brownian path deriving from `plan.seed`,
+        and under a plan setting a turn, each flock again in the same batch
+        with the first drone left unturned.
         """
-        return cls(
-            composite = composite,
-            frames    = tree.map(
-                asarray,
-                jit(
+        lanes = tree.map(
+            asarray,
+            jit(
+                vmap(
                     vmap(
-                        lambda key: kept(
+                        lambda key, turning: kept(
                             air       = air,
                             composite = composite,
                             key       = key,
-                            plan      = plan
-                        )
-                    )
-                )(split(seeded(plan.seed), plan.seeds))
-            ),
-            plan = plan
+                            plan      = plan,
+                            turning   = turning
+                        ),
+                        in_axes = (0, None)
+                    ),
+                    in_axes = (None, 0)
+                )
+            )(
+                split(seeded(plan.seed), plan.seeds),
+                array([True, False]) if plan.turn_deg else array([True])
+            )
+        )
+        return cls(
+            composite = composite,
+            frames    = tree.map(lambda leaf: leaf[0], lanes),
+            plan      = plan,
+            unturned  = tree.map(lambda leaf: leaf[1], lanes) if plan.turn_deg else None
         )
 
     def grouped(self, cloud: ndarray) -> ndarray:
@@ -548,11 +572,18 @@ def first_zero(curve: ndarray) -> int:
     return crossed[0] if crossed.size else curve.size
 
 
-def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
+def kept(
+    air       : Air,
+    composite : Composite,
+    key       : Array,
+    plan      : Plan,
+    turning   : Array | bool = True
+) -> Flock:
     """
     Flies one flock, an outer `lax.scan` keeping every `frame_every`-th
     step of an inner one, each inner step hearing over the radio, moving the
-    flock through `stepped`, and then setting the first drone's turn.
+    flock through `stepped`, and then setting the first drone's turn where
+    `turning` holds.
 
     Args:
         air       : The channels each drone reads.
@@ -560,6 +591,8 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
         key       : The key the launch, the Brownian path, each lost packet,
                     and each step of the noise slot's state derive from.
         plan      : The plan the flock flies to.
+        turning   : Whether the first drone turns, which leaves every draw
+                    as it is either way.
 
     Returns:
         The flock at each kept frame.
@@ -609,7 +642,7 @@ def kept(air: Air, composite: Composite, key: Array, plan: Plan) -> Flock:
             lambda held: held.commands,
             moved,
             moved.commands.at[0].set(
-                where(t >= plan.turn_at_s, plan.turned, moved.commands[0])
+                where((t >= plan.turn_at_s) & turning, plan.turned, moved.commands[0])
             )
         ) if plan.turn_deg else moved
         return (turned, heard, sent), None
@@ -655,8 +688,9 @@ def response(
         distances : Each drone's distance from the first drone as the turn
                     began, in meters.
         plan      : The plan the flock flew to.
-        rotation  : The rotation of each drone's heading since the
-                    turn began, as a complex number on the unit circle,
+        rotation  : The rotation of each drone's heading away from its
+                    heading in the unturned flight, from the frame before
+                    the turn began, as a complex number on the unit circle,
                     `(n_frames, n_drones)`.
 
     Returns:

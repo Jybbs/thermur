@@ -127,11 +127,11 @@ describe('the heading chart', () => {
     const chart = charted(RulesReach, 1024)
     expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(readings(chart)).toEqual([
-      '12.8°', 'of 20° · 64% ± 10',
-      '6.2°', 'of 20° · 31% ± 5',
-      '13.1°', 'of 20° · 66% ± 9',
-      '10.1°', 'of 20° · 50% ± 10',
-      '8.6°', 'of 20° · 43% ± 11'
+      '0.1°', 'of 20° · 0% ± 0',
+      '0.5°', 'of 20° · 3% ± 2',
+      '0.1°', 'of 20° · 0% ± 0',
+      '0.5°', 'of 20° · 3% ± 2',
+      '0.6°', 'of 20° · 3% ± 3'
     ])
     expect(knobs(chart).map(knob => knob.checked)).toEqual([true, false])
     expect(dots(chart)).toEqual(['true', 'false'])
@@ -166,11 +166,11 @@ describe('the stops on the dial’s rim', () => {
     knobs(chart)[1]!.click()
     await chart.widget.vm.$nextTick()
     expect(readings(chart)).toEqual([
-      '12.7°', 'of 90° · 14% ± 2',
-      '6.5°', 'of 90° · 7% ± 1',
-      '13.0°', 'of 90° · 14% ± 2',
-      '10.3°', 'of 90° · 12% ± 2',
-      '7.4°', 'of 90° · 8% ± 3'
+      '0.2°', 'of 90° · 0% ± 0',
+      '0.5°', 'of 90° · 1% ± 0',
+      '0.2°', 'of 90° · 0% ± 0',
+      '0.3°', 'of 90° · 0% ± 0',
+      '2.1°', 'of 90° · 2% ± 2'
     ])
     expect(knobs(chart).map(knob => knob.checked)).toEqual([false, true])
     expect(dots(chart)).toEqual(['false', 'true'])
@@ -228,12 +228,12 @@ describe('the rings', () => {
   it('staggers the rings over the theme’s settling time, outer first', () => {
     document.documentElement.style.setProperty('--th-settle', '240ms')
     vi.spyOn(performance, 'now').mockReturnValue(0)
-    const chart = charted(RulesReach, 672)
+    const chart = charted(Past, 672)
     chart.stand.frames.run(1, 300)
-    const [outer, , inner] = readings(chart).filter(line => line.endsWith('°'))
-    expect(Number(outer!.slice(0, -1)) / 12.8).toBeGreaterThan(Number(inner!.slice(0, -1)) / 13.1)
+    const [outer, inner] = readings(chart).filter(line => line.endsWith('°'))
+    expect(Number(outer!.slice(0, -1)) / 10).toBeGreaterThan(Number(inner!.slice(0, -1)) / 40)
     chart.stand.frames.run(20, 400)
-    expect(readings(chart)[0]).toBe('12.8°')
+    expect(readings(chart).filter(line => line.endsWith('°'))).toEqual(['10.0°', '40.0°'])
   })
 
   it('leaves no listener, observer, or frame behind once it unmounts mid-sweep', () => {
