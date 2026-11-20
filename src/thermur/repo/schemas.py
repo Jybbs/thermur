@@ -28,7 +28,7 @@ Holds the records the `repo` tasks read and report:
 
 from collections     import Counter
 from collections.abc import Hashable, Iterable, Iterator, Mapping, Sequence
-from datetime        import datetime
+from datetime        import datetime, timedelta
 from enum            import StrEnum, auto
 from http            import HTTPMethod
 from itertools       import cycle
@@ -613,6 +613,14 @@ class Manifest(Document, title="pyproject.toml"):
     version: str = Field(validation_alias=AliasPath("project", "version"))
     """
     The release `[project]` carries, the version a tag names.
+    """
+
+    window: timedelta = Field(
+        validation_alias = AliasPath("tool", "uv", "exclude-newer")
+    )
+    """
+    The age a release reaches before a lockfile resolves it, the ISO 8601
+    duration `[tool.uv]` declares as `exclude-newer`.
     """
 
     @property

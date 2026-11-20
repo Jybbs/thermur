@@ -6,8 +6,9 @@ then prints, writes, and tries:
 - The pins `Tools`, `Locked`, `Scripts`, `Builds`, `Site`, `Actions`,
   `Images`, and `Wrangler` report lagging, those `Site` reports including
   each pin of every package of the site's workspace and each exact release
-  `overrides` gives a package, each beside its newest release's date and
-  the advisories the lift clears, and the edits each writes into the copy
+  `overrides` gives a package, each newest release older than the window
+  `[tool.uv]` declares, each beside its newest release's date and the
+  advisories the lift clears, and the edits each writes into the copy
 - The releases `Site` reads as exact, and the ranges it leaves alone
 - The table the lift prints, the holds naming no row, and the pins it
   lifts short of its holds
@@ -53,6 +54,16 @@ KIT     = Path("docs/kit/package.json")
 NOW     = datetime(2026, 10, 16, tzinfo=UTC)
 PACKAGE = Path("docs/package.json")
 PAGES   = Path(".github/workflows/pages.yml")
+
+
+@fixture
+def age(checkout: Checkout) -> str:
+    """
+    Writes the `--minimum-release-age` flag, in whole seconds, that holds
+    a Bun resolve to releases older than the window the copy's `[tool.uv]`
+    declares.
+    """
+    return f"--minimum-release-age={int(checkout.manifest.window.total_seconds())}"
 
 
 @fixture
@@ -497,6 +508,7 @@ def test_scripts_reads_each_exact_pin_a_task_script_declares(
 
 
 def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
+    age      : str,
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
@@ -530,7 +542,7 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     answer(
         "bun",
         answers = {
-            '"outdated --filter=*"' : printed(
+            f'"outdated --filter=* {age}"': printed(
                 value = "| Package | Current | Update | Latest | Workspace |\n"
                 "|---------|---------|--------|--------|-----------|\n"
                 f"| @zag-js/select | {zag} | 9.9.9 | 9.9.9 | @thermur/kit |\n"
@@ -539,9 +551,9 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 | @thermur/kit |\n"
                 f"| vue (peer) | {vue} | 9.9.9 | 9.9.9 | @thermur/kit |"
             ),
-            '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
-            '"audit --json"'        : printed({}),
-            "*": "exit 1"
+            '"info "*'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"' : printed({}),
+            "*"              : "exit 1"
         }
     )
 
@@ -565,6 +577,7 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
 
 
 def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
+    age      : str,
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
@@ -582,15 +595,15 @@ def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
     answer(
         "bun",
         answers = {
-            '"outdated --filter=*"' : printed(
+            f'"outdated --filter=* {age}"': printed(
                 value = "| Package | Current | Update | Latest | Workspace |\n"
                 "|---------|---------|--------|--------|-----------|\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
                 f"| vue (dev) | {vue}0 | {vue}0 | 9.9.9 | @thermur/kit |"
             ),
-            '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
-            '"audit --json"'        : printed({}),
-            "*": "exit 1"
+            '"info "*'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"' : printed({}),
+            "*"              : "exit 1"
         }
     )
 
@@ -636,37 +649,46 @@ def test_site_reads_only_an_exact_release_as_a_pin(exact: bool, version: str):
 )
 def test_site_reads_each_package_bun_outdated_lists(
     after    : dict,
+    age      : str,
     answer   : Callable[..., StandIn],
     audited  : dict,
     checkout : Checkout,
     cleared  : tuple[str, ...]
 ):
     """
-    Asserts that `Site` reports each package `bun outdated` lists, with
-    or without its `(dev)` mark, beside the date `bun info` gives its
-    newest release, and clears an advisory `bun audit` reports on one only
-    where the audit of a copy of `docs/` with the lift written reports it
-    no longer, a copy holding each workspace package's manifest that it
-    resolves only where an advisory names a row, so an advisory the lift
-    leaves standing clears nothing.
+    Asserts that `Site` reports each package `bun outdated` lists under the
+    window, with or without its `(dev)` mark, beside the date `bun info`
+    gives its newest release. A release Bun marks `*`, the newest the window
+    allows, makes a row where it is ahead of the pinned release and none
+    where it is the pinned release. `Site` clears an advisory `bun audit`
+    reports on one only where the audit of a copy of `docs/` with the lift
+    written reports it no longer, a copy holding each workspace package's
+    manifest that it resolves only where an advisory names a row, so an
+    advisory the lift leaves standing clears nothing.
     """
     pins  = override(checkout, {})["devDependencies"]
     table = (
         "| Package | Current | Update | Latest |\n"
         "|---------|---------|--------|--------|\n"
+        f"| knip (dev) | {pins['knip']} | {pins['knip']} | {pins['knip']} * |\n"
         f"| satori (dev) | {pins['satori']} | {pins['satori']} | 0.99.0 |\n"
+        f"| vitest (dev) | {pins['vitest']} | {pins['vitest']} * | 9.0.0 * |\n"
         f"| vue | {pins['vue']} | {pins['vue']} | 9.9.9 |"
     )
-    times  = {"0.99.0": "2026-10-16T08:03:00.061Z", "9.9.9": "2026-10-13T00:00:00Z"}
+    times = {
+        "0.99.0" : "2026-10-16T08:03:00.061Z",
+        "9.0.0"  : "2026-10-01T00:00:00Z",
+        "9.9.9"  : "2026-10-13T00:00:00Z"
+    }
     lifted = 'grep -q \'"satori"[^,]*"0.99.0"\' package.json'
     bun    = answer(
         "bun",
         answers = {
-            '"outdated --filter=*"' : printed(table),
-            '"info "*'              : printed(times),
-            '"audit --json"'        : f'case "$PWD" in */thermur-*) {lifted} && '
+            f'"outdated --filter=* {age}"': printed(table),
+            '"info "*'       : printed(times),
+            '"audit --json"' : f'case "$PWD" in */thermur-*) {lifted} && '
             f"{printed(after)} || {printed(audited)} ;; *) {printed(audited)} ;; esac",
-            '"install --lockfile-only"': "test -f kit/package.json"
+            f'"install --lockfile-only {age}"': "test -f kit/package.json"
         }
     )
 
@@ -678,12 +700,14 @@ def test_site_reads_each_package_bun_outdated_lists(
             datetime(2026, 10, 16, 8, 3, 0, 61000, tzinfo=UTC),
             cleared
         ),
+        ("vitest", "9.0.0", datetime(2026, 10, 1, tzinfo=UTC), ()),
         ("vue", "9.9.9", datetime(2026, 10, 13, tzinfo=UTC), ())
     ]
-    assert ("bun install --lockfile-only" in bun.commands) is bool(audited)
+    assert (f"bun install --lockfile-only {age}" in bun.commands) is bool(audited)
 
 
 def test_site_reads_each_release_overrides_holds_a_package_to(
+    age      : str,
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
@@ -692,12 +716,13 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     behind the one its `latest` tag names, after the rows `bun outdated`
     prints and beside the date `bun info` gives that release, and that
     writing its edit lifts the override. A prerelease of the newest release
-    lags it, while an override at or ahead of its newest release makes
-    no row, a release ahead of a newest prerelease included. `bun info`
-    never runs for a caret, an x-range, a bare major, a union opening on a
-    release, or a release Semantic Versioning rejects, and a package `bun
-    outdated` already lists makes one row, whose edit lifts its override
-    as well.
+    lags it, while an override at or ahead of its newest release makes no
+    row, a release ahead of a newest prerelease included, and so does a
+    newest release published inside the window `[tool.uv]` declares or on
+    a date `bun info` does not give. `bun info` never runs for a caret,
+    an x-range, a bare major, a union opening on a release, or a release
+    Semantic Versioning rejects, and a package `bun outdated` already lists
+    makes one row, whose edit lifts its override as well.
     """
     vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
     manifest = override(
@@ -711,7 +736,9 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             "minimatch"  : "11.0.8",
             "picomatch"  : "4",
             "semver"     : "7.5.2 || 7.6.0",
+            "tinyexec"   : "1.0.0",
             "tinyglobby" : "1.0.0-rc.1",
+            "ufo"        : "1.0.0",
             "vitepress"  : "2.0.0-alpha.20",
             "vue"        : vue
         }
@@ -719,24 +746,28 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     answer(
         "bun",
         answers = {
-            '"outdated --filter=*"'     : printed(
+            f'"outdated --filter=* {age}"' : printed(
                 value = "| Package | Current | Update | Latest |\n"
                 "|---------|---------|--------|--------|\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 |"
             ),
-            '"info chokidar version"'   : printed("2.0.0-beta.1"),
-            '"info fflate version"'     : printed("0.8.3"),
-            '"info minimatch version"'  : printed("11.0.8"),
-            '"info tinyglobby version"' : printed("1.0.0"),
-            '"info vitepress version"'  : printed("1.6.4"),
-            '"info "*" time --json"'    : printed(
+            '"info chokidar version"'      : printed("2.0.0-beta.1"),
+            '"info fflate version"'        : printed("0.8.3"),
+            '"info minimatch version"'     : printed("11.0.8"),
+            '"info tinyexec version"'      : printed("1.0.1"),
+            '"info tinyglobby version"'    : printed("1.0.0"),
+            '"info ufo version"'           : printed("1.1.0"),
+            '"info vitepress version"'     : printed("1.6.4"),
+            '"info "*" time --json"'       : printed(
                 value = {
                     "0.8.3" : "2026-05-16T00:14:03Z",
                     "1.0.0" : "2026-03-02T00:00:00Z",
+                    "1.0.1" :
+                        f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}",
                     "9.9.9" : "2026-10-13T00:00:00Z"
                 }
             ),
-            '"audit --json"'            : printed({}),
+            '"audit --json"'               : printed({}),
             "*": "exit 1"
         }
     )

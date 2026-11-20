@@ -8,7 +8,7 @@ pins through the command its source ships, and the lift finds each through
 """
 
 from collections.abc import Collection
-from datetime        import datetime
+from datetime        import UTC, datetime
 from json            import dumps, loads
 from pathlib         import Path
 from pydantic        import BaseModel, Field
@@ -591,22 +591,41 @@ class Site(Manager):
     """
 
     @property
+    def age(self) -> str:
+        """
+        Writes the `--minimum-release-age` flag, in whole seconds, that
+        holds a Bun resolve to releases older than the window `[tool.uv]`
+        declares.
+        """
+        seconds = int(self.checkout.manifest.window.total_seconds())
+        return f"--minimum-release-age={seconds}"
+
+    @property
     def lags(self) -> list[Lag]:
         """
         Lists each package `bun outdated --filter=*` prints a row for at
         a release some manifest of the workspace declares, leaving out a
         range, then each package it lists no row for that `overrides` holds
         to an exact release behind its newest, beside the advisories the
-        lift clears on it.
+        lift clears on it. Each newest release is older than the window
+        `[tool.uv]` declares, so a package the window holds at its current
+        release makes no lag.
         """
         package = self.checkout.package
         listed  = {
             (name, current): newest
             for name, current, newest in findall(
                 rf"(?m)^\| (\S+)(?: \(\w+\))? +\| ({self.release}) +"
-                r"\| \S+ +\| (\S+) +\|(?: [^|\n]+\|)?$",
-                self.read("bun", "outdated", "--filter=*", folder=package.folder)
+                r"\| \S+(?: \*)? +\| (\S+)(?: \*)? +\|(?: [^|\n]+\|)?$",
+                self.read(
+                    "bun",
+                    "outdated",
+                    "--filter=*",
+                    self.age,
+                    folder = package.folder
+                )
             )
+            if newest != current
         }
         names = {name for name, _ in listed}
         pins  = listed | {
@@ -616,6 +635,7 @@ class Site(Manager):
             and fullmatch(self.release, current)
             and Version.is_valid(current)
             and Version.parse(newest := self.latest(name)) > current
+            and self.aged(name, newest)
         }
         return self.cleared(
             [
@@ -651,6 +671,16 @@ class Site(Manager):
             for name, advisories in loads(audited.stdout or "{}").items()
         }
 
+    def aged(self, name: str, version: str) -> bool:
+        """
+        Tells whether the release `version` of the npm package `name` was
+        published, as `bun info` reports it, at least the window `[tool.uv]`
+        declares ago.
+        """
+        published = self.published(name, version)
+        cutoff    = datetime.now(UTC) - self.checkout.manifest.window
+        return published is not None and datetime.fromisoformat(published) <= cutoff
+
     def cleared(self, lags: list[Lag]) -> list[Lag]:
         """
         Copies each of `lags` with the advisories `bun audit` reports on
@@ -677,6 +707,7 @@ class Site(Manager):
                 "bun",
                 "install",
                 "--lockfile-only",
+                self.age,
                 capture = True,
                 folder  = package.folder
             )
