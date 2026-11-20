@@ -6,9 +6,10 @@ running it, and the collection hook lets a test open a network connection
 only when it carries the `network` mark.
 """
 
-from collections.abc    import Callable
+from collections.abc    import Callable, Iterator
 from common.edits       import executable, git
 from common.environment import CLEARED
+from common.opened      import Opened
 from common.stand_ins   import StandIn
 from os                 import environ, pathsep
 from pathlib            import Path
@@ -46,6 +47,7 @@ class PlainFile(SingleFileSnapshotExtension):
 @fixture
 def checkout(
     monkeypatch  : MonkeyPatch,
+    opens        : Opened,
     pytestconfig : Config,
     tmp_path     : Path,
     tracked      : list[Path]
@@ -55,10 +57,15 @@ def checkout(
     program's mode, into a git repository holding no commit, so git lists
     each copied file as one it would track. It then trusts the copy's mise
     configuration and returns the `Checkout` rooted there, which a case
-    edits before a check reads it.
+    edits before a check reads it. `opens` records nothing while the copy is
+    made, and records each copied file the case opens under the path it was
+    copied from.
     """
     copy = Checkout(root=tmp_path)
-    Checkout(root=pytestconfig.rootpath).copy(tracked, copy.root)
+    with monkeypatch.context() as copying:
+        copying.setattr(opens, "paused", True)
+        Checkout(root=pytestconfig.rootpath).copy(tracked, copy.root)
+    monkeypatch.setitem(opens.copies, tmp_path, pytestconfig.rootpath)
     copy.run("git", "init", "--quiet")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
     return copy
@@ -129,6 +136,26 @@ def mise(request: FixtureRequest, stand_in: Callable[[str, str], StandIn]) -> St
     through `request.param`, or exiting `0` where it passes none.
     """
     return stand_in("mise", getattr(request, "param", "exit 0"))
+
+
+@fixture(autouse=True, scope="session")
+def opens(pytestconfig: Config, tracked: list[Path]) -> Opened:
+    """
+    Adds the `Opened` hook over the files `tracked` lists where
+    pytest-testmon collects, so a change to a file a test opens selects
+    that test.
+    """
+    return Opened.added(pytestconfig, tracked)
+
+
+@fixture(autouse=True)
+def recorded(opens: Opened) -> Iterator[None]:
+    """
+    Records each tracked file the test opened once it ends, through
+    `Opened.record`.
+    """
+    yield
+    opens.record()
 
 
 @fixture(scope="session")

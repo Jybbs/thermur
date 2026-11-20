@@ -1,9 +1,9 @@
 """
 Holds the edits a case makes to its copy of the checkout before a check
 reads it, meaning text added to the end of a file, one string replaced in a
-file, a task file written fresh, and a git command run under a fixed author,
-beside the writer of an executable file each of them and the stand-ins
-share.
+file, a task file written fresh, a git command run under a fixed author, and
+a repository committing every file it holds to `main`, beside the writer of
+an executable file each of them and the stand-ins share.
 """
 
 from pathlib import Path
@@ -17,6 +17,19 @@ def append(checkout: Checkout, path: str, text: str):
     """
     with (checkout.root / path).open("a", encoding="utf-8") as file:
         file.write(text)
+
+
+def committed(checkout: Checkout):
+    """
+    Starts a git repository on `main` at the root of `checkout` and commits
+    every file under it there.
+    """
+    for command in (
+        ["init", "--initial-branch=main", "--quiet"],
+        ["add", "--all"],
+        ["commit", "--message=Start", "--quiet"]
+    ):
+        git(checkout, *command)
 
 
 def edit(checkout: Checkout, path: str, *, new: str, old: str):

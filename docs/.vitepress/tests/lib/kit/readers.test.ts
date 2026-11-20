@@ -22,6 +22,19 @@ function scratch(modules: Readonly<Record<string, string>>): string {
   return docs
 }
 
+/**
+ * Declares to `vitest --changed` each file `readersOf` reads off the site,
+ * meaning each piece's declaration and each module `READING` names outside
+ * `LEFT`, so a change to one selects this test.
+ */
+import.meta.glob([
+  '../../../../kit/src/*/*.json',
+  '../../../lib/**/*.ts',
+  '../../../theme/**/*.ts',
+  '!../../../lib/kit/**',
+  '!../../../theme/kit/**'
+], { query: '?raw' })
+
 describe('readersOf', () => {
   it('lists each module importing a value of a piece, sorted, past types, other packages, and the catalog', async () => {
     const docs = scratch({

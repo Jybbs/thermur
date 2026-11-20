@@ -8,19 +8,12 @@ export default defineConfig({
   cacheDir : cacheDir(import.meta.url, 'vitest'),
 
   test: {
+    css                 : { include: [/\.css\?raw$/u] },
     expect              : { requireAssertions: true },
     forceRerunTriggers  : [
       ...configDefaults.forceRerunTriggers,
-      '**/*.{bib,css,lock,md,snap,toml}',
-      '**/.github/**',
-      '**/.gitignore',
-      '**/.mise/**',
-      '**/.vitepress/**/*.{css,snap}',
-      '**/.vitepress/config/**',
-      '**/.vitepress/{lib,theme}/**/*.ts',
-      '**/fonts/**',
-      '**/kit/src/*/*.json',
-      '**/public/**'
+      '**/*.lock',
+      '**/.mise/**'
     ],
     include             : ['.vitepress/tests/**/*.test.ts', 'kit/tests/**/*.test.{ts,tsx}'],
     pool                : 'threads',
