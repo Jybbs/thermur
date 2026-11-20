@@ -762,7 +762,8 @@ class Package(Document, title="docs/package.json"):
 
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    One event a workflow runs on, narrowed to the files a change touches.
+    One event a workflow runs on, narrowed to the files a change touches and
+    to the activity types of the event.
     """
 
     paths: tuple[str, ...] = ()
@@ -1004,6 +1005,14 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
         return [value]
 
 
+def read_triggers(events: Mapping[str, dict | None]) -> dict[str, dict]:
+    """
+    Reads each event a workflow runs on, an event written with no filters
+    reading as one that carries none.
+    """
+    return {event: trigger or {} for event, trigger in events.items()}
+
+
 class Workflow(Document):
     """
     One workflow under `.github/workflows/`, with the events it runs on and
@@ -1020,7 +1029,9 @@ class Workflow(Document):
     The name the workflow's runs carry.
     """
 
-    events: frozendict[str, Trigger | None] = Field(validation_alias="on")
+    events: Annotated[frozendict[str, Trigger], BeforeValidator(read_triggers)] = Field(
+        validation_alias = "on"
+    )
     """
     The events the workflow runs on, each narrowed by its filters where it
     carries any.
@@ -1065,18 +1076,14 @@ class Workflow(Document):
         Tells whether the workflow runs as a pull request is marked ready
         for review, which none of the event's default types does.
         """
-        return "ready_for_review" in (
-            self.events.get("pull_request") or Trigger()
-        ).types
+        return "ready_for_review" in self.events.get("pull_request", Trigger()).types
 
     def pushes(self, file: str) -> bool:
         """
         Tells whether a push changing `file`, relative to the root, runs
         the workflow.
         """
-        return "push" in self.events and (self.events["push"] or Trigger()).matches(
-            file
-        )
+        return "push" in self.events and self.events["push"].matches(file)
 
     def saves(self, action: str) -> bool:
         """

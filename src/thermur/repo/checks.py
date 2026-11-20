@@ -19,7 +19,7 @@ from yaml            import NodeEvent, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Job, Parity, read_pin
+from thermur.repo.schemas  import Finding, Parity, read_pin
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -175,10 +175,7 @@ class DraftCheck(Check):
         it is marked ready, then each of its jobs carrying no guard skipping
         a draft.
         """
-        for path, workflow in self.checkout.workflows.items():
-            if not workflow.on_pull_request:
-                continue
-
+        for path, workflow in self.checkout.pulls.items():
             if not workflow.on_ready:
                 yield Finding(
                     file    = path,
@@ -190,7 +187,7 @@ class DraftCheck(Check):
                     yield Finding(
                         file    = path,
                         message = f"The `{key}` job in `{path}` runs on a draft, "
-                        f"since its condition carries no `{Job.draft}`"
+                        f"since its condition carries no `{job.draft}`"
                     )
 
 
@@ -211,9 +208,10 @@ class FootnoteCheck(Check):
 
 class GateCheck(Check):
     """
-    Every workflow ends on a job under the key `gate`, which names the check
-    run it reports, runs under `always()`, and waits for every other job, so
-    the one check a ruleset requires carries every job's verdict.
+    Every workflow ends on a job under the key `gate`, which names the
+    check run it reports, runs under `always()`, alone or beside the guard
+    skipping a draft, and waits for every other job, so the one check a
+    ruleset requires carries every job's verdict.
 
     A gate job left out of a failed run is reported as skipped, which a
     ruleset counts as passing, so the gate runs whatever the other jobs
@@ -802,8 +800,8 @@ class RulesetCheck(Check):
         """
         gates = {
             workflow.gate.name
-            for workflow in self.checkout.workflows.values()
-            if workflow.on_pull_request and workflow.gate
+            for workflow in self.checkout.pulls.values()
+            if workflow.gate
         }
         for path, ruleset in self.checkout.rulesets.items():
             for context in sorted(ruleset.contexts - gates):

@@ -349,6 +349,23 @@ def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
     assert ParityCheck(checkout=checkout).findings == []
 
 
+def test_a_gate_naming_the_draft_guard_first_passes(checkout: Checkout):
+    """
+    Asserts that a gate whose condition names the draft guard before
+    `always()` passes both the gate and the draft checks, since each reads
+    the terms `&&` joins in any order.
+    """
+    edit(
+        checkout,
+        CI,
+        new = "${{ !github.event.pull_request.draft && always() }}",
+        old = "${{ always() && !github.event.pull_request.draft }}"
+    )
+
+    assert GateCheck(checkout=checkout).findings == []
+    assert DraftCheck(checkout=checkout).findings == []
+
+
 def test_a_gate_running_under_a_bare_always_passes(checkout: Checkout):
     """
     Asserts that a gate whose condition is `always()` written without the
@@ -883,6 +900,15 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             "",
             f"`{SITE}` runs on no `ready_for_review` pull request",
             id = "site-default-types"
+        ),
+        param(
+            CI,
+            "    paths : ['**', '!docs/.vitepress/**', "
+            "docs/.vitepress/lib/rendered/**]\n"
+            "    types : [opened, synchronize, reopened, ready_for_review]\n",
+            "",
+            f"`{CI}` runs on no `ready_for_review` pull request",
+            id = "ci-no-filters"
         ),
         param(
             CI,
