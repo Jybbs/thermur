@@ -1,15 +1,13 @@
 """
 Holds `Registry`, the stand-in a lock task test resolves the package `aged`
-against on the loopback address, answering as a PyPI simple index and as the
-npm registry with the date each release was published, and `serving`, which
-runs it.
+against on the loopback address, answering as a PyPI simple index with the
+date each release was uploaded, and `serving`, which runs it.
 """
 
-from base64          import b64encode
 from collections.abc import Iterator
 from contextlib      import contextmanager
 from datetime        import datetime
-from hashlib         import sha256, sha512
+from hashlib         import sha256
 from http.server     import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io              import BytesIO
 from json            import dumps
@@ -41,10 +39,8 @@ def serving(published: dict[str, datetime]) -> Iterator[str]:
 class Registry(BaseHTTPRequestHandler):
     """
     Answers for the package `aged` at each release the server's `published`
-    map dates, as the JSON simple index uv reads at `/simple/aged/`, each
-    wheel under `/files/`, and the document Bun reads at `/aged`, whose
-    integrity hashes the version alone, since `bun install --lockfile-only`
-    downloads no tarball.
+    map dates, as the JSON simple index uv reads at `/simple/aged/` and each
+    wheel under `/files/`.
     """
 
     @property
@@ -58,8 +54,8 @@ class Registry(BaseHTTPRequestHandler):
     @property
     def published(self) -> dict[str, str]:
         """
-        Writes the date each release was published in the form both
-        registries publish it, by release.
+        Writes the date each release was uploaded in the form the simple
+        index publishes it, by release.
         """
         return {
             version: f"{date:%Y-%m-%dT%H:%M:%S.000Z}"
@@ -68,16 +64,13 @@ class Registry(BaseHTTPRequestHandler):
 
     def do_GET(self):
         """
-        Writes the index, the wheel, or the npm document the path names,
-        answering any other path with `404`.
+        Writes the index or the wheel the path names, answering any other
+        path with `404`.
         """
         match self.path:
             case "/simple/aged/":
                 kind = "application/vnd.pypi.simple.v1+json"
                 body = self.index()
-            case "/aged":
-                kind = "application/json"
-                body = self.document()
             case path if path.startswith("/files/aged-"):
                 kind = "application/octet-stream"
                 body = wheel(path.split("-")[1])
@@ -97,31 +90,6 @@ class Registry(BaseHTTPRequestHandler):
         rather than reading its metadata through ranges.
         """
         self.send_error(405)
-
-    def document(self) -> bytes:
-        """
-        Writes the npm document Bun reads, listing each release beside the
-        date it was published and naming the newest under `latest`.
-        """
-        return dumps(
-            {
-                "dist-tags" : {"latest": max(self.published)},
-                "name"      : "aged",
-                "time"      : self.published,
-                "versions"  : {
-                    version: {
-                        "dist"    : {
-                            "integrity" : "sha512-"
-                            + b64encode(sha512(version.encode()).digest()).decode(),
-                            "tarball"   : f"{self.address}/aged/-/aged-{version}.tgz"
-                        },
-                        "name"    : "aged",
-                        "version" : version
-                    }
-                    for version in self.published
-                }
-            }
-        ).encode()
 
     def index(self) -> bytes:
         """

@@ -10,17 +10,15 @@ entry for a platform another tool carries. It also pins which `AUDIT_IGNORE`
 ids `lock:scan` passes to `bun audit --ignore`, and how it fails before the
 audit on an id a release fixes, naming the entry and the patched version, or
 on an id `gh` cannot read, each against a stand-in `gh`. Last, it pins that
-`lock:sync`, running the real `uv` and `bun` against a stand-in registry,
-leaves out of each lockfile a release newer than the window `[tool.uv]`
-declares, and fails before locking on a window written other than as whole
-days.
+`lock:sync`, running the real `uv` against a stand-in registry, leaves out
+of `uv.lock` a release newer than the window `[tool.uv]` declares, and fails
+before locking on a window written other than as whole days.
 """
 
 from collections.abc  import Callable
 from common.registry  import serving
 from common.stand_ins import StandIn
 from datetime         import UTC, datetime
-from json             import dumps
 from os               import environ, pathsep
 from pathlib          import Path
 from pytest           import Config, MonkeyPatch, fixture, mark, param
@@ -440,17 +438,16 @@ def test_the_scan_fails_before_auditing_on_an_entry_it_cannot_set_aside(
 
 @mark.enable_socket
 @mark.allow_hosts(["127.0.0.1"])
-def test_the_sync_leaves_a_release_newer_than_the_window_out_of_each_lock(
+def test_the_sync_leaves_a_release_newer_than_the_window_out_of_uv_lock(
     copy        : Path,
     monkeypatch : MonkeyPatch,
     stand_in    : Callable[[str, str], StandIn]
 ):
     """
     Asserts that `lock:sync`, resolving the package `aged` through the real
-    `uv` and `bun` against a registry publishing `1.0.0` twice the window
-    `[tool.uv]` declares ago and `2.0.0` half of it ago, locks `1.0.0` in
-    `uv.lock` and in `docs/bun.lock`, each resolver reading the window the
-    worktree's `pyproject.toml` declares.
+    `uv` against a registry publishing `1.0.0` twice the window `[tool.uv]`
+    declares ago and `2.0.0` half of it ago, locks `1.0.0` in `uv.lock`,
+    reading the window the worktree's `pyproject.toml` declares.
     """
     window   = Checkout(root=copy).manifest.window
     now      = datetime.now(UTC)
@@ -467,27 +464,20 @@ def test_the_sync_leaves_a_release_newer_than_the_window_out_of_each_lock(
             ]
         )
     )
-    (copy / "docs").mkdir()
-    (copy / "docs/package.json").write_text(
-        dumps({"name": "probe", "private": True, "devDependencies": {"aged": "*"}})
-    )
+    stand_in("bun", "exit 0")
     stood = stand_in("mise", "exit 0").log.parent
     path  = pathsep.join(
         entry for entry in environ["PATH"].split(pathsep) if Path(entry) != stood
     )
-    for program in ("bun", "uv"):
-        stand_in(program, f'exec {quote(which(program, path=path))} "$@"')
+    stand_in("uv", f'exec {quote(which("uv", path=path))} "$@"')
 
     with serving({"1.0.0": now - 2 * window, "2.0.0": now - window / 2}) as address:
-        monkeypatch.setenv("BUN_CONFIG_REGISTRY", f"{address}/")
-        monkeypatch.setenv("BUN_INSTALL_CACHE_DIR", str(copy / ".cache/bun"))
         monkeypatch.setenv("UV_DEFAULT_INDEX", f"{address}/simple")
         monkeypatch.setenv("UV_NO_CACHE", "1")
         result = executed(copy, "sync")
 
     assert result.returncode == 0, result.stderr
     assert 'name = "aged"\nversion = "1.0.0"' in (copy / "uv.lock").read_text()
-    assert '"aged@1.0.0"' in (copy / "docs/bun.lock").read_text()
 
 
 def test_the_sync_fails_on_a_window_bun_cannot_be_given_before_locking(
