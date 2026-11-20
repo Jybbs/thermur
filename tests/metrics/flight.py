@@ -599,6 +599,41 @@ def test_a_fixed_speed_keeps_every_drone_at_the_cruise(
     assert plan.airspeeds_m_s[0] < speeds.min() <= speeds.max() < plan.airspeeds_m_s[1]
 
 
+@mark.parametrize(
+    ("added", "reach"),
+    [param(0.0, 0.0, id="rotating"), param(pi / 2, 1.0, id="turned")]
+)
+def test_a_flock_rotating_as_a_whole_reads_only_the_rotation_its_turn_adds(
+    added : float,
+    reach : float
+):
+    """
+    Asserts that drones all rotating together read, against an unturned
+    flight rotating with them, only the rotation added from the turn on, no
+    reach where none is added and the whole turn for a further quarter turn,
+    and no speed where every shell joins at once.
+    """
+    spots            = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
+    whole            = 0.05 * arange(1, 21)[:, None] * ones(12)
+    unturned, turned = (
+        laid(
+            positions  = spots,
+            velocities = 10.0 * stack(
+                [cos(angles), sin(angles), zeros(angles.shape)],
+                -1
+            ),
+            turn_deg = 90.0
+        )
+        for angles in (whole, whole + where(arange(20) >= 10, added, 0.0)[:, None])
+    )
+
+    assert_allclose(
+        replace(turned, unturned=unturned.frames).turn_response,
+        [[0.0, 0.0], [reach, reach]],
+        atol = 1e-6
+    )
+
+
 def test_a_response_spreading_at_a_constant_speed_reads_that_speed():
     """
     Asserts that shells of drones turning at times proportional to their
@@ -655,6 +690,30 @@ def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
     )
 
     assert_allclose(flight.spectral_peak_hz, 4 / 3, rtol=1e-5)
+
+
+def test_a_relaxing_mode_over_a_static_deformation_peaks_in_the_lowest_bin():
+    """
+    Asserts that a line of drones whose velocities across the course hold
+    a static deformation five times the size of a fluctuation relaxing
+    with no wave reads its spectral peak at the lowest frequency the flight
+    resolves, since the deformation is the mode's time mean and leaves the
+    zero bin once that mean is removed.
+    """
+    spots  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
+    along  = spots[:, 0] - spots[:, 0].mean()
+    wave   = 2 * pi * along / (4 * along.std())
+    swing  = 5 * cos(wave) + exp(-arange(20)[:, None] / 3) * sin(wave)
+    flight = laid(
+        positions  = spots,
+        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
+    )
+
+    assert_allclose(
+        flight.spectral_peak_hz,
+        1 / (flight.settled.velocities.shape[1] * flight.plan.frame_s),
+        rtol = 1e-5
+    )
 
 
 def test_each_seed_of_the_batch_flies_as_it_does_alone(
@@ -772,7 +831,9 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
 ):
     """
     Asserts that from `turn_at_s` on, the first drone commands the turned
-    velocity, and the turn's speed and reach read as finite values.
+    velocity, that the unturned flight in the same batch matches every frame
+    before the turn and never turns, and that the turn's speed and reach
+    read as finite values.
     """
     plan  = short(duration_s=4.0, turn_at_s=1.0, turn_deg=90.0)
     flown = Flight.flown(AIR, composite, plan)
@@ -784,6 +845,10 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
         full((2, 30, 3), plan.turned),
         atol = 1e-5
     )
+    assert_array_equal(flown.unturned.positions[:, :10], flown.frames.positions[:, :10])
+    assert (
+        linalg.norm(flown.unturned.commands[:, 10:, 0] - plan.turned, axis=-1) > 1
+    ).all()
     assert isfinite(speed).all()
     assert (speed >= 0).all()
     assert isfinite(reach).all()
@@ -910,4 +975,5 @@ def test_the_statistics_table_holds_each_statistic_by_seed(flight: Flight):
     assert ((table.polarization > 0) & (table.polarization <= 1)).all()
     assert isnan(table.turn_reach).all()
     assert isnan(table.turn_speed_m_s).all()
+    assert flight.unturned is None
     assert (table.fragments >= 1).all()

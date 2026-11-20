@@ -95,9 +95,9 @@ class Air(Module):
         at the grid's edge beyond it.
 
         Args:
-            positions : Each drone's east, north, and height above the
-                        ground, in meters, `(n_drones, 3)`.
-            t         : The time, in seconds since the simulation started.
+            positions: Each drone's east, north, and height above the
+                       ground, in meters, `(n_drones, 3)`.
+            t: The time, in seconds since the simulation started.
 
         Returns:
             Each channel's reading at each drone, `(n_drones,)`, by the

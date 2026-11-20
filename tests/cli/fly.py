@@ -1,6 +1,7 @@
 """
 Pins `thermur fly`, meaning the steps it computes with no step named and
-with step names, what it prints, and its exit on a flag past its bound.
+with step names, what it prints, its exit on a flag past its bound, and
+where the help of its steps comes from.
 """
 
 from pytest import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
@@ -69,3 +70,26 @@ def test_a_flag_past_its_bound_exits_with_status_two_computing_nothing(
 
     assert exited.value.code == 2
     assert computed == []
+
+
+@mark.parametrize(
+    ("entry", "parse_docstring"),
+    [
+        param(None, False, id="signature"),
+        param("Each step of the graph to compute.", True, id="docstring")
+    ]
+)
+def test_the_help_of_the_steps_comes_from_the_docstring(
+    entry           : str | None,
+    parse_docstring : bool
+):
+    """
+    Asserts that the steps of `thermur fly` take no help from the signature
+    and take the entry of the docstring's `Args` block as written, which
+    `thermur fly --help` prints beside `STEPS`.
+    """
+    collection = app["fly"].assemble_argument_collection(
+        parse_docstring = parse_docstring
+    )
+
+    assert collection["STEPS"].parameter.help == entry

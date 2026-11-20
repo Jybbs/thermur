@@ -720,9 +720,8 @@ class InertialSpin(Overdamped):
         `friction` of one as `inertia_s` falls to zero.
 
         Args:
-            increment   : The increment of the command, in meters per
-                          second.
-            observation : What the drone senses.
+            increment: The increment of the command, in meters per second.
+            observation: What the drone senses.
 
         Returns:
             The increment of the drone's command, in meters per second, and
@@ -755,9 +754,9 @@ class InertialSpin(Overdamped):
         toward the torque of the pull.
 
         Args:
-            force       : The other slots' acceleration on the drone, in
-                          meters per second squared.
-            observation : What the drone senses, its weights set.
+            force: The other slots' acceleration on the drone, in meters per
+                   second squared.
+            observation: What the drone senses, its weights set.
 
         Returns:
             The rate of the drone's command, in meters per second squared,

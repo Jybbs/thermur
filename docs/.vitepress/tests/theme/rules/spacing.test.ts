@@ -8,11 +8,12 @@ import { RELEASED }                     from '../../common/browser.ts'
 import { type Charted, charted, press } from '../../common/rules.ts'
 
 /**
- * The parts of the chart a case reads and moves: the slider standing over the
- * track, its thumb, the toggle playing the sweep, the spacing read above the
- * handle drawn, each rule's row, and each row's reading.
+ * The parts of the chart a case reads and moves: the track's caption, the
+ * slider standing over the track, its thumb, the toggle playing the sweep, the
+ * spacing read above the handle drawn, each rule's row, and each row's reading.
  */
 interface Parts {
+  caption : SVGElement
   player  : HTMLElement
   readout : string
   rows    : SVGElement[]
@@ -26,6 +27,7 @@ interface Parts {
 function parts({ host }: Charted): Parts {
   const rows = [...host.querySelectorAll<SVGElement>('g.rules-fade')]
   return {
+    caption : [...host.querySelectorAll('text')].find(text => text.textContent === 'LAUNCH SPACING')!,
     player  : host.querySelector<HTMLElement>('.rules-play')!,
     readout : host.querySelector('.rules-handle')!.previousElementSibling!.textContent,
     rows,
@@ -87,13 +89,15 @@ describe('the coupling chart', () => {
   })
 
   it('sets its caption above the track on a narrow column', () => {
-    const chart   = charted(RulesSpacing, 672)
-    const caption = (): Element => [...chart.host.querySelectorAll('text')].find(text =>
-      text.textContent === 'LAUNCH SPACING')!
-    expect(caption().getAttribute('y')).toBe('28')
+    const chart = charted(RulesSpacing, 672)
+    expect(parts(chart).caption.getAttribute('y')).toBe('28')
     chart.widen(390)
-    expect(caption().getAttribute('y')).toBe('12')
+    expect(parts(chart).caption.getAttribute('y')).toBe('12')
     expect(chart.host.querySelector('svg')!.getAttribute('width')).toBe('390')
+  })
+
+  it.for([672, 390])('sets its caption as every control’s label is set at %i px', width => {
+    expect(parts(charted(RulesSpacing, width)).caption).toSetAsControlLabel()
   })
 
   it('lifts the row under the pointer over the others, keeping it lifted across a redraw', () => {
