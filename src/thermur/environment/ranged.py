@@ -126,13 +126,13 @@ class Remote(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
             short at the end of the file.
 
         Raises:
-            HTTPException : Where every one of `attempts` fails, the last on
-                            its answer, such as a status other than 200 or
-                            206 or a body cut short.
-            OSError       : Where every one of `attempts` fails, the last on
-                            its connection or on a stalled read.
-            ValueError    : Where the server answers with the whole file, or
-                            sends no part holding one of the ranges.
+            HTTPException: Where every one of `attempts` fails, the last on
+                           its answer, such as a status other than 200 or
+                           206 or a body cut short.
+            OSError: Where every one of `attempts` fails, the last on its
+                     connection or on a stalled read.
+            ValueError: Where the server answers with the whole file, or
+                        sends no part holding one of the ranges.
         """
         address = urlsplit(self.url)
         try:

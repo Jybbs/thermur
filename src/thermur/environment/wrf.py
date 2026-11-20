@@ -453,9 +453,9 @@ def checked(field: DataArray, *, bounds: Range, unit: str) -> DataArray:
     as one outside them.
 
     Args:
-        field  : The converted field, named as a failure reports it.
-        bounds : The lowest and the highest value it may take.
-        unit   : The unit of its values, as a failure reports it.
+        field: The converted field, named as a failure reports it.
+        bounds: The lowest and the highest value it may take.
+        unit: The unit of its values, as a failure reports it.
 
     Returns:
         `field`, unchanged.
@@ -502,8 +502,8 @@ def distances(burning: ndarray, sampling: tuple[float, float]) -> ndarray:
     transform returns finite distances to a point outside the grid there.
 
     Args:
-        burning  : Whether each cell burns, `(n_rows, n_columns)`.
-        sampling : The spacing of the rows and of the columns.
+        burning: Whether each cell burns, `(n_rows, n_columns)`.
+        sampling: The spacing of the rows and of the columns.
     """
     if burning.any():
         return distance_transform_edt(~burning, sampling=sampling)

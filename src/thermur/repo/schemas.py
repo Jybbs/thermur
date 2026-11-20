@@ -538,6 +538,15 @@ class Manifest(Document, title="pyproject.toml"):
     The major and minor `requires-python` sets as the floor.
     """
 
+    holds: frozendict[str, str] = Field(
+        frozendict(),
+        validation_alias = AliasPath("tool", "thermur", "holds")
+    )
+    """
+    The reason `[tool.thermur.holds]` gives for holding each pin where it
+    stands, by the pin as the table `lock:lift` prints names it.
+    """
+
     homepage: str = Field(validation_alias=AliasPath("project", "urls", "Homepage"))
     """
     The address of the docs site `[project.urls]` names, with its scheme and
@@ -2239,16 +2248,17 @@ class Lag(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True)
             published = published
         )
 
-    def row(self, now: datetime) -> str:
+    def row(self, now: datetime, reason: str = "") -> str:
         """
         Writes the pin as a row of the table, its newest release's age
-        counted in whole days up to `now`.
+        counted in whole days up to `now`, and `reason` as the reason a
+        recorded hold gives for holding it, empty where none does.
         """
         age = (now - self.published).days if self.published else ""
         return (
             f"| `{self.pin}` | {', '.join(f'`{file}`' for file in self.files)} | "
             f"{self.current} | {self.newest} | {'yes' if self.major else 'no'} | "
-            f"{age} | {', '.join(self.advisories)} |"
+            f"{age} | {', '.join(self.advisories)} | {reason} |"
         )
 
     def write(self, root: Path):

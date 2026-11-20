@@ -32,6 +32,12 @@ export const TONE = {
   muted  : 'var(--vp-c-text-2)',
   rule   : 'var(--vp-c-divider)'
 } as const
+/**
+ * How a drawing sets a caption standing over a control, in the muted tone and
+ * the `kit-caption` class, which the kit's label rule sets in the face, weight,
+ * case, and spacing of every control's label.
+ */
+export const CAPTION = { class: 'kit-caption', fill: TONE.muted } as const
 
 /**
  * Sets `attributes` on `node`, each color, face, and opacity as a style

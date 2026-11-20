@@ -53,15 +53,32 @@ class CacheConnection(Connection):
     Hamilton's store keeps one connection per thread and, once deleted,
     closes only the connection of the thread deleting it. A collection
     deleting the store on another thread therefore frees this thread's
-    connection, which closes here rather than raising `ResourceWarning`,
-    since the store opens each connection with `check_same_thread=False`.
+    connection, which closes here rather than raising `ResourceWarning`.
+    A connection sits in a reference cycle with its statement cache, so
+    whichever thread runs a collection frees and closes it, and each one
+    opens with `check_same_thread=False` whatever its caller passes.
+    """
+
+    opened = False
+    """
+    Whether `Connection.__init__` opened the database, which a failed open
+    leaves false.
     """
 
     def __del__(self):
         """
-        Closes the connection as it is freed.
+        Closes the connection as it is freed, unless it never opened.
         """
-        self.close()
+        if self.opened:
+            self.close()
+
+    def __init__(self, *args: object, **kwargs: object):
+        """
+        Opens the connection `sqlite3.connect` describes with `args` and
+        `kwargs`, its thread check off.
+        """
+        super().__init__(*args, **kwargs | {"check_same_thread": False})
+        self.opened = True
 
 
 @dataclass(frozen=True)

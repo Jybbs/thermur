@@ -11,7 +11,7 @@ from thermur.pipeline.settings import Settings
 
 
 def fly(
-    *steps   : Annotated[str, Parameter(help="Each step of the graph to compute.")],
+    *steps   : str,
     settings : Annotated[Settings | None, Parameter(name="*")] = None
 ):
     """
@@ -23,6 +23,9 @@ def fly(
     names, computes those steps and whatever they read, saving each table
     among them and printing each. Exits nonzero, computing nothing, where a
     name matches no step, and with status 2 where a flag fails its bound.
+
+    Args:
+        steps: Each step of the graph to compute.
     """
     results = Graph(recorded=True, settings=settings or Settings()).compute(
         *steps or ("frames", "statistics")

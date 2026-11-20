@@ -596,13 +596,13 @@ def kept(
     `turning` holds.
 
     Args:
-        air       : The channels each drone reads.
-        composite : The slots the flock flies under.
-        key       : The key the launch, the Brownian path, each lost packet,
-                    and each step of the noise slot's state derive from.
-        plan      : The plan the flock flies to.
-        turning   : Whether the first drone turns, which leaves every draw
-                    as it is either way.
+        air: The channels each drone reads.
+        composite: The slots the flock flies under.
+        key: The key the launch, the Brownian path, each lost packet, and
+             each step of the noise slot's state derive from.
+        plan: The plan the flock flies to.
+        turning: Whether the first drone turns, which leaves every draw as
+                 it is either way.
 
     Returns:
         The flock at each kept frame.
@@ -695,13 +695,13 @@ def response(
     Fits how one flock's shells of drones respond to a turn.
 
     Args:
-        distances : Each drone's distance from the first drone as the turn
-                    began, in meters.
-        plan      : The plan the flock flew to.
-        rotation  : The rotation of each drone's heading away from its
-                    heading in the unturned flight, from the frame before
-                    the turn began, as a complex number on the unit circle,
-                    `(n_frames, n_drones)`.
+        distances: Each drone's distance from the first drone as the turn
+                   began, in meters.
+        plan: The plan the flock flew to.
+        rotation: The rotation of each drone's heading away from its heading
+                  in the unturned flight, from the frame before the turn
+                  began, as a complex number on the unit circle, `(n_frames,
+                  n_drones)`.
 
     Returns:
         The speed of the response, in meters per second, zero where fewer than
@@ -753,15 +753,15 @@ def stepped(
     - The step of the noise slot's state
 
     Args:
-        air       : The channels each drone reads.
-        composite : The slots the flock flies under.
-        flock     : The flock at `t`.
-        inbox     : What each drone heard of every other by `t`.
-        key       : The key the noise slot's draws at this step derive from.
-        path      : The Brownian path the increments are read from, or a
-                    function of the step's two ends returning them.
-        plan      : The plan the flock flies to.
-        t         : The time, in seconds since the flight started.
+        air: The channels each drone reads.
+        composite: The slots the flock flies under.
+        flock: The flock at `t`.
+        inbox: What each drone heard of every other by `t`.
+        key: The key the noise slot's draws at this step derive from.
+        path: The Brownian path the increments are read from, or a function
+              of the step's two ends returning them.
+        plan: The plan the flock flies to.
+        t: The time, in seconds since the flight started.
 
     Returns:
         The flock at `t + plan.step_s`.
