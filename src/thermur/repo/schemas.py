@@ -969,10 +969,11 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
     def skips_drafts(self) -> bool:
         """
         Tells whether the job's condition requires the pull request it runs
-        on to be no draft, which a run with no pull request meets, since the
-        missing `draft` reads as an empty string.
+        on to be no draft, joining the guard to its other terms through `&&`
+        alone, which a run with no pull request meets, since the missing
+        `draft` reads as an empty string.
         """
-        return self.draft in self.terms
+        return self.draft in self.terms and "||" not in self.condition
 
     @property
     def terms(self) -> set[str]:
@@ -1005,12 +1006,12 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
         return [value]
 
 
-def read_triggers(events: Mapping[str, dict | None]) -> dict[str, dict]:
+def read_trigger(trigger: dict | None) -> dict:
     """
-    Reads each event a workflow runs on, an event written with no filters
+    Reads one event a workflow runs on, an event written with no filters
     reading as one that carries none.
     """
-    return {event: trigger or {} for event, trigger in events.items()}
+    return trigger or {}
 
 
 class Workflow(Document):
@@ -1029,7 +1030,7 @@ class Workflow(Document):
     The name the workflow's runs carry.
     """
 
-    events: Annotated[frozendict[str, Trigger], BeforeValidator(read_triggers)] = Field(
+    events: frozendict[str, Annotated[Trigger, BeforeValidator(read_trigger)]] = Field(
         validation_alias = "on"
     )
     """

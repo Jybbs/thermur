@@ -919,6 +919,14 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             id = "check-guard"
         ),
         param(
+            CI,
+            "    if      : ${{ !github.event.pull_request.draft }}\n",
+            "    if      : ${{ !github.event.pull_request.draft || always() }}\n",
+            f"The `check` job in `{CI}` runs on a draft, since its condition "
+            "carries no `!github.event.pull_request.draft`",
+            id = "check-guard-or"
+        ),
+        param(
             SITE,
             "${{ always() && !github.event.pull_request.draft }}",
             "${{ always() }}",

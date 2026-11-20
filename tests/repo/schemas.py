@@ -219,7 +219,13 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
     ("text", "location", "message"),
     [
         param("name: w\nname: v\n", (), "names `name` more than once", id="unread"),
-        param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid")
+        param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid"),
+        param(
+            "name: w\njobs: {}\non: [push, pull_request]\n",
+            ("on",),
+            "valid frozendict",
+            id = "listed-events"
+        )
     ]
 )
 def test_a_yaml_document_reports_its_error_under_its_path(
