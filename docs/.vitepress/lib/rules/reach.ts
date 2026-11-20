@@ -162,7 +162,7 @@ export class Reach {
       })
       ring.angle.textContent = `${shown.toFixed(1)}°`
       ring.share.textContent = `of ${Math.round(this.#turn)}° · `
-                             + `${Math.round(share * 100)}% ± ${Math.round(error * 100)}`
+                             + `${(share * 100).toFixed(1)}% ± ${(error * 100).toFixed(1)}`
     })
     const [x, y] = dial.at(layout, layout.outer + 6, this.#turn)
     markup.set(this.#marker!, { d: `M${layout.center[0]},${layout.center[1]} L${x},${y}` })

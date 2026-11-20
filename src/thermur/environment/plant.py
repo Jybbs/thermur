@@ -99,10 +99,10 @@ class Plant(Module):
         height's rate.
 
         Args:
-            commands   : Each drone's commanded velocity, `(..., 3)`, in
-                         meters per second.
-            velocities : Each drone's velocity, `(..., 3)`, in meters per
-                         second.
+            commands: Each drone's commanded velocity, `(..., 3)`, in meters
+                      per second.
+            velocities: Each drone's velocity, `(..., 3)`, in meters per
+                        second.
 
         Returns:
             Each drone's acceleration, `(..., 3)`, in meters per second

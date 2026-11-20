@@ -205,6 +205,29 @@ def test_each_listed_trial_opens_a_slot_of_the_composite_once():
     assert [trial.name for trial in trials] == [f"{slot}_trial" for slot in slots]
 
 
+def test_the_heading_trial_favors_a_spontaneous_spectral_peak_nearest_zero():
+    """
+    Asserts that the heading trial scores a spontaneous correlation peaking
+    at zero frequency, the overdamped form measured on starling flocks,
+    above one peaking at a traveling wave's 0.45 Hz.
+    """
+    (heading,) = (trial for trial in Trial.listed() if trial.slot == "heading")
+    (measure,) = (
+        each for each in heading.measures if each.statistic == "spectral_peak_hz"
+    )
+    table = Dataset(
+        {
+            "spectral_peak_hz": (
+                ("candidate", "condition", "seed"),
+                array([[[0.0, 0.0]], [[0.45, 0.45]]])
+            )
+        },
+        coords = {"candidate": ["relaxing", "waving"], "condition": ["spontaneous"]}
+    )
+
+    assert measure.score(table).values.tolist() == [[0.0, 0.0], [-0.45, -0.45]]
+
+
 def trial(*measures: Measure) -> Trial:
     """
     Builds a trial of one coupling candidate and one control, chosen by

@@ -1448,24 +1448,37 @@ def test_an_edit_naming_a_prefix_of_a_longer_release_fails(tmp_path: Path):
 
 
 @mark.parametrize(
-    ("published", "row"),
+    ("published", "reason", "row"),
     [
         param(
             "2026-10-01T12:00:00Z",
-            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes | 14 | GHSA-1, GHSA-2 |",
+            "",
+            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes | 14 | GHSA-1, GHSA-2 |  |",
             id = "dated"
         ),
         param(
             None,
-            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes |  | GHSA-1, GHSA-2 |",
+            "",
+            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes |  | GHSA-1, GHSA-2 |  |",
             id = "undated"
+        ),
+        param(
+            None,
+            "Held",
+            "| `uv` | `uv.lock` | 0.12.22 | 0.13.1 | yes |  | GHSA-1, GHSA-2 | Held |",
+            id = "held"
         )
     ]
 )
-def test_a_lag_writes_its_row_counting_whole_days(published: str | None, row: str):
+def test_a_lag_writes_its_row_counting_whole_days(
+    published : str | None,
+    reason    : str,
+    row       : str
+):
     """
     Asserts that a lag's row counts its newest release's age in whole days
-    up to the instant given, leaving the cell empty where no date is known.
+    up to the instant given, leaving the cell empty where no date is known,
+    and ends on the reason a recorded hold gives, empty where none does.
     """
     lag = Lag(
         advisories = ("GHSA-1", "GHSA-2"),
@@ -1476,7 +1489,7 @@ def test_a_lag_writes_its_row_counting_whole_days(published: str | None, row: st
         upgraded   = True
     )
 
-    assert lag.row(datetime(2026, 10, 16, 11, tzinfo=UTC)) == row
+    assert lag.row(datetime(2026, 10, 16, 11, tzinfo=UTC), reason) == row
 
 
 def test_an_edit_writes_the_newest_release_behind_the_text_it_names(tmp_path: Path):
