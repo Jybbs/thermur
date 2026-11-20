@@ -7,7 +7,7 @@ and the `Composite` summing the slots the settings nest by name.
 """
 
 from dataclasses import fields
-from equinox     import Module, field, tree_at
+from equinox     import Module, field, filter_jit, tree_at
 from functools   import partial
 from jax         import Array, ShapeDtypeStruct, lax, tree, vmap
 from jax.numpy     import (
@@ -432,6 +432,7 @@ class Radio(Module):
             )
         )(receivers, senders)
 
+    @filter_jit
     def heard(
         self,
         flock  : Flock,

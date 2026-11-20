@@ -956,7 +956,6 @@ def test_the_neighbors_agree_with_an_exact_search_over_the_same_broadcasts(drone
     velocities  = array([10.0, 0.0, 0.0]) + 1.5 * normal(key(drones + 1), (drones, 3))
     rows        = arange(drones)[:, newaxis]
     hold        = radio.hold_periods * radio.period_steps(0.1)
-    heard       = jit(radio.heard, static_argnames=("lag", "step_s"))
     inbox, sent = radio.opened(flock_of(positions, velocities), 0, 0.1)
     exact       = (
         linalg.norm(positions[:, newaxis] - positions, axis=-1) <= radio.range_m
@@ -987,13 +986,13 @@ def test_the_neighbors_agree_with_an_exact_search_over_the_same_broadcasts(drone
         )
 
     for step in range(1, 121):
-        inbox, sent = heard(
+        inbox, sent = radio.heard(
             flock_of(positions + step * 0.1 * velocities, velocities),
             inbox,
             key(0),
             0,
             sent,
-            step,
+            array(step),
             0.1
         )
         if step % radio.period_steps(0.1) == 0:
