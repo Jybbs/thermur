@@ -1,8 +1,11 @@
 import { expect } from 'vitest'
 
+import { CONTROL_LABEL, labeled } from './sheets.ts'
+
 declare module 'vitest' {
   interface Matchers<R> {
-    toReadAsPublished: () => R
+    toReadAsPublished   : () => R
+    toSetAsControlLabel : () => R
   }
 }
 
@@ -23,6 +26,14 @@ expect.extend({
     return {
       message : () => `${JSON.stringify(received)} carries ${broken.join(' and ') || 'nothing banned'}`,
       pass    : broken.length === 0
+    }
+  },
+
+  toSetAsControlLabel(received: Element) {
+    const read = labeled(received)
+    return {
+      message : () => `${received.textContent} reads ${JSON.stringify(read)} from the kit’s label rule`,
+      pass    : this.equals(read, CONTROL_LABEL)
     }
   }
 })

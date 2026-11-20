@@ -4,7 +4,7 @@ Every widget on the site builds its controls, the chrome around its drawing, and
 
 ## The Pieces
 
-The catalog below walks the kit one piece at a time, its stage setting out each part of the kit at work on a made-up fire front and flock, and the card beneath it naming when a widget reads the piece, how many of the site's modules read it, what it replaces, and the line that takes it up. A control sets its label in the mono face at weight 500, uppercase, with 0.1em of letter spacing, and every transition reads the site's shared settling time, which drops to zero for a reader who prefers reduced motion.
+The catalog below walks the kit one piece at a time, its stage setting out each part of the kit at work on a made-up fire front and flock, and the card beneath it naming when a widget reads the piece, how many of the site's modules read it, what it replaces, and the line that takes it up. A control sets its label in the mono face at weight 500, uppercase, with 0.1em of letter spacing, as does a caption a chart draws over a control, and every transition reads the site's shared settling time, which drops to zero for a reader who prefers reduced motion.
 
 <!-- pieces -->
 
