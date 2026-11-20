@@ -2,8 +2,9 @@
 Defines the fixtures every test folder shares, each described where it is
 defined, beside the plain-file extension every snapshot is written through.
 The autouse `environment` fixture isolates every test from the machine
-running it, and the collection hook lets a test open a network connection
-only when it carries the `network` mark.
+running it, the collection hook lets a test open a network connection only
+when it carries the `network` mark, and the `--share` option runs one share
+of a suite split by test across several machines.
 """
 
 from collections.abc    import Callable
@@ -17,6 +18,8 @@ from pytest             import (
     FixtureRequest,
     Item,
     MonkeyPatch,
+    Parser,
+    Session,
     TempPathFactory,
     fixture,
     mark
@@ -218,6 +221,39 @@ def tracked(pytestconfig: Config) -> list[Path]:
     return Checkout(root=pytestconfig.rootpath).tracked()
 
 
+def pytest_addoption(parser: Parser):
+    """
+    Adds `--share`, which takes `<index>/<count>` and runs the share of the
+    suite at `index`, counting from 1, out of `count` shares.
+    """
+    parser.addoption(
+        "--share",
+        help    = "Run the share at <index>, counting from 1, out of <count> shares",
+        metavar = "<index>/<count>",
+        type    = share
+    )
+
+
+def pytest_collection_finish(session: Session):
+    """
+    Skips every collected test outside the share `--share` names, taking
+    every `count`-th test from the one at `index` in the order of their
+    node IDs, which every machine computes alike under any `pytest-randomly`
+    seed. A skip rather than a deselection leaves syrupy reading every test
+    as selected, so it still reports a snapshot no test reads, while it
+    reads a skipped test's snapshots as still in use.
+    """
+    if picked := session.config.getoption("share"):
+        index, count = picked
+        kept         = set(
+            sorted(item.nodeid for item in session.items)[index - 1 :: count]
+        )
+        skip = mark.skip(reason=f"Runs in another share than {index}/{count}")
+        for item in session.items:
+            if item.nodeid not in kept:
+                item.add_marker(skip)
+
+
 def pytest_collection_modifyitems(items: list[Item]):
     """
     Adds pytest-socket's `enable_socket` mark to every test carrying the
@@ -228,6 +264,21 @@ def pytest_collection_modifyitems(items: list[Item]):
     for item in items:
         if item.get_closest_marker("network"):
             item.add_marker(mark.enable_socket)
+
+
+def share(text: str) -> tuple[int, int]:
+    """
+    Reads `<index>/<count>` as the share at `index` out of `count` shares.
+
+    Raises:
+        ValueError: Where `text` is no such pair, or `index` falls outside 1
+                    to `count`.
+    """
+    index, count = map(int, text.split("/"))
+    if not 1 <= index <= count:
+        raise ValueError(f"No share {index} out of {count}")
+
+    return index, count
 
 
 @fixture
