@@ -121,6 +121,9 @@ pythonpath               = ["tests"]
 strict                   = true
 testpaths                = ["tests"]
 
+[tool.thermur.holds]
+satori = "0.63 widens the gap around the middle dot in the preview cards' mono lines by about 7 px"
+
 [tool.uv]
 build-constraint-dependencies = [
     "cython==3.3.1",
