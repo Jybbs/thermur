@@ -19,7 +19,7 @@ from yaml            import NodeEvent, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Parity, read_pin
+from thermur.repo.schemas  import Finding, Job, Parity, read_pin
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -160,6 +160,38 @@ class CommitCheck(Check):
             )
             for path, (action, commit) in pinned
         ]
+
+
+class DraftCheck(Check):
+    """
+    Every workflow running on a pull request runs as the pull request is
+    marked ready for review, and each of its jobs skips a draft, so a push
+    to a draft starts no job and the head marked ready runs every one.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each workflow running on a pull request that does not run as
+        it is marked ready, then each of its jobs carrying no guard skipping
+        a draft.
+        """
+        for path, workflow in self.checkout.workflows.items():
+            if not workflow.on_pull_request:
+                continue
+
+            if not workflow.on_ready:
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` runs on no `ready_for_review` pull request"
+                )
+
+            for key, job in workflow.jobs.items():
+                if not job.skips_drafts:
+                    yield Finding(
+                        file    = path,
+                        message = f"The `{key}` job in `{path}` runs on a draft, "
+                        f"since its condition carries no `{Job.draft}`"
+                    )
 
 
 class FootnoteCheck(Check):

@@ -19,6 +19,7 @@ from thermur.repo.checks   import (
     BinCheck,
     Check,
     CommitCheck,
+    DraftCheck,
     FootnoteCheck,
     GateCheck,
     GuideCheck,
@@ -353,7 +354,12 @@ def test_a_gate_running_under_a_bare_always_passes(checkout: Checkout):
     Asserts that a gate whose condition is `always()` written without the
     `${{ }}` GitHub lets a condition leave out passes.
     """
-    edit(checkout, CI, new="if      : always()", old="if      : ${{ always() }}")
+    edit(
+        checkout,
+        CI,
+        new = "if      : always()",
+        old = "if      : ${{ always() && !github.event.pull_request.draft }}"
+    )
 
     assert GateCheck(checkout=checkout).findings == []
 
@@ -821,11 +827,19 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
             id = "unnamed"
         ),
         param(
-            "${{ always() }}",
+            "${{ always() && !github.event.pull_request.draft }}",
             "${{ success() }}",
             f"The `gate` job in `{CI}` runs under `${{{{ success() }}}}` rather than "
             "`always()`",
             id = "condition"
+        ),
+        param(
+            "always() && !github",
+            "always() && github.ref == 'refs/heads/main' && !github",
+            f"The `gate` job in `{CI}` runs under `${{{{ always() && github.ref == "
+            "'refs/heads/main' && !github.event.pull_request.draft }}` rather than "
+            "`always()`",
+            id = "narrowed"
         ),
         param(
             "needs   : [check]",
@@ -850,6 +864,60 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
 
     assert GateCheck(checkout=checkout).findings == [
         Finding(file=Path(CI), message=message)
+    ]
+
+
+@mark.parametrize(
+    ("path", "old", "new", "message"),
+    [
+        param(
+            CI,
+            ", ready_for_review]",
+            "]",
+            f"`{CI}` runs on no `ready_for_review` pull request",
+            id = "ci-types"
+        ),
+        param(
+            SITE,
+            "    types : [opened, synchronize, reopened, ready_for_review]\n",
+            "",
+            f"`{SITE}` runs on no `ready_for_review` pull request",
+            id = "site-default-types"
+        ),
+        param(
+            CI,
+            "    if      : ${{ !github.event.pull_request.draft }}\n",
+            "",
+            f"The `check` job in `{CI}` runs on a draft, since its condition "
+            "carries no `!github.event.pull_request.draft`",
+            id = "check-guard"
+        ),
+        param(
+            SITE,
+            "${{ always() && !github.event.pull_request.draft }}",
+            "${{ always() }}",
+            f"The `gate` job in `{SITE}` runs on a draft, since its condition "
+            "carries no `!github.event.pull_request.draft`",
+            id = "gate-guard"
+        )
+    ]
+)
+def test_a_workflow_running_on_a_draft_is_named(
+    checkout : Checkout,
+    message  : str,
+    new      : str,
+    old      : str,
+    path     : str
+):
+    """
+    Asserts that a pull-request workflow whose activity types leave out
+    `ready_for_review` is named, as is each of its jobs whose condition
+    carries no guard skipping a draft.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert DraftCheck(checkout=checkout).findings == [
+        Finding(file=Path(path), message=message)
     ]
 
 

@@ -7,6 +7,7 @@ concurrency:
 jobs:
   check:
     name    : ${{ matrix.name }}
+    if      : ${{ !github.event.pull_request.draft }}
     outputs : { site-coverage: "${{ steps.attach.outputs.artifact-url }}" }
     runs-on : &image ubuntu-26.04
 
@@ -48,7 +49,7 @@ jobs:
 
   gate:
     name    : 📡 Readout
-    if      : ${{ always() }}
+    if      : ${{ always() && !github.event.pull_request.draft }}
     needs   : [check]
     runs-on : *image
 
@@ -66,6 +67,7 @@ jobs:
 on:
   pull_request:
     paths : [.github/CONTRIBUTING.md, .github/README.md, .github/actions/provision/**, .github/workflows/site.yml, .gitignore, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, docs/**, pyproject.toml, src/thermur/identity/fonts/**]
+    types : [opened, synchronize, reopened, ready_for_review]
 
   workflow_dispatch:
 
