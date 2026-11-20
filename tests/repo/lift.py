@@ -953,10 +953,15 @@ def test_a_trial_passes_where_mise_ci_passes_and_isolates_the_major_lift(
     """
     Asserts that a trial whose lifted clone fails `mise ci` fails, that
     one holding back the major lift breaking it passes, and that the lift
-    isolates that lift, rebuilding `.venv` before each run of `mise ci` and
-    leaving the checkout as it was.
+    isolates that lift, trying no major lift `pyproject.toml` records a
+    hold on, rebuilding `.venv` before each run of `mise ci` and leaving the
+    checkout as it was.
     """
-    lift = Lift(checkout=clone, lags=[floor, uv_lag(clone)])
+    hold(clone, {"satori": "It breaks"})
+    lift = Lift(
+        checkout = clone,
+        lags     = [floor, Lag(current="1", newest="2", pin="satori"), uv_lag(clone)]
+    )
 
     assert (lift.passes(), lift.passes({"uv"}), lift.isolate()) == (False, True, "uv")
     assert Config.read(clone.root) == clone.config

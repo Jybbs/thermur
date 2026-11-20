@@ -138,7 +138,8 @@ def test_a_hold_naming_no_row_stops_the_task_before_anything_runs(
 def test_a_recorded_hold_stands_without_the_flag_and_a_stale_one_is_named(
     capsys : CaptureFixture[str],
     clone  : Checkout,
-    lifted : Callable[..., None]
+    lifted : Callable[..., None],
+    mise   : StandIn
 ):
     """
     Asserts that the table marks a pin `pyproject.toml` records a hold on
