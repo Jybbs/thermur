@@ -376,7 +376,9 @@ def test_info_runs_bun_from_the_folder_holding_the_site_s_manifest(
     """
     Asserts that `Manager.info` runs `bun info` from the site's folder, the
     one holding `docs/package.json`, through a stand-in `bun` printing the
-    folder it runs in.
+    folder it runs in. Bun reads the registry from a `bunfig.toml` or an
+    `.npmrc` in the folder it runs in, so `bun info` asks the registry that
+    `bun outdated` and `bun install` resolve the site's packages from.
     """
     answer("bun", answers={'"info "*': "pwd -P"})
 
