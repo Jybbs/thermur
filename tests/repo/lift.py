@@ -713,16 +713,17 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
 ):
     """
     Asserts that `Site` reports each package `overrides` holds to a release
-    behind the one its `latest` tag names, after the rows `bun outdated`
-    prints and beside the date `bun info` gives that release, and that
-    writing its edit lifts the override. A prerelease of the newest release
-    lags it, while an override at or ahead of its newest release makes no
-    row, a release ahead of a newest prerelease included, and so does a
-    newest release published inside the window `[tool.uv]` declares or on
-    a date `bun info` does not give. `bun info` never runs for a caret,
-    an x-range, a bare major, a union opening on a release, or a release
-    Semantic Versioning rejects, and a package `bun outdated` already lists
-    makes one row, whose edit lifts its override as well.
+    behind its newest release outside the window `[tool.uv]` declares, after
+    the rows `bun outdated` prints and beside the date `bun info` gives that
+    release, and that writing its edit lifts the override. A newest release
+    inside the window gives way to the newest one outside it, so an override
+    that one is ahead of makes a row and an override at it makes none. A
+    prerelease lags its release, while an override at or ahead of its newest
+    release makes no row, a release ahead of each prerelease included, and
+    so does a package `bun info` dates no release for. `bun info` never runs
+    for a caret, an x-range, a bare major, a union opening on a release,
+    or a release Semantic Versioning rejects, and a package `bun outdated`
+    already lists makes one row, whose edit lifts its override as well.
     """
     vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
     manifest = override(
@@ -734,6 +735,7 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             "glob"       : "^14.0.0",
             "knip"       : "6.x",
             "minimatch"  : "11.0.8",
+            "picocolors" : "1.0.0",
             "picomatch"  : "4",
             "semver"     : "7.5.2 || 7.6.0",
             "tinyexec"   : "1.0.0",
@@ -743,6 +745,18 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             "vue"        : vue
         }
     )
+    old    = "2026-03-02T00:00:00Z"
+    recent = f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}"
+    times  = {
+        "chokidar"   : {"2.0.0": old, "2.1.0-beta.1": old},
+        "fflate"     : {"0.7.5": old, "0.8.3": "2026-05-16T00:14:03Z"},
+        "minimatch"  : {"11.0.8": old, "modified": old},
+        "picocolors" : {"1.0.0": old, "1.1.0": recent},
+        "tinyexec"   : {"1.0.0": old, "1.0.1": "2026-04-01T00:00:00Z", "1.0.2": recent},
+        "tinyglobby" : {"1.0.0": old, "1.0.0-rc.1": old},
+        "ufo"        : {},
+        "vitepress"  : {"1.6.4": old, "2.0.0-alpha.20": old}
+    }
     answer(
         "bun",
         answers = {
@@ -751,22 +765,11 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
                 "|---------|---------|--------|--------|\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 |"
             ),
-            '"info chokidar version"'      : printed("2.0.0-beta.1"),
-            '"info fflate version"'        : printed("0.8.3"),
-            '"info minimatch version"'     : printed("11.0.8"),
-            '"info tinyexec version"'      : printed("1.0.1"),
-            '"info tinyglobby version"'    : printed("1.0.0"),
-            '"info ufo version"'           : printed("1.1.0"),
-            '"info vitepress version"'     : printed("1.6.4"),
-            '"info "*" time --json"'       : printed(
-                value = {
-                    "0.8.3" : "2026-05-16T00:14:03Z",
-                    "1.0.0" : "2026-03-02T00:00:00Z",
-                    "1.0.1" :
-                        f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}",
-                    "9.9.9" : "2026-10-13T00:00:00Z"
-                }
-            ),
+            **{
+                f'"info {name} time --json"': printed(released)
+                for name, released in times.items()
+            },
+            '"info vue time --json"'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
             '"audit --json"'               : printed({}),
             "*": "exit 1"
         }
@@ -777,12 +780,14 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     assert [(lag.pin, lag.current, lag.newest, lag.published) for lag in lags] == [
         ("vue", vue, "9.9.9", datetime(2026, 10, 13, tzinfo=UTC)),
         ("fflate", "0.7.5", "0.8.3", datetime(2026, 5, 16, 0, 14, 3, tzinfo=UTC)),
+        ("tinyexec", "1.0.0", "1.0.1", datetime(2026, 4, 1, tzinfo=UTC)),
         ("tinyglobby", "1.0.0-rc.1", "1.0.0", datetime(2026, 3, 2, tzinfo=UTC))
     ]
     lifted = loads(checkout.read(PACKAGE))
     assert lifted["overrides"] == {
         **manifest["overrides"],
         "fflate"     : "0.8.3",
+        "tinyexec"   : "1.0.1",
         "tinyglobby" : "1.0.0",
         "vue"        : "9.9.9"
     }

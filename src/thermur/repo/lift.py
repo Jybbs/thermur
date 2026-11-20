@@ -573,9 +573,10 @@ class Scripts(Manager):
 
 class Site(Manager):
     """
-    Bun, reporting each exact pin in a manifest of the site's workspace that
-    `bun outdated` lists, and each exact release `overrides` holds a package
-    to, against the release its `latest` tag names.
+    Bun, reporting each exact pin in a manifest of the site's workspace
+    that `bun outdated` lists, and each exact release `overrides` holds a
+    package to, against its newest release older than the window `[tool.uv]`
+    declares.
     """
 
     closing: ClassVar[str] = '(?=")'
@@ -634,8 +635,8 @@ class Site(Manager):
             if name not in names
             and fullmatch(self.release, current)
             and Version.is_valid(current)
-            and Version.parse(newest := self.latest(name)) > current
-            and self.aged(name, newest)
+            and (newest := self.newest(name))
+            and Version.parse(newest) > current
         }
         return self.cleared(
             [
@@ -670,16 +671,6 @@ class Site(Manager):
             name: {advisory["url"].rpartition("/")[2] for advisory in advisories}
             for name, advisories in loads(audited.stdout or "{}").items()
         }
-
-    def aged(self, name: str, version: str) -> bool:
-        """
-        Tells whether the release `version` of the npm package `name` was
-        published, as `bun info` reports it, at least the window `[tool.uv]`
-        declares ago.
-        """
-        published = self.published(name, version)
-        cutoff    = datetime.now(UTC) - self.checkout.manifest.window
-        return published is not None and datetime.fromisoformat(published) <= cutoff
 
     def cleared(self, lags: list[Lag]) -> list[Lag]:
         """
@@ -739,6 +730,27 @@ class Site(Manager):
                 self.checkout.read(manifest)
             )
         }
+
+    def newest(self, name: str) -> str | None:
+        """
+        Reads the newest release of the npm package `name`, short of a
+        prerelease, that `bun info` dates at least the window `[tool.uv]`
+        declares ago, the release `bun outdated` reports under the window.
+        """
+        cutoff = datetime.now(UTC) - self.checkout.manifest.window
+        return max(
+            (
+                version
+                for version, published in loads(
+                    self.info(name, "time", "--json")
+                ).items()
+                if Version.is_valid(version)
+                and not Version.parse(version).prerelease
+                and datetime.fromisoformat(published) <= cutoff
+            ),
+            default = None,
+            key     = Version.parse
+        )
 
 
 class Tools(Manager):
