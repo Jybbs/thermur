@@ -167,10 +167,9 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         moves, and relocks every other lockfile through `lock:sync`.
 
         Raises:
-            CalledProcessError : Where a command the write runs exits
-                                 nonzero.
-            ValueError         : Where a file names no release an edit
-                                 lifts.
+            CalledProcessError: Where a command the write runs exits
+                                nonzero.
+            ValueError: Where a file names no release an edit lifts.
         """
         lifted = self.lifted(held)
         for lag in lifted:
