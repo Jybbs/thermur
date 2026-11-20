@@ -9,6 +9,7 @@ then prints, writes, and tries:
   `overrides` gives a package, each beside its newest release's date and
   the advisories the lift clears, and the edits each writes into the copy
 - The releases `Site` reads as exact, and the ranges it leaves alone
+- The folder `Manager.info` runs `bun info` from
 - The table the lift prints, the holds naming no row, and the pins it
   lifts short of its holds
 - The commands the write runs, and the trial's verdict in a scratch clone
@@ -366,6 +367,23 @@ def test_images_reports_no_row_for_a_label_holding_more_than_a_family_and_a_vers
     )
 
     assert Images(checkout=Checkout(root=checkout.root)).lags == []
+
+
+def test_info_runs_bun_from_the_folder_holding_the_site_s_manifest(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Manager.info` runs `bun info` from the site's folder, the
+    one holding `docs/package.json`, through a stand-in `bun` printing the
+    folder it runs in.
+    """
+    answer("bun", answers={'"info "*': "pwd -P"})
+
+    assert (
+        Path(Manager(checkout=checkout).info("vue").strip())
+        == checkout.root / checkout.package.folder
+    )
 
 
 def test_locked_reads_each_package_the_upgrade_moves(
