@@ -14,6 +14,7 @@ from common.drones   import small
 from common.edits    import edit
 from common.runs     import computed
 from common.settings import Tuned
+from contextlib      import closing
 from dataclasses     import make_dataclass
 from decimal         import Decimal
 from enum            import IntEnum, StrEnum
@@ -355,13 +356,22 @@ def test_a_failed_save_raises_its_own_error_where_the_run_began(
     assert Path.cwd() == clone.root
 
 
-def test_a_freed_cache_connection_releases_the_lock_it_held(tmp_path: Path):
+@mark.parametrize("check_same_thread", [True, False])
+def test_a_freed_cache_connection_releases_the_lock_it_held(
+    check_same_thread : bool,
+    tmp_path          : Path
+):
     """
     Asserts that a `CacheConnection` freed by a collection on another thread
-    closes, releasing the lock its open transaction held.
+    closes, releasing the lock its open transaction held, whichever thread
+    check its caller passes.
     """
     database = tmp_path / "store.db"
-    held     = connect(database, check_same_thread=False, factory=CacheConnection)
+    held     = connect(
+        database,
+        check_same_thread = check_same_thread,
+        factory           = CacheConnection
+    )
     held.execute("begin exclusive")
     cycle = [held]
     cycle.append(cycle)
@@ -370,7 +380,8 @@ def test_a_freed_cache_connection_releases_the_lock_it_held(tmp_path: Path):
     collector.start()
     collector.join()
 
-    connect(database, factory=CacheConnection, timeout=0).execute("begin exclusive")
+    with closing(connect(database, timeout=0)) as probe:
+        probe.execute("begin exclusive")
 
 
 def test_a_graph_reads_every_subpackage_s_steps_by_default(
