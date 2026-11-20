@@ -1038,6 +1038,13 @@ class Workflow(Document):
     carries any.
     """
 
+    group: str = Field("", validation_alias=AliasPath("concurrency", "group"))
+    """
+    The concurrency group the workflow's runs share, where a run starting
+    in the group cancels or holds the one in progress there, or nothing
+    where its runs share none.
+    """
+
     @property
     def checks(self) -> list[tuple[str, str]]:
         """
@@ -1078,6 +1085,16 @@ class Workflow(Document):
         for review, which none of the event's default types does.
         """
         return "ready_for_review" in self.events.get("pull_request", Trigger()).types
+
+    @property
+    def splits_drafts(self) -> bool:
+        """
+        Tells whether the workflow's concurrency group, where it declares
+        one, reads the pull request's `draft` state, so a run on a draft
+        shares no group with a run on the head marked ready and leaves it
+        running.
+        """
+        return not self.group or Job.draft.removeprefix("!") in self.group
 
     def pushes(self, file: str) -> bool:
         """

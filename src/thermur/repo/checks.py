@@ -19,7 +19,7 @@ from yaml            import NodeEvent, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Parity, read_pin
+from thermur.repo.schemas  import Finding, Job, Parity, read_pin
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -165,21 +165,29 @@ class CommitCheck(Check):
 class DraftCheck(Check):
     """
     Every workflow running on a pull request runs as the pull request is
-    marked ready for review, and each of its jobs skips a draft, so a push
-    to a draft starts no job and the head marked ready runs every one.
+    marked ready for review, keeps its runs on a draft in a concurrency
+    group of their own, and each of its jobs skips a draft, so a push to a
+    draft starts no job and cancels no run on the head marked ready.
     """
 
     def scan(self) -> Iterator[Finding]:
         """
         Names each workflow running on a pull request that does not run as
-        it is marked ready, then each of its jobs carrying no guard skipping
-        a draft.
+        it is marked ready or shares its concurrency group with a draft,
+        then each of its jobs carrying no guard skipping a draft.
         """
         for path, workflow in self.checkout.pulls.items():
             if not workflow.on_ready:
                 yield Finding(
                     file    = path,
                     message = f"`{path}` runs on no `ready_for_review` pull request"
+                )
+
+            if not workflow.splits_drafts:
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` cancels a ready run from a draft, since its "
+                    f"concurrency group leaves out `{Job.draft.removeprefix('!')}`"
                 )
 
             for key, job in workflow.jobs.items():
