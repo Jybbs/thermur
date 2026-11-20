@@ -29,10 +29,10 @@ expect.extend({
     }
   },
 
-  toSetAsControlLabel(received: Element) {
+  toSetAsControlLabel(received: SVGElement) {
     const read = labeled(received)
     return {
-      message : () => `${received.textContent} reads ${JSON.stringify(read)} from the kit’s label rule`,
+      message : () => `${received.textContent} is set in ${JSON.stringify(read)}`,
       pass    : this.equals(read, CONTROL_LABEL)
     }
   }

@@ -70,15 +70,18 @@ function flattened(list: CSSRuleList): CSSStyleRule[] {
 }
 
 /**
- * Reads the face, weight, spacing, and case the kit's label rule declares for
- * `element`, or nothing where none of the rule's selectors matches it.
+ * Reads the face, weight, spacing, and case `element` is set in, each from its
+ * inline style where it sets one and otherwise from the kit's label rule, or
+ * nothing where none of the rule's selectors matches it.
  */
-export function labeled(element: Element): Record<string, string> {
+export function labeled(element: SVGElement): Record<string, string> {
   const sheet  = fs.readFileSync(`${import.meta.dirname}/../../../kit/src/styles/label.css`, 'utf8')
   const [rule] = flattened(opened(sheet).style.sheet!.cssRules)
   const keys   = Object.keys(CONTROL_LABEL)
   return element.matches(rule!.selectorText)
-    ? Object.fromEntries(keys.map(key => [key, rule!.style.getPropertyValue(key)]))
+    ? Object.fromEntries(keys.map(key => [
+      key, element.style.getPropertyValue(key) || rule!.style.getPropertyValue(key)
+    ]))
     : {}
 }
 
