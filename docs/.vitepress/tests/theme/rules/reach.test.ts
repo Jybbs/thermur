@@ -184,6 +184,13 @@ describe('the stops on the dial’s rim', () => {
     expect(new Set(knobs(chart).map(knob => knob.name)).size).toBe(1)
   })
 
+  it('sets the caption over the radios as every control’s label is set', () => {
+    const chart   = charted(RulesReach, 672)
+    const caption = [...chart.host.querySelectorAll('text')]
+      .find(text => text.textContent === 'THE FIRST DRONE TURNS')!
+    expect(caption).toSetAsControlLabel()
+  })
+
   it('stands each radio over its stop on the rim, again at each width', async () => {
     const chart = charted(RulesReach, 672)
     await chart.widget.vm.$nextTick()
