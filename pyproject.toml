@@ -134,6 +134,7 @@ build-constraint-dependencies = [
     "tomlkit==0.15.2",
     "trove-classifiers==2026.9.21.13"
 ]
+exclude-newer                 = "P7D"
 python-downloads              = "never"
 python-preference             = "only-system"
 required-version              = "==0.13.8"
