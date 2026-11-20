@@ -30,7 +30,7 @@ from numpy          import float32, int32, int64, ones, zeros
 from pathlib        import Path
 from pydantic       import BaseModel, HttpUrl, create_model
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
-from sqlite3        import connect
+from sqlite3        import OperationalError, connect
 from threading      import Thread
 from unittest.mock  import Mock
 from uuid           import UUID
@@ -254,12 +254,15 @@ def test_equal_values_fingerprint_alike(
     assert fingerprinted(made()) == fingerprinted(made())
 
 
-def test_a_call_naming_no_step_is_refused(graphed: Callable[..., Graph]):
+def test_a_cache_connection_that_fails_to_open_raises_only_its_error(tmp_path: Path):
     """
-    Asserts that a call naming no step raises a `ValueError` saying so.
+    Asserts that a `CacheConnection` on a path SQLite cannot open raises its
+    `OperationalError` and leaves nothing for its deallocator to report.
     """
-    with raises(ValueError, match="Name at least one step to compute"):
-        graphed().compute()
+    with raises(OperationalError):
+        connect(tmp_path / "missing/store.db", factory=CacheConnection)
+
+    collect()
 
 
 @mark.parametrize(
@@ -310,6 +313,14 @@ def test_the_saver_writes_a_file_its_loader_reads_back_whole(
         assert_identical(read, data)
 
 
+def test_a_call_naming_no_step_is_refused(graphed: Callable[..., Graph]):
+    """
+    Asserts that a call naming no step raises a `ValueError` saying so.
+    """
+    with raises(ValueError, match="Name at least one step to compute"):
+        graphed().compute()
+
+
 def test_a_component_s_code_change_computes_the_flight_again(
     clone       : Checkout,
     monkeypatch : MonkeyPatch
@@ -335,25 +346,6 @@ def test_a_component_s_code_change_computes_the_flight_again(
     graph.compute("flight")
 
     assert {"composite", "flight"} <= computed(graph)
-
-
-def test_a_failed_save_raises_its_own_error_where_the_run_began(
-    clone       : Checkout,
-    graphed     : Callable[..., Graph],
-    monkeypatch : MonkeyPatch
-):
-    """
-    Asserts that a saver failing on a recorded run raises its own error
-    and leaves the working directory where the run began rather than in the
-    run's folder.
-    """
-    monkeypatch.chdir(clone.root)
-    monkeypatch.setattr(NetcdfWriter, "save_data", Mock(side_effect=OSError("full")))
-
-    with raises(OSError, match="full"):
-        graphed(recorded=True).compute("table")
-
-    assert Path.cwd() == clone.root
 
 
 @mark.parametrize("check_same_thread", [True, False])
@@ -382,6 +374,25 @@ def test_a_freed_cache_connection_releases_the_lock_it_held(
 
     with closing(connect(database, timeout=0)) as probe:
         probe.execute("begin exclusive")
+
+
+def test_a_failed_save_raises_its_own_error_where_the_run_began(
+    clone       : Checkout,
+    graphed     : Callable[..., Graph],
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a saver failing on a recorded run raises its own error
+    and leaves the working directory where the run began rather than in the
+    run's folder.
+    """
+    monkeypatch.chdir(clone.root)
+    monkeypatch.setattr(NetcdfWriter, "save_data", Mock(side_effect=OSError("full")))
+
+    with raises(OSError, match="full"):
+        graphed(recorded=True).compute("table")
+
+    assert Path.cwd() == clone.root
 
 
 def test_a_graph_reads_every_subpackage_s_steps_by_default(

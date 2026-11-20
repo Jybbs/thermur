@@ -59,11 +59,18 @@ class CacheConnection(Connection):
     opens with `check_same_thread=False` whatever its caller passes.
     """
 
+    opened = False
+    """
+    Whether `Connection.__init__` opened the database, which a failed open
+    leaves false.
+    """
+
     def __del__(self):
         """
-        Closes the connection as it is freed.
+        Closes the connection as it is freed, unless it never opened.
         """
-        self.close()
+        if self.opened:
+            self.close()
 
     def __init__(self, *args: object, **kwargs: object):
         """
@@ -71,6 +78,7 @@ class CacheConnection(Connection):
         `kwargs`, its thread check off.
         """
         super().__init__(*args, **kwargs | {"check_same_thread": False})
+        self.opened = True
 
 
 @dataclass(frozen=True)
