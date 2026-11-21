@@ -55,8 +55,8 @@ describe('launched', () => {
     for (const [name, held] of Object.entries({ positions, velocities })) {
       held.flat().forEach((value, index) => expect(launch[name as keyof typeof launch][index]).toBeCloseTo(value, 3))
     }
-    const grounded = velocities.filter((_, drone) => positions[drone]![2] === 0).map(velocity => velocity[2]!)
-    expect(grounded.length).toBeGreaterThan(0)
-    expect(Math.min(...grounded)).toBeGreaterThan(0)
+    const grounded = Array.from(positions.keys()).filter(drone => positions[drone]![2] === 0)
+    expect(Math.min(...grounded.map(drone => draws[3 * plan.drones + 3 * drone + 2]!))).toBeLessThan(0)
+    expect(Math.min(...grounded.map(drone => launch.velocities[3 * drone + 2]!))).toBeGreaterThan(0)
   })
 })
