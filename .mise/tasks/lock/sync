@@ -1,9 +1,10 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "relock"
-#MISE description = "Re-resolve `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests"
+#MISE description = "Re-resolve `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, each to the releases older than the window `[tool.uv]` sets as `exclude-newer`"
 
 source "$MISE_PROJECT_ROOT/.mise/lib/lockfiles.sh"
 
+age=$(python -c 'import re, sys, tomllib; window = tomllib.load(sys.stdin.buffer)["tool"]["uv"]["exclude-newer"]; days = re.fullmatch(r"P(\d+)D", window) or sys.exit(f"[tool.uv] sets exclude-newer to {window!r}, which lock:sync passes Bun only when written as whole days, P<days>D"); print(86400 * int(days[1]))' < pyproject.toml)
 mise lock
 each_lockfile uv lock --no-locked
-bun install --cwd docs --lockfile-only
+bun install --cwd docs --lockfile-only --minimum-release-age="$age"

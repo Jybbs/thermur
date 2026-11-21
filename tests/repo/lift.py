@@ -6,17 +6,19 @@ then prints, writes, and tries:
 - The pins `Tools`, `Locked`, `Scripts`, `Builds`, `Site`, `Actions`,
   `Images`, and `Wrangler` report lagging, those `Site` reports including
   each pin of every package of the site's workspace and each exact release
-  `overrides` gives a package, each beside its newest release's date and
-  the advisories the lift clears, and the edits each writes into the copy
+  `overrides` gives a package, each newest release older than the window
+  `[tool.uv]` declares, each beside its newest release's date and the
+  advisories the lift clears, and the edits each writes into the copy
 - The releases `Site` reads as exact, and the ranges it leaves alone
-- The table the lift prints, the holds naming no row, and the pins it
-  lifts short of its holds
+- The folder `Manager.info` runs `bun info` from
+- The table the lift prints with each recorded hold's reason, the holds
+  and recorded holds naming no row, and the pins it lifts short of both
 - The commands the write runs, and the trial's verdict in a scratch clone
   beside the major lift whose hold lets the rest pass
 """
 
 from collections.abc  import Callable
-from common.edits     import edit
+from common.edits     import edit, hold
 from common.lags      import BREAKING, uv_lag
 from common.stand_ins import StandIn
 from contextlib       import nullcontext
@@ -53,6 +55,16 @@ KIT     = Path("docs/kit/package.json")
 NOW     = datetime(2026, 10, 16, tzinfo=UTC)
 PACKAGE = Path("docs/package.json")
 PAGES   = Path(".github/workflows/pages.yml")
+
+
+@fixture
+def age(checkout: Checkout) -> str:
+    """
+    Writes the `--minimum-release-age` flag, in whole seconds, that holds
+    a Bun resolve to releases older than the window the copy's `[tool.uv]`
+    declares.
+    """
+    return f"--minimum-release-age={int(checkout.manifest.window.total_seconds())}"
 
 
 @fixture
@@ -128,6 +140,20 @@ def printed(value: object) -> str:
     return f"printf '%s\\n' {quote(value if isinstance(value, str) else dumps(value))}"
 
 
+def test_a_checkout_recording_no_holds_lifts_every_pin(checkout: Checkout):
+    """
+    Asserts that a `pyproject.toml` with no `[tool.thermur.holds]` table
+    records no hold, so the lift keeps every lagging pin, names no recorded
+    hold stale, and leaves each row's reason empty.
+    """
+    hold(checkout, {})
+    edit(checkout, "pyproject.toml", new="", old="\n[tool.thermur.holds]\n")
+    lift = Lift(checkout=checkout, lags=[uv_lag(checkout)])
+
+    assert (lift.recorded, lift.stale, lift.lifted()) == ({}, [], lift.lags)
+    assert lift.table(NOW).splitlines()[2].endswith("|  |  |")
+
+
 def test_a_manager_reading_nothing_of_its_own_reports_no_lag(checkout: Checkout):
     """
     Asserts that the base manager, running no report command of its own,
@@ -164,53 +190,6 @@ def test_a_python_lift_within_its_minor_leaves_its_floor(
     assert [lag.files for lag in lags] == [[CONFIG]]
     assert from_toml(checkout.read(CONFIG))["tools"]["python"] == patch
     assert checkout.read(Path("pyproject.toml")) == manifest
-
-
-def test_an_action_under_a_subpath_reads_the_releases_of_its_repository(
-    answer   : Callable[..., StandIn],
-    checkout : Checkout
-):
-    """
-    Asserts that an action used under a subpath of its repository reads the
-    latest release and the tags of the repository its owner and name give,
-    reports the lag under the full action, and lifts its pin in the file
-    naming it.
-    """
-    lifted = "b" * 40
-    (checkout.root / ".github/workflows/scan.yml").write_text(
-        "name: s\non:\n  push:\njobs:\n  a:\n    runs-on: x\n    steps:\n"
-        f"      - uses: github/codeql-action/init@{'a' * 40}\n"
-    )
-    pins = dict(step.pin for _, step in checkout.steps if step.pin)
-    gh   = answer(
-        "gh",
-        answers = {
-            "*codeql-action": printed(
-                value = {"publishedAt": NOW.isoformat(), "tagName": "v4"}
-            ),
-            "*": printed({"publishedAt": NOW.isoformat(), "tagName": "v1"})
-        }
-    )
-    answer(
-        "git",
-        answers = {
-            "*/github/codeql-action": printed(f"{lifted}\trefs/tags/v4"),
-            **{
-                f"*/{action}": printed(f"{commit}\trefs/tags/v1")
-                for action, commit in pins.items()
-            }
-        }
-    )
-
-    lags = written(Actions(checkout=checkout).lags, checkout.root)
-
-    assert [(lag.pin, lag.newest, lag.files) for lag in lags] == [
-        ("github/codeql-action/init", "v4", [Path(".github/workflows/scan.yml")])
-    ]
-    assert "--repo github/codeql-action" in " ".join(gh.commands)
-    assert f"github/codeql-action/init@{lifted}" in checkout.read(
-        Path(".github/workflows/scan.yml")
-    )
 
 
 @mark.parametrize(
@@ -286,6 +265,53 @@ def test_images_reads_the_newest_version_of_the_image_s_family(
         f"{family}-{lifting}" if lifted else pins["image"]
     }
     assert ImageCheck(checkout=reread).findings == []
+
+
+def test_an_action_under_a_subpath_reads_the_releases_of_its_repository(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that an action used under a subpath of its repository reads the
+    latest release and the tags of the repository its owner and name give,
+    reports the lag under the full action, and lifts its pin in the file
+    naming it.
+    """
+    lifted = "b" * 40
+    (checkout.root / ".github/workflows/scan.yml").write_text(
+        "name: s\non:\n  push:\njobs:\n  a:\n    runs-on: x\n    steps:\n"
+        f"      - uses: github/codeql-action/init@{'a' * 40}\n"
+    )
+    pins = dict(step.pin for _, step in checkout.steps if step.pin)
+    gh   = answer(
+        "gh",
+        answers = {
+            "*codeql-action": printed(
+                value = {"publishedAt": NOW.isoformat(), "tagName": "v4"}
+            ),
+            "*": printed({"publishedAt": NOW.isoformat(), "tagName": "v1"})
+        }
+    )
+    answer(
+        "git",
+        answers = {
+            "*/github/codeql-action": printed(f"{lifted}\trefs/tags/v4"),
+            **{
+                f"*/{action}": printed(f"{commit}\trefs/tags/v1")
+                for action, commit in pins.items()
+            }
+        }
+    )
+
+    lags = written(Actions(checkout=checkout).lags, checkout.root)
+
+    assert [(lag.pin, lag.newest, lag.files) for lag in lags] == [
+        ("github/codeql-action/init", "v4", [Path(".github/workflows/scan.yml")])
+    ]
+    assert "--repo github/codeql-action" in " ".join(gh.commands)
+    assert f"github/codeql-action/init@{lifted}" in checkout.read(
+        Path(".github/workflows/scan.yml")
+    )
 
 
 def test_builds_reads_each_build_pin_against_every_build_pin_unpinned(
@@ -368,61 +394,23 @@ def test_images_reports_no_row_for_a_label_holding_more_than_a_family_and_a_vers
     assert Images(checkout=Checkout(root=checkout.root)).lags == []
 
 
-def test_locked_reads_each_package_the_upgrade_moves(
+def test_info_runs_bun_from_the_folder_holding_the_site_s_manifest(
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
     """
-    Asserts that `Locked` reports each package the dry run of `uv lock
-    --upgrade` updates, leaving out one it adds, as a package the lift
-    upgrades, beside the earliest upload of its newest release and each
-    advisory a release up to the newest fixes.
+    Asserts that `Manager.info` runs `bun info` from the site's folder, the
+    one holding `docs/package.json`, through a stand-in `bun` printing the
+    folder it runs in. Bun reads the registry from a `bunfig.toml` or an
+    `.npmrc` in the folder it runs in, so `bun info` asks the registry that
+    `bun outdated` and `bun install` resolve the site's packages from.
     """
-    dry_run = (
-        "Resolved 3 packages in 1ms\n"
-        "Update alpha v1.0.0 -> v1.1.0\n"
-        "Add gamma v1.0.0\n"
-        "Update beta-pkg v0.9.0 -> v2.0.0"
-    )
-    alpha = {"name": "alpha", "version": "1.0.0"}
-    audit = {
-        "vulnerabilities": [
-            {"dependency": alpha, "id": "GHSA-fixed", "fix_versions": ["1.0.5"]},
-            {"dependency": alpha, "id": "GHSA-later", "fix_versions": ["1.2.0"]}
-        ]
-    }
-    tree = {
-        "resolution": {
-            "a" : package("alpha", uploaded="2026-10-07T00:00:00Z", version="1.1.0"),
-            "b" : package("beta-pkg", uploaded="2026-10-09T00:00:00Z", version="2.0.0")
-        }
-    }
-    answer(
-        "uv",
-        answers = {
-            '"lock --dry-run"*' : f"{printed(dry_run)} >&2",
-            '"audit "*'         : printed(audit),
-            '"tree --format"*'  : printed(tree)
-        }
-    )
+    answer("bun", answers={'"info "*': "pwd -P"})
 
-    assert Locked(checkout=checkout).lags == [
-        Lag(
-            advisories = ("GHSA-fixed",),
-            current    = "1.0.0",
-            newest     = "1.1.0",
-            pin        = "alpha",
-            published  = datetime(2026, 10, 7, tzinfo=UTC),
-            upgraded   = True
-        ),
-        Lag(
-            current   = "0.9.0",
-            newest    = "2.0.0",
-            pin       = "beta-pkg",
-            published = datetime(2026, 10, 9, tzinfo=UTC),
-            upgraded  = True
-        )
-    ]
+    assert (
+        Path(Manager(checkout=checkout).info("vue").strip())
+        == checkout.root / checkout.package.folder
+    )
 
 
 @mark.parametrize(
@@ -496,7 +484,65 @@ def test_scripts_reads_each_exact_pin_a_task_script_declares(
     )) is bool(latest and listed)
 
 
+def test_locked_reads_each_package_the_upgrade_moves(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Locked` reports each package the dry run of `uv lock
+    --upgrade` updates, leaving out one it adds, as a package the lift
+    upgrades, beside the earliest upload of its newest release and each
+    advisory a release up to the newest fixes.
+    """
+    dry_run = (
+        "Resolved 3 packages in 1ms\n"
+        "Update alpha v1.0.0 -> v1.1.0\n"
+        "Add gamma v1.0.0\n"
+        "Update beta-pkg v0.9.0 -> v2.0.0"
+    )
+    alpha = {"name": "alpha", "version": "1.0.0"}
+    audit = {
+        "vulnerabilities": [
+            {"dependency": alpha, "id": "GHSA-fixed", "fix_versions": ["1.0.5"]},
+            {"dependency": alpha, "id": "GHSA-later", "fix_versions": ["1.2.0"]}
+        ]
+    }
+    tree = {
+        "resolution": {
+            "a" : package("alpha", uploaded="2026-10-07T00:00:00Z", version="1.1.0"),
+            "b" : package("beta-pkg", uploaded="2026-10-09T00:00:00Z", version="2.0.0")
+        }
+    }
+    answer(
+        "uv",
+        answers = {
+            '"lock --dry-run"*' : f"{printed(dry_run)} >&2",
+            '"audit "*'         : printed(audit),
+            '"tree --format"*'  : printed(tree)
+        }
+    )
+
+    assert Locked(checkout=checkout).lags == [
+        Lag(
+            advisories = ("GHSA-fixed",),
+            current    = "1.0.0",
+            newest     = "1.1.0",
+            pin        = "alpha",
+            published  = datetime(2026, 10, 7, tzinfo=UTC),
+            upgraded   = True
+        ),
+        Lag(
+            current   = "0.9.0",
+            newest    = "2.0.0",
+            pin       = "beta-pkg",
+            published = datetime(2026, 10, 9, tzinfo=UTC),
+            upgraded  = True
+        )
+    ]
+
+
 def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
+    age      : str,
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
@@ -530,7 +576,7 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     answer(
         "bun",
         answers = {
-            '"outdated --filter=*"' : printed(
+            f'"outdated --filter=* {age}"': printed(
                 value = "| Package | Current | Update | Latest | Workspace |\n"
                 "|---------|---------|--------|--------|-----------|\n"
                 f"| @zag-js/select | {zag} | 9.9.9 | 9.9.9 | @thermur/kit |\n"
@@ -539,9 +585,9 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 | @thermur/kit |\n"
                 f"| vue (peer) | {vue} | 9.9.9 | 9.9.9 | @thermur/kit |"
             ),
-            '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
-            '"audit --json"'        : printed({}),
-            "*": "exit 1"
+            '"info "*'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"' : printed({}),
+            "*"              : "exit 1"
         }
     )
 
@@ -561,46 +607,6 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
         "devDependencies"  : {"vue": "9.9.9"},
         "peerDependencies" : {"vue": f"{vue} || ^4.0.0"}
     }
-    assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
-
-
-def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
-    answer   : Callable[..., StandIn],
-    checkout : Checkout
-):
-    """
-    Asserts that `Site` reports a package two manifests of the workspace pin
-    at different releases as one row for each release, each lifting only the
-    manifest declaring it, a release opening on the other's included.
-    """
-    kit = loads(checkout.read(KIT))
-    vue = override(checkout, {})["devDependencies"]["vue"]
-    (checkout.root / KIT).write_text(
-        dumps({**kit, "devDependencies": {"vue": f"{vue}0"}}, indent=4),
-        encoding = "utf-8"
-    )
-    answer(
-        "bun",
-        answers = {
-            '"outdated --filter=*"' : printed(
-                value = "| Package | Current | Update | Latest | Workspace |\n"
-                "|---------|---------|--------|--------|-----------|\n"
-                f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
-                f"| vue (dev) | {vue}0 | {vue}0 | 9.9.9 | @thermur/kit |"
-            ),
-            '"info "*'              : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
-            '"audit --json"'        : printed({}),
-            "*": "exit 1"
-        }
-    )
-
-    lags = written(Site(checkout=checkout).lags, checkout.root)
-
-    assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
-        ("vue", vue, [PACKAGE]),
-        ("vue", f"{vue}0", [KIT])
-    ]
-    assert loads(checkout.read(KIT))["devDependencies"] == {"vue": "9.9.9"}
     assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
 
 
@@ -636,37 +642,46 @@ def test_site_reads_only_an_exact_release_as_a_pin(exact: bool, version: str):
 )
 def test_site_reads_each_package_bun_outdated_lists(
     after    : dict,
+    age      : str,
     answer   : Callable[..., StandIn],
     audited  : dict,
     checkout : Checkout,
     cleared  : tuple[str, ...]
 ):
     """
-    Asserts that `Site` reports each package `bun outdated` lists, with
-    or without its `(dev)` mark, beside the date `bun info` gives its
-    newest release, and clears an advisory `bun audit` reports on one only
-    where the audit of a copy of `docs/` with the lift written reports it
-    no longer, a copy holding each workspace package's manifest that it
-    resolves only where an advisory names a row, so an advisory the lift
-    leaves standing clears nothing.
+    Asserts that `Site` reports each package `bun outdated` lists under the
+    window, with or without its `(dev)` mark, beside the date `bun info`
+    gives its newest release. A release Bun marks `*`, the newest the window
+    allows, makes a row where it is ahead of the pinned release and none
+    where it is the pinned release. `Site` clears an advisory `bun audit`
+    reports on one only where the audit of a copy of `docs/` with the lift
+    written reports it no longer, a copy holding each workspace package's
+    manifest that it resolves only where an advisory names a row, so an
+    advisory the lift leaves standing clears nothing.
     """
     pins  = override(checkout, {})["devDependencies"]
     table = (
         "| Package | Current | Update | Latest |\n"
         "|---------|---------|--------|--------|\n"
+        f"| knip (dev) | {pins['knip']} | {pins['knip']} | {pins['knip']} * |\n"
         f"| satori (dev) | {pins['satori']} | {pins['satori']} | 0.99.0 |\n"
+        f"| vitest (dev) | {pins['vitest']} | {pins['vitest']} * | 9.0.0 * |\n"
         f"| vue | {pins['vue']} | {pins['vue']} | 9.9.9 |"
     )
-    times  = {"0.99.0": "2026-10-16T08:03:00.061Z", "9.9.9": "2026-10-13T00:00:00Z"}
+    times = {
+        "0.99.0" : "2026-10-16T08:03:00.061Z",
+        "9.0.0"  : "2026-10-01T00:00:00Z",
+        "9.9.9"  : "2026-10-13T00:00:00Z"
+    }
     lifted = 'grep -q \'"satori"[^,]*"0.99.0"\' package.json'
     bun    = answer(
         "bun",
         answers = {
-            '"outdated --filter=*"' : printed(table),
-            '"info "*'              : printed(times),
-            '"audit --json"'        : f'case "$PWD" in */thermur-*) {lifted} && '
+            f'"outdated --filter=* {age}"': printed(table),
+            '"info "*'       : printed(times),
+            '"audit --json"' : f'case "$PWD" in */thermur-*) {lifted} && '
             f"{printed(after)} || {printed(audited)} ;; *) {printed(audited)} ;; esac",
-            '"install --lockfile-only"': "test -f kit/package.json"
+            f'"install --lockfile-only {age}"': "test -f kit/package.json"
         }
     )
 
@@ -678,26 +693,71 @@ def test_site_reads_each_package_bun_outdated_lists(
             datetime(2026, 10, 16, 8, 3, 0, 61000, tzinfo=UTC),
             cleared
         ),
+        ("vitest", "9.0.0", datetime(2026, 10, 1, tzinfo=UTC), ()),
         ("vue", "9.9.9", datetime(2026, 10, 13, tzinfo=UTC), ())
     ]
-    assert ("bun install --lockfile-only" in bun.commands) is bool(audited)
+    assert (f"bun install --lockfile-only {age}" in bun.commands) is bool(audited)
+
+
+def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
+    age      : str,
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Site` reports a package two manifests of the workspace pin
+    at different releases as one row for each release, each lifting only the
+    manifest declaring it, a release opening on the other's included.
+    """
+    kit = loads(checkout.read(KIT))
+    vue = override(checkout, {})["devDependencies"]["vue"]
+    (checkout.root / KIT).write_text(
+        dumps({**kit, "devDependencies": {"vue": f"{vue}0"}}, indent=4),
+        encoding = "utf-8"
+    )
+    answer(
+        "bun",
+        answers = {
+            f'"outdated --filter=* {age}"': printed(
+                value = "| Package | Current | Update | Latest | Workspace |\n"
+                "|---------|---------|--------|--------|-----------|\n"
+                f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
+                f"| vue (dev) | {vue}0 | {vue}0 | 9.9.9 | @thermur/kit |"
+            ),
+            '"info "*'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"' : printed({}),
+            "*"              : "exit 1"
+        }
+    )
+
+    lags = written(Site(checkout=checkout).lags, checkout.root)
+
+    assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
+        ("vue", vue, [PACKAGE]),
+        ("vue", f"{vue}0", [KIT])
+    ]
+    assert loads(checkout.read(KIT))["devDependencies"] == {"vue": "9.9.9"}
+    assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
 
 
 def test_site_reads_each_release_overrides_holds_a_package_to(
+    age      : str,
     answer   : Callable[..., StandIn],
     checkout : Checkout
 ):
     """
     Asserts that `Site` reports each package `overrides` holds to a release
-    behind the one its `latest` tag names, after the rows `bun outdated`
-    prints and beside the date `bun info` gives that release, and that
-    writing its edit lifts the override. A prerelease of the newest release
-    lags it, while an override at or ahead of its newest release makes
-    no row, a release ahead of a newest prerelease included. `bun info`
-    never runs for a caret, an x-range, a bare major, a union opening on a
-    release, or a release Semantic Versioning rejects, and a package `bun
-    outdated` already lists makes one row, whose edit lifts its override
-    as well.
+    behind its newest release outside the window `[tool.uv]` declares, after
+    the rows `bun outdated` prints and beside the date `bun info` gives that
+    release, and that writing its edit lifts the override. A newest release
+    inside the window gives way to the newest one outside it, so an override
+    that one is ahead of makes a row and an override at it makes none. A
+    prerelease lags its release, while an override at or ahead of its newest
+    release makes no row, a release ahead of each prerelease included, and
+    so does a package `bun info` dates no release for. `bun info` never runs
+    for a caret, an x-range, a bare major, a union opening on a release,
+    or a release Semantic Versioning rejects, and a package `bun outdated`
+    already lists makes one row, whose edit lifts its override as well.
     """
     vue      = loads(checkout.read(PACKAGE))["devDependencies"]["vue"]
     manifest = override(
@@ -709,34 +769,42 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             "glob"       : "^14.0.0",
             "knip"       : "6.x",
             "minimatch"  : "11.0.8",
+            "picocolors" : "1.0.0",
             "picomatch"  : "4",
             "semver"     : "7.5.2 || 7.6.0",
+            "tinyexec"   : "1.0.0",
             "tinyglobby" : "1.0.0-rc.1",
+            "ufo"        : "1.0.0",
             "vitepress"  : "2.0.0-alpha.20",
             "vue"        : vue
         }
     )
+    old    = "2026-03-02T00:00:00Z"
+    recent = f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}"
+    times  = {
+        "chokidar"   : {"2.0.0": old, "2.1.0-beta.1": old},
+        "fflate"     : {"0.7.5": old, "0.8.3": "2026-05-16T00:14:03Z"},
+        "minimatch"  : {"11.0.8": old, "modified": old},
+        "picocolors" : {"1.0.0": old, "1.1.0": recent},
+        "tinyexec"   : {"1.0.0": old, "1.0.1": "2026-04-01T00:00:00Z", "1.0.2": recent},
+        "tinyglobby" : {"1.0.0": old, "1.0.0-rc.1": old},
+        "ufo"        : {},
+        "vitepress"  : {"1.6.4": old, "2.0.0-alpha.20": old}
+    }
     answer(
         "bun",
         answers = {
-            '"outdated --filter=*"'     : printed(
+            f'"outdated --filter=* {age}"' : printed(
                 value = "| Package | Current | Update | Latest |\n"
                 "|---------|---------|--------|--------|\n"
                 f"| vue (dev) | {vue} | {vue} | 9.9.9 |"
             ),
-            '"info chokidar version"'   : printed("2.0.0-beta.1"),
-            '"info fflate version"'     : printed("0.8.3"),
-            '"info minimatch version"'  : printed("11.0.8"),
-            '"info tinyglobby version"' : printed("1.0.0"),
-            '"info vitepress version"'  : printed("1.6.4"),
-            '"info "*" time --json"'    : printed(
-                value = {
-                    "0.8.3" : "2026-05-16T00:14:03Z",
-                    "1.0.0" : "2026-03-02T00:00:00Z",
-                    "9.9.9" : "2026-10-13T00:00:00Z"
-                }
-            ),
-            '"audit --json"'            : printed({}),
+            **{
+                f'"info {name} time --json"': printed(released)
+                for name, released in times.items()
+            },
+            '"info vue time --json"'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"'               : printed({}),
             "*": "exit 1"
         }
     )
@@ -746,39 +814,18 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     assert [(lag.pin, lag.current, lag.newest, lag.published) for lag in lags] == [
         ("vue", vue, "9.9.9", datetime(2026, 10, 13, tzinfo=UTC)),
         ("fflate", "0.7.5", "0.8.3", datetime(2026, 5, 16, 0, 14, 3, tzinfo=UTC)),
+        ("tinyexec", "1.0.0", "1.0.1", datetime(2026, 4, 1, tzinfo=UTC)),
         ("tinyglobby", "1.0.0-rc.1", "1.0.0", datetime(2026, 3, 2, tzinfo=UTC))
     ]
     lifted = loads(checkout.read(PACKAGE))
     assert lifted["overrides"] == {
         **manifest["overrides"],
         "fflate"     : "0.8.3",
+        "tinyexec"   : "1.0.1",
         "tinyglobby" : "1.0.0",
         "vue"        : "9.9.9"
     }
     assert lifted["devDependencies"]["vue"] == "9.9.9"
-
-
-def test_the_lift_gathers_each_managers_lags_in_the_order_they_are_declared(
-    checkout    : Checkout,
-    monkeypatch : MonkeyPatch
-):
-    """
-    Asserts that a lift given no lags gathers those of every manager,
-    each found as a subclass of `Manager`, in the order the managers are
-    declared.
-    """
-    for manager in Manager.__subclasses__():
-        monkeypatch.setattr(
-            manager,
-            "lags",
-            property(
-                lambda self: [Lag(current="1", newest="2", pin=type(self).__name__)]
-            )
-        )
-
-    assert [lag.pin for lag in Lift(checkout=checkout).lags] == [
-        "Actions", "Builds", "Images", "Locked", "Scripts", "Site", "Tools", "Wrangler"
-    ]
 
 
 @mark.parametrize(
@@ -857,14 +904,39 @@ def test_actions_reads_each_action_its_latest_release_moves(
     } == {lifted}
 
 
+def test_the_lift_gathers_each_managers_lags_in_the_order_they_are_declared(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a lift given no lags gathers those of every manager,
+    each found as a subclass of `Manager`, in the order the managers are
+    declared.
+    """
+    for manager in Manager.__subclasses__():
+        monkeypatch.setattr(
+            manager,
+            "lags",
+            property(
+                lambda self: [Lag(current="1", newest="2", pin=type(self).__name__)]
+            )
+        )
+
+    assert [lag.pin for lag in Lift(checkout=checkout).lags] == [
+        "Actions", "Builds", "Images", "Locked", "Scripts", "Site", "Tools", "Wrangler"
+    ]
+
+
 def test_the_lift_lifts_each_pin_no_hold_names_and_lists_each_hold_naming_none(
     checkout: Checkout
 ):
     """
-    Asserts that the lift keeps each lagging pin neither its holds nor the
-    pins a trial holds name, a hold naming every row carrying the pin, and
-    lists in order each hold naming no row.
+    Asserts that the lift keeps each lagging pin that neither its holds, the
+    holds `pyproject.toml` records, nor the pins a trial holds name, a hold
+    naming every row carrying the pin, and lists in order each hold and each
+    recorded hold naming no row.
     """
+    hold(checkout, {"beta": "Gone", "omega": "Gone", "satori": "It breaks"})
     lags = [
         Lag(
             current  = "1",
@@ -878,9 +950,9 @@ def test_the_lift_lifts_each_pin_no_hold_names_and_lists_each_hold_naming_none(
     ]
     lift = Lift(checkout=checkout, holds=("zeta", "minijinja", "alpha"), lags=lags)
 
-    assert [lag.pin for lag in lift.lifted()] == ["satori", "vue"]
-    assert [lag.pin for lag in lift.lifted({"vue"})] == ["satori"]
-    assert lift.unmatched == ["alpha", "zeta"]
+    assert [lag.pin for lag in lift.lifted()] == ["vue"]
+    assert lift.lifted({"vue"}) == []
+    assert (lift.unmatched, lift.stale) == (["alpha", "zeta"], ["beta", "omega"])
 
 
 @mark.parametrize(
@@ -937,10 +1009,15 @@ def test_a_trial_passes_where_mise_ci_passes_and_isolates_the_major_lift(
     """
     Asserts that a trial whose lifted clone fails `mise ci` fails, that
     one holding back the major lift breaking it passes, and that the lift
-    isolates that lift, rebuilding `.venv` before each run of `mise ci` and
-    leaving the checkout as it was.
+    isolates that lift, trying no major lift `pyproject.toml` records a
+    hold on, rebuilding `.venv` before each run of `mise ci` and leaving the
+    checkout as it was.
     """
-    lift = Lift(checkout=clone, lags=[floor, uv_lag(clone)])
+    hold(clone, {"satori": "It breaks"})
+    lift = Lift(
+        checkout = clone,
+        lags     = [floor, Lag(current="1", newest="2", pin="satori"), uv_lag(clone)]
+    )
 
     assert (lift.passes(), lift.passes({"uv"}), lift.isolate()) == (False, True, "uv")
     assert Config.read(clone.root) == clone.config
@@ -972,9 +1049,10 @@ def test_a_trial_whose_write_fails_fails_before_mise_ci_and_isolates_nothing(
 def test_the_table_lists_each_lag_or_says_none_lags(checkout: Checkout):
     """
     Asserts that the lift prints one Markdown table holding a row for each
-    lagging pin under a bolded header, and a sentence in its place where no
-    pin lags.
+    lagging pin under a bolded header, each recorded hold's reason beside
+    its pin, and a sentence in its place where no pin lags.
     """
+    hold(checkout, {"minijinja": "It breaks"})
     uv = uv_lag(checkout).model_copy(
         update = {"published": datetime(2026, 10, 14, tzinfo=UTC)}
     )
@@ -990,10 +1068,10 @@ def test_the_table_lists_each_lag_or_says_none_lags(checkout: Checkout):
 
     assert Lift(checkout=checkout, lags=lags).table(NOW).splitlines() == [
         "| **Pin** | **Declared In** | **Current** | **Newest** | **Major** "
-        "| **Age in Days** | **Clears** |",
-        "|---|---|---|---|---|---|---|",
-        f"| `uv` | `.mise/config.toml` | {uv.current} | {uv.newest} | yes | 2 |  |",
-        "| `minijinja` | `uv.lock` | 2.24.0 | 2.25.0 | no |  |  |"
+        "| **Age in Days** | **Clears** | **Held Because** |",
+        "|---|---|---|---|---|---|---|---|",
+        f"| `uv` | `.mise/config.toml` | {uv.current} | {uv.newest} | yes | 2 |  |  |",
+        "| `minijinja` | `uv.lock` | 2.24.0 | 2.25.0 | no |  |  | It breaks |"
     ]
     assert Lift(checkout=checkout, lags=[]).table(NOW) == (
         "Every pin stands at its newest release."

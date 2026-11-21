@@ -50,7 +50,7 @@ Every pull request runs `🐦‍⬛ CI` except one touching only the site's own 
 | `🪓 Cruft` | `mise cruft` | knip reports an unused file, export, or dependency in the site, or an import cycle |
 | `🦺 Coverage` | `mise run site:coverage` | A site test fails under coverage, or the site's coverage falls below 95% on statements, branches, functions, or lines |
 
-Each workflow ends on a `📡 Readout` gate that waits on every row and fails where any of them fails, so it is the one check a pull request has to pass, and `mise ci` runs every row's task once `mise doctor project` passes.
+Each workflow ends on a `📡 Readout` gate that waits on every row and fails where any of them fails, so it is the one check a pull request has to pass, and `mise ci` runs every row's task once `mise doctor project` passes. Each workflow skips every row while the pull request is a draft, and its `📡 Readout` then reports as skipped, which GitHub counts as passing. Marking the draft ready for review runs every row on its head, and each push after runs them again.
 
 ## Labels
 

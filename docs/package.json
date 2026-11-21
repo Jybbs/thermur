@@ -9,13 +9,13 @@
         "@types/culori"       : "4.0.1",
         "@types/node"         : "26.6.6",
         "@vitest/coverage-v8" : "5.1.0",
-        "@vue/test-utils"     : "2.6.0",
+        "@vue/test-utils"     : "2.5.1",
         "@vue/tsconfig"       : "0.9.1",
         "culori"              : "4.0.2",
         "happy-dom"           : "21.0.4",
         "katex"               : "0.19.1",
         "knip"                : "6.45.1",
-        "oxlint"              : "1.94.0",
+        "oxlint"              : "1.93.0",
         "satori"              : "0.47.1",
         "smol-toml"           : "1.9.1",
         "typescript"          : "7.0.2",
@@ -33,6 +33,6 @@
     "overrides"       : {
         "fflate"    : "0.8.3",
         "glob"      : "14.0.6",
-        "minimatch" : "11.0.9"
+        "minimatch" : "11.0.8"
     }
 }

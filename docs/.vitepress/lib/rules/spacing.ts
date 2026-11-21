@@ -59,10 +59,6 @@ export interface Tuning {
 }
 
 /**
- * How the track's caption is set.
- */
-const CAPTION = { 'fill': markup.TONE.muted, 'letter-spacing': '0.08em' } as const
-/**
  * How each rule's dot is ringed against the ground.
  */
 const DOT = { 'stroke': markup.TONE.ground, 'stroke-width': 2 } as const
@@ -192,8 +188,8 @@ export function drawRail(
   const { fromS, left, narrow, ty } = layout
   const [lo, hi]                    = [stops[0]!, stops.at(-1)!]
   const caption                     = narrow
-    ? markup.text(markup.FACE.mono, 10.5, 'LAUNCH SPACING', left, 12, CAPTION)
-    : markup.text(markup.FACE.mono, 10.5, 'LAUNCH SPACING', left - 44, ty + 4, { ...CAPTION, ...END })
+    ? markup.text(markup.FACE.mono, 10.5, 'LAUNCH SPACING', left, 12, markup.CAPTION)
+    : markup.text(markup.FACE.mono, 10.5, 'LAUNCH SPACING', left - 44, ty + 4, { ...markup.CAPTION, ...END })
   const glyph                       = markup.svg('path', {
     d    : playing ? GLYPH.pause : GLYPH.play,
     fill : markup.TONE.lead

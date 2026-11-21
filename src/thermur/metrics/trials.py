@@ -295,11 +295,7 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
                     Measure(condition="large", goal=1.0, statistic="turn_reach"),
                     Measure(condition="small", goal=inf, statistic="turn_speed_m_s"),
                     Measure(condition="large", goal=inf, statistic="turn_speed_m_s"),
-                    Measure(
-                        condition = "spontaneous",
-                        goal      = inf,
-                        statistic = "spectral_peak_hz"
-                    ),
+                    Measure(condition="spontaneous", statistic="spectral_peak_hz"),
                     Measure(
                         condition = "spontaneous",
                         goal      = POLARIZATION,
