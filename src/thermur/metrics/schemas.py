@@ -6,7 +6,7 @@ the seeds of one flight, which the settings nest as `plan`.
 from jax        import Array
 from jax.numpy  import array, cbrt, cos, deg2rad, pi, sin, stack, zeros_like
 from jax.random import normal, split
-from math       import gamma, radians
+from math       import gamma, prod, radians
 from numpy      import arange, ndarray
 from pydantic   import BaseModel, Field, model_validator
 from typing     import Annotated, Self
@@ -40,7 +40,16 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     """
     The center of the launch cloud, east, north, and above the ground, in
     meters, by default on the parametric threat's course to the front it
-    crosses within two minutes.
+    crosses within two minutes, its height the lowest the launch's center
+    takes, which `clearance_sd` raises for a deeper cloud.
+    """
+
+    clearance_sd: Positive = 4.0
+    """
+    The vertical standard deviations of the launch cloud its center sits at
+    least above the ground, by default 4, past which a Gaussian draw falls
+    for 0.003% of drones, so about one flock of 1,000 in 32 sets a drone on
+    the ground.
     """
 
     course_deg: float = 180.0
@@ -148,6 +157,18 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     """
 
     @property
+    def depth_m(self) -> float:
+        """
+        Computes the cloud's vertical standard deviation, in meters, the
+        thin axis of `axes` scaled to hold `spacing_m` cubed for each drone.
+        """
+        return (
+            self.axes[2]
+            * self.spacing_m
+            * (3 * self.drones / (4 * pi * prod(self.axes))) ** (1 / 3)
+        )
+
+    @property
     def frame_s(self) -> float:
         """
         Multiplies the integrator's step by the steps between two frames.
@@ -160,6 +181,16 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         Counts the frames a flight keeps.
         """
         return self.steps // self.frame_every
+
+    @property
+    def height_m(self) -> float:
+        """
+        Raises the launch's center to `clearance_sd` times `depth_m` where
+        that clears `center_m`'s height, in meters, which leaves a flock
+        of up to 304 drones at the default 100 m and lifts one of 1,000 to
+        149 m.
+        """
+        return max(self.center_m[2], self.clearance_sd * self.depth_m)
 
     @property
     def nearest_m(self) -> float:
@@ -259,9 +290,10 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     def launched(self, key: Array) -> Flock:
         """
         Draws a flock in the thin horizontal cloud `axes` shapes, as
-        Gaussian offsets whose ellipsoid at one standard deviation
-        holds `spacing_m` cubed for each drone, flying the course within
-        `scatter_deg`, each commanding the velocity it launches at.
+        Gaussian offsets whose ellipsoid at one standard deviation holds
+        `spacing_m` cubed for each drone, centered at `height_m` and any
+        drone the draw sets under the ground set on it, flying the course
+        within `scatter_deg`, each commanding the velocity it launches at.
         """
         where_key, heading_key = split(key)
         lengths                = array(self.axes) / cbrt(array(self.axes).prod())
@@ -275,9 +307,11 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         scatter    = normal(heading_key, shape) * deg2rad(array(self.scatter_deg))
         velocities = self.cruise_m_s * unit(course + scatter)
         return Flock(
-            commands   = velocities,
-            forces     = zeros_like(offsets),
-            positions  = array(self.center_m) + offsets,
+            commands  = velocities,
+            forces    = zeros_like(offsets),
+            positions = (
+                array((*self.center_m[:2], self.height_m)) + offsets
+            ).at[:, 2].max(0.0),
             spins      = zeros_like(offsets),
             velocities = velocities
         )

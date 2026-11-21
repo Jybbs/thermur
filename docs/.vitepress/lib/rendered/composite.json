@@ -78,6 +78,7 @@
       1000.0,
       100.0
     ],
+    "clearance_sd": 4.0,
     "course_deg": 180.0,
     "cruise_m_s": 10.0,
     "neighbors": 7,

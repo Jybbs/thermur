@@ -451,7 +451,8 @@ class Home(Component):
     height_m: float = 100.0
     """
     The height the drone is pulled toward, in meters above the ground, by
-    default the launch's.
+    default that of the launch's center, which a flock of more than 304
+    drones launches above.
     """
 
     radius_m: Positive = 1000.0
