@@ -4,14 +4,22 @@ the checkout as it stands, over one that breaks every check, over one whose
 manifest fails to validate, and over one whose only findings are warnings.
 """
 
-from collections.abc  import Callable
-from common.edits     import append, edit, task
-from pytest           import CaptureFixture, MonkeyPatch, fixture, raises
-from syrupy.assertion import SnapshotAssertion
-from types            import ModuleType
+from collections.abc     import Callable
+from common.declarations import DECLARED
+from common.edits        import append, edit, task
+from pytest              import CaptureFixture, MonkeyPatch, fixture, mark, raises
+from syrupy.assertion    import SnapshotAssertion
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Issue, Level
+
+pytestmark = mark.reads(
+    *DECLARED,
+    "src/**",
+    "docs/.vitepress/lib/rendered/**",
+    "docs/kit/src/**"
+)
 
 
 @fixture

@@ -6,19 +6,26 @@ deletion by hand, the validation that stops it before any call, and the
 prompt that stops it from sending anything unanswered.
 """
 
-from collections.abc  import Callable
-from common.edits     import edit
-from common.stand_ins import StandIn
-from json             import dumps
-from pathlib          import Path
-from pytest           import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
-from subprocess       import CalledProcessError, DEVNULL, run
-from syrupy.assertion import SnapshotAssertion
-from types            import ModuleType
+from collections.abc     import Callable
+from common.declarations import DECLARED
+from common.edits        import edit
+from common.stand_ins    import StandIn
+from json                import dumps
+from pathlib             import Path
+from pytest              import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
+from subprocess          import CalledProcessError, DEVNULL, run
+from syrupy.assertion    import SnapshotAssertion
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
 
-LIVE = {"main branch protection": 24390266, "release tag protection": 24390267}
+LIVE       = {"main branch protection": 24390266, "release tag protection": 24390267}
+pytestmark = mark.reads(
+    *DECLARED,
+    "src/**",
+    "docs/.vitepress/lib/rendered/**",
+    "docs/kit/src/**"
+)
 
 
 @fixture

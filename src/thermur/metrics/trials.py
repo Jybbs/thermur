@@ -135,6 +135,12 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     The length of each flight of the trial, in seconds.
     """
 
+    replay_s: float = 10.0
+    """
+    The length of the flight each composite flies once for the models to
+    rank, in seconds.
+    """
+
     @property
     def name(self) -> str:
         """
@@ -211,7 +217,7 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         composites = self.composites(composite, plan.similarity)
         long       = plan.changed(duration_s=self.duration_s)
         short      = plan.changed(
-            duration_s  = 10.0,
+            duration_s  = self.replay_s,
             frame_every = 1,
             seeds       = 1,
             settled_s   = 0.0

@@ -67,7 +67,8 @@ describe('PieceCard’s fold', () => {
   it('copies the line taking the piece up', async () => {
     const widget = mount(PieceCard, { attachTo: document.body, props: { readers: {}, shown: 'toggle' } })
     await widget.get('.kit-card-fold [data-shown] .kit-card-fact:last-child .kit-catalog-row button').trigger('click')
-    await vi.waitFor(async () => expect(await navigator.clipboard.readText()).toBe(lineOf(pieceOf('toggle'))))
+    await flushPromises()
+    expect(await navigator.clipboard.readText()).toBe(lineOf(pieceOf('toggle')))
   })
 
   it('loads the piece’s source once a reader opens it, and once alone', async () => {
@@ -76,8 +77,9 @@ describe('PieceCard’s fold', () => {
     const source = widget.get('.kit-card-fold [data-shown] .kit-card-source')
     expect(source.get('pre').text()).toBe('Loading the source')
     await source.trigger('toggle')
+    await load.mock.results[0]!.value
     await flushPromises()
-    await vi.waitFor(() => expect(source.get('pre').text()).toContain('export function tween'))
+    expect(source.get('pre').text()).toContain('export function tween')
     await source.trigger('toggle')
     expect(load).toHaveBeenCalledOnce()
     expect(source.get('code').text()).toBe('docs/kit/src/motion/timing.ts')

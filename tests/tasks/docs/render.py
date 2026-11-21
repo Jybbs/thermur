@@ -5,13 +5,21 @@ whose page lacks its pair of markers and each marker naming no entry in
 `docs/pages/references.bib`, either of which fails the task.
 """
 
-from collections.abc import Callable
-from common.edits    import append, edit
-from pathlib         import Path
-from pytest          import CaptureFixture, MonkeyPatch, raises
-from types           import ModuleType
+from collections.abc     import Callable
+from common.declarations import DECLARED
+from common.edits        import append, edit
+from pathlib             import Path
+from pytest              import CaptureFixture, MonkeyPatch, mark, raises
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
+
+pytestmark = mark.reads(
+    *DECLARED,
+    "src/**",
+    "docs/.vitepress/lib/rendered/**",
+    "docs/kit/src/**"
+)
 
 
 def test_a_marker_naming_no_entry_fails_the_render(

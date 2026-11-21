@@ -4,12 +4,20 @@ study named in the order given, one line per key naming no entry, and the
 argument mise holds a call to.
 """
 
-from collections.abc import Callable
-from pytest          import CaptureFixture, Config, MonkeyPatch, raises
-from subprocess      import run
-from types           import ModuleType
+from collections.abc     import Callable
+from common.declarations import DECLARED
+from pytest              import CaptureFixture, Config, MonkeyPatch, mark, raises
+from subprocess          import run
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
+
+pytestmark = mark.reads(
+    *DECLARED,
+    "src/**",
+    "docs/.vitepress/lib/rendered/**",
+    "docs/kit/src/**"
+)
 
 
 def test_a_call_naming_no_key_is_refused(pytestconfig: Config):

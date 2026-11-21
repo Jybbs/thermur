@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
-import { type DOMWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
-import { wcagContrast }                              from 'culori'
-import { afterEach, describe, expect, it, vi }       from 'vitest'
-import { createSSRApp, ref }                         from 'vue'
-import { renderToString }                            from 'vue/server-renderer'
+import { type DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { wcagContrast }                                             from 'culori'
+import { afterEach, describe, expect, it, vi }                      from 'vitest'
+import { createSSRApp, ref }                                        from 'vue'
+import { renderToString }                                           from 'vue/server-renderer'
 
 import { colorOf, roles, shadeOf } from '../../../lib/identity.ts'
 import source                      from '../../../lib/rendered/identity.json' with { type: 'json' }
+import * as sketch                 from '../../../lib/specimen/sketch.ts'
 import IdentityPalette             from '../../../theme/identity/palette.ts'
 import { FLOORS, paintedIn }       from '../../common/contrast.ts'
 
@@ -77,16 +78,18 @@ describe('the warning and critical lines of IdentityPalette', () => {
       .toEqual(['warning', 'critical'].map(role => `fill: var(--th-${role}); stroke: var(--vp-c-text-1);`))
   })
 
-  it.for(['dark', 'light'] as const)('holds each level’s name and marks to their contrast on the %s ground', scheme => {
-    const ground = shadeOf('ground', scheme)
-    for (const level of levels()) {
-      const name = paintedIn(level.get('text').attributes('style')!, 'fill', scheme)
-      const edge = paintedIn(level.get('.identity-level-edge').attributes('style')!, 'stroke', scheme)
-      const ring = paintedIn(level.get('rect').attributes('style')!, 'stroke', scheme)
+  it.for(Object.keys(sketch.LEVELS).flatMap(role => (['dark', 'light'] as const).map(scheme => [role, scheme] as const)))(
+    'holds the %s level’s name and marks to their contrast on the %s ground',
+    ([role, scheme]) => {
+      const ground = shadeOf('ground', scheme)
+      const level  = levels().find(found => found.get('text').text() === role)!
+      const name   = paintedIn(level.get('text').attributes('style')!, 'fill', scheme)
+      const edge   = paintedIn(level.get('.identity-level-edge').attributes('style')!, 'stroke', scheme)
+      const ring   = paintedIn(level.get('rect').attributes('style')!, 'stroke', scheme)
       expect(wcagContrast(name, ground)).toBeGreaterThanOrEqual(FLOORS.text)
       expect(Math.min(wcagContrast(edge, ground), wcagContrast(ring, ground))).toBeGreaterThanOrEqual(FLOORS.mark)
     }
-  })
+  )
 })
 
 describe('copying from IdentityPalette', () => {
@@ -96,16 +99,16 @@ describe('copying from IdentityPalette', () => {
     isDark.value = dark
     const widget = mount(IdentityPalette, { attachTo: document.body })
     await widget.findAll('.identity-copy')[1]!.trigger('click')
-    await vi.waitFor(async () =>
-      expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.series[1]![scheme])))
-    await vi.waitFor(() => expect(widget.get('[aria-live]').text()).toMatch(/^Copied #/u))
+    await flushPromises()
+    expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.series[1]![scheme]))
+    expect(widget.get('[aria-live]').text()).toMatch(/^Copied #/u)
   })
 
   it('copies a role’s hex from its key in the scheme on display', async () => {
     isDark.value = true
     const widget = mount(IdentityPalette, { attachTo: document.body })
     await widget.findAll('.identity-key')[roles.indexOf('lead')]!.trigger('click')
-    await vi.waitFor(async () =>
-      expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.lead.dark)))
+    await flushPromises()
+    expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.lead.dark))
   })
 })

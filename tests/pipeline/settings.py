@@ -5,11 +5,12 @@ installed clone, and what the model refuses, over a stand-in field and the
 coupling slot, beside the fire data's settings each source sets.
 """
 
-from common.edits    import append, edit, hold
-from common.settings import Tuned
-from pathlib         import Path
-from pydantic        import ValidationError
-from pytest          import MonkeyPatch, TempPathFactory, fixture, mark, param, raises
+from common.declarations import DECLARED
+from common.edits        import append, edit, hold
+from common.settings     import Tuned
+from pathlib             import Path
+from pydantic            import ValidationError
+from pytest              import MonkeyPatch, TempPathFactory, fixture, mark, param, raises
 
 from thermur.controller.components import Constant
 from thermur.repo.checkout         import Checkout
@@ -21,6 +22,9 @@ radius_m = 7.0
 [tool.thermur.coupling]
 coupling_per_s = 2.5
 """
+
+
+pytestmark = mark.reads(*DECLARED, "src/**")
 
 
 @fixture
@@ -137,27 +141,41 @@ def test_a_speed_slot_too_stiff_for_the_step_fails(installed: Checkout):
         Tuned(speed={"relaxation_s": 1e-4})
 
 
-def test_a_variable_sets_a_component_as_json(
+@mark.parametrize(
+    ("variable", "value", "field", "expected"),
+    [
+        param(
+            "THERMUR_COUPLING",
+            '{"coupling_per_s": 4}',
+            "coupling",
+            Constant(coupling_per_s=4.0),
+            id = "component-as-json"
+        ),
+        param(
+            "THERMUR_SIMULATION",
+            "data/samples/wrf_sample.nc",
+            "simulation",
+            Path("data/samples/wrf_sample.nc"),
+            id = "simulation"
+        )
+    ]
+)
+def test_a_variable_sets_its_field_over_the_table(
+    expected    : object,
+    field       : str,
     installed   : Checkout,
-    monkeypatch : MonkeyPatch
+    monkeypatch : MonkeyPatch,
+    value       : str,
+    variable    : str
 ):
     """
-    Asserts that a prefixed variable holding a JSON object sets a component
-    over the table.
+    Asserts that a prefixed variable sets its field over the table, a JSON
+    object setting a component over the slot the table sets, and a path
+    setting the simulation the table names none of.
     """
-    monkeypatch.setenv("THERMUR_COUPLING", '{"coupling_per_s": 4}')
+    monkeypatch.setenv(variable, value)
 
-    assert Tuned().coupling == Constant(coupling_per_s=4.0)
-
-
-def test_a_variable_sets_the_simulation(installed: Checkout, monkeypatch: MonkeyPatch):
-    """
-    Asserts that `THERMUR_SIMULATION` names the simulation over the table,
-    which names none.
-    """
-    monkeypatch.setenv("THERMUR_SIMULATION", "data/samples/wrf_sample.nc")
-
-    assert Tuned().simulation == Path("data/samples/wrf_sample.nc")
+    assert getattr(Tuned(), field) == expected
 
 
 def test_the_holds_table_sets_no_field_and_fails_nothing(installed: Checkout):

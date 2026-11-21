@@ -136,11 +136,8 @@ describe('fontsHref', () => {
 })
 
 describe('identityCss', () => {
-  it('sets the label of a button filled in the lead in the ground, at rest, hovered, and pressed', () => {
-    const css = identity.identityCss()
-    for (const state of ['active-', 'hover-', '']) {
-      expect(css).toContain(`--vp-button-brand-${state}text: var(--th-ground);`)
-    }
+  it.each(['active-', 'hover-', ''])('sets the label of a button filled in the lead in the ground in the state `%s`', state => {
+    expect(identity.identityCss()).toContain(`--vp-button-brand-${state}text: var(--th-ground);`)
   })
 
   it('sets a role through light-dark only where its two colors differ', () => {

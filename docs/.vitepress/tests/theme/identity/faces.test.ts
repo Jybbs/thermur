@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import * as kit                                      from '@thermur/kit'
-import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi }       from 'vitest'
+import { type VueWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi }                      from 'vitest'
 
 import { fontStack } from '../../../lib/identity.ts'
 import source        from '../../../lib/rendered/identity.json' with { type: 'json' }
@@ -20,20 +20,21 @@ describe('the rows', () => {
     expect(rows[2]!.get('.identity-hex').text()).toBe(fontStack(source.faces.mono))
   })
 
-  it('sets each row in its own face and each weight at that weight', () => {
-    const rows = mount(IdentityFaces).findAll('.identity-face')
-    Object.values(source.faces).forEach((face, place) => {
-      expect(rows[place]!.attributes('style')).toEqual(expect.stringContaining(face.family))
-      expect(rows[place]!.findAll('.identity-weights span').map(weight => weight.attributes('style')))
+  it.for(Object.values(source.faces).map((face, place) => ({ face, place })))(
+    'sets the $face.family row in its own face and each weight at that weight',
+    ({ face, place }) => {
+      const row = mount(IdentityFaces).findAll('.identity-face')[place]!
+      expect(row.attributes('style')).toEqual(expect.stringContaining(face.family))
+      expect(row.findAll('.identity-weights span').map(weight => weight.attributes('style')))
         .toEqual(face.weights.map(weight => `font-weight: ${weight};`))
-    })
-  })
+    }
+  )
 
   it('copies a face’s stack on a press', async () => {
     const widget = mount(IdentityFaces, { attachTo: document.body })
     await widget.findAll('.identity-face')[1]!.trigger('click')
-    await vi.waitFor(async () =>
-      expect(await navigator.clipboard.readText()).toBe(fontStack(source.faces.display)))
+    await flushPromises()
+    expect(await navigator.clipboard.readText()).toBe(fontStack(source.faces.display))
   })
 
   it('holds a face while the focus rests on its row', async () => {

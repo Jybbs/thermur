@@ -31,7 +31,7 @@ describe('the kit’s pieces', () => {
   it('reads each piece’s source as the files sharing its declaration’s name, each loading its text', async () => {
     expect(pieceOf('slider').sources).toEqual(['controls/slider.tsx'])
     expect(pieceOf('copy').sources).toEqual(['chrome/copy.ts'])
-    expect(PIECES.every(piece => piece.sources.length > 0)).toBe(true)
+    expect(PIECES.filter(piece => piece.sources.length === 0)).toStrictEqual([])
     expect(await SOURCES['motion/timing.ts']!()).toContain('export function tween')
   })
 

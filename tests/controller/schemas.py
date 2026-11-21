@@ -13,7 +13,7 @@ from jax.random      import key
 from lineax          import FunctionLinearOperator
 from math            import inf
 from numpy.testing   import assert_allclose, assert_array_equal
-from pytest          import mark, param, raises
+from pytest          import Subtests, mark, param, raises
 
 from thermur.controller.components import (
     Centroid,
@@ -433,13 +433,16 @@ def test_from_settings_reads_each_slot_by_name_scaled_to_the_launch():
     }
 
 
-def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position():
+def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position(
+    subtests: Subtests
+):
     """
     Asserts that drones stacked at one point each list every other drone,
     which `KDTree.query` may order ahead of the drone itself.
     """
     for own, row in enumerate(nearest(3, zeros((4, 3)))):
-        assert sorted(row) == sorted({0, 1, 2, 3} - {own})
+        with subtests.test(own=own):
+            assert sorted(row) == sorted({0, 1, 2, 3} - {own})
 
 
 def test_nearest_orders_neighbors_by_distance_over_a_batch():

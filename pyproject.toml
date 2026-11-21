@@ -110,6 +110,10 @@ addopts                  = [
     "--numprocesses=auto",
     "-m",
     "not network",
+    "-p",
+    "common.isolation",
+    "-p",
+    "common.shares",
     "-ra",
     "--snapshot-dirname=fixtures"
 ]
@@ -118,6 +122,7 @@ empty_parameter_set_mark = "fail_at_collect"
 filterwarnings           = ["error"]
 markers                  = [
     "network: reaches a service over the network",
+    "reads: the patterns of the tracked files a case's checkout copies",
     "slow: runs longer than a few seconds"
 ]
 norecursedirs            = ["common", "fixtures"]

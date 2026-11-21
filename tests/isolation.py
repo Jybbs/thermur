@@ -1,25 +1,28 @@
 """
 Pins the isolation the suite keeps from the machine running it, covering
-the shell variables each test starts without, the home folder it reads,
-the block that stops a test without the `network` mark from opening a
-connection, the Unix socket a process pool reaches its server over, the mark
-that lets a `network` test open a connection, and the one JAX compilation
-cache every worker shares.
+the shell variables each test starts without, the home folder it reads, the
+terminal type and width it runs under, the block that stops a test without
+the `network` mark from opening a connection, the Unix socket a process
+pool reaches its server over, the mark that lets a `network` test open a
+connection, and the one JAX compilation cache every worker shares.
 """
 
-from collections.abc    import Iterator
-from common.environment import CLEARED
-from jax                import config
-from os                 import environ
-from pathlib            import Path
-from pytest             import Config, FixtureRequest, MonkeyPatch, fixture, mark, raises, warns
-from pytest_socket      import SocketBlockedError
-from socket             import create_connection, socketpair
-from tests.conftest     import pytest_collection_modifyitems
+from collections.abc  import Iterator
+from common.isolation import CLEARED, TERMINAL, pytest_collection_modifyitems
+from jax              import config
+from os               import environ
+from pathlib          import Path
+from pytest           import Config, FixtureRequest, MonkeyPatch, fixture, mark, raises, warns
+from pytest_socket    import SocketBlockedError
+from socket           import create_connection, socketpair
+
+from thermur.pipeline.settings import Settings
+
+SETTING = Settings.model_config["env_prefix"] + next(iter(Settings.model_fields))
 
 
 @fixture(
-    params = [*CLEARED, "THERMUR_RADIUS_M", "thermur_radius_m", "usage_try"],
+    params = [*CLEARED, SETTING.upper(), SETTING.lower(), "usage_try"],
     scope  = "module"
 )
 def name(request: FixtureRequest) -> Iterator[str]:
@@ -37,12 +40,12 @@ def name(request: FixtureRequest) -> Iterator[str]:
 
 def test_a_network_test_gets_the_mark_that_opens_the_socket(request: FixtureRequest):
     """
-    Asserts that the collection hook in `tests/conftest.py` gives a test
+    Asserts that the collection hook in `common.isolation` gives a test
     carrying the `network` mark pytest-socket's `enable_socket` mark, which
     lets that test open a connection.
     """
     request.node.add_marker(mark.network)
-    pytest_collection_modifyitems(request.config, [request.node])
+    pytest_collection_modifyitems([request.node])
 
     assert request.node.get_closest_marker("enable_socket")
 
@@ -103,7 +106,21 @@ def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     its GitHub Actions form, the files a GitHub Actions runner collects
     a workflow step's outputs and a workflow run's summary page from, the
     branch and the commit `gha:brief` prefers, the ones naming where a tool
-    keeps its cache, configuration, data, and state, and a variable opening
-    on `THERMUR_` in either case, which sets a setting.
+    keeps its cache, configuration, data, and state, a variable opening on
+    the `env_prefix` of `Settings` in either case, which sets a setting, and
+    one opening on `usage_`, through which mise hands a task its flags.
     """
     assert name not in environ
+
+
+@mark.parametrize(("variable", "value"), TERMINAL.items())
+def test_the_terminal_reads_one_type_and_width_on_every_machine(
+    value    : str,
+    variable : str
+):
+    """
+    Asserts that each test runs under the `dumb` terminal 80 columns wide,
+    so a program sizing or coloring its output for the terminal prints alike
+    on every machine.
+    """
+    assert environ[variable] == value

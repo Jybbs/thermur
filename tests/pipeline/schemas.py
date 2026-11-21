@@ -5,11 +5,12 @@ holds, and which edits change a subpackage's digest, its own or those of the
 modules it imports.
 """
 
-from common.edits import append
-from pathlib      import Path
-from platform     import platform
-from pydantic     import ValidationError
-from pytest       import Config, MonkeyPatch, mark, param, raises
+from common.declarations import DECLARED
+from common.edits        import append
+from pathlib             import Path
+from platform            import platform
+from pydantic            import ValidationError
+from pytest              import Config, MonkeyPatch, mark, param, raises
 
 from thermur.pipeline.schemas  import Run, Subpackage
 from thermur.pipeline.settings import Settings
@@ -26,6 +27,9 @@ def doubled(value: float) -> float:
     """
     return value * 2  # The stand-in factor.
 '''
+
+
+pytestmark = mark.reads(*DECLARED, "src/**")
 
 
 @mark.parametrize(

@@ -3,43 +3,58 @@ Pins the flight's steps, meaning the reference flight the settings describe,
 its frames and statistics as tables, and one trial step per open slot.
 """
 
-from common.drones import short, small, still_air
-from numpy.testing import assert_array_equal
+from common.declarations import DECLARED
+from common.drones       import short, small, still_air
+from numpy.testing       import assert_array_equal
+from pytest              import MonkeyPatch, mark
+from xarray              import Dataset
 
-from thermur.controller.components import Elastic
-from thermur.controller.schemas    import Composite
-from thermur.metrics               import steps
-from thermur.metrics.flight        import Flight
-from thermur.metrics.trials        import Measure, Trial
-from thermur.pipeline.graph        import Graph
-from thermur.pipeline.settings     import Settings
-from thermur.repo.checkout         import Checkout
+from thermur.controller.schemas import Composite
+from thermur.metrics            import steps
+from thermur.metrics.flight     import Flight
+from thermur.metrics.trials     import Trial
+from thermur.pipeline.graph     import Graph
+from thermur.pipeline.settings  import Settings
+from thermur.repo.checkout      import Checkout
+
+pytestmark = mark.reads(*DECLARED, "src/**")
 
 
-def test_a_trial_step_flies_its_trial_against_the_settings_composite():
+def test_a_trial_step_flies_its_trial_against_the_settings_composite(
+    monkeypatch: MonkeyPatch
+):
     """
-    Asserts that a trial step flies the trial it is given under the
-    composite and the plan the settings hold.
+    Asserts that a trial step flies the trial it is given through the
+    air and under the composite it reads and the plan the settings hold,
+    returning the table the trial returns.
     """
     trial = Trial(
-        candidates = {"elastic": Elastic()},
-        conditions = {"small": {}},
-        duration_s = 2.0,
-        measures   = (Measure(statistic="spacing_m"),),
+        candidates = {},
+        conditions = {},
+        measures   = (),
         slot       = "cohesion"
     )
-    settings = Settings(plan=short())
+    settings  = Settings(plan=short())
+    air       = still_air()
+    composite = Composite.from_settings(settings)
+    received  = []
+    table     = Dataset()
+    monkeypatch.setattr(
+        Trial,
+        "flown",
+        lambda *passed: received.append(passed) or table
+    )
 
     flown = steps.flown_trial(
-        still_air(),
-        Composite.from_settings(settings),
+        air,
+        composite,
         "digest",
         settings,
         trial
     )
 
-    assert list(flown.candidate.values) == ["reference", "elastic"]
-    assert flown.spacing_m.dims == ("candidate", "condition", "seed")
+    assert flown is table
+    assert received == [(trial, air, composite, settings.plan)]
 
 
 def test_each_open_slot_is_tried_by_a_step_of_its_own(clone: Checkout):

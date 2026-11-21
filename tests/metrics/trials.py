@@ -67,14 +67,16 @@ def test_a_measure_scores_each_candidate_and_seed_so_larger_is_favored(
 def test_a_flown_trial_tables_every_flight_beside_its_ranks():
     """
     Asserts that flying a trial returns its statistics by candidate,
-    condition, and seed, whether each candidate is favored, and the rank of
-    each model on each candidate's replayed flight.
+    condition, and seed, whether each candidate is favored, and the rank
+    of each model on each candidate's replayed flight, a replay as short as
+    the flights.
     """
     flown = Trial(
         candidates = {"elastic": Elastic()},
         conditions = {"small": {"drones": 10}},
         duration_s = 2.0,
         measures   = (Measure(statistic="spacing_m"),),
+        replay_s   = 2.0,
         slot       = "cohesion"
     ).flown(still_air(), Composite.from_settings(Settings()), short())
 

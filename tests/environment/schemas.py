@@ -11,21 +11,22 @@ Pins the records the fire data is read through:
 - The docstring `documented` gives each field of a record
 """
 
-from contextlib         import AbstractContextManager, nullcontext
-from dataclasses        import fields
-from equinox            import Module
-from hashlib            import sha256
-from importlib.metadata import version
-from numpy              import nan
-from numpy.testing      import assert_allclose
-from pathlib            import Path
-from pydantic           import ValidationError
-from pytest             import MonkeyPatch, mark, param, raises
-from tempfile           import NamedTemporaryFile
-from unittest.mock      import Mock
-from urllib.error       import URLError
-from urllib.request     import Request, urlopen
-from xarray             import Dataset
+from common.declarations import DECLARED
+from contextlib          import AbstractContextManager, nullcontext
+from dataclasses         import fields
+from equinox             import Module
+from hashlib             import sha256
+from importlib.metadata  import version
+from numpy               import nan
+from numpy.testing       import assert_allclose
+from pathlib             import Path
+from pydantic            import ValidationError
+from pytest              import MonkeyPatch, mark, param, raises
+from tempfile            import NamedTemporaryFile
+from unittest.mock       import Mock
+from urllib.error        import URLError
+from urllib.request      import Request, urlopen
+from xarray              import Dataset
 
 from thermur.environment.schemas import (
     BASE_K,
@@ -40,6 +41,8 @@ from thermur.environment.schemas import (
     documented
 )
 from thermur.repo.checkout import Checkout
+
+pytestmark = mark.reads(*DECLARED, "src/**")
 
 
 def measured(**figures: list[float]) -> Dataset:
