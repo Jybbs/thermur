@@ -11,7 +11,7 @@ from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from dataclasses     import asdict, fields, replace
 from equinox         import tree_at
 from functools       import cached_property, partial
-from jax             import Array, numpy as jnp, tree, vmap
+from jax             import Array, enable_x64, numpy as jnp, tree, vmap
 from jax.random      import key as seeded, normal, split, uniform
 from json            import dumps
 from math            import sqrt
@@ -450,9 +450,10 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     1.5 m/s on every axis and its third drone flying on its second, and
     the curve orders 340 drones scattered the same way, its third drone on
     its second, each value drawn in double precision and rounded to four
-    decimals. A launch of 24 drones at a spacing of 120 m and a clearance of
-    1.5 deviations raises its center past `center_m` and sets four drones on
-    the ground, one of them drawn heading down.
+    decimals. A launch of 24 drones at a spacing of 120 m and a clearance
+    of 1.5 deviations raises its center past `center_m` and sets two drones
+    on the ground, one of them drawn heading down, its draws taken in double
+    precision and written to eight decimals.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
@@ -500,9 +501,17 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         composite,
         replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
     )
-    raised                 = plan.changed(clearance_sd=1.5, drones=24, spacing_m=120.0)
-    where_key, heading_key = split(seeded(raised.seed))
-    launch                 = raised.launched(seeded(raised.seed))
+    raised = plan.changed(clearance_sd=1.5, drones=24, spacing_m=120.0)
+    with enable_x64():
+        where_key, heading_key = split(seeded(raised.seed))
+        launch                 = raised.launched(seeded(raised.seed))
+        launches               = around(
+            [
+                normal(where_key, (raised.drones, 3)),
+                normal(heading_key, (raised.drones, 3))
+            ],
+            8
+        )
     cloud             = default_rng(plan.seed)
     center            = (*roost.center_m, roost.height_m)
     points            = around(cloud.normal(center, 25.0, (340, 3)), 4)
@@ -554,10 +563,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
             )
         },
         "launch"   : {
-            "draws"      : [
-                *normal(where_key, (raised.drones, 3)).ravel().tolist(),
-                *normal(heading_key, (raised.drones, 3)).ravel().tolist()
-            ],
+            "draws"      : launches.ravel().tolist(),
             "plan"       : raised.model_dump(
                 include = {"clearance_sd", "drones", "spacing_m"}
             ),
