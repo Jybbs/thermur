@@ -5,9 +5,10 @@ terminal type and width it runs under, the block that stops a test without
 the `network` mark from opening a connection, the Unix socket a process
 pool reaches its server over, the mark that lets a `network` test open a
 connection, the files a `reads` mark leaves in a case's checkout, the shared
-copy the read-only cases read apart from the worktree and build once, the
-one JAX compilation cache every worker shares, and the test modules a folder
-of the same name would hide from collection.
+copy the read-only cases read apart from the worktree, build once, and read
+through a `Checkout` holding no value an earlier case cached, the one JAX
+compilation cache every worker shares, and the test modules a folder of the
+same name would hide from collection.
 """
 
 from collections.abc  import Iterator
@@ -160,6 +161,15 @@ def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
     assert not (checked.root / "pyproject.toml").samefile(
         pytestconfig.rootpath / "pyproject.toml"
     )
+
+
+def test_the_shared_copy_holds_no_value_an_earlier_case_cached(checked: Checkout):
+    """
+    Asserts that the `Checkout` each case reads the shared copy through
+    holds only its fields as the case starts, so no `cached_property` an
+    earlier case read hides a patch on `Checkout` from this one.
+    """
+    assert vars(checked).keys() == Checkout.model_fields.keys()
 
 
 def test_the_shared_copy_is_built_once_for_every_worker(

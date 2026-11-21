@@ -64,27 +64,14 @@ def checkout(
     return copy
 
 
-@fixture(scope="session")
-def checked(
-    pytestconfig     : Config,
-    tmp_path_factory : TempPathFactory,
-    tracked          : list[Path],
-    worker_id        : str
-) -> Checkout:
+@fixture
+def checked(shared: Path) -> Checkout:
     """
-    Copies every file `tracked` lists once for the whole run, into a git
-    repository holding no commit beside the base temporary folder every
-    pytest-xdist worker shares, which the first worker to take its lock
-    writes and every other reads. It copies each file rather than linking
-    it, so the copy shares no inode with the worktree, and no case edits it.
+    Builds a `Checkout` over the copy `shared` holds for each case, holding
+    no value a `cached_property` read in an earlier case, so a case patching
+    `Checkout` reads its patch through every property derived from it.
     """
-    shared = tmp_path_factory.getbasetemp()
-
-    return copied_once(
-        (shared if worker_id == "master" else shared.parent) / "checked",
-        pytestconfig.rootpath,
-        tracked
-    )
+    return Checkout(root=shared)
 
 
 @fixture
@@ -201,6 +188,32 @@ def pins(pytestconfig: Config) -> dict[str, str]:
             for requirement in [*manifest.requires, *manifest.constraints]
         }
     }
+
+
+@fixture(scope="session")
+def shared(
+    pytestconfig     : Config,
+    tmp_path_factory : TempPathFactory,
+    tracked          : list[Path],
+    worker_id        : str
+) -> Path:
+    """
+    Copies every file `tracked` lists once for the whole run, into a git
+    repository holding no commit beside the base temporary folder every
+    pytest-xdist worker shares, which the first worker to take its lock
+    writes and every other reads. It copies each file rather than linking
+    it, so the copy shares no inode with the worktree, and no case edits it.
+
+    Returns:
+        The folder holding the copy.
+    """
+    base = tmp_path_factory.getbasetemp()
+
+    return copied_once(
+        (base if worker_id == "master" else base.parent) / "checked",
+        pytestconfig.rootpath,
+        tracked
+    ).root
 
 
 @fixture
