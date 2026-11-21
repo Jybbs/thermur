@@ -8,11 +8,15 @@ from common.drones import short, still_air
 from dataclasses   import fields
 from math          import inf
 from numpy         import array
-from pytest        import mark, param
+from pytest        import MonkeyPatch, mark, param, raises
+from types         import SimpleNamespace
 from xarray        import Dataset, concat
 
 from thermur.controller.components import Constant, Cruise, Elastic, InertialSpin, Weighted
 from thermur.controller.schemas    import Composite
+from thermur.environment.air       import Air
+from thermur.metrics.flight        import Flight
+from thermur.metrics.schemas       import Plan
 from thermur.metrics.trials        import Measure, REFERENCE, Trial, summarized
 from thermur.pipeline.settings     import Settings
 
@@ -73,6 +77,7 @@ def test_a_flown_trial_tables_every_flight_beside_its_ranks():
     flown = Trial(
         candidates = {"elastic": Elastic()},
         conditions = {"small": {"drones": 10}},
+        drones     = 10,
         duration_s = 2.0,
         measures   = (Measure(statistic="spacing_m"),),
         slot       = "cohesion"
@@ -83,6 +88,21 @@ def test_a_flown_trial_tables_every_flight_beside_its_ranks():
     assert list(flown.model.values) == [REFERENCE, "elastic"]
     assert flown.log_likelihood.dims == ("candidate", "model")
     assert not flown.favored.sel(candidate=REFERENCE)
+
+
+def test_a_summary_reads_the_mean_across_seeds_beside_its_standard_error():
+    """
+    Asserts that the summary keeps every dimension but the seed, the mean of
+    each pair of seeds beside half their population spread over the root of
+    the count.
+    """
+    summary = summarized(TABLE["spacing_m"])
+
+    assert summary["mean"].values.tolist() == [[5.0, 1.0], [2.0, 2.0]]
+    assert summary["error"].values.tolist() == [
+        [1 / 2**0.5, 0.0],
+        [0.0, 2 / 2**0.5]
+    ]
 
 
 @mark.parametrize(
@@ -141,19 +161,46 @@ def test_a_candidate_is_kept_only_where_no_measure_leaves_it_worse(
     assert not kept.sel(candidate="uncoupled")
 
 
-def test_a_summary_reads_the_mean_across_seeds_beside_its_standard_error():
-    """
-    Asserts that the summary keeps every dimension but the seed, the mean of
-    each pair of seeds beside half their population spread over the root of
-    the count.
-    """
-    summary = summarized(TABLE["spacing_m"])
-
-    assert summary["mean"].values.tolist() == [[5.0, 1.0], [2.0, 2.0]]
-    assert summary["error"].values.tolist() == [
-        [1 / 2**0.5, 0.0],
-        [0.0, 2 / 2**0.5]
+@mark.parametrize(
+    ("conditions", "drones"),
+    [
+        param({"spontaneous": {}}, 9, id="trial-size"),
+        param({"small": {"drones": 10}}, 10, id="condition-size")
     ]
+)
+def test_a_trial_flies_its_own_flock_size_unless_its_condition_sets_one(
+    conditions  : dict[str, dict[str, int | float]],
+    drones      : int,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that a trial flies the flock size it holds rather than the
+    plan's, and the size a condition sets over both, while its short replay
+    flies the trial's own size.
+    """
+    sizes: list[int] = []
+
+    def flown(air: Air, composite: Composite, plan: Plan) -> SimpleNamespace:
+        """
+        Records the flock size of the plan, returning no statistics for a
+        long flight and stopping the trial at the short replay.
+        """
+        sizes.append(plan.drones)
+        if plan.seeds == 1:
+            raise LookupError
+        return SimpleNamespace(statistics=Dataset())
+
+    monkeypatch.setattr(Flight, "flown", flown)
+    with raises(LookupError):
+        Trial(
+            candidates = {},
+            conditions = conditions,
+            drones     = 9,
+            measures   = (),
+            slot       = "heading"
+        ).flown(still_air(), Composite.from_settings(Settings()), short())
+
+    assert sizes == [drones, 9]
 
 
 def test_a_trial_flies_the_reference_then_each_candidate_then_each_control():

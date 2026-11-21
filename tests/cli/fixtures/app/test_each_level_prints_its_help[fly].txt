@@ -119,7 +119,10 @@ Flies the flock, or computes the steps of the graph named.
 │                               from east, by default west. [default: 180.0]   │
 │ --plan.cruise-m-s FLOAT       The speed each drone launches and cruises at,  │
 │                               in meters per second. [default: 10.0]          │
-│ --plan.drones INT             The size of the flock. [default: 100]          │
+│ --plan.drones INT             The size of the flock, by default near the     │
+│                               median of the ten starling flocks of 448 to    │
+│                               2,631 birds the topological interaction was    │
+│                               measured on. [default: 1000]                   │
 │ --plan.duration-s FLOAT       The length of the flight, in seconds.          │
 │                               [default: 120.0]                               │
 │ --plan.frame-every INT        The number of steps between two kept frames.   │
