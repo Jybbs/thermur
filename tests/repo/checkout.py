@@ -112,7 +112,7 @@ def test_installed_roots_a_checkout_at_the_clone_the_package_came_from(
         param(
             ".mise/bin",
             "scripts",
-            ["h_experiments", "prose", "pytest", "thermur"],
+            ["coverage", "h_experiments", "prose", "pytest", "thermur"],
             id = "scripts"
         )
     ]
