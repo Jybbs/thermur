@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import motion       from '../../../theme/styles/motion.css?raw'
 import { computed } from '../../common/sheets.ts'
 
 /**
@@ -27,14 +28,14 @@ const PRESS = {
 
 describe('the fill’s timings', () => {
   it.for(Object.entries({ ...TIMES, ...PRESS }))('scales %s by the fill’s pace', ([property, time]) => {
-    expect(computed('', property, ':root', 'motion.css')).toBe(`calc(${time}ms * 1)`)
+    expect(computed('', property, ':root', motion)).toBe(`calc(${time}ms * 1)`)
   })
 
   it.for(Object.keys({ ...TIMES, ...PRESS }))('sets %s to nothing for a reader who prefers reduced motion', property => {
-    expect(computed('', property, ':root', 'motion.css', true)).toMatch(/\* 0\)$/u)
+    expect(computed('', property, ':root', motion, true)).toMatch(/\* 0\)$/u)
   })
 
   it.for([false, true])('turns the ink at once under a press, where reduced motion is %s', reduced => {
-    expect(computed('', '--th-fill-press-turn', ':root', 'motion.css', reduced)).toBe('0ms')
+    expect(computed('', '--th-fill-press-turn', ':root', motion, reduced)).toBe('0ms')
   })
 })

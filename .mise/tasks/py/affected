@@ -1,14 +1,18 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "affected"
-#MISE description = "Run the tests testmon selects for the changes since the merge base with `main`, tracing no child process a test starts, or the whole suite where a file other than the Python under `src` or `tests` changed, passing any further arguments to `pytest`"
+#MISE description = "Run the tests testmon selects for the changes since the merge base with `main`, each test recorded as reading the Python it ran and the tracked text files with an extension it opened in its own process, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed or a file other than Python was added or renamed, passing any further arguments to `pytest`"
 
-traced=(':(exclude,glob)src/**/*.py' ':(exclude,glob)tests/**/*.py')
-untraced=$(
-  git diff --merge-base --name-only main -- "${traced[@]}" &&
-    git ls-files --exclude-standard --others -- "${traced[@]}"
+shared=(uv.lock pyproject.toml .mise)
+other=(':/' ':(top,exclude)*.py')
+changed=$(
+  git diff --merge-base --name-only main -- "${shared[@]}" &&
+    git diff --diff-filter=A --merge-base --name-only --no-renames main \
+      -- "${other[@]}" &&
+    git ls-files --exclude-standard --others -- "${shared[@]}" &&
+    git ls-files --exclude-standard --others -- "${other[@]}"
 )
 selection=--testmon-forceselect
-[[ -z "$untraced" ]] || selection=--testmon-noselect
+[[ -z "$changed" ]] || selection=--testmon-noselect
 
 mkdir -p .cache/testmon
 TESTMON_DATAFILE=.cache/testmon/data pytest "$selection" "$@"
