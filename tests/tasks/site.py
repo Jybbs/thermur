@@ -8,7 +8,7 @@ every `bun` command in the clone runs under.
 """
 
 from collections.abc  import Callable
-from common.edits     import committed, executable
+from common.edits     import append, committed, executable, git
 from common.stand_ins import StandIn
 from pathlib          import Path
 from pytest           import Config, MonkeyPatch, fixture, mark, param
@@ -41,6 +41,31 @@ def site(tmp_path: Path) -> Path:
     committed(Checkout(root=tmp_path))
 
     return tmp_path / "docs"
+
+
+def listed(clone: Checkout, path: str) -> set[str]:
+    """
+    Commits a newline added to the file at `path` in `clone`, then lists
+    the site's test files Vitest's `--changed main` selects there, under the
+    site's own configuration.
+
+    Returns:
+        Each test file's path under `docs/`.
+    """
+    append(clone, path, "\n")
+    git(clone, "commit", "--all", "--message=Change", "--quiet")
+    return set(
+        run(
+            [
+                "node_modules/.bin/vitest", "list", "--changed", "main",
+                "--filesOnly", "--config", ".vitepress/config/vitest.config.ts"
+            ],
+            capture_output = True,
+            check          = True,
+            cwd            = clone.root / "docs",
+            text           = True
+        ).stdout.splitlines()
+    )
 
 
 def ran(cwd: Path, pytestconfig: Config, task: str) -> CompletedProcess:
@@ -275,10 +300,11 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
 
 
 @mark.parametrize(
-    ("deleted", "passed"),
+    ("deleted", "moved", "passed"),
     [
         param(
             "docs/pages/index.md",
+            None,
             [
                 "vitest", "run", "--config",
                 ".vitepress/config/vitest.config.ts", "--marker"
@@ -286,7 +312,17 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
             id = "page"
         ),
         param(
+            "docs/pages/index.md",
+            "docs/pages/home.md",
+            [
+                "vitest", "run", "--config",
+                ".vitepress/config/vitest.config.ts", "--marker"
+            ],
+            id = "renamed"
+        ),
+        param(
             "src/flock.py",
+            None,
             [
                 "vitest", "run", "--changed", "main",
                 "--config", ".vitepress/config/vitest.config.ts", "--marker"
@@ -297,6 +333,7 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
 )
 def test_the_affected_site_tests_run_whole_where_a_file_other_than_python_was_deleted(
     deleted      : str,
+    moved        : str | None,
     passed       : list[str],
     pytestconfig : Config,
     site         : Path
@@ -304,9 +341,65 @@ def test_the_affected_site_tests_run_whole_where_a_file_other_than_python_was_de
     """
     Asserts that `site:affected` runs the whole suite where a file other
     than Python was deleted since the merge base with `main`, wherever it
-    sat, since Vitest selects no test for a deleted file that only a glob
-    declared, and keeps `--changed main` where only Python was deleted.
+    sat, a file git renames included, since Vitest selects no test for a
+    deleted file that only a glob declared, and keeps `--changed main` where
+    only Python was deleted.
     """
-    (site.parent / deleted).unlink()
+    if moved is None:
+        (site.parent / deleted).unlink()
+    else:
+        git(Checkout(root=site.parent), "mv", deleted, moved)
 
     assert ran(site, pytestconfig, "affected").stdout.splitlines() == passed
+
+
+@mark.parametrize(
+    ("changed", "selected"),
+    [
+        param(
+            "docs/.vitepress/lib/moving.ts",
+            [
+                ".vitepress/tests/lib/kit/readers.test.ts",
+                ".vitepress/tests/lib/moving.test.ts",
+                ".vitepress/tests/lib/page-data.test.ts",
+                ".vitepress/tests/theme/components.test.ts",
+                ".vitepress/tests/theme/pause.test.ts"
+            ],
+            id = "module"
+        ),
+        param(
+            "docs/pages/reference/kit.md",
+            [
+                ".vitepress/tests/config.test.ts",
+                ".vitepress/tests/lib/kit/pieces.test.ts",
+                ".vitepress/tests/lib/site.test.ts"
+            ],
+            id = "page"
+        )
+    ]
+)
+def test_the_affected_site_tests_are_those_vitest_reaches_from_a_change(
+    changed      : str,
+    clone        : Checkout,
+    pytestconfig : Config,
+    selected     : list[str]
+):
+    """
+    Asserts that Vitest's `--changed main`, under the site's own
+    configuration and packages, adds to what it lists for a change to
+    the contributor guide, which no site test reads, each test file
+    importing the file a further commit changed or naming it through
+    `import.meta.glob`, and no other. Vitest lists the tests mounting a kit
+    control in the copy for any change, so the list for the guide sets them
+    aside.
+    """
+    (
+        clone.root / "docs/node_modules"
+    ).symlink_to(pytestconfig.rootpath / "docs/node_modules")
+    append(clone, ".git/info/exclude", "/docs/node_modules\n")
+    git(clone, "branch", "--move", "main")
+    git(clone, "switch", "--create", "change", "--quiet")
+
+    assert sorted(
+        listed(clone, ".github/CONTRIBUTING.md") ^ listed(clone, changed)
+    ) == selected

@@ -151,13 +151,14 @@ def opens(pytestconfig: Config, tracked: list[Path]) -> Opened:
 
 
 @fixture(autouse=True)
-def recorded(opens: Opened) -> Iterator[None]:
+def recorded(opens: Opened, request: FixtureRequest) -> Iterator[None]:
     """
     Records each tracked file the test opened once it ends, through
-    `Opened.record`.
+    `Opened.record`, those the setup of a fixture it requests opened
+    included, whichever test ran that setup.
     """
     yield
-    opens.record()
+    opens.record(request.fixturenames)
 
 
 @fixture(scope="session")

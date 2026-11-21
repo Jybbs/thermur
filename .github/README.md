@@ -434,7 +434,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | **Task** | **What It Does** |
 |---|---|
 | `mise test` | Runs the test suite through pytest on every core, passing any further arguments to it, so `--numprocesses=0` runs it on one process and `--share=<index>/<count>` runs one share of the suite split by test across several machines |
-| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, each test counted as reading the Python it ran and every tracked text file with an extension it opened, tracing no child process a test starts, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed, passing any further arguments to pytest |
+| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, each test counted as reading the Python it ran and every tracked text file with an extension it opened, tracing no child process a test starts, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed or a file other than Python was added, passing any further arguments to pytest |
 | `mise coverage` | Runs the suite under coverage, writes the HTML report under `.cache/coverage/html`, and prints the report for each file, failing below 95% on the total every worker measured |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |
@@ -459,7 +459,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise typecheck` | Type-checks the site's TypeScript through `tsc` |
 | `mise cruft` | Reports every unused file, export, and dependency in the site, and every import cycle, through knip |
 | `mise run site:test` | Runs the site's Vitest suite, passing any further arguments to it |
-| `mise run site:affected` | Runs the site's tests that the changes since the merge base with `main` reach, through Vitest's `--changed`, counting each file a test names through `import.meta.glob`, or the whole suite where a lockfile, a `package.json`, a file under `.mise`, or the Vitest configuration or a module it imports changed, or a file other than Python was deleted, passing any further arguments to Vitest |
+| `mise run site:affected` | Runs the site's tests that the changes since the merge base with `main` reach, through Vitest's `--changed`, counting each file a test names through `import.meta.glob`, or the whole suite where a lockfile, a `package.json`, a file under `.mise`, or the Vitest configuration or a module it imports changed, or a file other than Python was deleted or renamed, passing any further arguments to Vitest |
 | `mise run site:coverage` | Runs the site's suite under coverage, failing below 95% on statements, branches, functions, or lines |
 
 [`.github/CONTRIBUTING.md`](CONTRIBUTING.md) takes a contributor from a clone to a merged pull request, then sets out the code's style, the checks each pull request runs, and the labels each issue and pull request takes.

@@ -166,15 +166,16 @@ def branch(tmp_path: Path) -> Checkout:
             "--testmon-forceselect",
             id = "python-committed"
         ),
-        param({"docs/pages/index.md": "commit"}, "--testmon-forceselect", id="page"),
+        param({".gitignore": "commit"}, "--testmon-forceselect", id="text-modified"),
+        param({"docs/pages/index.md": "commit"}, "--testmon-noselect", id="page-added"),
         param(
             {"tests/fixtures/flock/case.txt": "tree"},
-            "--testmon-forceselect",
+            "--testmon-noselect",
             id = "fixture-untracked"
         ),
         param(
             {"src/thermur/flock.toml": "index"},
-            "--testmon-forceselect",
+            "--testmon-noselect",
             id = "source-data-staged"
         ),
         param({"uv.lock": "main"}, "--testmon-forceselect", id="main-only"),
@@ -203,11 +204,12 @@ def test_the_affected_tests_select_unless_a_shared_input_changed(
     """
     Asserts that `py:affected` runs pytest under the testmon data file
     in `.cache/testmon` with `--testmon-noselect` where `uv.lock`,
-    `pyproject.toml`, or a file under `.mise` changed since the merge base
-    with `main`, whether committed on the branch, staged, or left in the
-    working tree, and with `--testmon-forceselect` where only other files
-    changed. A file committed to `main` after the branch was cut counts as
-    no change, and so does a file git ignores.
+    `pyproject.toml`, or a file under `.mise` changed or a file other
+    than Python was added since the merge base with `main`, whether
+    committed on the branch, staged, or left in the working tree, and with
+    `--testmon-forceselect` where only other files changed. A file committed
+    to `main` after the branch was cut counts as no change, and so does a
+    file git ignores.
     """
     stand_in("pytest", 'printf "%s\\n" "$TESTMON_DATAFILE" "$@"')
     for path, where in edits.items():
@@ -266,49 +268,47 @@ def affected(pytestconfig: Config, repository: Checkout) -> list[str]:
 @fixture
 def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
     """
-    Commits to the `branch` repository a `README.md`, a `notes.md`, a
-    `NOTICE`, a `mark.png` holding bytes UTF-8 cannot decode, a conftest
-    holding the `opens` and `recorded` fixtures the suite's own conftest
-    holds, and a suite of six tests:
+    Commits to the `branch` repository a `README.md`, a `guide.md`, a
+    `notes.md`, a `NOTICE`, a `mark.png` holding bytes UTF-8 cannot decode,
+    the suite's own conftest, and a suite of eight tests:
 
     - One opening the README
-    - One opening a copy of it under `tmp_path` that the hook maps back onto it
+    - One opening the copy of it `checkout` makes, which the hook maps back onto it
     - One opening the README while the hook is paused
+    - Two requesting a session fixture that opens the guide once
     - One opening the `NOTICE`
     - One opening the mark
     - One opening nothing
 
-    It then runs `py:affected` once so pytest-testmon records what each
-    test read.
+    It then moves `main` onto that commit, so no file the suite adds counts
+    as added since `main`, and runs `py:affected` once so pytest-testmon
+    records what each test read.
 
     Returns:
         The `Checkout` rooted at the repository.
     """
     for path, text in {
-        "NOTICE"            : "A notice.\n",
-        "README.md"         : "A flock.\n",
-        "notes.md"          : "Unread.\n",
-        "tests/conftest.py" : (
-            "from common.opened import Opened\n"
-            "from pytest import fixture\n"
-            "from thermur.repo.checkout import Checkout\n\n"
-            "@fixture(autouse=True, scope='session')\n"
-            "def opens(pytestconfig):\n"
-            "    root = pytestconfig.rootpath\n"
-            "    return Opened.added(pytestconfig, Checkout(root=root).tracked())\n\n"
-            "@fixture(autouse=True)\n"
-            "def recorded(opens):\n"
-            "    yield\n"
-            "    opens.record()\n"
+        "NOTICE"              : "A notice.\n",
+        "README.md"           : "A flock.\n",
+        "guide.md"            : "A guide.\n",
+        "notes.md"            : "Unread.\n",
+        "tests/conftest.py"   : (pytestconfig.rootpath / "tests/conftest.py").read_text(
+            encoding = "utf-8"
         ),
-        "tests/test_flock.py": (
-            "from pathlib import Path\n\n"
+        "tests/test_flock.py" : (
+            "from pathlib import Path\n"
+            "from pytest import fixture\n\n"
+            "@fixture(scope='session')\n"
+            "def guide():\n"
+            "    return Path('guide.md').read_text()\n\n"
             "def test_reads():\n"
             "    assert Path('README.md').read_text()\n\n"
-            "def test_copies(monkeypatch, opens, tmp_path):\n"
-            "    (tmp_path / 'README.md').write_bytes(Path('README.md').read_bytes())\n"
-            "    monkeypatch.setitem(opens.copies, tmp_path, Path.cwd())\n"
-            "    assert (tmp_path / 'README.md').read_text()\n\n"
+            "def test_copies(checkout):\n"
+            "    assert (checkout.root / 'README.md').read_text()\n\n"
+            "def test_guides_first(guide):\n"
+            "    assert guide\n\n"
+            "def test_guides_second(guide):\n"
+            "    assert guide\n\n"
             "def test_reads_paused(monkeypatch, opens):\n"
             "    monkeypatch.setattr(opens, 'paused', True)\n"
             "    assert Path('README.md').read_text()\n\n"
@@ -325,6 +325,7 @@ def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
     (branch.root / "mark.png").write_bytes(b"\x89PNG\xff")
     git(branch, "add", "--all")
     git(branch, "commit", "--message=Suite", "--quiet")
+    git(branch, "update-ref", "refs/heads/main", "HEAD")
     affected(pytestconfig, branch)
 
     return branch
@@ -359,13 +360,24 @@ def test_the_affected_tests_fail_where_no_main_resolves(
             ["tests/test_flock.py::test_copies", "tests/test_flock.py::test_reads"],
             id = "read"
         ),
+        param(
+            "guide.md",
+            [
+                "tests/test_flock.py::test_guides_first",
+                "tests/test_flock.py::test_guides_second"
+            ],
+            id = "fixture"
+        ),
         param("notes.md", [], id="unread"),
         param("mark.png", [], id="unfingerprinted"),
         param("NOTICE", [], id="extensionless"),
         param(
             "uv.lock",
             [
-                "tests/test_flock.py::test_copies", "tests/test_flock.py::test_reads",
+                "tests/test_flock.py::test_copies",
+                "tests/test_flock.py::test_guides_first",
+                "tests/test_flock.py::test_guides_second",
+                "tests/test_flock.py::test_reads",
                 "tests/test_flock.py::test_reads_mark",
                 "tests/test_flock.py::test_reads_nothing",
                 "tests/test_flock.py::test_reads_notice",
@@ -383,11 +395,12 @@ def test_the_affected_tests_are_those_opening_a_changed_file(
 ):
     """
     Asserts that `py:affected` runs only the tests that opened a changed
-    file other than Python, the test opening a copy the `Opened` hook
-    maps back onto that file included and the test opening it while the
-    hook is paused left out. It runs none for a file no test opened or
-    one pytest-testmon cannot fingerprint as text, whose reader it still
-    records, and runs every test where `uv.lock` changed.
+    file other than Python, the test opening a copy the `Opened` hook maps
+    back onto that file and each test requesting a session fixture that
+    opened it included, and the test opening it while the hook is paused
+    left out. It runs none for a file no test opened or one pytest-testmon
+    cannot fingerprint as text, whose reader it still records, and runs
+    every test where `uv.lock` changed.
     """
     (suite.root / path).write_text("Changed.\n", encoding="utf-8")
 

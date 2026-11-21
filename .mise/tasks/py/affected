@@ -1,11 +1,15 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "affected"
-#MISE description = "Run the tests testmon selects for the changes since the merge base with `main`, each test recorded as reading the Python it ran and the tracked text files with an extension it opened in its own process, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed, passing any further arguments to `pytest`"
+#MISE description = "Run the tests testmon selects for the changes since the merge base with `main`, each test recorded as reading the Python it ran and the tracked text files with an extension it opened in its own process, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed or a file other than Python was added, passing any further arguments to `pytest`"
 
 shared=(uv.lock pyproject.toml .mise)
+other=(':/' ':(top,exclude)*.py')
 changed=$(
   git diff --merge-base --name-only main -- "${shared[@]}" &&
-    git ls-files --exclude-standard --others -- "${shared[@]}"
+    git diff --diff-filter=A --merge-base --name-only --no-renames main \
+      -- "${other[@]}" &&
+    git ls-files --exclude-standard --others -- "${shared[@]}" &&
+    git ls-files --exclude-standard --others -- "${other[@]}"
 )
 selection=--testmon-forceselect
 [[ -z "$changed" ]] || selection=--testmon-noselect
