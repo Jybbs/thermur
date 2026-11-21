@@ -6,9 +6,10 @@ import type { Model } from './slots.ts'
  * along the course, across it, and up, holding the plan's spacing cubed for
  * each drone, its height raised to `clearance_sd` deviations of its depth
  * where that clears the center's and any drone drawn under the ground set on
- * it, each flying the course within its scatter at the cruise speed, every
- * draw from `normal`. Each drone's east, north, and height go to three
- * places of `positions`, and its velocity likewise to `velocities`.
+ * it, each flying the course within its scatter at the cruise speed and
+ * climbing where it was drawn under the ground, every draw from `normal`.
+ * Each drone's east, north, and height go to three places of `positions`, and
+ * its velocity likewise to `velocities`.
  */
 export function launched(
   normal     : () => number,
@@ -39,6 +40,6 @@ export function launched(
     const speed = cruise_m_s / Math.hypot(x, y, z)
     velocities[at]     = x * speed
     velocities[at + 1] = y * speed
-    velocities[at + 2] = z * speed
+    velocities[at + 2] = (positions[at + 2] === 0 ? Math.abs(z) : z) * speed
   }
 }

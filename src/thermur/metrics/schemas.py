@@ -4,7 +4,7 @@ the seeds of one flight, which the settings nest as `plan`.
 """
 
 from jax        import Array
-from jax.numpy  import array, cbrt, cos, deg2rad, pi, sin, stack, zeros_like
+from jax.numpy  import array, cbrt, cos, deg2rad, pi, sin, stack, where, zeros_like
 from jax.random import normal, split
 from math       import gamma, prod, radians
 from numpy      import arange, ndarray
@@ -293,7 +293,8 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         Gaussian offsets whose ellipsoid at one standard deviation holds
         `spacing_m` cubed for each drone, centered at `height_m` and any
         drone the draw sets under the ground set on it, flying the course
-        within `scatter_deg`, each commanding the velocity it launches at.
+        within `scatter_deg` and climbing where it was drawn under the
+        ground, each commanding the velocity it launches at.
         """
         where_key, heading_key = split(key)
         lengths                = array(self.axes) / cbrt(array(self.axes).prod())
@@ -306,12 +307,14 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         offsets    = normal(where_key, shape) * lengths * scale @ basis
         scatter    = normal(heading_key, shape) * deg2rad(array(self.scatter_deg))
         velocities = self.cruise_m_s * unit(course + scatter)
+        positions  = array((*self.center_m[:2], self.height_m)) + offsets
+        velocities = velocities.at[:, 2].set(
+            where(positions[:, 2] < 0, abs(velocities[:, 2]), velocities[:, 2])
+        )
         return Flock(
-            commands  = velocities,
-            forces    = zeros_like(offsets),
-            positions = (
-                array((*self.center_m[:2], self.height_m)) + offsets
-            ).at[:, 2].max(0.0),
+            commands   = velocities,
+            forces     = zeros_like(offsets),
+            positions  = positions.at[:, 2].max(0.0),
             spins      = zeros_like(offsets),
             velocities = velocities
         )

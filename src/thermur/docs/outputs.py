@@ -12,7 +12,7 @@ from dataclasses     import asdict, fields, replace
 from equinox         import tree_at
 from functools       import cached_property, partial
 from jax             import Array, numpy as jnp, tree, vmap
-from jax.random      import key as seeded, uniform
+from jax.random      import key as seeded, normal, split, uniform
 from json            import dumps
 from math            import sqrt
 from numpy           import (
@@ -450,13 +450,16 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     1.5 m/s on every axis and its third drone flying on its second, and
     the curve orders 340 drones scattered the same way, its third drone on
     its second, each value drawn in double precision and rounded to four
-    decimals.
+    decimals. A launch of 24 drones at a spacing of 120 m and a clearance of
+    1.5 deviations raises its center past `center_m` and sets four drones on
+    the ground, one of them drawn heading down.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
         the radio as `relayed` lays it out, the held senders at each packet
-        of the second run, and the curve's drones beside the order `zorder`
-        gives it.
+        of the second run, the curve's drones beside the order `zorder`
+        gives it, and the launch's draws in the order the site's copy reads
+        them beside the plan it changes and the flock it launches.
     """
     zig            = composite.noise
     roost          = composite.roost
@@ -497,6 +500,9 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         composite,
         replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
     )
+    raised                 = plan.changed(clearance_sd=1.5, drones=24, spacing_m=120.0)
+    where_key, heading_key = split(seeded(raised.seed))
+    launch                 = raised.launched(seeded(raised.seed))
     cloud             = default_rng(plan.seed)
     center            = (*roost.center_m, roost.height_m)
     points            = around(cloud.normal(center, 25.0, (340, 3)), 4)
@@ -546,6 +552,17 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
                 flock     = middle,
                 plan      = plan
             )
+        },
+        "launch"   : {
+            "draws"      : [
+                *normal(where_key, (raised.drones, 3)).ravel().tolist(),
+                *normal(heading_key, (raised.drones, 3)).ravel().tolist()
+            ],
+            "plan"       : raised.model_dump(
+                include = {"clearance_sd", "drones", "spacing_m"}
+            ),
+            "positions"  : around(asarray(launch.positions, dtype=float), 4).tolist(),
+            "velocities" : around(asarray(launch.velocities, dtype=float), 4).tolist()
         },
         "radio"    : relayed(
             flock = tree_at(
