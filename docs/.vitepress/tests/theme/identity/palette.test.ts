@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { type DOMWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
+import { type DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import { wcagContrast }                                             from 'culori'
 import { afterEach, describe, expect, it, vi }                      from 'vitest'
 import { createSSRApp, ref }                                        from 'vue'
@@ -103,7 +103,7 @@ describe('copying from IdentityPalette', () => {
     await widget.findAll('.identity-copy')[1]!.trigger('click')
     await write.mock.results[0]!.value
     expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.series[1]![scheme]))
-    await widget.vm.$nextTick()
+    await flushPromises()
     expect(widget.get('[aria-live]').text()).toMatch(/^Copied #/u)
   })
 

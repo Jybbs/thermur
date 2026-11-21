@@ -7,9 +7,8 @@ running it.
 
 from collections.abc  import Callable
 from common.edits     import executable, git
-from common.isolation import CLEARED, TERMINAL
+from common.isolation import CLEARED, TERMINAL, copied_once
 from common.stand_ins import StandIn
-from filelock         import FileLock
 from itertools        import chain
 from os               import environ, pathsep
 from pathlib          import Path
@@ -80,15 +79,12 @@ def checked(
     it, so the copy shares no inode with the worktree, and no case edits it.
     """
     shared = tmp_path_factory.getbasetemp()
-    copy   = Checkout(
-        root = (shared if worker_id == "master" else shared.parent) / "checked"
-    )
-    with FileLock(copy.root.with_suffix(".lock")):
-        if not copy.root.exists():
-            Checkout(root=pytestconfig.rootpath).copy(tracked, copy.root)
-            copy.run("git", "init", "--quiet")
 
-    return copy
+    return copied_once(
+        (shared if worker_id == "master" else shared.parent) / "checked",
+        pytestconfig.rootpath,
+        tracked
+    )
 
 
 @fixture

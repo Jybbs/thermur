@@ -11,7 +11,7 @@ of the same name would hide from collection.
 """
 
 from collections.abc  import Iterator
-from common.isolation import CLEARED, pytest_collection_modifyitems
+from common.isolation import CLEARED, copied_once, pytest_collection_modifyitems
 from jax              import config
 from os               import environ
 from pathlib          import Path
@@ -56,6 +56,23 @@ def test_a_network_test_gets_the_mark_that_opens_the_socket(request: FixtureRequ
     assert request.node.get_closest_marker("enable_socket")
 
 
+def test_a_second_build_of_the_shared_copy_leaves_the_first_in_place(
+    pytestconfig : Config,
+    tmp_path     : Path
+):
+    """
+    Asserts that building the shared copy where one already stands leaves
+    each file of the first in place, so every worker after the first reads
+    the copy the first built.
+    """
+    files = [Path("pyproject.toml")]
+    first = copied_once(tmp_path / "checked", pytestconfig.rootpath, files)
+    inode = (first.root / "pyproject.toml").stat().st_ino
+    copied_once(tmp_path / "checked", pytestconfig.rootpath, files)
+
+    assert (first.root / "pyproject.toml").stat().st_ino == inode
+
+
 def test_a_socket_stays_closed_outside_the_network_mark():
     """
     Asserts that a test without the `network` mark cannot open a connection,
@@ -87,16 +104,6 @@ def test_a_unix_socket_stays_open():
         assert right.recv(5) == b"flock"
 
 
-def test_every_worker_shares_one_locked_jax_cache(pytestconfig: Config):
-    """
-    Asserts that JAX keeps each program it compiles under `.cache/jax` with
-    a size limit set, under which it locks each entry through `filelock`, so
-    every worker reads and writes the one cache at once.
-    """
-    assert config.jax_compilation_cache_dir == str(pytestconfig.rootpath / ".cache/jax")
-    assert config.jax_compilation_cache_max_size != -1
-
-
 @mark.reads("pyproject.toml", ".mise/**")
 def test_a_reads_mark_copies_only_the_files_its_patterns_match(checkout: Checkout):
     """
@@ -110,6 +117,16 @@ def test_a_reads_mark_copies_only_the_files_its_patterns_match(checkout: Checkou
     }
 
     assert copied == {".mise", "pyproject.toml"}
+
+
+def test_every_worker_shares_one_locked_jax_cache(pytestconfig: Config):
+    """
+    Asserts that JAX keeps each program it compiles under `.cache/jax` with
+    a size limit set, under which it locks each entry through `filelock`, so
+    every worker reads and writes the one cache at once.
+    """
+    assert config.jax_compilation_cache_dir == str(pytestconfig.rootpath / ".cache/jax")
+    assert config.jax_compilation_cache_max_size != -1
 
 
 def test_home_is_an_empty_folder():

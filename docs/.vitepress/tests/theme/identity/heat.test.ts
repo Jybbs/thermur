@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { enableAutoUnmount, mount }            from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { afterEach, describe, expect, it, vi }     from 'vitest'
 
 import { heatRamp } from '../../../lib/identity.ts'
 import source       from '../../../lib/rendered/identity.json' with { type: 'json' }
@@ -51,7 +51,7 @@ describe('IdentityHeat', () => {
     await chip.trigger('click')
     await write.mock.results[0]!.value
     expect(await navigator.clipboard.readText()).toBe(hex)
-    await widget.vm.$nextTick()
+    await flushPromises()
     expect(widget.get('[aria-live]').text()).toBe(`Copied ${hex}`)
   })
 })
