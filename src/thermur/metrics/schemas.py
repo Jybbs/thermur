@@ -53,9 +53,10 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     The speed each drone launches and cruises at, in meters per second.
     """
 
-    drones: Count = 100
+    drones: Count = 1000
     """
-    The size of the flock.
+    The size of the flock, by default near the median of the ten starling
+    flocks of 448 to 2,631 birds the topological interaction was measured on.
     """
 
     duration_s: Positive = 120.0
