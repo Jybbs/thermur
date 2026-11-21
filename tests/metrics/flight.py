@@ -118,17 +118,17 @@ def composite() -> Composite:
     params = [param(120.0, id="two-minutes"), param(300.0, id="five-minutes")],
     scope  = "module"
 )
-def default(composite: Composite, request: FixtureRequest) -> Flight:
+def hundred(composite: Composite, request: FixtureRequest) -> Flight:
     """
-    Flies the default plan under the default composite through the
-    parametric threat's air, for the plan's two minutes and for the five the
-    rules page reads.
+    Flies the default plan at 100 drones under the default composite through
+    the parametric threat's air, for the plan's two minutes and for the five
+    the rules page reads.
     """
     settings = Settings()
     return Flight.flown(
         WrfOutput.from_settings(settings).air,
         composite,
-        settings.plan.model_copy(update={"duration_s": request.param})
+        settings.plan.changed(drones=100, duration_s=request.param)
     )
 
 
@@ -262,28 +262,28 @@ def test_a_delayed_heading_flies_otherwise_than_one_a_step_shorter(
 
 
 @mark.slow
-def test_a_default_flight_holds_the_roost_s_height(default: Flight):
+def test_a_flight_of_100_drones_holds_the_roost_s_height(hundred: Flight):
     """
-    Asserts that the default flight holds its drones within 10 m of the
+    Asserts that a flight of 100 drones holds them within 10 m of the
     roost's height on the mean over its settled frames and its seeds, where
-    a plant bounding a descent tighter than a climb lifts it some 60 m above
-    it in two minutes.
+    a plant bounding a descent tighter than a climb lifts the flock some 60
+    m above that height in two minutes.
     """
     assert_allclose(
-        asarray(default.settled.positions)[..., 2].mean(),
+        asarray(hundred.settled.positions)[..., 2].mean(),
         Settings().roost.height_m,
         atol = 10.0
     )
 
 
 @mark.slow
-def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
+def test_a_flight_of_100_drones_keeps_a_starling_flock_s_shape(hundred: Flight):
     """
-    Asserts that the largest group of the default flight, averaged over the
-    frames `Plan.shape_every_s` apart through two minutes and through five
-    and over the seeds, holds its longest axis within 4.02 to 6.94 times its
-    thinnest, the span of the starling flocks the starling model is checked
-    against.
+    Asserts that the largest group of a flight of 100 drones, averaged over
+    the frames `Plan.shape_every_s` apart through two minutes and through
+    five and over the seeds, holds its longest axis within 4.02 to 6.94
+    times its thinnest, the span of the starling flocks the starling model
+    is checked against.
 
     The middle axis goes unchecked, since that ratio rises with flock size
     in the starling model's flocks, a dependence the Rome flocks behind the
@@ -292,38 +292,40 @@ def test_a_default_flight_keeps_a_starling_flock_s_shape(default: Flight):
     flocks report their shape as a mean over time, and one frame's shape
     stretches and folds as the flock turns at the roost's rim.
     """
-    assert 4.02 <= default.group_aspect_ratios.mean(0)[2] <= 6.94
+    assert 4.02 <= hundred.group_aspect_ratios.mean(0)[2] <= 6.94
 
 
 @mark.slow
-def test_a_default_flight_sets_off_zigs(default: Flight):
+def test_a_flight_of_100_drones_sets_off_zigs(hundred: Flight):
     """
-    Asserts that some drone of the default flight after two minutes and
+    Asserts that some drone of a flight of 100 drones after two minutes and
     after five holds a zig's countdown at some kept frame, so the roost's
     turn and the neighbors' zigs reach the noise slot's state in flight.
     """
-    assert (asarray(default.frames.forces)[..., 0] > 0).any()
+    assert (asarray(hundred.frames.forces)[..., 0] > 0).any()
 
 
 @mark.slow
-def test_a_default_flight_keeps_the_outdoor_drone_flock_s_spacing(default: Flight):
+def test_a_flight_of_100_drones_keeps_the_outdoor_drone_flock_s_spacing(
+    hundred: Flight
+):
     """
-    Asserts that the default flight after two minutes and after five keeps
-    its drones 12 to 30 m from their nearest neighbors on the mean, the
-    spacing the outdoor drone flock kept.
+    Asserts that a flight of 100 drones after two minutes and after five
+    keeps its drones 12 to 30 m from their nearest neighbors on the mean,
+    the spacing the outdoor drone flock kept.
     """
-    assert 12.0 <= float(default.spacing_m.mean()) <= 30.0
+    assert 12.0 <= float(hundred.spacing_m.mean()) <= 30.0
 
 
 @mark.slow
-def test_a_default_flight_keeps_every_drone_over_the_roost(default: Flight):
+def test_a_flight_of_100_drones_keeps_every_drone_over_the_roost(hundred: Flight):
     """
-    Asserts that every drone of the default flight after two minutes and
-    after five sits within the roost's radius of its center and above the
-    ground.
+    Asserts that every drone of a flight of 100 drones after two minutes
+    and after five sits within the roost's radius of its center and above
+    the ground.
     """
     roost = Settings().roost
-    spots = asarray(default.frames.positions)[:, -1]
+    spots = asarray(hundred.frames.positions)[:, -1]
 
     assert (
         linalg.norm(spots[..., :2] - asarray(roost.center_m), axis=-1) <= roost.radius_m

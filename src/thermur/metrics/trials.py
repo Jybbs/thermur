@@ -32,10 +32,11 @@ from thermur.controller.components import (
     Vectorial,
     Weighted
 )
-from thermur.controller.schemas import Component, Composite
-from thermur.environment.air    import Air
-from thermur.metrics.flight     import Flight
-from thermur.metrics.schemas    import Plan
+from thermur.controller.schemas  import Component, Composite
+from thermur.environment.air     import Air
+from thermur.environment.schemas import Count
+from thermur.metrics.flight      import Flight
+from thermur.metrics.schemas     import Plan
 
 POLARIZATION = 0.96
 """
@@ -130,6 +131,12 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     candidates and never kept.
     """
 
+    drones: Count = SIZES["middle"]["drones"]
+    """
+    The size of the flock each flight of the trial flies where its condition
+    sets none, by default the middle of `SIZES`.
+    """
+
     duration_s: float = 60.0
     """
     The length of each flight of the trial, in seconds.
@@ -215,8 +222,8 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             candidate's flight.
         """
         composites = self.composites(composite, plan.similarity)
-        long       = plan.changed(duration_s=self.duration_s)
-        short      = plan.changed(
+        long       = plan.changed(drones=self.drones, duration_s=self.duration_s)
+        short      = long.changed(
             duration_s  = self.replay_s,
             frame_every = 1,
             seeds       = 1,

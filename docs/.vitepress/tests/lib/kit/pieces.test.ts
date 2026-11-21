@@ -1,19 +1,15 @@
-import fs   from 'node:fs'
-import path from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
 import manifest                                    from '../../../../kit/package.json' with { type: 'json' }
+import kit                                         from '../../../../pages/reference/kit.md?raw'
 import { PARTS, PIECES, SOURCES, lineOf, pieceOf } from '../../../lib/kit/pieces.ts'
-import { pagesDir }                                from '../../../lib/paths.ts'
 
 /**
  * Reads the name in each row of the table The Kit carries, as `mise render`
  * last wrote it.
  */
 function tabled(): string[] {
-  const page = fs.readFileSync(path.join(pagesDir(import.meta.url), 'reference', 'kit.md'), 'utf8')
-  return [...page.matchAll(/^\| (?<name>[^*|][^|]*) \| `/gmu)].map(row => row.groups!.name!)
+  return [...kit.matchAll(/^\| (?<name>[^*|][^|]*) \| `/gmu)].map(row => row.groups!.name!)
 }
 
 describe('the kit’s pieces', () => {

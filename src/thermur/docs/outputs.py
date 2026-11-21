@@ -11,19 +11,23 @@ from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
 from dataclasses     import asdict, fields, replace
 from equinox         import tree_at
 from functools       import cached_property, partial
-from jax             import Array, numpy as jnp, tree, vmap
-from jax.random      import fold_in, key as seeded, uniform
+from jax             import Array, enable_x64, numpy as jnp, tree, vmap
+from jax.random      import key as seeded, normal, split, uniform
 from json            import dumps
 from math            import sqrt
-from numpy           import argsort, around, asarray, cross, geomspace, linalg, ndarray, zeros
-from numpy.random    import default_rng
-from pathlib         import Path
-from pydantic        import BaseModel, Field, TypeAdapter, create_model
+from numpy           import (
+    arange, around, asarray, cross, geomspace, linalg, ndarray, zeros
+)
+from numpy.random import default_rng
+from pathlib      import Path
+from pydantic     import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.controller.schemas import Composite, Flock, Inbox, Observation, Radio
-from thermur.docs.kit           import Piece
-from thermur.docs.pages         import Page
-from thermur.environment.air    import Air
+from thermur.controller.schemas import (
+    Composite, Flock, Inbox, Observation, Radio, unit, zorder
+)
+from thermur.docs.kit        import Piece
+from thermur.docs.pages      import Page
+from thermur.environment.air import Air
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
@@ -74,8 +78,10 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
     The file the site's suite reads three small flocks from, each beside its
     Brownian increments, the uniform draw each drone's zig reads, and the
-    flock one step of the package's composite moves it to, and a run of the
-    package's radio beside the draws each packet's loss reads.
+    flock one step of the package's composite moves it to, a run of the
+    package's radio beside the draws each packet's loss reads, a run of it
+    losing no packet, the order the package's `zorder` gives a cloud of
+    drones, and a launch of the package's plan beside the draws it reads.
     """
 
     threat: Path = Path("docs/.vitepress/lib/rendered/threat.json")
@@ -212,18 +218,21 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         } | ParametricThreat().model_dump()
         settings  = Settings()
         composite = Composite.from_settings(settings)
+        model     = {
+            slot.name: {"kind": type(component).__name__} | asdict(component)
+            for slot in fields(Composite)
+            if (component := getattr(composite, slot.name))
+        }
+        model["radio"]["slots"] = composite.radio.slots
         return {
             self.composite : dumps(
-                {
-                    slot.name: {"kind": type(component).__name__} | asdict(component)
-                    for slot in fields(Composite)
-                    if (component := getattr(composite, slot.name))
-                }
+                model
                 | {
                     "plan": settings.plan.model_dump(
                         include = {
-                            "axes", "center_m", "course_deg", "cruise_m_s",
-                            "neighbors", "scatter_deg", "spacing_m", "step_s"
+                            "axes", "center_m", "clearance_sd",
+                            "course_deg", "cruise_m_s", "neighbors",
+                            "scatter_deg", "spacing_m", "step_s"
                         }
                     )
                 },
@@ -425,17 +434,33 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     Moves three flocks of twelve drones from `plan` through one step of
     `composite`, each with five zigs under way at its side, at its push
     back, and in its refractory time. The first sits astride the rim of the
-    roost's disk on the side its course heads toward, its zigs read from the
-    key the step derives, and the other two sit on the roost's center, half
-    their drones drawing zero and the rest drawing across the chances a few
-    zigging neighbors give, the last under a radio whose delay outlasts the
-    zig's reaction and cue. Beside them, the radio carries the six drones of
-    the first flock nearest its first drone, all within the radio's range of
-    one another.
+    roost's disk on the side its course heads toward, its zigs read from
+    the key the step derives, and the other two sit on the roost's center,
+    half their drones drawing zero and the rest drawing across the chances a
+    few zigging neighbors give, the last under a radio whose delay outlasts
+    the zig's reaction and cue. Beside them, the radio carries a flock of
+    eight more drones than a table holds on the roost's center, launched at
+    half the spacing of the other three, so a drone hears more senders than
+    its table keeps, its last drone flying back at the cruise speed from 5
+    m past the radio's range ahead of the drone leading along the flock's
+    mean velocity, so no drone holds it as the radio opens and it flies into
+    the flock's range. A second run carries 120 drones scattered 25 m about
+    the roost's center over a radio losing no packet, the even drones flying
+    east at the cruise speed and the odd ones west, each velocity scattered
+    1.5 m/s on every axis and its third drone flying on its second, and
+    the curve orders 340 drones scattered the same way, its third drone on
+    its second, each value drawn in double precision and rounded to four
+    decimals. A launch of 24 drones at a spacing of 120 m and a clearance
+    of 1.5 deviations raises its center past `center_m` and sets two drones
+    on the ground, one of them drawn heading down, the launch run in double
+    precision and the draws it reads written to eight decimals.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
-        the radio as `relayed` lays it out.
+        the radio as `relayed` lays it out, the held senders at each packet
+        of the second run, the curve's drones beside the order `zorder`
+        gives it, and the launch's draws in the order the site's copy reads
+        them beside the plan it changes and the flock it launches.
     """
     zig            = composite.noise
     roost          = composite.roost
@@ -462,14 +487,62 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         forces    = forces,
         plan      = plan
     )
-    near = argsort(linalg.norm(rim.positions - rim.positions[0], axis=-1))[:6]
-    late = tree_at(
+    radio = posed(
+        center_m  = roost.center_m,
+        composite = composite,
+        forces    = zeros((Radio.slots + 8, 3)),
+        plan      = plan,
+        spacing_m = 4.0
+    )
+    heading = unit(radio.velocities.mean(0))
+    leader  = radio.positions[(radio.positions @ heading).argmax()]
+    late    = tree_at(
         lambda slots: slots.radio,
         composite,
         replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
     )
+    raised = plan.changed(clearance_sd=1.5, drones=24, spacing_m=120.0)
+    with enable_x64():
+        where_key, heading_key = split(seeded(raised.seed))
+        launch                 = raised.launched(seeded(raised.seed))
+        drawn = around(
+            [
+                normal(where_key, (raised.drones, 3)),
+                normal(heading_key, (raised.drones, 3))
+            ],
+            8
+        )
+    cloud             = default_rng(plan.seed)
+    center            = (*roost.center_m, roost.height_m)
+    points            = around(cloud.normal(center, 25.0, (340, 3)), 4)
+    points[2]         = points[1]
+    crossing          = around(cloud.normal(center, 25.0, (120, 3)), 4)
+    crossing[2]       = crossing[1]
+    velocities        = cloud.normal(0.0, 1.5, (120, 3))
+    velocities[:, 0] += plan.cruise_m_s * (-1.0) ** arange(120)
+    velocities        = around(velocities, 4)
+    velocities[2]     = velocities[1]
+    crossed           = relayed(
+        flock = tree.map(
+            lambda leaf: jnp.asarray(leaf, dtype="float32"),
+            Flock(
+                commands   = velocities,
+                forces     = zeros((120, 3)),
+                positions  = crossing,
+                spins      = zeros((120, 3)),
+                velocities = velocities
+            )
+        ),
+        plan  = plan,
+        radio = replace(composite.radio, loss=0.0)
+    )
     return {
-        "flocks": {
+        "crossing" : {name: crossed[name] for name in ("flock", "held", "packets")},
+        "curve"    : {
+            "order"  : asarray(zorder(jnp.asarray(points))).tolist(),
+            "points" : points.tolist()
+        },
+        "flocks"   : {
             "late"  : flown(
                 composite = late,
                 draws     = draws,
@@ -489,7 +562,30 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
                 plan      = plan
             )
         },
-        "radio": relayed(tree.map(lambda leaf: leaf[near], rim), plan, composite.radio)
+        "launch"   : {
+            "draws"      : drawn.ravel().tolist(),
+            "plan"       : raised.model_dump(
+                include = {"clearance_sd", "drones", "spacing_m"}
+            ),
+            "positions"  : around(asarray(launch.positions, dtype=float), 4).tolist(),
+            "velocities" : around(asarray(launch.velocities, dtype=float), 4).tolist()
+        },
+        "radio"    : relayed(
+            flock = tree_at(
+                lambda flock: (flock.positions, flock.velocities),
+                radio,
+                (
+                    radio.positions.at[-1].set(
+                        jnp.round(leader + (composite.radio.range_m + 5) * heading, 4)
+                    ),
+                    radio.velocities.at[-1].set(
+                        jnp.round(-plan.cruise_m_s * heading, 4)
+                    )
+                )
+            ),
+            plan  = plan,
+            radio = composite.radio
+        )
     }
 
 
@@ -519,21 +615,22 @@ def posed(
     center_m  : Sequence[float],
     composite : Composite,
     forces    : ndarray,
-    plan      : Plan
+    plan      : Plan,
+    spacing_m : float = 8.0
 ) -> Flock:
     """
-    Launches a flock of drones from `plan` a few meters apart around
-    `center_m`, one for each row of `forces`, which sets their zigs, each
-    commanding a velocity apart from the one it flies and off the cruise
-    speed and spinning toward the velocity it flies, its last drone moved
-    half the cohesion's hard sphere ahead of the one before it along that
-    drone's command. Every value is rounded to four decimals, so a copy of
-    the step reads the same flock the package moves.
+    Launches a flock of drones from `plan` at a launch spacing of
+    `spacing_m` around `center_m`, one for each row of `forces`, which sets
+    their zigs, each commanding a velocity apart from the one it flies and
+    off the cruise speed and spinning toward the velocity it flies, its last
+    drone moved half the cohesion's hard sphere ahead of the one before it
+    along that drone's command. Every value is rounded to four decimals, so
+    a copy of the step reads the same flock the package moves.
     """
     launch = plan.changed(
         center_m  = (*center_m, composite.roost.height_m),
         drones    = len(forces),
-        spacing_m = 8.0
+        spacing_m = spacing_m
     ).launched(seeded(plan.seed))
     commands      = asarray(launch.commands, dtype=float) * [0.8, 1.2, 0.5]
     positions     = asarray(launch.positions, dtype=float)
@@ -566,17 +663,23 @@ def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
     """
     Carries the broadcasts of `flock` over `radio` from its opening for
     `radio.delay_s` and six packet periods past it, each drone flying its
-    velocity, keeping at each step a packet falls on the uniform draws each
-    pair's loss reads, unrounded so a copy keeps each packet the link keeps,
-    and what each drone then heard of every other.
+    velocity, keeping at each step a packet falls on the uniform draw each
+    pair's loss reads, by receiver and then by every other drone, unrounded
+    so a copy keeps each packet the link keeps, and the senders each drone's
+    table then holds.
 
     Returns:
-        The flock the radio opens on, the number of steps it runs, each
-        step a packet falls at, and at each such step the draws, whether
-        each drone hears each other, and the position it last heard each
-        other at.
+        The forces, positions, and velocities of the flock the radio opens
+        on, each step a packet falls at, and at each such step the draws,
+        the senders each drone's table holds in the order of their indices,
+        and the position it last heard each one at.
     """
-    key         = seeded(plan.seed)
+    key    = seeded(plan.seed)
+    drones = len(flock.positions)
+    rows   = jnp.arange(drones)[:, None]
+    others = jnp.broadcast_to(jnp.arange(drones), (drones, drones))[
+        ~jnp.eye(drones, dtype=bool)
+    ].reshape(drones, drones - 1)
     period      = radio.period_steps(plan.step_s)
     steps       = radio.delay_steps(plan.step_s) + 6 * period
     inbox, sent = radio.opened(flock, 0, plan.step_s)
@@ -596,18 +699,36 @@ def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
             step_s = plan.step_s
         )
         if step % period == 0:
-            kept.append((uniform(fold_in(key, step), inbox.heard.shape), inbox))
+            kept.append((radio.draws(key, rows, others, jnp.asarray(step)), inbox))
 
+    def listed(held: Inbox) -> list[tuple[ndarray, ndarray]]:
+        """
+        Lists for each receiver the senders its table holds in `held`, in
+        the order of their indices, beside the position it last heard each
+        one at.
+        """
+        order     = jnp.where(held.heard, held.senders, drones).argsort(1)
+        senders   = asarray(jnp.take_along_axis(held.senders, order, 1))
+        positions = asarray(jnp.take_along_axis(held.positions, order[..., None], 1))
+        return [
+            (senders[receiver, :count], positions[receiver, :count])
+            for receiver, count in enumerate(asarray(held.heard.sum(1)))
+        ]
+
+    tables = [listed(held) for _, held in kept]
     return {
         "draws"     : [asarray(draws, dtype=float).tolist() for draws, _ in kept],
-        "flock"     : rounded(flock),
-        "heard"     : [asarray(heard.heard, dtype=int).tolist() for _, heard in kept],
+        "flock"     : {
+            name: leaf
+            for name, leaf in rounded(flock).items()
+            if name in ("forces", "positions", "velocities")
+        },
+        "held"      : [[row.tolist() for row, _ in table] for table in tables],
         "packets"   : list(range(0, steps, period)),
         "positions" : [
-            around(asarray(heard.positions, dtype=float), 4).tolist()
-            for _, heard in kept
-        ],
-        "steps"     : steps
+            [around(position.astype(float), 4).tolist() for _, position in table]
+            for table in tables
+        ]
     }
 
 

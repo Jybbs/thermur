@@ -5,9 +5,10 @@ The autouse `environment` fixture isolates every test from the machine
 running it.
 """
 
-from collections.abc  import Callable
+from collections.abc  import Callable, Iterator
 from common.edits     import executable, git
 from common.isolation import CLEARED, TERMINAL, copied_once
+from common.opened    import Opened
 from common.stand_ins import StandIn
 from itertools        import chain
 from os               import environ, pathsep
@@ -38,6 +39,7 @@ class PlainFile(SingleFileSnapshotExtension):
 @fixture
 def checkout(
     monkeypatch  : MonkeyPatch,
+    opens        : Opened,
     pytestconfig : Config,
     request      : FixtureRequest,
     tmp_path     : Path,
@@ -49,16 +51,21 @@ def checkout(
     carries one, keeping each program's mode, into a git repository holding
     no commit, so git lists each copied file as one it would track. It then
     trusts the copy's mise configuration and returns the `Checkout` rooted
-    there, which a case edits before a check reads it.
+    there, which a case edits before a check reads it. `opens` records
+    nothing while the copy is made, and records each copied file the case
+    opens under the path it was copied from.
     """
     copy  = Checkout(root=tmp_path)
     reads = [*chain.from_iterable(
         mark.args for mark in request.node.iter_markers("reads")
     )]
-    Checkout(root=pytestconfig.rootpath).copy(
-        [path for path in tracked if not reads or any(map(path.full_match, reads))],
-        copy.root
-    )
+    with monkeypatch.context() as copying:
+        copying.setattr(opens, "paused", True)
+        Checkout(root=pytestconfig.rootpath).copy(
+            [path for path in tracked if not reads or any(map(path.full_match, reads))],
+            copy.root
+        )
+    monkeypatch.setitem(opens.copies, tmp_path, pytestconfig.rootpath)
     copy.run("git", "init", "--quiet")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
     return copy
@@ -146,6 +153,27 @@ def mise(request: FixtureRequest, stand_in: Callable[[str, str], StandIn]) -> St
     return stand_in("mise", getattr(request, "param", "exit 0"))
 
 
+@fixture(autouse=True, scope="session")
+def opens(pytestconfig: Config, tracked: list[Path]) -> Opened:
+    """
+    Adds the `Opened` hook over the files `tracked` lists where
+    pytest-testmon collects, so a change to a file a test opens selects
+    that test.
+    """
+    return Opened.added(pytestconfig, tracked)
+
+
+@fixture(autouse=True)
+def recorded(opens: Opened, request: FixtureRequest) -> Iterator[None]:
+    """
+    Records each tracked file the test opened once it ends, through
+    `Opened.record`, those the setup of a fixture it requests opened
+    included, whichever test ran that setup.
+    """
+    yield
+    opens.record(request.fixturenames)
+
+
 @fixture(scope="session")
 def pins(pytestconfig: Config) -> dict[str, str]:
     """
@@ -192,6 +220,7 @@ def pins(pytestconfig: Config) -> dict[str, str]:
 
 @fixture(scope="session")
 def shared(
+    opens            : Opened,
     pytestconfig     : Config,
     tmp_path_factory : TempPathFactory,
     tracked          : list[Path],
@@ -203,17 +232,23 @@ def shared(
     pytest-xdist worker shares, which the first worker to take its lock
     writes and every other reads. It copies each file rather than linking
     it, so the copy shares no inode with the worktree, and no case edits it.
+    `opens` records nothing while the copy is made, and records each copied
+    file a case opens under the path it was copied from.
 
     Returns:
         The folder holding the copy.
     """
     base = tmp_path_factory.getbasetemp()
 
-    return copied_once(
-        (base if worker_id == "master" else base.parent) / "checked",
-        pytestconfig.rootpath,
-        tracked
-    ).root
+    with MonkeyPatch.context() as copying:
+        copying.setattr(opens, "paused", True)
+        root = copied_once(
+            (base if worker_id == "master" else base.parent) / "checked",
+            pytestconfig.rootpath,
+            tracked
+        ).root
+    opens.copies[root] = pytestconfig.rootpath
+    return root
 
 
 @fixture

@@ -4,8 +4,9 @@ counts it derives from its length and its step, and the launch it draws.
 """
 
 from common.drones import short
+from jax           import vmap
 from jax.numpy     import arccos, array, cos, deg2rad, sin, sqrt
-from jax.random    import key
+from jax.random    import key, split
 from numpy         import arange
 from numpy.testing import assert_allclose
 from pydantic      import ValidationError
@@ -61,11 +62,45 @@ def test_a_changed_plan_is_validated_as_a_new_one_is():
         plan.changed(drones=3)
 
 
+def test_a_flock_of_100_launches_at_the_center_s_height_as_drawn():
+    """
+    Asserts that a flock of 100 launches at the height `center_m` sets with
+    every drone of 256 launches above the ground, so neither the raised
+    height nor the hold at the ground moves a drone off its draw.
+    """
+    plan = Plan(drones=100)
+
+    assert plan.height_m == plan.center_m[2]
+    assert vmap(plan.launched)(split(key(plan.seed), 256)).positions[..., 2].min() > 0
+
+
+def test_a_flock_of_the_default_size_launches_above_the_ground():
+    """
+    Asserts that a flock of the default size launches its center
+    `clearance_sd` deviations of its depth above the ground, past the height
+    `center_m` sets, and that no drone of 256 launches starts under the
+    ground, the hold at the ground setting at least one drone and fewer
+    than one in 10,000 on it, each climbing and commanding the velocity it
+    launches at.
+    """
+    plan     = Plan()
+    launches = vmap(plan.launched)(split(key(plan.seed), 256))
+    heights  = launches.positions[..., 2]
+
+    assert plan.height_m == plan.clearance_sd * plan.depth_m > plan.center_m[2]
+    assert_allclose(heights.std(1).mean(), plan.depth_m, rtol=0.05)
+    assert heights.min() >= 0
+    assert 0 < (heights == 0).sum() < 1e-4 * heights.size
+    assert (launches.velocities[..., 2][heights == 0] > 0).all()
+    assert (launches.commands == launches.velocities).all()
+
+
 def test_a_launch_flies_the_course_at_the_cruise_in_a_cloud_about_its_center():
     """
     Asserts that a launch holds every drone at the cruise speed and no
     force, scatters no heading at a zero `scatter_deg`, centers its cloud
-    near `center_m`, and draws the same cloud from the same key.
+    near `center_m` at `height_m`, and draws the same cloud from the same
+    key.
     """
     plan   = short(drones=400, scatter_deg=0.0)
     flock  = plan.launched(key(3))
@@ -74,7 +109,11 @@ def test_a_launch_flies_the_course_at_the_cruise_in_a_cloud_about_its_center():
     assert_allclose((flock.velocities**2).sum(-1), 100.0, rtol=1e-5)
     assert_allclose(flock.velocities, array([[-10.0, 0.0, 0.0]] * 400), atol=1e-5)
     assert_allclose(flock.forces, 0.0)
-    assert_allclose(flock.positions.mean(0), plan.center_m, atol=10.0)
+    assert_allclose(
+        flock.positions.mean(0),
+        (*plan.center_m[:2], plan.height_m),
+        atol = 10.0
+    )
     assert spread[0] > spread[1] > spread[2]
     assert_allclose(plan.launched(key(3)).positions, flock.positions)
 
