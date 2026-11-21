@@ -26,10 +26,10 @@ def main():
     Moves the version and prints the one it moved to, exiting with status
     `2` where `--patch` and `--major` are both given.
     """
-    named = {part: environ.get(f"usage_{part}") == "true" for part in (
-        "major", "patch"
-    )}
-    if all(named.values()):
+    named = [
+        part for part in ("major", "patch") if environ.get(f"usage_{part}") == "true"
+    ]
+    if len(named) > 1:
         print(
             "`--patch` and `--major` name two releases, so give one at most",
             file = stderr
@@ -42,7 +42,7 @@ def main():
         "uv",
         "version",
         "--bump",
-        next((part for part, given in named.items() if given), "minor"),
+        next(iter(named), "minor"),
         "--frozen",
         "--short",
         capture = True

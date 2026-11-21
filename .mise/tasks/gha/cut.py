@@ -67,12 +67,15 @@ class Draft:
             The path as `published`, `updated`, or `created`, and the URL of
             the release it leaves.
         """
-        if published := [release for release in self.releases if not release["draft"]]:
+        if published := next(
+            (release for release in self.releases if not release["draft"]),
+            None
+        ):
             print(
                 f"::error::{self.version} is already published, so `mise bump` "
                 "moves `[project].version` to the next release"
             )
-            return "published", published[0]["url"]
+            return "published", published["url"]
 
         if self.releases:
             notes = run(
