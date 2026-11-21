@@ -21,7 +21,7 @@ from dataclasses  import asdict, fields
 from jax          import numpy as jnp
 from jax.random   import key as seeded, uniform
 from json         import loads
-from numpy        import asarray, linalg
+from numpy        import asarray, linalg, minimum
 from pathlib      import Path
 from pydantic     import BaseModel, Field
 from typing       import Annotated
@@ -405,14 +405,19 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     checkout: Checkout
 ):
     """
-    Asserts that the parity file holds a flock of twelve astride the rim of
-    the roost's disk and two on its center, each commanding off its velocity
-    and off the cruise speed with one pair inside the cohesion's hard
-    sphere, the center's resting drones starting a zig toward their zigging
-    neighbors' side where their draw is zero and the last flock's radio
-    delay outlasting the zig's reaction and cue, beside a run of the radio
-    in which every drone hears every other as it opens, and that the copy
-    the repository holds has not drifted.
+    Asserts that the parity file holds a flock of twelve astride the rim
+    of the roost's disk and two on its center, each commanding off its
+    velocity and off the cruise speed with one pair inside the cohesion's
+    hard sphere, the center's resting drones starting a zig toward their
+    zigging neighbors' side where their draw is zero and the last flock's
+    radio delay outlasting the zig's reaction and cue, beside a run of the
+    radio in which each drone's table holds `Radio.slots` of the senders in
+    range as it opens, or every one where fewer are, some drone hearing more
+    senders than its table holds, and the last drone, which no drone holds
+    as it opens, held by a drone by the last packet, a run over a crossing
+    flock whose tables turn over and whose third drone sits on its second,
+    a curve over drones with one coincident pair, and that the copy the
+    repository holds has not drifted.
     """
     outputs   = Outputs(checkout=checkout)
     settings  = Settings()
@@ -427,12 +432,18 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
         }
         for name, flock in paired["flocks"].items()
     }
-    rim     = flocks["rim"]
-    roost   = flocks["roost"]
-    outward = linalg.norm(rim["positions"][:, :2] - composite.roost.center_m, axis=-1)
-    apart   = linalg.norm(rim["positions"][:, None] - rim["positions"], axis=-1)
-    resting = (roost["forces"][:, 0] == 0) & (roost["draws"] == 0)
-    radio   = paired["radio"]
+    rim      = flocks["rim"]
+    roost    = flocks["roost"]
+    outward  = linalg.norm(rim["positions"][:, :2] - composite.roost.center_m, axis=-1)
+    apart    = linalg.norm(rim["positions"][:, None] - rim["positions"], axis=-1)
+    resting  = (roost["forces"][:, 0] == 0) & (roost["draws"] == 0)
+    radio    = paired["radio"]
+    crossing = paired["crossing"]
+    curve    = paired["curve"]
+    sent     = asarray(radio["flock"]["positions"])
+    within   = (
+        linalg.norm(sent[:, None] - sent, axis=-1) <= composite.radio.range_m
+    ).sum(1) - 1
 
     assert outward.min() < composite.roost.radius_m < outward.max()
     assert (rim["commands"] != rim["velocities"]).all()
@@ -443,8 +454,20 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     assert (roost["stepped"][resting, 0] > zig.refractory_s).all()
     assert (roost["stepped"][resting, 1] == -1).any()
     assert paired["flocks"]["late"]["delay_s"] > zig.reaction_s + zig.cue_s
-    assert asarray(radio["heard"][0]).all()
-    assert len(radio["packets"]) == len(radio["draws"]) == len(radio["positions"])
+    assert (within > Radio.slots).any()
+    assert list(map(len, radio["held"][0])) == minimum(within, Radio.slots).tolist()
+    assert not any(len(sent) - 1 in row for row in radio["held"][0])
+    assert any(len(sent) - 1 in row for row in radio["held"][-1])
+    assert (
+        len(radio["packets"])
+        == len(radio["draws"])
+        == len(radio["held"])
+        == len(radio["positions"])
+    )
+    assert crossing["held"][0] != crossing["held"][-1]
+    assert crossing["flock"]["positions"][1] == crossing["flock"]["positions"][2]
+    assert curve["points"][1] == curve["points"][2]
+    assert sorted(curve["order"]) == list(range(len(curve["points"])))
     assert outputs.parity not in outputs.drifted
 
 

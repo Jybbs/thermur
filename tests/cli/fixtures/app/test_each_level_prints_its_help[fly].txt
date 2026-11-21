@@ -113,13 +113,24 @@ Flies the flock, or computes the steps of the graph named.
 │ --plan.center-m FLOAT FLOAT   The center of the launch cloud, east, north,   │
 │   FLOAT                       and above the ground, in meters, by default on │
 │   --plan.empty-center-m       the parametric threat's course to the front it │
-│                               crosses within two minutes. [default: (1000.0, │
-│                               1000.0, 100.0)]                                │
+│                               crosses within two minutes, its height the     │
+│                               lowest the launch's center takes, which        │
+│                               clearance_sd raises for a deeper cloud.        │
+│                               [default: (1000.0, 1000.0, 100.0)]             │
+│ --plan.clearance-sd FLOAT     The vertical standard deviations of the launch │
+│                               cloud its center sits at least above the       │
+│                               ground, by default 4, past which a Gaussian    │
+│                               draw falls for 0.003% of drones, so about one  │
+│                               flock of 1,000 in 32 sets a drone on the       │
+│                               ground. [default: 4.0]                         │
 │ --plan.course-deg FLOAT       The launch heading in degrees counterclockwise │
 │                               from east, by default west. [default: 180.0]   │
 │ --plan.cruise-m-s FLOAT       The speed each drone launches and cruises at,  │
 │                               in meters per second. [default: 10.0]          │
-│ --plan.drones INT             The size of the flock. [default: 100]          │
+│ --plan.drones INT             The size of the flock, by default near the     │
+│                               median of the ten starling flocks of 448 to    │
+│                               2,631 birds the topological interaction was    │
+│                               measured on. [default: 1000]                   │
 │ --plan.duration-s FLOAT       The length of the flight, in seconds.          │
 │                               [default: 120.0]                               │
 │ --plan.frame-every INT        The number of steps between two kept frames.   │
@@ -214,8 +225,10 @@ Flies the flock, or computes the steps of the graph named.
 │   --roost.empty-center-m      by default the launch's. [default: (1000.0,    │
 │                               1000.0)]                                       │
 │ --roost.height-m FLOAT        The height the drone is pulled toward, in      │
-│                               meters above the ground, by default the        │
-│                               launch's. [default: 100.0]                     │
+│                               meters above the ground, by default that of    │
+│                               the launch's center, which a flock of more     │
+│                               than 304 drones launches above. [default:      │
+│                               100.0]                                         │
 │ --roost.radius-m FLOAT        The disk's radius, in meters. [default:        │
 │                               1000.0]                                        │
 │ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
