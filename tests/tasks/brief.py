@@ -92,21 +92,22 @@ def job(result: str = "success", **outputs: str) -> dict:
         ),
         param(
             "draft.yml",
-            {"cut": job(state="kept", url="https://u/d", version="0.2.0")},
+            {"cut": job(state="updated", url="https://u/d", version="0.2.0")},
             None,
-            id = "draft-kept"
+            id = "draft-updated"
         ),
         param(
             "draft.yml",
-            {"cut": job(state="skipped", url="https://u/r", version="0.1.0")},
+            {
+                "cut": job(
+                    result  = "failure",
+                    state   = "published",
+                    url     = "https://u/r",
+                    version = "0.1.0"
+                )
+            },
             None,
-            id = "draft-skipped"
-        ),
-        param(
-            "draft.yml",
-            {"cut": job(state="unchanged", url="", version="0.1.0")},
-            None,
-            id = "draft-unchanged"
+            id = "draft-published"
         ),
         param("draft.yml", {"cut": job("failure")}, None, id="draft-failed"),
         param(
@@ -164,8 +165,9 @@ def test_each_workflow_renders_its_summary(
     """
     Asserts that a workflow file with a template of its own renders that
     template, naming the coverage report a coverage row attached and none
-    where the row left its output empty, the path the draft cut took, or the
-    address the deploy published, and that any other renders `base.md.j2`.
+    where the row left its output empty, the path the draft cut took,
+    failing on the published path, or the address the deploy published, and
+    that any other renders `base.md.j2`.
     """
     assert readout(file, needs, branch).summary == snapshot
 

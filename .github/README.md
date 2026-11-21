@@ -446,6 +446,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise relock` | Re-resolves every lockfile after its manifest changes |
 | `mise scan` | Holds every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories through `uv audit` and `bun audit`, setting aside each `AUDIT_IGNORE` id no release fixes yet |
 | `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, the actions the workflows pin, the runner image every job runs on, and the wrangler release `🐦‍⬛ Pages` deploys through, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands for that run, and each pin `[tool.thermur.holds]` in `pyproject.toml` records there on every run, its reason printed beside it |
+| `mise bump` | Moves `[project].version` in `pyproject.toml` to the next minor release, or the next patch or major one under `--patch` or `--major`, carrying `uv.lock` and the `version` of `CITATION.cff` with it |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 | `mise fetch` | Downloads the WRF-SFIRE sample from the address its pinned digest keys and checks it against that digest before moving it into `data/samples/` |
 | `mise browse` | Opens Hamilton's experiment viewer over the runs `thermur fly` records under `data/runs/`, passing any further arguments to it |
