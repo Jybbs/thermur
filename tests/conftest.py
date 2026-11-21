@@ -2,27 +2,17 @@
 Defines the fixtures every test folder shares, each described where it is
 defined, beside the plain-file extension every snapshot is written through.
 The autouse `environment` fixture isolates every test from the machine
-running it, the collection hook lets a test open a network connection only
-when it carries the `network` mark, and the `--share` option runs one share
-of a suite split by test across several machines.
+running it.
 """
 
-from collections.abc    import Callable
-from common.edits       import executable, git
-from common.environment import CLEARED
-from common.stand_ins   import StandIn
-from os                 import environ, pathsep
-from pathlib            import Path
-from pytest             import (
-    Config,
-    FixtureRequest,
-    Item,
-    MonkeyPatch,
-    Parser,
-    TempPathFactory,
-    fixture,
-    mark
-)
+from collections.abc  import Callable
+from common.edits     import executable, git
+from common.isolation import CLEARED, TERMINAL, copied_once
+from common.stand_ins import StandIn
+from itertools        import chain
+from os               import environ, pathsep
+from pathlib          import Path
+from pytest           import Config, FixtureRequest, MonkeyPatch, TempPathFactory, fixture
 from shlex            import quote
 from syrupy.assertion import SnapshotAssertion
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
@@ -49,21 +39,52 @@ class PlainFile(SingleFileSnapshotExtension):
 def checkout(
     monkeypatch  : MonkeyPatch,
     pytestconfig : Config,
+    request      : FixtureRequest,
     tmp_path     : Path,
     tracked      : list[Path]
 ) -> Checkout:
     """
-    Copies into `tmp_path` every file `tracked` lists, keeping each
-    program's mode, into a git repository holding no commit, so git lists
-    each copied file as one it would track. It then trusts the copy's mise
-    configuration and returns the `Checkout` rooted there, which a case
-    edits before a check reads it.
+    Copies into `tmp_path` each file `tracked` lists that matches a pattern
+    of a `reads` mark on the case or its module, or every file where neither
+    carries one, keeping each program's mode, into a git repository holding
+    no commit, so git lists each copied file as one it would track. It then
+    trusts the copy's mise configuration and returns the `Checkout` rooted
+    there, which a case edits before a check reads it.
     """
-    copy = Checkout(root=tmp_path)
-    Checkout(root=pytestconfig.rootpath).copy(tracked, copy.root)
+    copy  = Checkout(root=tmp_path)
+    reads = [*chain.from_iterable(
+        mark.args for mark in request.node.iter_markers("reads")
+    )]
+    Checkout(root=pytestconfig.rootpath).copy(
+        [path for path in tracked if not reads or any(map(path.full_match, reads))],
+        copy.root
+    )
     copy.run("git", "init", "--quiet")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(tmp_path))
     return copy
+
+
+@fixture(scope="session")
+def checked(
+    pytestconfig     : Config,
+    tmp_path_factory : TempPathFactory,
+    tracked          : list[Path],
+    worker_id        : str
+) -> Checkout:
+    """
+    Copies every file `tracked` lists once for the whole run, into a git
+    repository holding no commit beside the base temporary folder every
+    pytest-xdist worker shares, which the first worker to take its lock
+    writes and every other reads. It copies each file rather than linking
+    it, so the copy shares no inode with the worktree, and no case edits it.
+    """
+    shared = tmp_path_factory.getbasetemp()
+
+    return copied_once(
+        (shared if worker_id == "master" else shared.parent) / "checked",
+        pytestconfig.rootpath,
+        tracked
+    )
 
 
 @fixture
@@ -101,7 +122,10 @@ def environment(
     and every one opening on `usage_`, through which mise hands a task each
     flag its usage spec declares and which every program the task starts
     inherits. It then points `HOME` at an empty folder the test owns, so a
-    tool that falls back to `~` finds none of the developer's files there.
+    tool that falls back to `~` finds none of the developer's files there,
+    and sets the terminal type and width `TERMINAL` names, so a program
+    sizing or coloring its output for the terminal prints alike on every
+    machine.
 
     mise reads a configuration file out of every folder above the one
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
@@ -122,6 +146,8 @@ def environment(
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
     monkeypatch.setenv("MISE_IGNORED_CONFIG_PATHS", str(settled))
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(pytestconfig.rootpath))
+    for name, value in TERMINAL.items():
+        monkeypatch.setenv(name, value)
 
 
 @fixture
@@ -218,58 +244,6 @@ def tracked(pytestconfig: Config) -> list[Path]:
     `Checkout.tracked` lists them.
     """
     return Checkout(root=pytestconfig.rootpath).tracked()
-
-
-def pytest_addoption(parser: Parser):
-    """
-    Adds `--share`, which takes `<index>/<count>` and runs the share of the
-    suite at `index`, counting from 1, out of `count` shares.
-    """
-    parser.addoption(
-        "--share",
-        help    = "Run the share at <index>, counting from 1, out of <count> shares",
-        metavar = "<index>/<count>",
-        type    = share
-    )
-
-
-def pytest_collection_modifyitems(config: Config, items: list[Item]):
-    """
-    Adds pytest-socket's `enable_socket` mark, which reopens the socket
-    `--disable-socket` closes, to every test carrying the `network` mark,
-    and skips every test outside the share `--share` names. A share takes
-    every `count`-th test from the one at `index` in node ID order, which
-    every machine computes alike under any `pytest-randomly` seed. A skip
-    leaves syrupy reading every test as selected, so it still reports a
-    snapshot no test reads, while it reads a skipped test's snapshots as
-    still in use.
-    """
-    for item in items:
-        if item.get_closest_marker("network"):
-            item.add_marker(mark.enable_socket)
-
-    if picked := config.getoption("share"):
-        index, count = picked
-        kept         = set(sorted(item.nodeid for item in items)[index - 1 :: count])
-        skip         = mark.skip(reason=f"Runs in another share than {index}/{count}")
-        for item in items:
-            if item.nodeid not in kept:
-                item.add_marker(skip)
-
-
-def share(text: str) -> tuple[int, int]:
-    """
-    Reads `<index>/<count>` as the share at `index` out of `count` shares.
-
-    Raises:
-        ValueError: Where `text` is no such pair, or `index` falls outside 1
-                    to `count`.
-    """
-    index, count = map(int, text.split("/"))
-    if not 1 <= index <= count:
-        raise ValueError(f"No share {index} out of {count}")
-
-    return index, count
 
 
 @fixture

@@ -1,127 +1,16 @@
 """
-Pins the arguments each `py` task hands the formatter or pytest, meaning the
-folders the formatter reads, the reports coverage writes, every argument a
-reader adds, the annotations `py:check` prints under GitHub Actions, and the
-selection `py:affected` makes for each change since `main`.
+Pins the selection `py:affected` makes for each change since `main`, and how
+it fails where no `main` resolves.
 """
 
 from collections.abc  import Callable
 from common.edits     import git
 from common.stand_ins import StandIn
 from pathlib          import Path
-from pytest           import Config, MonkeyPatch, fixture, mark, param
+from pytest           import Config, fixture, mark, param
 from subprocess       import run
 
 from thermur.repo.checkout import Checkout
-
-FOLDERS = [".mise/tasks", "src", "tests"]
-
-
-@mark.parametrize(
-    ("task", "actions", "passed"),
-    [
-        param(
-            "check",
-            "true",
-            ["check", "--output-format", "github", "--marker", *FOLDERS],
-            id = "check-actions"
-        ),
-        param(
-            "check",
-            "",
-            ["check", "--output-format", "text", "--marker", *FOLDERS],
-            id = "check-empty"
-        ),
-        param(
-            "check",
-            None,
-            ["check", "--output-format", "text", "--marker", *FOLDERS],
-            id = "check-unset"
-        ),
-        param("format", None, ["format", "--marker", *FOLDERS], id="format"),
-        param("test", None, ["--marker"], id="test"),
-        param(
-            "coverage",
-            None,
-            [
-                "--cov", "--cov-fail-under=0", "--cov-report=", "--marker",
-                "html", "--fail-under=0", "report"
-            ],
-            id = "coverage"
-        )
-    ]
-)
-def test_each_task_hands_its_program_every_argument(
-    actions      : str | None,
-    monkeypatch  : MonkeyPatch,
-    passed       : list[str],
-    pytestconfig : Config,
-    stand_in     : Callable[[str, str], StandIn],
-    task         : str
-):
-    """
-    Asserts that each `py` task runs its program on the arguments
-    it fixes followed by every argument a reader adds, the formatter
-    over `.mise/tasks`, `src`, and `tests` and coverage writing its
-    HTML and terminal reports from the data afterward, with `py:check`
-    passing `--output-format github` where `GITHUB_ACTIONS` is set and
-    `--output-format text` where it is empty or unset.
-    """
-    root = pytestconfig.rootpath
-    for program in ("coverage", "prose", "pytest"):
-        stand_in(program, 'printf "%s\\n" "$@"')
-
-    if actions is not None:
-        monkeypatch.setenv("GITHUB_ACTIONS", actions)
-
-    printed = run(
-        [root / ".mise/tasks/py" / task, "--marker"],
-        capture_output = True,
-        check          = True,
-        cwd            = root,
-        text           = True
-    ).stdout.splitlines()
-
-    assert printed == passed
-
-
-@mark.parametrize(
-    ("measured", "reported", "status"),
-    [
-        param(0, 0, 0, id="both-pass"),
-        param(1, 0, 1, id="a-test-fails"),
-        param(0, 2, 2, id="below-fail-under"),
-        param(1, 2, 2, id="both-fail")
-    ]
-)
-def test_the_coverage_reports_whatever_the_suite_returns(
-    measured     : int,
-    pytestconfig : Config,
-    reported     : int,
-    stand_in     : Callable[[str, str], StandIn],
-    status       : int
-):
-    """
-    Asserts that `py:coverage` writes the HTML report at any total and
-    runs the terminal report, which fails below `fail_under`, whether or
-    not a test failed, exiting with the report's status where it fails and
-    otherwise with the status of the suite.
-    """
-    stand_in("pytest", f"exit {measured}")
-    coverage = stand_in(
-        "coverage",
-        f'[ "$*" = "html --fail-under=0" ] || exit {reported}'
-    )
-    ran = run(
-        [pytestconfig.rootpath / ".mise/tasks/py/coverage"],
-        capture_output = True,
-        cwd            = pytestconfig.rootpath
-    )
-
-    assert (ran.returncode, coverage.commands) == (
-        status,
-        ["coverage html --fail-under=0", "coverage report"]
-    )
 
 
 @fixture

@@ -1,17 +1,17 @@
 """
-Pins the `--share` option `tests/conftest.py` adds, which splits the suite
-by test across several machines, meaning the tests each share runs under any
+Pins the `--share` option `common.shares` adds, which splits the suite by
+test across several machines, meaning the tests each share runs under any
 `pytest-randomly` seed, the unused snapshot every share reports, and the one
 entry for each source file in the coverage data combined from every share.
 """
 
-from coverage       import Coverage, CoverageData
-from os             import pathsep
-from pathlib        import Path
-from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
-from subprocess     import CompletedProcess, run
-from sys            import executable
-from tests.conftest import share
+from common.shares import share
+from coverage      import Coverage, CoverageData
+from os            import pathsep
+from pathlib       import Path
+from pytest        import Config, MonkeyPatch, fixture, mark, param, raises
+from subprocess    import CompletedProcess, run
+from sys           import executable
 
 CASES = [f"test_{number}" for number in range(5)]
 
@@ -19,12 +19,12 @@ CASES = [f"test_{number}" for number in range(5)]
 @fixture
 def suite(monkeypatch: MonkeyPatch, pytestconfig: Config, tmp_path: Path) -> Path:
     """
-    Writes a suite under `tmp_path` whose conftest imports the share hooks
-    from `tests/conftest.py`, holding one module of the cases `CASES` names,
-    and records the snapshot each case matches. It clears the variable
-    naming the pytest-xdist worker running this case, under which syrupy
-    reads the suite's own run as a worker and leaves its unused snapshots to
-    a controller that never runs.
+    Writes a suite under `tmp_path` whose conftest registers `common.shares`
+    as a plugin, holding one module of the cases `CASES` names, and
+    records the snapshot each case matches. It clears the variable naming
+    the pytest-xdist worker running this case, under which syrupy reads
+    the suite's own run as a worker and leaves its unused snapshots to a
+    controller that never runs.
 
     Returns:
         The path of the module holding the cases.
@@ -33,7 +33,7 @@ def suite(monkeypatch: MonkeyPatch, pytestconfig: Config, tmp_path: Path) -> Pat
     monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
     monkeypatch.setenv("PYTHONPATH", pathsep.join(map(str, [root, root / "tests"])))
     (tmp_path / "conftest.py").write_text(
-        "from tests.conftest import pytest_addoption, pytest_collection_modifyitems\n",
+        'pytest_plugins = ["common.shares"]\n',
         encoding = "utf-8"
     )
     module = tmp_path / "test_cases.py"

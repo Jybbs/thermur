@@ -67,14 +67,16 @@ def test_a_measure_scores_each_candidate_and_seed_so_larger_is_favored(
 def test_a_flown_trial_tables_every_flight_beside_its_ranks():
     """
     Asserts that flying a trial returns its statistics by candidate,
-    condition, and seed, whether each candidate is favored, and the rank of
-    each model on each candidate's replayed flight.
+    condition, and seed, whether each candidate is favored, and the rank
+    of each model on each candidate's replayed flight, a replay as short as
+    the flights.
     """
     flown = Trial(
         candidates = {"elastic": Elastic()},
         conditions = {"small": {"drones": 10}},
         duration_s = 2.0,
         measures   = (Measure(statistic="spacing_m"),),
+        replay_s   = 2.0,
         slot       = "cohesion"
     ).flown(still_air(), Composite.from_settings(Settings()), short())
 
@@ -203,6 +205,14 @@ def test_each_listed_trial_opens_a_slot_of_the_composite_once():
     assert len(set(slots)) == len(slots)
     assert set(slots) <= {field.name for field in fields(Composite)}
     assert [trial.name for trial in trials] == [f"{slot}_trial" for slot in slots]
+
+
+def test_every_listed_trial_replays_each_composite_for_ten_seconds():
+    """
+    Asserts that every trial the package runs flies each composite for 10 s
+    for the models to rank.
+    """
+    assert {trial.replay_s for trial in Trial.listed()} == {10.0}
 
 
 def test_the_heading_trial_favors_a_spontaneous_spectral_peak_nearest_zero():
