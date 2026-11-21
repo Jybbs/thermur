@@ -127,6 +127,37 @@ def test_a_drone_learns_a_sender_beyond_its_table_from_a_member_s_list():
     assert not holds(heard, 0, 2)
 
 
+def test_a_drone_learns_only_the_list_a_member_broadcast_its_delay_earlier():
+    """
+    Asserts that a drone learns a sender from the neighbor list a member
+    broadcast `delay_s` before the packet, rather than from the list the
+    member holds as the packet falls, which no packet has carried yet.
+    """
+    positions = array(
+        [[0.0, 0.0, 0.0], [10.0, 0.0, 0.0], [20.0, 0.0, 0.0], [30.0, 0.0, 0.0]]
+    )
+    flock = flock_of(positions, zeros((4, 3)))
+    radio = Radio(
+        delay_s = 0.1,
+        loss    = 0.0,
+        range_m = 100.0,
+        rate_hz = 10.0
+    )
+    _, sent = radio.opened(flock, 0, 0.1)
+    table   = Inbox.from_broadcast(flock, radio.range_m, flock, 2)
+    inbox   = replace(
+        table,
+        heard   = table.heard.at[0].set(array([True, False])),
+        lists   = stack([table.senders.at[1].set(array([3, 3])), table.senders]),
+        senders = table.senders.at[0].set(array([1, 0]))
+    )
+
+    heard, _ = radio.heard(flock, inbox, key(0), 0, sent, 1, 0.1)
+
+    assert holds(heard, 0, 3)
+    assert not holds(heard, 0, 2)
+
+
 def test_a_fixed_speed_leaves_no_acceleration_along_the_velocity():
     """
     Asserts that a speed slot holding the speed fixed takes out the part

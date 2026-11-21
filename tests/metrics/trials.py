@@ -17,7 +17,7 @@ from thermur.controller.schemas    import Composite
 from thermur.environment.air       import Air
 from thermur.metrics.flight        import Flight
 from thermur.metrics.schemas       import Plan
-from thermur.metrics.trials        import Measure, REFERENCE, Trial, summarized
+from thermur.metrics.trials        import Measure, REFERENCE, SIZES, Trial, summarized
 from thermur.pipeline.settings     import Settings
 
 TABLE = Dataset(
@@ -250,6 +250,20 @@ def test_each_listed_trial_opens_a_slot_of_the_composite_once():
     assert len(set(slots)) == len(slots)
     assert set(slots) <= {field.name for field in fields(Composite)}
     assert [trial.name for trial in trials] == [f"{slot}_trial" for slot in slots]
+
+
+def test_every_listed_trial_flies_the_sizes_its_tables_were_measured_at():
+    """
+    Asserts that every flight of every listed trial flies one of the sizes
+    `SIZES` holds, whatever the plan's own flock size.
+    """
+    plan = Settings().plan
+
+    assert {
+        plan.changed(drones=trial.drones).changed(**changes).drones
+        for trial in Trial.listed()
+        for changes in trial.conditions.values()
+    } <= {size["drones"] for size in SIZES.values()}
 
 
 def test_the_heading_trial_favors_a_spontaneous_spectral_peak_nearest_zero():

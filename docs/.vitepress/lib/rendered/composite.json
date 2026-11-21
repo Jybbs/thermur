@@ -46,7 +46,8 @@
     "hold_periods": 3,
     "loss": 0.4,
     "range_m": 50.0,
-    "rate_hz": 5.0
+    "rate_hz": 5.0,
+    "slots": 16
   },
   "roost": {
     "kind": "Home",

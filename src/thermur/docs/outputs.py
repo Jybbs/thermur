@@ -15,12 +15,12 @@ from jax             import Array, numpy as jnp, tree, vmap
 from jax.random      import key as seeded, uniform
 from json            import dumps
 from math            import sqrt
-from numpy           import argsort, around, asarray, cross, geomspace, linalg, ndarray, zeros
+from numpy           import around, asarray, cross, geomspace, linalg, ndarray, zeros
 from numpy.random    import default_rng
 from pathlib         import Path
 from pydantic        import BaseModel, Field, TypeAdapter, create_model
 
-from thermur.controller.schemas import Composite, Flock, Inbox, Observation, Radio
+from thermur.controller.schemas import Composite, Flock, Inbox, Observation, Radio, unit
 from thermur.docs.kit           import Piece
 from thermur.docs.pages         import Page
 from thermur.environment.air    import Air
@@ -212,13 +212,15 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         } | ParametricThreat().model_dump()
         settings  = Settings()
         composite = Composite.from_settings(settings)
+        model     = {
+            slot.name: {"kind": type(component).__name__} | asdict(component)
+            for slot in fields(Composite)
+            if (component := getattr(composite, slot.name))
+        }
+        model["radio"]["slots"] = composite.radio.slots
         return {
             self.composite : dumps(
-                {
-                    slot.name: {"kind": type(component).__name__} | asdict(component)
-                    for slot in fields(Composite)
-                    if (component := getattr(composite, slot.name))
-                }
+                model
                 | {
                     "plan": settings.plan.model_dump(
                         include = {
@@ -429,9 +431,13 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     key the step derives, and the other two sit on the roost's center, half
     their drones drawing zero and the rest drawing across the chances a few
     zigging neighbors give, the last under a radio whose delay outlasts the
-    zig's reaction and cue. Beside them, the radio carries the six drones of
-    the first flock nearest its first drone, all within the radio's range of
-    one another.
+    zig's reaction and cue. Beside them, the radio carries a flock of eight
+    more drones than a table holds on the roost's center, launched at half
+    the spacing of the other three, so a drone hears more senders than its
+    table keeps, its last drone flying back at the cruise speed from 5 m
+    past the radio's range ahead of the drone leading along the flock's mean
+    velocity, so no drone holds it as the radio opens and it flies into the
+    flock's range.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
@@ -462,14 +468,22 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         forces    = forces,
         plan      = plan
     )
-    near = argsort(linalg.norm(rim.positions - rim.positions[0], axis=-1))[:6]
-    late = tree_at(
+    radio = posed(
+        center_m  = roost.center_m,
+        composite = composite,
+        forces    = zeros((Radio.slots + 8, 3)),
+        plan      = plan,
+        spacing_m = 4.0
+    )
+    heading = unit(radio.velocities.mean(0))
+    leader  = radio.positions[(radio.positions @ heading).argmax()]
+    late    = tree_at(
         lambda slots: slots.radio,
         composite,
         replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
     )
     return {
-        "flocks": {
+        "flocks" : {
             "late"  : flown(
                 composite = late,
                 draws     = draws,
@@ -489,7 +503,20 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
                 plan      = plan
             )
         },
-        "radio": relayed(tree.map(lambda leaf: leaf[near], rim), plan, composite.radio)
+        "radio"  : relayed(
+            flock = tree_at(
+                lambda flock: (flock.positions, flock.velocities),
+                radio,
+                (
+                    radio.positions.at[-1].set(
+                        jnp.round(leader + (composite.radio.range_m + 5) * heading, 4)
+                    ),
+                    radio.velocities.at[-1].set(-plan.cruise_m_s * heading)
+                )
+            ),
+            plan  = plan,
+            radio = composite.radio
+        )
     }
 
 
@@ -519,21 +546,22 @@ def posed(
     center_m  : Sequence[float],
     composite : Composite,
     forces    : ndarray,
-    plan      : Plan
+    plan      : Plan,
+    spacing_m : float = 8.0
 ) -> Flock:
     """
-    Launches a flock of drones from `plan` a few meters apart around
-    `center_m`, one for each row of `forces`, which sets their zigs, each
-    commanding a velocity apart from the one it flies and off the cruise
-    speed and spinning toward the velocity it flies, its last drone moved
-    half the cohesion's hard sphere ahead of the one before it along that
-    drone's command. Every value is rounded to four decimals, so a copy of
-    the step reads the same flock the package moves.
+    Launches a flock of drones from `plan` at a launch spacing of
+    `spacing_m` around `center_m`, one for each row of `forces`, which sets
+    their zigs, each commanding a velocity apart from the one it flies and
+    off the cruise speed and spinning toward the velocity it flies, its last
+    drone moved half the cohesion's hard sphere ahead of the one before it
+    along that drone's command. Every value is rounded to four decimals, so
+    a copy of the step reads the same flock the package moves.
     """
     launch = plan.changed(
         center_m  = (*center_m, composite.roost.height_m),
         drones    = len(forces),
-        spacing_m = 8.0
+        spacing_m = spacing_m
     ).launched(seeded(plan.seed))
     commands      = asarray(launch.commands, dtype=float) * [0.8, 1.2, 0.5]
     positions     = asarray(launch.positions, dtype=float)
