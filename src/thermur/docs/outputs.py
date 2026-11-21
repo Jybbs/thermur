@@ -433,22 +433,23 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     Moves three flocks of twelve drones from `plan` through one step of
     `composite`, each with five zigs under way at its side, at its push
     back, and in its refractory time. The first sits astride the rim of the
-    roost's disk on the side its course heads toward, its zigs read from the
-    key the step derives, and the other two sit on the roost's center, half
-    their drones drawing zero and the rest drawing across the chances a few
-    zigging neighbors give, the last under a radio whose delay outlasts the
-    zig's reaction and cue. Beside them, the radio carries a flock of eight
-    more drones than a table holds on the roost's center, launched at half
-    the spacing of the other three, so a drone hears more senders than its
-    table keeps, its last drone flying back at the cruise speed from 5 m
-    past the radio's range ahead of the drone leading along the flock's mean
-    velocity, so no drone holds it as the radio opens and it flies into the
-    flock's range. A second run carries 120 drones scattered 25 m about the
-    roost's center over a radio losing no packet, every other drone flying
-    back along the east axis at the cruise speed and its third drone flying
-    on its second, and the curve orders 340 drones scattered the same way,
-    its third drone on its second, each value drawn in double precision and
-    rounded to four decimals.
+    roost's disk on the side its course heads toward, its zigs read from
+    the key the step derives, and the other two sit on the roost's center,
+    half their drones drawing zero and the rest drawing across the chances a
+    few zigging neighbors give, the last under a radio whose delay outlasts
+    the zig's reaction and cue. Beside them, the radio carries a flock of
+    eight more drones than a table holds on the roost's center, launched at
+    half the spacing of the other three, so a drone hears more senders than
+    its table keeps, its last drone flying back at the cruise speed from 5
+    m past the radio's range ahead of the drone leading along the flock's
+    mean velocity, so no drone holds it as the radio opens and it flies into
+    the flock's range. A second run carries 120 drones scattered 25 m about
+    the roost's center over a radio losing no packet, the even drones flying
+    east at the cruise speed and the odd ones west, each velocity scattered
+    1.5 m/s on every axis and its third drone flying on its second, and
+    the curve orders 340 drones scattered the same way, its third drone on
+    its second, each value drawn in double precision and rounded to four
+    decimals.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
@@ -644,10 +645,10 @@ def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
     table then holds.
 
     Returns:
-        The flock the radio opens on, the number of steps it runs, each
-        step a packet falls at, and at each such step the draws, the senders
-        each drone's table holds in the order of their indices, and the
-        position it last heard each one at.
+        The forces, positions, and velocities of the flock the radio opens
+        on, each step a packet falls at, and at each such step the draws,
+        the senders each drone's table holds in the order of their indices,
+        and the position it last heard each one at.
     """
     key    = seeded(plan.seed)
     drones = len(flock.positions)
@@ -693,14 +694,17 @@ def relayed(flock: Flock, plan: Plan, radio: Radio) -> dict[str, object]:
     tables = [listed(held) for _, held in kept]
     return {
         "draws"     : [asarray(draws, dtype=float).tolist() for draws, _ in kept],
-        "flock"     : rounded(flock),
+        "flock"     : {
+            name: leaf
+            for name, leaf in rounded(flock).items()
+            if name in ("forces", "positions", "velocities")
+        },
         "held"      : [[row.tolist() for row, _ in table] for table in tables],
         "packets"   : list(range(0, steps, period)),
         "positions" : [
             [around(position.astype(float), 4).tolist() for _, position in table]
             for table in tables
-        ],
-        "steps"     : steps
+        ]
     }
 
 

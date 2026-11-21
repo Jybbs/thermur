@@ -4,7 +4,7 @@ import { Curve } from '../../../lib/front/curve.ts'
 import parity    from '../../../lib/rendered/parity.json' with { type: 'json' }
 
 describe('Curve', () => {
-  it('orders a launch as the package’s zorder does, clipping each window to the ends', () => {
+  it('orders a scattered flock as the package’s zorder does, clipping each window to the ends', () => {
     const { order, points } = parity.curve
     const curve             = new Curve(points.length)
     curve.through(0, new Float64Array(points.flat()), 3)

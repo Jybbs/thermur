@@ -243,9 +243,9 @@ class Radio(Module):
     - The sender appears in the neighbor list a member of its table
       broadcasts, as OLSR populates its 2-hop neighbor set in section 8.2
       of RFC 3626
-    - The sender is one of the `slots` drones beside it along the Z-order
-      curve of the broadcasts, which reaches a drone whose members list no
-      sender in range
+    - The sender is another drone in the `slots` places along the Z-order
+      curve of the broadcasts that start `slots / 2` before its own, which
+      reaches a drone whose members list no sender in range
     """
 
     delay_s: NonNegative = field(default=1.0, static=True)
@@ -312,7 +312,8 @@ class Radio(Module):
 
         - Each sender its table holds
         - Each sender the neighbor lists of the members it hears name
-        - Each of the `slots` drones beside it along the Z-order curve
+        - Each other drone in the `slots` places along the Z-order curve
+          that start `slots / 2` before its own
 
         A packet arrives where its sender broadcast from within `range_m`
         of the receiver and the link keeps it. Each receiver then keeps in

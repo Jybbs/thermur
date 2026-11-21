@@ -30,12 +30,12 @@ function apart(at: number, from: Float64Array, into: Float64Array, to: number): 
  * not lose it, and each drone forgets a sender once the link's hold passes with
  * no packet from it, a drone never hearing itself. Each drone holds in its table
  * the link's `slots` nearest senders it hears, and learns a sender beyond the
- * table from the neighbor list each member of the table broadcast and from the
- * `slots` drones beside it along the Z-order curve of the broadcasts. What drone
- * `r` last heard of drone `s` sits at `(r * count + s) * SENT` of `inbox`, laid
- * out as `SENT` gives, and whether its table holds that sender at
- * `r * count + s` of `heard`. Every array a step reads and writes is built once,
- * so a step allocates nothing.
+ * table from the neighbor list each member of the table broadcast and from each
+ * other drone in the `slots` places along the Z-order curve of the broadcasts
+ * that start `slots / 2` before its own. What drone `r` last heard of drone `s`
+ * sits at `(r * count + s) * SENT` of `inbox`, laid out as `SENT` gives, and
+ * whether its table holds that sender at `r * count + s` of `heard`. Every array
+ * a step reads and writes is built once, so a step allocates nothing.
  */
 export class Radio {
   readonly heard     : Uint8Array
@@ -127,8 +127,9 @@ export class Radio {
   /**
    * Weighs for `receiver` the senders its table holds that it still hears,
    * those the neighbor lists at `lists` of the members whose packet at `base`
-   * reaches it name, and the `slots` drones beside it along the curve, then
-   * keeps the nearest as its table.
+   * reaches it name, and each other drone in the `slots` places along the
+   * curve that start `slots / 2` before its own, then keeps the nearest as its
+   * table.
    */
   #choose(base: number, lists: number, now: number, receiver: number): void {
     const count = this.#count
@@ -235,8 +236,8 @@ export class Radio {
    * broadcasts sent the link's delay earlier, each lost where `random` falls
    * under the link's loss, to each receiver from the senders its table holds,
    * from those the neighbor lists the members it hears sent with them name, and
-   * from the `slots` drones beside it along the Z-order curve of those
-   * broadcasts. Each receiver then keeps in its table the `slots` nearest of
+   * from each other drone in the `slots` places along the Z-order curve of
+   * those broadcasts that start `slots / 2` before its own. Each receiver then keeps in its table the `slots` nearest of
    * these and of the senders it still holds, ranked by the positions it heard,
    * forgetting a sender no packet reached for the link's hold, which, as a
    * whole number of packet periods, runs out only where a packet falls.
