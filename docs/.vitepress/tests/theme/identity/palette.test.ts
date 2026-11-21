@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { type DOMWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { type DOMWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
 import { wcagContrast }                                             from 'culori'
 import { afterEach, describe, expect, it, vi }                      from 'vitest'
 import { createSSRApp, ref }                                        from 'vue'
@@ -99,17 +99,20 @@ describe('copying from IdentityPalette', () => {
   ] as const)('copies the hex of the scheme on display, dark: %s', async ([dark, scheme]) => {
     isDark.value = dark
     const widget = mount(IdentityPalette, { attachTo: document.body })
+    const write  = vi.spyOn(navigator.clipboard, 'writeText')
     await widget.findAll('.identity-copy')[1]!.trigger('click')
-    await flushPromises()
+    await write.mock.results[0]!.value
     expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.series[1]![scheme]))
+    await widget.vm.$nextTick()
     expect(widget.get('[aria-live]').text()).toMatch(/^Copied #/u)
   })
 
   it('copies a role’s hex from its key in the scheme on display', async () => {
     isDark.value = true
     const widget = mount(IdentityPalette, { attachTo: document.body })
+    const write  = vi.spyOn(navigator.clipboard, 'writeText')
     await widget.findAll('.identity-key')[roles.indexOf('lead')]!.trigger('click')
-    await flushPromises()
+    await write.mock.results[0]!.value
     expect(await navigator.clipboard.readText()).toBe(colorOf(source.palette.lead.dark))
   })
 })

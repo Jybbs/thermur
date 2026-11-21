@@ -207,6 +207,14 @@ def test_each_listed_trial_opens_a_slot_of_the_composite_once():
     assert [trial.name for trial in trials] == [f"{slot}_trial" for slot in slots]
 
 
+def test_every_listed_trial_replays_each_composite_for_ten_seconds():
+    """
+    Asserts that every trial the package runs flies each composite for 10 s
+    for the models to rank.
+    """
+    assert {trial.replay_s for trial in Trial.listed()} == {10.0}
+
+
 def test_the_heading_trial_favors_a_spontaneous_spectral_peak_nearest_zero():
     """
     Asserts that the heading trial scores a spontaneous correlation peaking

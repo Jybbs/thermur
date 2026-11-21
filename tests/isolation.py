@@ -5,18 +5,21 @@ terminal type and width it runs under, the block that stops a test without
 the `network` mark from opening a connection, the Unix socket a process
 pool reaches its server over, the mark that lets a `network` test open a
 connection, the files a `reads` mark leaves in a case's checkout, the shared
-copy the read-only cases read apart from the worktree, and the one JAX
-compilation cache every worker shares.
+copy the read-only cases read apart from the worktree and build once, the
+one JAX compilation cache every worker shares, and the test modules a folder
+of the same name would hide from collection.
 """
 
 from collections.abc  import Iterator
-from common.isolation import CLEARED, TERMINAL, pytest_collection_modifyitems
+from common.isolation import CLEARED, pytest_collection_modifyitems
 from jax              import config
 from os               import environ
 from pathlib          import Path
-from pytest           import Config, FixtureRequest, MonkeyPatch, fixture, mark, raises, warns
-from pytest_socket    import SocketBlockedError
-from socket           import create_connection, socketpair
+from pytest           import (
+    Config, FixtureRequest, MonkeyPatch, TempPathFactory, fixture, mark, raises, warns
+)
+from pytest_socket import SocketBlockedError
+from socket        import create_connection, socketpair
 
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
@@ -117,6 +120,18 @@ def test_home_is_an_empty_folder():
     assert list(Path.home().iterdir()) == []
 
 
+def test_no_test_module_shares_its_name_with_a_folder_beside_it(pytestconfig: Config):
+    """
+    Asserts that no module under `tests/` sits beside a folder of its own
+    name, since under `--import-mode=importlib` pytest imports the namespace
+    module it makes for the folder in the file's place and collects none of
+    the file's cases.
+    """
+    tests = pytestconfig.rootpath / "tests"
+
+    assert [path for path in tests.rglob("*.py") if path.with_suffix("").is_dir()] == []
+
+
 def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
     checked      : Checkout,
     pytestconfig : Config
@@ -128,6 +143,21 @@ def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
     assert not (checked.root / "pyproject.toml").samefile(
         pytestconfig.rootpath / "pyproject.toml"
     )
+
+
+def test_the_shared_copy_is_built_once_for_every_worker(
+    checked          : Checkout,
+    tmp_path_factory : TempPathFactory,
+    worker_id        : str
+):
+    """
+    Asserts that the copy the read-only cases share sits in the folder
+    holding every pytest-xdist worker's base temporary folder, so the run
+    builds it once rather than once a worker.
+    """
+    base = tmp_path_factory.getbasetemp()
+
+    assert checked.root.parent == (base if worker_id == "master" else base.parent)
 
 
 def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
@@ -144,7 +174,7 @@ def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     assert name not in environ
 
 
-@mark.parametrize(("variable", "value"), TERMINAL.items())
+@mark.parametrize(("variable", "value"), [("COLUMNS", "80"), ("TERM", "dumb")])
 def test_the_terminal_reads_one_type_and_width_on_every_machine(
     value    : str,
     variable : str

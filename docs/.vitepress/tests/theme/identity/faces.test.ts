@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import * as kit                                      from '@thermur/kit'
-import { type VueWrapper, enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
+import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi }                      from 'vitest'
 
 import { fontStack } from '../../../lib/identity.ts'
@@ -32,8 +32,9 @@ describe('the rows', () => {
 
   it('copies a face’s stack on a press', async () => {
     const widget = mount(IdentityFaces, { attachTo: document.body })
+    const write  = vi.spyOn(navigator.clipboard, 'writeText')
     await widget.findAll('.identity-face')[1]!.trigger('click')
-    await flushPromises()
+    await write.mock.results[0]!.value
     expect(await navigator.clipboard.readText()).toBe(fontStack(source.faces.display))
   })
 

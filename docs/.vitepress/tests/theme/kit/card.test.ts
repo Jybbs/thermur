@@ -66,8 +66,9 @@ describe('PieceCard’s fold', () => {
 
   it('copies the line taking the piece up', async () => {
     const widget = mount(PieceCard, { attachTo: document.body, props: { readers: {}, shown: 'toggle' } })
+    const write  = vi.spyOn(navigator.clipboard, 'writeText')
     await widget.get('.kit-card-fold [data-shown] .kit-card-fact:last-child .kit-catalog-row button').trigger('click')
-    await flushPromises()
+    await write.mock.results[0]!.value
     expect(await navigator.clipboard.readText()).toBe(lineOf(pieceOf('toggle')))
   })
 
