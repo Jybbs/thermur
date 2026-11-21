@@ -28,7 +28,7 @@ Holds the records the `repo` tasks read and report:
 
 from collections     import Counter
 from collections.abc import Hashable, Iterable, Iterator, Mapping, Sequence
-from datetime        import datetime
+from datetime        import datetime, timedelta
 from enum            import StrEnum, auto
 from http            import HTTPMethod
 from itertools       import cycle
@@ -55,7 +55,7 @@ from pydantic               import (
 )
 from re               import MULTILINE, compile as regex, escape, findall, fullmatch, match, search, sub, subn
 from tomllib          import loads
-from typing           import Annotated, Self
+from typing           import Annotated, ClassVar, Self
 from urllib.parse     import urlsplit
 from yaml             import MappingNode, MarkedYAMLError, Node, SafeLoader, load
 from yaml.constructor import ConstructorError
@@ -624,6 +624,14 @@ class Manifest(Document, title="pyproject.toml"):
     The release `[project]` carries, the version a tag names.
     """
 
+    window: timedelta = Field(
+        validation_alias = AliasPath("tool", "uv", "exclude-newer")
+    )
+    """
+    The age a release reaches before a lockfile resolves it, the ISO 8601
+    duration `[tool.uv]` declares as `exclude-newer`.
+    """
+
     @property
     def address(self) -> str:
         """
@@ -762,13 +770,20 @@ class Package(Document, title="docs/package.json"):
 
 class Trigger(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True):
     """
-    One event a workflow runs on, narrowed to the files a change touches.
+    One event a workflow runs on, narrowed to the files a change touches and
+    to the activity types of the event.
     """
 
     paths: tuple[str, ...] = ()
     """
     The globs naming the files whose change runs the workflow on this
     event, or none where any change runs it.
+    """
+
+    types: tuple[str, ...] = ()
+    """
+    The activity types of the event that run the workflow, or none where
+    the event's default types run it.
     """
 
     def matches(self, file: str) -> bool:
@@ -893,6 +908,11 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
     One job a workflow runs, with the rows its matrix includes.
     """
 
+    draft: ClassVar[str] = "!github.event.pull_request.draft"
+    """
+    The term of a condition skipping the job on a draft pull request.
+    """
+
     condition: str = Field("", validation_alias="if")
     """
     The expression deciding whether the job runs, or nothing where it runs
@@ -933,17 +953,11 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
     @property
     def always(self) -> bool:
         """
-        Tells whether the job runs under `always()`, with or without the
-        `${{ }}` GitHub lets a condition leave out, so it runs whatever the
-        jobs it waits for end in.
+        Tells whether the job runs under `always()`, alone or beside the
+        guard skipping a draft, so it runs whatever the jobs it waits for
+        end in.
         """
-        return (
-            (
-                self.condition.removeprefix("${{")
-                    .removesuffix("}}")
-                    .strip()
-            ) == "always()"
-        )
+        return self.terms - {self.draft} == {"always()"}
 
     @property
     def checks(self) -> list[tuple[str, str]]:
@@ -959,6 +973,32 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
             if "task" in row
         ]
 
+    @property
+    def skips_drafts(self) -> bool:
+        """
+        Tells whether the job's condition requires the pull request it runs
+        on to be no draft, joining the guard to its other terms through `&&`
+        alone, which a run with no pull request meets, since the missing
+        `draft` reads as an empty string.
+        """
+        return self.draft in self.terms and "||" not in self.condition
+
+    @property
+    def terms(self) -> set[str]:
+        """
+        Reads the expressions the job's condition joins with `&&`, with or
+        without the `${{ }}` GitHub lets a condition leave out.
+        """
+        return {
+            term.strip()
+            for term in (
+                self.condition.strip()
+                    .removeprefix("${{")
+                    .removesuffix("}}")
+                    .split("&&")
+            )
+        }
+
     def expand(self, value: str) -> list[str]:
         """
         Reads the values `value` takes across the job's rows:
@@ -972,6 +1012,14 @@ class Job(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True)
             return [row.get(key[1], "") for row in self.rows]
 
         return [value]
+
+
+def read_trigger(trigger: dict | None) -> dict:
+    """
+    Reads one event a workflow runs on, an event written with no filters
+    reading as one that carries none.
+    """
+    return trigger or {}
 
 
 class Workflow(Document):
@@ -990,10 +1038,19 @@ class Workflow(Document):
     The name the workflow's runs carry.
     """
 
-    events: frozendict[str, Trigger | None] = Field(validation_alias="on")
+    events: frozendict[str, Annotated[Trigger, BeforeValidator(read_trigger)]] = Field(
+        validation_alias = "on"
+    )
     """
     The events the workflow runs on, each narrowed by its filters where it
     carries any.
+    """
+
+    group: str = Field("", validation_alias=AliasPath("concurrency", "group"))
+    """
+    The concurrency group the workflow's runs share, where a run starting
+    in the group cancels or holds the one in progress there, or nothing
+    where its runs share none.
     """
 
     @property
@@ -1029,14 +1086,30 @@ class Workflow(Document):
         """
         return "pull_request" in self.events
 
+    @property
+    def on_ready(self) -> bool:
+        """
+        Tells whether the workflow runs as a pull request is marked ready
+        for review, which none of the event's default types does.
+        """
+        return "ready_for_review" in self.events.get("pull_request", Trigger()).types
+
+    @property
+    def splits_drafts(self) -> bool:
+        """
+        Tells whether the workflow's concurrency group, where it declares
+        one, reads the pull request's `draft` state, so a run on a draft
+        shares no group with a run on the head marked ready and leaves it
+        running.
+        """
+        return not self.group or Job.draft.removeprefix("!") in self.group
+
     def pushes(self, file: str) -> bool:
         """
         Tells whether a push changing `file`, relative to the root, runs
         the workflow.
         """
-        return "push" in self.events and (self.events["push"] or Trigger()).matches(
-            file
-        )
+        return "push" in self.events and self.events["push"].matches(file)
 
     def saves(self, action: str) -> bool:
         """

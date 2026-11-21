@@ -19,6 +19,7 @@ from thermur.repo.checks   import (
     BinCheck,
     Check,
     CommitCheck,
+    DraftCheck,
     FootnoteCheck,
     GateCheck,
     GuideCheck,
@@ -348,14 +349,58 @@ def test_a_copyright_year_range_still_reads_its_holders(checkout: Checkout):
     assert ParityCheck(checkout=checkout).findings == []
 
 
+def test_a_gate_naming_the_draft_guard_first_passes(checkout: Checkout):
+    """
+    Asserts that a gate whose condition names the draft guard before
+    `always()` passes both the gate and the draft checks, since each reads
+    the terms `&&` joins in any order.
+    """
+    edit(
+        checkout,
+        CI,
+        new = "${{ !github.event.pull_request.draft && always() }}",
+        old = "${{ always() && !github.event.pull_request.draft }}"
+    )
+
+    assert GateCheck(checkout=checkout).findings == []
+    assert DraftCheck(checkout=checkout).findings == []
+
+
 def test_a_gate_running_under_a_bare_always_passes(checkout: Checkout):
     """
     Asserts that a gate whose condition is `always()` written without the
     `${{ }}` GitHub lets a condition leave out passes.
     """
-    edit(checkout, CI, new="if      : always()", old="if      : ${{ always() }}")
+    edit(
+        checkout,
+        CI,
+        new = "if      : always()",
+        old = "if      : ${{ always() && !github.event.pull_request.draft }}"
+    )
 
     assert GateCheck(checkout=checkout).findings == []
+
+
+def test_a_guide_without_its_checks_table_lists_no_check(checkout: Checkout):
+    """
+    Asserts that a contributor guide whose checks table loses its header
+    reads as listing no check, so every row of a pull-request workflow is
+    named as missing from it.
+    """
+    edit(
+        checkout,
+        ".github/CONTRIBUTING.md",
+        new = "| **Name** | **Runs Locally** |",
+        old = "| **Check** | **Runs Locally** |"
+    )
+
+    commands = {task.name: task.command for task in checkout.tasks}
+
+    assert [finding.message for finding in GuideCheck(checkout=checkout).findings] == [
+        f"The command beside `{name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where the command running `{task}` reads `{commands[task]}`"
+        for name, task in checkout.checks
+    ]
 
 
 @mark.parametrize(
@@ -407,25 +452,23 @@ def test_a_script_is_named_where_its_module_is_not_carried(
     ] * named
 
 
-def test_a_guide_without_its_checks_table_lists_no_check(checkout: Checkout):
+def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
     """
-    Asserts that a contributor guide whose checks table loses its header
-    reads as listing no check, so every row of a pull-request workflow is
+    Asserts that a contributor guide whose label table loses its header
+    reads as describing no label, so every label the registry declares is
     named as missing from it.
     """
     edit(
         checkout,
         ".github/CONTRIBUTING.md",
-        new = "| **Name** | **Runs Locally** |",
-        old = "| **Check** | **Runs Locally** |"
+        new = "| **Name** | **Covers** |",
+        old = "| **Label** | **Covers** |"
     )
 
-    commands = {task.name: task.command for task in checkout.tasks}
-
-    assert [finding.message for finding in GuideCheck(checkout=checkout).findings] == [
-        f"The command beside `{name}` in `.github/CONTRIBUTING.md` is missing, "
-        f"where the command running `{task}` reads `{commands[task]}`"
-        for name, task in checkout.checks
+    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
+        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
+        f"where its description in `.github/labels.toml` reads `{label.description}`"
+        for label in checkout.labels.rows
     ]
 
 
@@ -560,24 +603,23 @@ def test_a_site_manifest_naming_a_range_is_named(
     )
 
 
-def test_a_guide_without_its_label_table_describes_no_label(checkout: Checkout):
+def test_a_hatchling_pin_in_another_spelling_passes(
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
     """
-    Asserts that a contributor guide whose label table loses its header
-    reads as describing no label, so every label the registry declares is
-    named as missing from it.
+    Asserts that an exact pin naming hatchling in another spelling its
+    normalized name allows passes, since a package's name compares case
+    insensitively.
     """
     edit(
         checkout,
-        ".github/CONTRIBUTING.md",
-        new = "| **Name** | **Covers** |",
-        old = "| **Label** | **Covers** |"
+        "pyproject.toml",
+        new = f'"Hatchling=={pins["hatchling"]}"',
+        old = f'"hatchling=={pins["hatchling"]}"'
     )
 
-    assert [finding.message for finding in LabelCheck(checkout=checkout).findings] == [
-        f"The description of `{label.name}` in `.github/CONTRIBUTING.md` is missing, "
-        f"where its description in `.github/labels.toml` reads `{label.description}`"
-        for label in checkout.labels.rows
-    ]
+    assert PinCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -717,25 +759,6 @@ def test_a_toml_task_running_uv_run_unlocked_is_named_on_its_configuration(
     ]
 
 
-def test_a_hatchling_pin_in_another_spelling_passes(
-    checkout : Checkout,
-    pins     : dict[str, str]
-):
-    """
-    Asserts that an exact pin naming hatchling in another spelling its
-    normalized name allows passes, since a package's name compares case
-    insensitively.
-    """
-    edit(
-        checkout,
-        "pyproject.toml",
-        new = f'"Hatchling=={pins["hatchling"]}"',
-        old = f'"hatchling=={pins["hatchling"]}"'
-    )
-
-    assert PinCheck(checkout=checkout).findings == []
-
-
 def test_a_job_on_a_second_runner_image_is_named(
     checkout : Checkout,
     pins     : dict[str, str]
@@ -810,6 +833,23 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
     ]
 
 
+def test_a_page_whose_definitions_drift_is_named(checkout: Checkout):
+    """
+    Asserts that a page citing a study whose definition it leaves out is
+    named as drifted from the bibliography.
+    """
+    append(checkout, ".github/README.md", "\nOrdered flocks[^cavagna2010].\n")
+
+    assert RenderCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/README.md"),
+            message = "The footnote definitions in `.github/README.md` have drifted "
+            "from their entries in `docs/pages/references.bib`, and `mise render` "
+            "writes them again"
+        )
+    ]
+
+
 @mark.parametrize(
     ("old", "new", "message"),
     [
@@ -821,11 +861,19 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
             id = "unnamed"
         ),
         param(
-            "${{ always() }}",
+            "${{ always() && !github.event.pull_request.draft }}",
             "${{ success() }}",
             f"The `gate` job in `{CI}` runs under `${{{{ success() }}}}` rather than "
             "`always()`",
             id = "condition"
+        ),
+        param(
+            "always() && !github",
+            "always() && github.ref == 'refs/heads/main' && !github",
+            f"The `gate` job in `{CI}` runs under `${{{{ always() && github.ref == "
+            "'refs/heads/main' && !github.event.pull_request.draft }}` rather than "
+            "`always()`",
+            id = "narrowed"
         ),
         param(
             "needs   : [check]",
@@ -853,20 +901,91 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
     ]
 
 
-def test_a_page_whose_definitions_drift_is_named(checkout: Checkout):
-    """
-    Asserts that a page citing a study whose definition it leaves out is
-    named as drifted from the bibliography.
-    """
-    append(checkout, ".github/README.md", "\nOrdered flocks[^cavagna2010].\n")
-
-    assert RenderCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".github/README.md"),
-            message = "The footnote definitions in `.github/README.md` have drifted "
-            "from their entries in `docs/pages/references.bib`, and `mise render` "
-            "writes them again"
+@mark.parametrize(
+    ("path", "old", "new", "message"),
+    [
+        param(
+            CI,
+            ", ready_for_review]",
+            "]",
+            f"`{CI}` runs on no `ready_for_review` pull request",
+            id = "ci-types"
+        ),
+        param(
+            SITE,
+            "    types : [opened, synchronize, reopened, ready_for_review]\n",
+            "",
+            f"`{SITE}` runs on no `ready_for_review` pull request",
+            id = "site-default-types"
+        ),
+        param(
+            CI,
+            "    paths : ['**', '!docs/.vitepress/**', "
+            "docs/.vitepress/lib/rendered/**]\n"
+            "    types : [opened, synchronize, reopened, ready_for_review]\n",
+            "",
+            f"`{CI}` runs on no `ready_for_review` pull request",
+            id = "ci-no-filters"
+        ),
+        param(
+            CI,
+            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "",
+            f"`{CI}` cancels a ready run from a draft, since its concurrency "
+            "group leaves out `github.event.pull_request.draft`",
+            id = "ci-group"
+        ),
+        param(
+            SITE,
+            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "",
+            f"`{SITE}` cancels a ready run from a draft, since its concurrency "
+            "group leaves out `github.event.pull_request.draft`",
+            id = "site-group"
+        ),
+        param(
+            CI,
+            "    if      : ${{ !github.event.pull_request.draft }}\n",
+            "",
+            f"The `check` job in `{CI}` runs on a draft, since its condition "
+            "carries no `!github.event.pull_request.draft`",
+            id = "check-guard"
+        ),
+        param(
+            CI,
+            "    if      : ${{ !github.event.pull_request.draft }}\n",
+            "    if      : ${{ !github.event.pull_request.draft || always() }}\n",
+            f"The `check` job in `{CI}` runs on a draft, since its condition "
+            "carries no `!github.event.pull_request.draft`",
+            id = "check-guard-or"
+        ),
+        param(
+            SITE,
+            "${{ always() && !github.event.pull_request.draft }}",
+            "${{ always() }}",
+            f"The `gate` job in `{SITE}` runs on a draft, since its condition "
+            "carries no `!github.event.pull_request.draft`",
+            id = "gate-guard"
         )
+    ]
+)
+def test_a_workflow_running_on_a_draft_is_named(
+    checkout : Checkout,
+    message  : str,
+    new      : str,
+    old      : str,
+    path     : str
+):
+    """
+    Asserts that a pull-request workflow whose activity types leave out
+    `ready_for_review` or whose concurrency group leaves out the draft
+    state is named, as is each of its jobs whose condition carries no guard
+    skipping a draft.
+    """
+    edit(checkout, path, new=new, old=old)
+
+    assert DraftCheck(checkout=checkout).findings == [
+        Finding(file=Path(path), message=message)
     ]
 
 
@@ -974,6 +1093,26 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     ]
 
 
+def test_a_region_missing_its_pair_of_markers_is_named(checkout: Checkout):
+    """
+    Asserts that a region whose page carries its opening marker twice is
+    named as refused, and the page as current, since the render leaves the
+    region as it stands.
+    """
+    page = "docs/pages/data/index.md"
+    edit(
+        checkout,
+        page,
+        new = "<!-- crop -->\n\n## The Parametric",
+        old = "## The Parametric"
+    )
+
+    assert [finding.message for finding in RenderCheck(checkout=checkout).findings] == [
+        f"`{page}` does not carry the opening and then the closing marker of its "
+        "`crop` region once each, so `mise render` leaves the region as it stands"
+    ]
+
+
 @mark.parametrize(
     ("old", "new", "finding"),
     [
@@ -1027,23 +1166,23 @@ def test_a_subset_installed_or_saved_alone_is_named(
     assert KitCheck(checkout=checkout).findings == [finding]
 
 
-def test_a_region_missing_its_pair_of_markers_is_named(checkout: Checkout):
+def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
     """
-    Asserts that a region whose page carries its opening marker twice is
-    named as refused, and the page as current, since the render leaves the
-    region as it stands.
+    Asserts that renaming a label in the registry alone names the
+    release-notes categories, the bug and spec templates in that order, and
+    the guide, each still naming the old label, then the new label filed
+    under no category and missing from the guide.
     """
-    page = "docs/pages/data/index.md"
-    edit(
-        checkout,
-        page,
-        new = "<!-- crop -->\n\n## The Parametric",
-        old = "## The Parametric"
-    )
+    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
+    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
 
-    assert [finding.message for finding in RenderCheck(checkout=checkout).findings] == [
-        f"`{page}` does not carry the opening and then the closing marker of its "
-        "`crop` region once each, so `mise render` leaves the region as it stands"
+    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
+        Path(".github/release.yml"),
+        Path(".github/ISSUE_TEMPLATE/bug.md"),
+        Path(".github/ISSUE_TEMPLATE/spec.md"),
+        Path(".github/CONTRIBUTING.md"),
+        Path(".github/release.yml"),
+        Path(".github/CONTRIBUTING.md")
     ]
 
 
@@ -1215,23 +1354,21 @@ def test_each_anchor_a_manifest_carries_is_named_once(
     ]
 
 
-def test_a_renamed_label_is_named_in_every_file_naming_the_old_one(checkout: Checkout):
+def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
     """
-    Asserts that renaming a label in the registry alone names the
-    release-notes categories, the bug and spec templates in that order, and
-    the guide, each still naming the old label, then the new label filed
-    under no category and missing from the guide.
+    Asserts that a ruleset carrying a key the rulesets API does not take
+    is named on its own file, one finding per field, rather than ending
+    the audit.
     """
-    edit(checkout, ".github/ISSUE_TEMPLATE/spec.md", new='["🐞 bug"]', old="[]")
-    edit(checkout, ".github/labels.toml", new='"🐛 bug"', old='"🐞 bug"')
+    tags = ".github/rulesets/tags.json"
+    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
 
-    assert [finding.file for finding in LabelCheck(checkout=checkout).findings] == [
-        Path(".github/release.yml"),
-        Path(".github/ISSUE_TEMPLATE/bug.md"),
-        Path(".github/ISSUE_TEMPLATE/spec.md"),
-        Path(".github/CONTRIBUTING.md"),
-        Path(".github/release.yml"),
-        Path(".github/CONTRIBUTING.md")
+    assert RulesetCheck(checkout=checkout).findings == [
+        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
+        Finding(
+            file    = Path(tags),
+            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
+        )
     ]
 
 
@@ -1318,24 +1455,6 @@ def test_a_cache_key_ending_on_anything_but_its_hash_is_named(
     ]
 
 
-def test_a_ruleset_failing_validation_is_reported_on_its_path(checkout: Checkout):
-    """
-    Asserts that a ruleset carrying a key the rulesets API does not take
-    is named on its own file, one finding per field, rather than ending
-    the audit.
-    """
-    tags = ".github/rulesets/tags.json"
-    edit(checkout, tags, new='"enforcment"', old='"enforcement"')
-
-    assert RulesetCheck(checkout=checkout).findings == [
-        Finding(file=Path(tags), message=f"`enforcement` in `{tags}`: Field required"),
-        Finding(
-            file    = Path(tags),
-            message = f"`enforcment` in `{tags}`: Extra inputs are not permitted"
-        )
-    ]
-
-
 def test_a_second_pull_request_gate_keeps_the_required_check(checkout: Checkout):
     """
     Asserts that renaming the gate of one workflow running on a pull request
@@ -1364,6 +1483,20 @@ def test_a_site_manifest_failing_validation_is_named_on_its_path(checkout: Check
     assert [finding.file for finding in PinCheck(checkout=checkout).findings] == [
         Path("docs/kit/package.json")
     ]
+
+
+def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
+    """
+    Asserts that a problem `mise tasks validate` reports on a task, here
+    an alias two tasks share, is named on the file holding the task at the
+    severity mise reports.
+    """
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+
+    assert [
+        (finding.file, finding.level)
+        for finding in TaskCheck(checkout=checkout).findings
+    ] == [(path, Level.ERROR)]
 
 
 @mark.parametrize(
@@ -1623,20 +1756,6 @@ def test_a_moved_manifest_declaration_names_every_copy(
     ]
 
 
-def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkout):
-    """
-    Asserts that a problem `mise tasks validate` reports on a task, here
-    an alias two tasks share, is named on the file holding the task at the
-    severity mise reports.
-    """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
-
-    assert [
-        (finding.file, finding.level)
-        for finding in TaskCheck(checkout=checkout).findings
-    ] == [(path, Level.ERROR)]
-
-
 def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
     """
     Asserts that a Markdown template opening on no front matter is named on
@@ -1651,6 +1770,20 @@ def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
             "front matter"
         )
     ]
+
+
+def test_a_toml_task_continuing_uv_run_onto_its_flags_passes(checkout: Checkout):
+    """
+    Asserts that a task declared in TOML passes where its `uv run` takes
+    `--exact --locked` on the line a backslash continues it onto.
+    """
+    append(
+        checkout,
+        ".mise/config.toml",
+        "\n[tasks.\"py:sweep\"]\nrun = '''uv run \\\n--exact --locked pytest'''\n"
+    )
+
+    assert LockfileCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -1834,18 +1967,23 @@ def test_a_guide_out_of_step_with_the_rows_is_named(
     ]
 
 
-def test_a_toml_task_continuing_uv_run_onto_its_flags_passes(checkout: Checkout):
+def test_a_tools_input_to_another_action_installs_no_subset(
+    checkout : Checkout,
+    pins     : dict[str, str]
+):
     """
-    Asserts that a task declared in TOML passes where its `uv run` takes
-    `--exact --locked` on the line a backslash continues it onto.
+    Asserts that a `tools` input a step passes an action other than a
+    composite action of the checkout names no subset a Kit job must save.
     """
-    append(
-        checkout,
-        ".mise/config.toml",
-        "\n[tasks.\"py:sweep\"]\nrun = '''uv run \\\n--exact --locked pytest'''\n"
+    edit(
+        checkout = checkout,
+        new      = f"uses : actions/checkout@{pins['checkout']}\n"
+        "        with : { tools: bun }",
+        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
+        path = DRAFT
     )
 
-    assert LockfileCheck(checkout=checkout).findings == []
+    assert KitCheck(checkout=checkout).findings == []
 
 
 @mark.parametrize(
@@ -1901,25 +2039,6 @@ def test_a_required_check_no_pull_request_gate_names_is_named(
     ]
 
 
-def test_a_tools_input_to_another_action_installs_no_subset(
-    checkout : Checkout,
-    pins     : dict[str, str]
-):
-    """
-    Asserts that a `tools` input a step passes an action other than a
-    composite action of the checkout names no subset a Kit job must save.
-    """
-    edit(
-        checkout = checkout,
-        new      = f"uses : actions/checkout@{pins['checkout']}\n"
-        "        with : { tools: bun }",
-        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
-        path = DRAFT
-    )
-
-    assert KitCheck(checkout=checkout).findings == []
-
-
 def test_a_validation_error_outside_the_documents_is_raised(
     checkout    : Checkout,
     monkeypatch : MonkeyPatch
@@ -1952,6 +2071,25 @@ def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
             message = f"`{CI}`: Value error, names `name` more than once"
         )
     ]
+
+
+def test_a_workflow_sharing_no_concurrency_group_passes(checkout: Checkout):
+    """
+    Asserts that a pull-request workflow declaring no concurrency group
+    passes the draft check, since no run of it cancels another.
+    """
+    edit(
+        checkout,
+        CI,
+        new = "",
+        old = "concurrency:\n"
+        "  cancel-in-progress : ${{ github.event_name == 'pull_request' }}\n"
+        "  group              : ${{ github.workflow }}-"
+        "${{ github.head_ref || github.ref }}"
+        "${{ case(github.event.pull_request.draft, '-draft', '') }}\n"
+    )
+
+    assert DraftCheck(checkout=checkout).findings == []
 
 
 def test_a_written_file_drifting_from_its_declaration_is_named(checkout: Checkout):

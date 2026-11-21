@@ -1,6 +1,13 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE depends     = ["site:install"]
-#MISE description = "Run the site's tests that the changes since the merge base with `main` reach, or the whole suite where a changed file matches a rerun trigger, passing any further arguments to Vitest"
+#MISE description = "Run the site's tests that the changes since the merge base with `main` reach, or the whole suite where a changed file matches a rerun trigger or a file other than Python was deleted or renamed, passing any further arguments to Vitest"
 #MISE dir         = "{{config_root}}/docs"
 
-node_modules/.bin/vitest run --changed main --config .vitepress/config/vitest.config.ts "$@"
+deleted=$(
+  git diff --diff-filter=D --merge-base --name-only --no-renames main \
+    -- ':/' ':(top,exclude)*.py'
+)
+set -- --config .vitepress/config/vitest.config.ts "$@"
+[[ -n "$deleted" ]] || set -- --changed main "$@"
+
+node_modules/.bin/vitest run "$@"

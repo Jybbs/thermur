@@ -8,11 +8,13 @@ every `bun` command in the clone runs under.
 """
 
 from collections.abc  import Callable
-from common.edits     import executable
+from common.edits     import committed, executable, git
 from common.stand_ins import StandIn
 from pathlib          import Path
 from pytest           import Config, MonkeyPatch, fixture, mark, param
 from subprocess       import CompletedProcess, run
+
+from thermur.repo.checkout import Checkout
 
 ECHO = '#!/bin/sh\nprintf "%s\\n" "$(basename "$0")" "$@"\n'
 
@@ -21,16 +23,22 @@ ECHO = '#!/bin/sh\nprintf "%s\\n" "$(basename "$0")" "$@"\n'
 def site(tmp_path: Path) -> Path:
     """
     Writes a `docs/` folder holding an empty `.vitepress`, an empty `kit`,
-    and a `node_modules/.bin` holding a stand-in for each tool a `site` task
-    runs, each printing its own name and every argument it receives.
+    a front page, and a `node_modules/.bin` holding a stand-in for each tool
+    a `site` task runs, each printing its own name and every argument it
+    receives, beside a module under `src`, and commits them to `main` in a
+    git repository holding `docs/` and its stand-ins alone.
 
     Returns:
         The `docs/` folder, which every `site` task runs from.
     """
-    for folder in (".vitepress", "kit"):
+    for folder in (".vitepress", "kit", "pages"):
         (tmp_path / "docs" / folder).mkdir(parents=True)
     for tool in ("knip", "oxlint", "tsc", "vitepress", "vitest"):
         executable(tmp_path / "docs/node_modules/.bin" / tool, ECHO)
+    (tmp_path / "docs/pages/index.md").write_text("# Thermur\n", encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src/flock.py").write_text("", encoding="utf-8")
+    committed(Checkout(root=tmp_path))
 
     return tmp_path / "docs"
 
@@ -264,3 +272,57 @@ def test_the_link_check_reads_the_built_site_and_the_guides_offline(
         str(dist),
         "../.github/README.md", "../.github/CONTRIBUTING.md"
     ]
+
+
+@mark.parametrize(
+    ("deleted", "moved", "passed"),
+    [
+        param(
+            "docs/pages/index.md",
+            None,
+            [
+                "vitest", "run", "--config",
+                ".vitepress/config/vitest.config.ts", "--marker"
+            ],
+            id = "page"
+        ),
+        param(
+            "docs/pages/index.md",
+            "docs/pages/home.md",
+            [
+                "vitest", "run", "--config",
+                ".vitepress/config/vitest.config.ts", "--marker"
+            ],
+            id = "renamed"
+        ),
+        param(
+            "src/flock.py",
+            None,
+            [
+                "vitest", "run", "--changed", "main",
+                "--config", ".vitepress/config/vitest.config.ts", "--marker"
+            ],
+            id = "python"
+        )
+    ]
+)
+def test_the_affected_site_tests_run_whole_where_a_file_other_than_python_was_deleted(
+    deleted      : str,
+    moved        : str | None,
+    passed       : list[str],
+    pytestconfig : Config,
+    site         : Path
+):
+    """
+    Asserts that `site:affected` runs the whole suite where a file other
+    than Python was deleted since the merge base with `main`, wherever it
+    sat, a file git renames included, since Vitest selects no test for a
+    deleted file that only a glob declared, and keeps `--changed main` where
+    only Python was deleted.
+    """
+    if moved is None:
+        (site.parent / deleted).unlink()
+    else:
+        git(Checkout(root=site.parent), "mv", deleted, moved)
+
+    assert ran(site, pytestconfig, "affected").stdout.splitlines() == passed

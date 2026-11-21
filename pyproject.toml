@@ -53,6 +53,7 @@ Repository = "https://github.com/Jybbs/thermur"
 [dependency-groups]
 dev = [
     "apache-hamilton[experiments]",
+    "filelock",
     "minijinja",
     "prose-formatter",
     "pytest",
@@ -60,6 +61,7 @@ dev = [
     "pytest-randomly",
     "pytest-socket",
     "pytest-testmon",
+    "pytest-xdist",
     "syrupy"
 ]
 
@@ -72,9 +74,10 @@ precision    = 2
 show_missing = true
 
 [tool.coverage.run]
-branch    = true
-data_file = ".cache/coverage/data"
-source    = ["src/thermur"]
+branch         = true
+data_file      = ".cache/coverage/data"
+relative_files = true
+source         = ["src/thermur"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [".mise", "src", "uv.lock"]
@@ -102,7 +105,9 @@ align-docstring-entries = false
 addopts                  = [
     "--allow-unix-socket",
     "--disable-socket",
+    "--dist=worksteal",
     "--import-mode=importlib",
+    "--numprocesses=auto",
     "-m",
     "not network",
     "-ra",
@@ -134,6 +139,7 @@ build-constraint-dependencies = [
     "tomlkit==0.15.2",
     "trove-classifiers==2026.9.21.13"
 ]
+exclude-newer                 = "P7D"
 python-downloads              = "never"
 python-preference             = "only-system"
 required-version              = "==0.13.8"

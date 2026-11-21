@@ -6,7 +6,7 @@ Pins the records the `repo` tasks read and report:
 - What a workflow's jobs, steps, and triggers derive, and the requirements
   a task script declares
 - What a `Finding` prints at each level, the findings a `Parity` and an
-  `Issue` make, and the holders a `Manifest` names
+  `Issue` make, and the holders and the window a `Manifest` names
 - The labels a `Template` lists, the rows a `Labels` registry accepts, the
   command a `Label` writes, and the live labels a registry omits
 - The keys and values `GithubSettings` accepts, the calls `Toggles` writes,
@@ -18,7 +18,7 @@ Pins the records the `repo` tasks read and report:
   and the packages a `Tree` finds
 """
 
-from datetime  import UTC, date, datetime
+from datetime  import UTC, date, datetime, timedelta
 from functools import reduce
 from json      import loads as from_json
 from packaging.requirements import Requirement
@@ -219,7 +219,13 @@ def test_the_authors_join_the_way_a_copyright_line_names_them(
     ("text", "location", "message"),
     [
         param("name: w\nname: v\n", (), "names `name` more than once", id="unread"),
-        param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid")
+        param("name: w\non:\n  push:\n", ("jobs",), "Field required", id="invalid"),
+        param(
+            "name: w\njobs: {}\non: [push, pull_request]\n",
+            ("on",),
+            "valid frozendict",
+            id = "listed-events"
+        )
     ]
 )
 def test_a_yaml_document_reports_its_error_under_its_path(
@@ -1578,6 +1584,21 @@ def test_the_lock_maps_each_package_to_its_version():
     }
 
     assert Lock.model_validate(rows).versions == {"a": "1.0", "b": "2.0"}
+
+
+def test_the_window_reads_the_duration_exclude_newer_declares(pytestconfig: Config):
+    """
+    Asserts that `Manifest.window` reads the ISO 8601 duration `[tool.uv]`
+    declares as `exclude-newer`, so a window other than the committed one
+    reaches each Bun resolve the lift runs.
+    """
+    parsed = Manifest.load(
+        ".toml",
+        (pytestconfig.rootpath / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    parsed["tool"]["uv"]["exclude-newer"] = "P3D"
+
+    assert Manifest.model_validate(parsed).window == timedelta(days=3)
 
 
 def workflow(text: str) -> Workflow:
