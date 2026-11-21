@@ -125,10 +125,19 @@ test.for([
       '.vitepress/tests/lib/kit/pieces.test.ts',
       '.vitepress/tests/lib/site.test.ts'
     ]
+  ],
+  [
+    'docs/.vitepress/theme/crop.ts',
+    [
+      '.vitepress/tests/lib/kit/readers.test.ts',
+      '.vitepress/tests/lib/page-data.test.ts',
+      '.vitepress/tests/theme/components.test.ts',
+      '.vitepress/tests/theme/crop.test.ts'
+    ]
   ]
 ] as const)(
   'vitest --changed adds to its list for the contributor guide exactly the test files reaching %s',
-  // Each case copies the repository and starts Vitest twice, measured at 3.2 to 3.8 seconds alone and 4.1 to 6.1 beside the whole suite at a load average near 20, past Vitest's default 5.
+  // Each case copies the repository and starts Vitest twice, measured at 1.5 to 8.1 seconds alone and beside the whole suite at a load average of 14 to 20, past Vitest's default of 5.
   { timeout: 60_000 },
   ([file, selected], { repository }) => {
     // Vitest lists the tests mounting a kit control in the copy for any change, so the list for the guide, which no test reads, sets them aside.
