@@ -1,9 +1,11 @@
 """
 Pins the `--share` option `tests/conftest.py` adds, which splits the suite
 by test across several machines, meaning the tests each share runs under any
-`pytest-randomly` seed and the unused snapshot every share reports.
+`pytest-randomly` seed, the unused snapshot every share reports, and the one
+entry for each source file in the coverage data combined from every share.
 """
 
+from coverage       import Coverage, CoverageData
 from os             import pathsep
 from pathlib        import Path
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
@@ -31,7 +33,7 @@ def suite(monkeypatch: MonkeyPatch, pytestconfig: Config, tmp_path: Path) -> Pat
     monkeypatch.delenv("PYTEST_XDIST_WORKER", raising=False)
     monkeypatch.setenv("PYTHONPATH", pathsep.join(map(str, [root, root / "tests"])))
     (tmp_path / "conftest.py").write_text(
-        "from tests.conftest import pytest_addoption, pytest_collection_finish\n",
+        "from tests.conftest import pytest_addoption, pytest_collection_modifyitems\n",
         encoding = "utf-8"
     )
     module = tmp_path / "test_cases.py"
@@ -112,6 +114,46 @@ def test_every_share_reports_a_snapshot_no_test_reads(
     written(kept, suite)
 
     assert ran(suite.parent, f"--share={index}/2").returncode == status
+
+
+def test_the_shares_combine_into_one_entry_for_each_source_file(
+    pytestconfig : Config,
+    tmp_path     : Path
+):
+    """
+    Asserts that coverage data measured in two checkouts at different paths
+    under the `pyproject.toml` coverage settings combines into one entry for
+    a source file both measured, which their relative paths make possible.
+    """
+    manifest  = pytestconfig.rootpath / "pyproject.toml"
+    data_file = Coverage(config_file=manifest).config.data_file
+    settings  = f"--rcfile={manifest}"
+    checkouts = [tmp_path / name for name in ("one", "two")]
+    for checkout in checkouts:
+        (checkout / "src/thermur").mkdir(parents=True)
+        (checkout / "src/thermur/flock.py").write_text(
+            "flown = True\n",
+            encoding = "utf-8"
+        )
+        run(
+            [executable, "-m", "coverage", "run", settings, "src/thermur/flock.py"],
+            capture_output = True,
+            check          = True,
+            cwd            = checkout
+        )
+    run(
+        [
+            executable, "-m", "coverage", "combine", settings,
+            *(str(checkout / data_file) for checkout in checkouts)
+        ],
+        capture_output = True,
+        check          = True,
+        cwd            = tmp_path
+    )
+    combined = CoverageData(basename=tmp_path / data_file)
+    combined.read()
+
+    assert sorted(combined.measured_files()) == ["src/thermur/flock.py"]
 
 
 @mark.parametrize("text", ["0/2", "3/2", "1", "one/two"])

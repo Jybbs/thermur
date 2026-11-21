@@ -2,15 +2,17 @@
 Pins the isolation the suite keeps from the machine running it, covering
 the shell variables each test starts without, the home folder it reads,
 the block that stops a test without the `network` mark from opening a
-connection, the Unix socket a process pool reaches its server over, and the
-mark that lets a `network` test open a connection.
+connection, the Unix socket a process pool reaches its server over, the mark
+that lets a `network` test open a connection, and the one JAX compilation
+cache every worker shares.
 """
 
 from collections.abc    import Iterator
 from common.environment import CLEARED
+from jax                import config
 from os                 import environ
 from pathlib            import Path
-from pytest             import FixtureRequest, MonkeyPatch, fixture, mark, raises, warns
+from pytest             import Config, FixtureRequest, MonkeyPatch, fixture, mark, raises, warns
 from pytest_socket      import SocketBlockedError
 from socket             import create_connection, socketpair
 from tests.conftest     import pytest_collection_modifyitems
@@ -40,7 +42,7 @@ def test_a_network_test_gets_the_mark_that_opens_the_socket(request: FixtureRequ
     lets that test open a connection.
     """
     request.node.add_marker(mark.network)
-    pytest_collection_modifyitems([request.node])
+    pytest_collection_modifyitems(request.config, [request.node])
 
     assert request.node.get_closest_marker("enable_socket")
 
@@ -74,6 +76,16 @@ def test_a_unix_socket_stays_open():
     with left, right:
         left.sendall(b"flock")
         assert right.recv(5) == b"flock"
+
+
+def test_every_worker_shares_one_locked_jax_cache(pytestconfig: Config):
+    """
+    Asserts that JAX keeps each program it compiles under `.cache/jax` with
+    a size limit set, under which it locks each entry through `filelock`, so
+    every worker reads and writes the one cache at once.
+    """
+    assert config.jax_compilation_cache_dir == str(pytestconfig.rootpath / ".cache/jax")
+    assert config.jax_compilation_cache_max_size != -1
 
 
 def test_home_is_an_empty_folder():

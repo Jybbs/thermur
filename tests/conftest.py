@@ -19,7 +19,6 @@ from pytest             import (
     Item,
     MonkeyPatch,
     Parser,
-    Session,
     TempPathFactory,
     fixture,
     mark
@@ -234,36 +233,28 @@ def pytest_addoption(parser: Parser):
     )
 
 
-def pytest_collection_finish(session: Session):
+def pytest_collection_modifyitems(config: Config, items: list[Item]):
     """
-    Skips every collected test outside the share `--share` names, taking
-    every `count`-th test from the one at `index` in the order of their
-    node IDs, which every machine computes alike under any `pytest-randomly`
-    seed. A skip rather than a deselection leaves syrupy reading every test
-    as selected, so it still reports a snapshot no test reads, while it
-    reads a skipped test's snapshots as still in use.
-    """
-    if picked := session.config.getoption("share"):
-        index, count = picked
-        kept         = set(
-            sorted(item.nodeid for item in session.items)[index - 1 :: count]
-        )
-        skip = mark.skip(reason=f"Runs in another share than {index}/{count}")
-        for item in session.items:
-            if item.nodeid not in kept:
-                item.add_marker(skip)
-
-
-def pytest_collection_modifyitems(items: list[Item]):
-    """
-    Adds pytest-socket's `enable_socket` mark to every test carrying the
-    `network` mark. The `--disable-socket` option in `addopts` blocks every
-    test from opening a connection, and a test carrying `enable_socket` can
-    reach a live service again.
+    Adds pytest-socket's `enable_socket` mark, which reopens the socket
+    `--disable-socket` closes, to every test carrying the `network` mark,
+    and skips every test outside the share `--share` names. A share takes
+    every `count`-th test from the one at `index` in node ID order, which
+    every machine computes alike under any `pytest-randomly` seed. A skip
+    leaves syrupy reading every test as selected, so it still reports a
+    snapshot no test reads, while it reads a skipped test's snapshots as
+    still in use.
     """
     for item in items:
         if item.get_closest_marker("network"):
             item.add_marker(mark.enable_socket)
+
+    if picked := config.getoption("share"):
+        index, count = picked
+        kept         = set(sorted(item.nodeid for item in items)[index - 1 :: count])
+        skip         = mark.skip(reason=f"Runs in another share than {index}/{count}")
+        for item in items:
+            if item.nodeid not in kept:
+                item.add_marker(skip)
 
 
 def share(text: str) -> tuple[int, int]:

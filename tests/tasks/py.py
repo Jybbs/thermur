@@ -44,8 +44,8 @@ FOLDERS = [".mise/tasks", "src", "tests"]
             "coverage",
             None,
             [
-                "--cov", "--cov-fail-under=0", "--cov-report=",
-                "--marker", "html", "report"
+                "--cov", "--cov-fail-under=0", "--cov-report=", "--marker",
+                "html", "--fail-under=0", "report"
             ],
             id = "coverage"
         )
@@ -102,14 +102,17 @@ def test_the_coverage_reports_whatever_the_suite_returns(
     status       : int
 ):
     """
-    Asserts that `py:coverage` writes the HTML report and runs the terminal
-    report, which fails below `fail_under`, whether or not a test failed,
-    exiting with the report's status where it fails and otherwise with the
-    status of the suite.
+    Asserts that `py:coverage` writes the HTML report at any total and
+    runs the terminal report, which fails below `fail_under`, whether or
+    not a test failed, exiting with the report's status where it fails and
+    otherwise with the status of the suite.
     """
     stand_in("pytest", f"exit {measured}")
-    coverage = stand_in("coverage", f'[ "$1" = html ] || exit {reported}')
-    ran      = run(
+    coverage = stand_in(
+        "coverage",
+        f'[ "$*" = "html --fail-under=0" ] || exit {reported}'
+    )
+    ran = run(
         [pytestconfig.rootpath / ".mise/tasks/py/coverage"],
         capture_output = True,
         cwd            = pytestconfig.rootpath
@@ -117,7 +120,7 @@ def test_the_coverage_reports_whatever_the_suite_returns(
 
     assert (ran.returncode, coverage.commands) == (
         status,
-        ["coverage html", "coverage report"]
+        ["coverage html --fail-under=0", "coverage report"]
     )
 
 
