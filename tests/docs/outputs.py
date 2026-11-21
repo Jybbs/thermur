@@ -414,7 +414,9 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     radio in which each drone's table holds `Radio.slots` of the senders in
     range as it opens, or every one where fewer are, some drone hearing more
     senders than its table holds, and the last drone, which no drone holds
-    as it opens, held by a drone by the last packet, and that the copy the
+    as it opens, held by a drone by the last packet, a run over a crossing
+    flock whose tables turn over and whose third drone sits on its second,
+    a curve over drones with one coincident pair, and that the copy the
     repository holds has not drifted.
     """
     outputs   = Outputs(checkout=checkout)
@@ -430,14 +432,16 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
         }
         for name, flock in paired["flocks"].items()
     }
-    rim     = flocks["rim"]
-    roost   = flocks["roost"]
-    outward = linalg.norm(rim["positions"][:, :2] - composite.roost.center_m, axis=-1)
-    apart   = linalg.norm(rim["positions"][:, None] - rim["positions"], axis=-1)
-    resting = (roost["forces"][:, 0] == 0) & (roost["draws"] == 0)
-    radio   = paired["radio"]
-    sent    = asarray(radio["flock"]["positions"])
-    within  = (
+    rim      = flocks["rim"]
+    roost    = flocks["roost"]
+    outward  = linalg.norm(rim["positions"][:, :2] - composite.roost.center_m, axis=-1)
+    apart    = linalg.norm(rim["positions"][:, None] - rim["positions"], axis=-1)
+    resting  = (roost["forces"][:, 0] == 0) & (roost["draws"] == 0)
+    radio    = paired["radio"]
+    crossing = paired["crossing"]
+    curve    = paired["curve"]
+    sent     = asarray(radio["flock"]["positions"])
+    within   = (
         linalg.norm(sent[:, None] - sent, axis=-1) <= composite.radio.range_m
     ).sum(1) - 1
 
@@ -451,10 +455,19 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     assert (roost["stepped"][resting, 1] == -1).any()
     assert paired["flocks"]["late"]["delay_s"] > zig.reaction_s + zig.cue_s
     assert (within > Radio.slots).any()
-    assert (asarray(radio["heard"][0]).sum(1) == minimum(within, Radio.slots)).all()
-    assert not asarray(radio["heard"][0])[:, -1].any()
-    assert asarray(radio["heard"][-1])[:, -1].any()
-    assert len(radio["packets"]) == len(radio["draws"]) == len(radio["positions"])
+    assert list(map(len, radio["held"][0])) == minimum(within, Radio.slots).tolist()
+    assert not any(len(sent) - 1 in row for row in radio["held"][0])
+    assert any(len(sent) - 1 in row for row in radio["held"][-1])
+    assert (
+        len(radio["packets"])
+        == len(radio["draws"])
+        == len(radio["held"])
+        == len(radio["positions"])
+    )
+    assert crossing["held"][0] != crossing["held"][-1]
+    assert crossing["flock"]["positions"][1] == crossing["flock"]["positions"][2]
+    assert curve["points"][1] == curve["points"][2]
+    assert sorted(curve["order"]) == list(range(len(curve["points"])))
     assert outputs.parity not in outputs.drifted
 
 

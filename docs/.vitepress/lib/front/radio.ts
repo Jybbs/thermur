@@ -179,7 +179,7 @@ export class Radio {
       const sender = this.#found[rank]!
       const pair   = receiver * count + sender
       if (this.#arrives[pair]) {
-        this.inbox.set(this.#sent.subarray(base + sender * SENT, base + (sender + 1) * SENT), pair * SENT)
+        for (let k = 0; k < SENT; k++) this.inbox[pair * SENT + k] = this.#sent[base + sender * SENT + k]!
         this.#received[pair] = this.#step
       }
       this.heard[pair]        = 1

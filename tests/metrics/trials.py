@@ -252,6 +252,21 @@ def test_each_listed_trial_opens_a_slot_of_the_composite_once():
     assert [trial.name for trial in trials] == [f"{slot}_trial" for slot in slots]
 
 
+def test_every_listed_condition_setting_no_size_flies_the_middle_size():
+    """
+    Asserts that each flight whose condition sets no flock size flies the
+    middle of `SIZES`, whatever the plan's own flock size.
+    """
+    plan = Settings().plan
+
+    assert {
+        plan.changed(drones=trial.drones).changed(**changes).drones
+        for trial in Trial.listed()
+        for changes in trial.conditions.values()
+        if "drones" not in changes
+    } == {SIZES["middle"]["drones"]}
+
+
 def test_every_listed_trial_flies_the_sizes_its_tables_were_measured_at():
     """
     Asserts that every flight of every listed trial flies one of the sizes

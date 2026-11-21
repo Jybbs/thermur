@@ -142,8 +142,7 @@ describe('the header', () => {
 describe('the marked bird', () => {
   it('draws the marked bird last and at the largest scale of its size', () => {
     const scales = scaled()
-    expect(scales.at(-1)).toBe(Math.max(...scales))
-    expect(scales.filter(scale => scale === scales.at(-1))).toHaveLength(1)
+    expect(scales.at(-1)! - Math.max(...scales.slice(0, -1))).toBeGreaterThan(1e-9)
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {
