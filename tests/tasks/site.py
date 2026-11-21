@@ -368,6 +368,16 @@ def test_the_affected_site_tests_run_whole_where_a_file_other_than_python_was_de
             id = "module"
         ),
         param(
+            "docs/.vitepress/lib/math.ts",
+            [
+                ".vitepress/tests/config.test.ts",
+                ".vitepress/tests/lib/kit/readers.test.ts",
+                ".vitepress/tests/lib/math.test.ts",
+                ".vitepress/tests/lib/page-data.test.ts"
+            ],
+            id = "module-read"
+        ),
+        param(
             "docs/pages/reference/kit.md",
             [
                 ".vitepress/tests/config.test.ts",

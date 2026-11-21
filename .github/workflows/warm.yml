@@ -19,6 +19,8 @@ jobs:
 
       matrix:
         include:
+          - name  : 🎒 Kit · Coverage
+            tools : bun node python uv
           - name  : 🎒 Kit · Lockfiles
             tools : bun python uv
           - name  : 🎒 Kit · Package

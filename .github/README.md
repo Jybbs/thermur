@@ -434,7 +434,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | **Task** | **What It Does** |
 |---|---|
 | `mise test` | Runs the test suite through pytest on every core, passing any further arguments to it, so `--numprocesses=0` runs it on one process and `--share=<index>/<count>` runs one share of the suite split by test across several machines |
-| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, each test counted as reading the Python it ran and every tracked text file with an extension it opened, tracing no child process a test starts, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed or a file other than Python was added, passing any further arguments to pytest |
+| `mise affected` | Runs the tests [pytest-testmon](https://testmon.org/) selects for the changes since the merge base with `main`, each test counted as reading the Python it ran and every tracked text file with an extension it opened, tracing no child process a test starts, or the whole suite where `uv.lock`, `pyproject.toml`, or a file under `.mise` changed or a file other than Python was added or renamed, passing any further arguments to pytest |
 | `mise coverage` | Runs the suite under coverage, writes the HTML report under `.cache/coverage/html`, and prints the report for each file, failing below 95% on the total every worker measured |
 | `mise check` | Reports every rewrite and lint finding [*Prose*](https://prose.fyi) makes over `.mise/tasks`, `src`, and `tests` |
 | `mise format` | Rewrites the Python source to *Prose*'s style |

@@ -168,6 +168,7 @@ def branch(tmp_path: Path) -> Checkout:
         ),
         param({".gitignore": "commit"}, "--testmon-forceselect", id="text-modified"),
         param({"docs/pages/index.md": "commit"}, "--testmon-noselect", id="page-added"),
+        param({".gitignore": "moved"}, "--testmon-noselect", id="text-renamed"),
         param(
             {"tests/fixtures/flock/case.txt": "tree"},
             "--testmon-noselect",
@@ -204,15 +205,18 @@ def test_the_affected_tests_select_unless_a_shared_input_changed(
     """
     Asserts that `py:affected` runs pytest under the testmon data file
     in `.cache/testmon` with `--testmon-noselect` where `uv.lock`,
-    `pyproject.toml`, or a file under `.mise` changed or a file other
-    than Python was added since the merge base with `main`, whether
-    committed on the branch, staged, or left in the working tree, and with
-    `--testmon-forceselect` where only other files changed. A file committed
-    to `main` after the branch was cut counts as no change, and so does a
-    file git ignores.
+    `pyproject.toml`, or a file under `.mise` changed or a file other than
+    Python was added since the merge base with `main`, a file git renames
+    included, whether committed on the branch, staged, or left in the
+    working tree, and with `--testmon-forceselect` where only other files
+    changed. A file committed to `main` after the branch was cut counts as
+    no change, and so does a file git ignores.
     """
     stand_in("pytest", 'printf "%s\\n" "$TESTMON_DATAFILE" "$@"')
     for path, where in edits.items():
+        if where == "moved":
+            git(branch, "mv", path, f"{path}.moved")
+            continue
         if where == "main":
             git(branch, "switch", "--quiet", "main")
         (branch.root / path).parent.mkdir(exist_ok=True, parents=True)
@@ -270,11 +274,12 @@ def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
     """
     Commits to the `branch` repository a `README.md`, a `guide.md`, a
     `notes.md`, a `NOTICE`, a `mark.png` holding bytes UTF-8 cannot decode,
-    the suite's own conftest, and a suite of eight tests:
+    the suite's own conftest, and a suite of nine tests:
 
     - One opening the README
     - One opening the copy of it `checkout` makes, which the hook maps back onto it
     - One opening the README while the hook is paused
+    - One opening the README before it requests a fixture by name
     - Two requesting a session fixture that opens the guide once
     - One opening the `NOTICE`
     - One opening the mark
@@ -316,6 +321,9 @@ def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
             "    assert Path('NOTICE').read_text()\n\n"
             "def test_reads_mark():\n"
             "    assert Path('mark.png').read_bytes()\n\n"
+            "def test_reads_then_requests(request):\n"
+            "    assert Path('README.md').read_text()\n"
+            "    assert request.getfixturevalue('tmp_path')\n\n"
             "def test_reads_nothing():\n"
             "    assert True\n"
         )
@@ -357,7 +365,10 @@ def test_the_affected_tests_fail_where_no_main_resolves(
     [
         param(
             "README.md",
-            ["tests/test_flock.py::test_copies", "tests/test_flock.py::test_reads"],
+            [
+                "tests/test_flock.py::test_copies", "tests/test_flock.py::test_reads",
+                "tests/test_flock.py::test_reads_then_requests"
+            ],
             id = "read"
         ),
         param(
@@ -381,7 +392,8 @@ def test_the_affected_tests_fail_where_no_main_resolves(
                 "tests/test_flock.py::test_reads_mark",
                 "tests/test_flock.py::test_reads_nothing",
                 "tests/test_flock.py::test_reads_notice",
-                "tests/test_flock.py::test_reads_paused"
+                "tests/test_flock.py::test_reads_paused",
+                "tests/test_flock.py::test_reads_then_requests"
             ],
             id = "lockfile"
         )
