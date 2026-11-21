@@ -2,11 +2,12 @@ name : 🐦‍⬛ CI
 
 concurrency:
   cancel-in-progress : ${{ github.event_name == 'pull_request' }}
-  group              : ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group              : ${{ github.workflow }}-${{ github.head_ref || github.ref }}${{ case(github.event.pull_request.draft, '-draft', '') }}
 
 jobs:
   check:
     name    : ${{ matrix.name }}
+    if      : ${{ !github.event.pull_request.draft }}
     outputs : { coverage: "${{ steps.attach.outputs.artifact-url }}" }
     runs-on : &image ubuntu-26.04
 
@@ -54,7 +55,7 @@ jobs:
 
   gate:
     name    : 📡 Readout
-    if      : ${{ always() }}
+    if      : ${{ always() && !github.event.pull_request.draft }}
     needs   : [check]
     runs-on : *image
 
@@ -72,6 +73,7 @@ jobs:
 on:
   pull_request:
     paths : ['**', '!docs/.vitepress/**', docs/.vitepress/lib/rendered/**]
+    types : [opened, synchronize, reopened, ready_for_review]
 
   workflow_dispatch:
 
