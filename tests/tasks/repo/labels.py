@@ -6,7 +6,7 @@ stops it from writing anything unanswered.
 """
 
 from collections.abc     import Callable
-from common.declarations import DECLARED
+from common.declarations import RENDERED
 from common.stand_ins    import StandIn
 from pytest              import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
 from shlex               import join
@@ -16,12 +16,7 @@ from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
 
-pytestmark = mark.reads(
-    *DECLARED,
-    "src/**",
-    "docs/.vitepress/lib/rendered/**",
-    "docs/kit/src/**"
-)
+pytestmark = mark.reads(*RENDERED)
 
 
 @fixture

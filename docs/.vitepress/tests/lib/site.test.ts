@@ -18,9 +18,12 @@ describe('themeConfig', () => {
     expect(config.logo).toEqual({ alt: 'Thermur', dark: `/${dark}`, light: `/${light}` })
   })
 
-  it.each(Object.entries(source.marks.wordmark))('sets the %s wordmark from a file the public folder holds', (_, file) => {
-    expect(fs.existsSync(path.join(publicDir(import.meta.url), file))).toBe(true)
-  })
+  it.each(Object.entries(source.marks.wordmark))(
+    'sets the %s wordmark from a file the public folder holds',
+    (_, file) => {
+      expect(fs.existsSync(path.join(publicDir(import.meta.url), file))).toBe(true)
+    }
+  )
 
   it('links the repository the manifest names', () => {
     expect(config.socialLinks).toEqual([{ icon: 'github', link: 'https://github.com/example/flock' }])

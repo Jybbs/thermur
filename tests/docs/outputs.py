@@ -16,7 +16,7 @@ repository holds:
   Visual Identity's regions lay the identity out as
 """
 
-from common.declarations import DECLARED
+from common.declarations import RENDERED
 from common.edits        import append, edit
 from dataclasses         import asdict, fields
 from jax                 import numpy as jnp
@@ -57,12 +57,7 @@ IDENTITY = Path("docs/pages/reference/identity.md")
 KIT      = Path("docs/pages/reference/kit.md")
 RULES    = Path("docs/pages/methods/rules.md")
 
-pytestmark = mark.reads(
-    *DECLARED,
-    "src/**",
-    "docs/.vitepress/lib/rendered/**",
-    "docs/kit/src/**"
-)
+pytestmark = mark.reads(*RENDERED)
 
 
 class Inner(BaseModel, use_attribute_docstrings=True):

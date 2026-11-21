@@ -13,8 +13,8 @@ describe('passing', () => {
   })
 
   it.for([395, 380, 420, 330])('parts the line %d pixels down around the oval at every column', far => {
-    expect(Array.from({ length: 25 }, (_, step) => 480 + step * 10).filter(x => rimOf(OVAL, x, passing(x, far, OVAL)) < 0.999))
-      .toStrictEqual([])
+    const columns = Array.from({ length: 25 }, (_, step) => 480 + step * 10)
+    expect(columns.filter(x => rimOf(OVAL, x, passing(x, far, OVAL)) < 0.999)).toStrictEqual([])
   })
 
   it('keeps a line on the side of the middle it started on', () => {

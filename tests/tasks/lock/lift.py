@@ -13,7 +13,7 @@ spec, over a clone of the checkout whose one lag lifts the `uv` mise pins:
 """
 
 from collections.abc     import Callable
-from common.declarations import DECLARED
+from common.declarations import RENDERED
 from common.edits        import hold
 from common.lags         import BREAKING, uv_lag
 from common.stand_ins    import StandIn
@@ -26,12 +26,7 @@ from thermur.repo.checkout import Checkout
 from thermur.repo.lift     import Lift
 from thermur.repo.schemas  import Config
 
-pytestmark = mark.reads(
-    *DECLARED,
-    "src/**",
-    "docs/.vitepress/lib/rendered/**",
-    "docs/kit/src/**"
-)
+pytestmark = mark.reads(*RENDERED)
 
 
 @fixture

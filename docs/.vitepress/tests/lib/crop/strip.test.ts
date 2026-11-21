@@ -143,7 +143,8 @@ describe('the gathering of a strip’s birds', () => {
     const tight   = Math.sqrt(crop.LATE / 2)
     const drawn   = crop.draws(strip)
     expect(drawn.map(({ x }) => x / crop.scaleAt(200)))
-      .toStrictEqual(drawn.map(({ index }) => expect.closeTo(middle + (strip.birds.x[index]! - middle) * tight, 2)))
+      .toStrictEqual(drawn.map(({ index }) =>
+        expect.closeTo(middle + (strip.birds.x[index]! - middle) * tight, 2)))
   })
 
   it.each([
@@ -180,7 +181,8 @@ describe('a strip’s birds at the part', () => {
     expect(Math.min(...rooms.map(({ room }) => room))).toBeGreaterThan(0)
     expect(Math.max(...rooms.map(({ alpha }) => alpha))).toBeLessThanOrEqual(0.82)
     expect(nearing.length).toBeGreaterThan(0)
-    expect(nearing.map(({ alpha }) => alpha)).toStrictEqual(nearing.map(({ room }) => expect.closeTo(0.82 * room / fade)))
+    expect(nearing.map(({ alpha }) => alpha))
+      .toStrictEqual(nearing.map(({ room }) => expect.closeTo(0.82 * room / fade)))
   })
 
   it('shrink by the root of the sky’s scale, no shorter than a bird still reads', () => {

@@ -11,7 +11,7 @@ Pins the records the fire data is read through:
 - The docstring `documented` gives each field of a record
 """
 
-from common.declarations import DECLARED
+from common.declarations import PACKAGED
 from contextlib          import AbstractContextManager, nullcontext
 from dataclasses         import fields
 from equinox             import Module
@@ -42,7 +42,7 @@ from thermur.environment.schemas import (
 )
 from thermur.repo.checkout import Checkout
 
-pytestmark = mark.reads(*DECLARED, "src/**")
+pytestmark = mark.reads(*PACKAGED)
 
 
 def measured(**figures: list[float]) -> Dataset:

@@ -5,7 +5,7 @@ holds, and which edits change a subpackage's digest, its own or those of the
 modules it imports.
 """
 
-from common.declarations import DECLARED
+from common.declarations import PACKAGED
 from common.edits        import append
 from pathlib             import Path
 from platform            import platform
@@ -29,7 +29,7 @@ def doubled(value: float) -> float:
 '''
 
 
-pytestmark = mark.reads(*DECLARED, "src/**")
+pytestmark = mark.reads(*PACKAGED)
 
 
 @mark.parametrize(

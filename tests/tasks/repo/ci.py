@@ -6,19 +6,14 @@ row fails.
 """
 
 from collections.abc     import Callable
-from common.declarations import DECLARED
+from common.declarations import RENDERED
 from common.stand_ins    import StandIn
 from pytest              import MonkeyPatch, mark, param, raises
 from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
 
-pytestmark = mark.reads(
-    *DECLARED,
-    "src/**",
-    "docs/.vitepress/lib/rendered/**",
-    "docs/kit/src/**"
-)
+pytestmark = mark.reads(*RENDERED)
 
 
 @mark.parametrize(

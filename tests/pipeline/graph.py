@@ -10,7 +10,7 @@ and what a recorded run keeps.
 
 from collections.abc     import Callable
 from common.cached       import Pitch
-from common.declarations import DECLARED
+from common.declarations import PACKAGED
 from common.drones       import small
 from common.edits        import edit
 from common.runs         import computed
@@ -52,7 +52,7 @@ from thermur.pipeline.schemas  import Run
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 
-pytestmark = mark.reads(*DECLARED, "src/**")
+pytestmark = mark.reads(*PACKAGED)
 
 
 class Bare(BaseModel):

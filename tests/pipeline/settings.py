@@ -5,7 +5,7 @@ installed clone, and what the model refuses, over a stand-in field and the
 coupling slot, beside the fire data's settings each source sets.
 """
 
-from common.declarations import DECLARED
+from common.declarations import PACKAGED
 from common.edits        import append, edit, hold
 from common.settings     import Tuned
 from pathlib             import Path
@@ -24,7 +24,7 @@ coupling_per_s = 2.5
 """
 
 
-pytestmark = mark.reads(*DECLARED, "src/**")
+pytestmark = mark.reads(*PACKAGED)
 
 
 @fixture

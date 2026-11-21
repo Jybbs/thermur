@@ -4,7 +4,9 @@ the shell variables each test starts without, the home folder it reads, the
 terminal type and width it runs under, the block that stops a test without
 the `network` mark from opening a connection, the Unix socket a process
 pool reaches its server over, the mark that lets a `network` test open a
-connection, and the one JAX compilation cache every worker shares.
+connection, the files a `reads` mark leaves in a case's checkout, the shared
+copy the read-only cases read apart from the worktree, and the one JAX
+compilation cache every worker shares.
 """
 
 from collections.abc  import Iterator
@@ -17,6 +19,7 @@ from pytest_socket    import SocketBlockedError
 from socket           import create_connection, socketpair
 
 from thermur.pipeline.settings import Settings
+from thermur.repo.checkout     import Checkout
 
 SETTING = Settings.model_config["env_prefix"] + next(iter(Settings.model_fields))
 
@@ -91,12 +94,40 @@ def test_every_worker_shares_one_locked_jax_cache(pytestconfig: Config):
     assert config.jax_compilation_cache_max_size != -1
 
 
+@mark.reads("pyproject.toml", ".mise/**")
+def test_a_reads_mark_copies_only_the_files_its_patterns_match(checkout: Checkout):
+    """
+    Asserts that a case carrying a `reads` mark finds in its checkout only
+    the tracked files that match one of the mark's patterns.
+    """
+    copied = {
+        path.relative_to(checkout.root).parts[0]
+        for path in checkout.root.rglob("*")
+        if path.is_file() and ".git" not in path.relative_to(checkout.root).parts
+    }
+
+    assert copied == {".mise", "pyproject.toml"}
+
+
 def test_home_is_an_empty_folder():
     """
     Asserts that `~` resolves to an empty folder, so no test reads a dotfile
     of the developer's.
     """
     assert list(Path.home().iterdir()) == []
+
+
+def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
+    checked      : Checkout,
+    pytestconfig : Config
+):
+    """
+    Asserts that each file of the copy every read-only case shares holds an
+    inode of its own, so no edit through it reaches the tracked file.
+    """
+    assert not (checked.root / "pyproject.toml").samefile(
+        pytestconfig.rootpath / "pyproject.toml"
+    )
 
 
 def test_the_shell_carries_no_variable_that_changes_a_result(name: str):

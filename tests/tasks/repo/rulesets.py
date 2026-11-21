@@ -7,7 +7,7 @@ prompt that stops it from sending anything unanswered.
 """
 
 from collections.abc     import Callable
-from common.declarations import DECLARED
+from common.declarations import RENDERED
 from common.edits        import edit
 from common.stand_ins    import StandIn
 from json                import dumps
@@ -20,12 +20,7 @@ from types               import ModuleType
 from thermur.repo.checkout import Checkout
 
 LIVE       = {"main branch protection": 24390266, "release tag protection": 24390267}
-pytestmark = mark.reads(
-    *DECLARED,
-    "src/**",
-    "docs/.vitepress/lib/rendered/**",
-    "docs/kit/src/**"
-)
+pytestmark = mark.reads(*RENDERED)
 
 
 @fixture

@@ -4,7 +4,7 @@ again on every run, the air the graph lays out from it, and when a rerun
 reads that air back from the cache.
 """
 
-from common.declarations      import DECLARED
+from common.declarations      import PACKAGED
 from common.drones            import small
 from common.runs              import computed
 from hamilton.caching.adapter import CachingBehavior
@@ -18,7 +18,7 @@ from thermur.pipeline.graph    import Graph
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
 
-pytestmark = mark.reads(*DECLARED, "src/**")
+pytestmark = mark.reads(*PACKAGED)
 
 
 @fixture

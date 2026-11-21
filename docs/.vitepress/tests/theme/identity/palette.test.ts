@@ -78,7 +78,8 @@ describe('the warning and critical lines of IdentityPalette', () => {
       .toEqual(['warning', 'critical'].map(role => `fill: var(--th-${role}); stroke: var(--vp-c-text-1);`))
   })
 
-  it.for(Object.keys(sketch.LEVELS).flatMap(role => (['dark', 'light'] as const).map(scheme => [role, scheme] as const)))(
+  it.for(Object.keys(sketch.LEVELS).flatMap(role =>
+    (['dark', 'light'] as const).map(scheme => [role, scheme] as const)))(
     'holds the %s level’s name and marks to their contrast on the %s ground',
     ([role, scheme]) => {
       const ground = shadeOf('ground', scheme)

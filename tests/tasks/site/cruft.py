@@ -1,6 +1,7 @@
 """
-Pins that the cruft report runs both of knip's passes, printing their
-annotations under GitHub Actions, and fails where either fails.
+Pins that the cruft report runs knip's pass over import cycles after a first
+pass that fails as well as after one that passes, and fails where either
+fails.
 """
 
 from common.edits import executable

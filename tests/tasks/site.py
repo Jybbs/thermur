@@ -1,8 +1,8 @@
 """
 Pins the arguments each `site` task hands the tool it runs, meaning the copy
-under `docs/node_modules/.bin` each runs, every argument a reader adds, and
-the annotations the lint prints under GitHub Actions, and the environment
-every `bun` command in the clone runs under.
+under `docs/node_modules/.bin` each runs, every argument a reader adds, the
+annotations the lint and the cruft report print under GitHub Actions, and
+the environment every `bun` command in the clone runs under.
 """
 
 from common.tasks import run_site

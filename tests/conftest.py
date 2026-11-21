@@ -10,15 +10,10 @@ from common.edits     import executable, git
 from common.isolation import CLEARED, TERMINAL
 from common.stand_ins import StandIn
 from filelock         import FileLock
+from itertools        import chain
 from os               import environ, pathsep
 from pathlib          import Path
-from pytest             import (
-    Config,
-    FixtureRequest,
-    MonkeyPatch,
-    TempPathFactory,
-    fixture
-)
+from pytest           import Config, FixtureRequest, MonkeyPatch, TempPathFactory, fixture
 from shlex            import quote
 from syrupy.assertion import SnapshotAssertion
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
@@ -58,9 +53,9 @@ def checkout(
     there, which a case edits before a check reads it.
     """
     copy  = Checkout(root=tmp_path)
-    reads = [pattern for mark in request.node.iter_markers(
-        "reads"
-    ) for pattern in mark.args]
+    reads = [*chain.from_iterable(
+        mark.args for mark in request.node.iter_markers("reads")
+    )]
     Checkout(root=pytestconfig.rootpath).copy(
         [path for path in tracked if not reads or any(map(path.full_match, reads))],
         copy.root

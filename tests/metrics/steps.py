@@ -3,10 +3,11 @@ Pins the flight's steps, meaning the reference flight the settings describe,
 its frames and statistics as tables, and one trial step per open slot.
 """
 
-from common.declarations import DECLARED
+from common.declarations import PACKAGED
 from common.drones       import short, small, still_air
 from numpy.testing       import assert_array_equal
 from pytest              import MonkeyPatch, mark
+from unittest.mock       import create_autospec
 from xarray              import Dataset
 
 from thermur.controller.schemas import Composite
@@ -17,16 +18,16 @@ from thermur.pipeline.graph     import Graph
 from thermur.pipeline.settings  import Settings
 from thermur.repo.checkout      import Checkout
 
-pytestmark = mark.reads(*DECLARED, "src/**")
+pytestmark = mark.reads(*PACKAGED)
 
 
 def test_a_trial_step_flies_its_trial_against_the_settings_composite(
     monkeypatch: MonkeyPatch
 ):
     """
-    Asserts that a trial step flies the trial it is given through the
-    air and under the composite it reads and the plan the settings hold,
-    returning the table the trial returns.
+    Asserts that a trial step passes `Trial.flown` the air, the composite
+    it reads, and the plan the settings hold, returning the table the trial
+    returns.
     """
     trial = Trial(
         candidates = {},
@@ -37,12 +38,11 @@ def test_a_trial_step_flies_its_trial_against_the_settings_composite(
     settings  = Settings(plan=short())
     air       = still_air()
     composite = Composite.from_settings(settings)
-    received  = []
     table     = Dataset()
     monkeypatch.setattr(
         Trial,
         "flown",
-        lambda *passed: received.append(passed) or table
+        replaced := create_autospec(Trial.flown, return_value=table)
     )
 
     flown = steps.flown_trial(
@@ -54,7 +54,7 @@ def test_a_trial_step_flies_its_trial_against_the_settings_composite(
     )
 
     assert flown is table
-    assert received == [(trial, air, composite, settings.plan)]
+    replaced.assert_called_once_with(trial, air, composite, settings.plan)
 
 
 def test_each_open_slot_is_tried_by_a_step_of_its_own(clone: Checkout):
