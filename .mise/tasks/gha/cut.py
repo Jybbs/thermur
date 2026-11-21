@@ -72,7 +72,7 @@ class Draft:
             None
         ):
             print(
-                f"::error::{self.version} is already published, so `mise bump` "
+                f"::error::{self.version} is already published, and `mise bump` "
                 "moves `[project].version` to the next release"
             )
             return "published", published["url"]

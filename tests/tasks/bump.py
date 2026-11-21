@@ -76,15 +76,16 @@ def uv(stand_in: Callable[[str, str], StandIn]) -> StandIn:
 @mark.parametrize(
     ("flags", "part", "version"),
     [
-        param([], "minor", "0.2.0", id="minor"),
-        param(["patch"], "patch", "0.1.1", id="patch"),
-        param(["major"], "major", "1.0.0", id="major")
+        param({}, "minor", "0.2.0", id="minor"),
+        param({"major": "false", "patch": "false"}, "minor", "0.2.0", id="minor-unset"),
+        param({"patch": "true"}, "patch", "0.1.1", id="patch"),
+        param({"major": "true"}, "major", "1.0.0", id="major")
     ]
 )
 def test_the_bump_moves_each_file_to_the_release_its_flag_names(
     bump        : ModuleType,
     capsys      : CaptureFixture[str],
-    flags       : list[str],
+    flags       : dict[str, str],
     monkeypatch : MonkeyPatch,
     part        : str,
     tmp_path    : Path,
@@ -93,13 +94,14 @@ def test_the_bump_moves_each_file_to_the_release_its_flag_names(
 ):
     """
     Asserts that the bump asks `uv version` for the next minor release by
-    default, or the patch or major one its flag names, writing the manifest
-    through uv without a relock, and writes the release uv prints into
-    the `thermur` entry of `uv.lock` and the `version` of `CITATION.cff`,
-    leaving every other pin and key as it was.
+    default or where mise passes each flag as `false`, or the patch or major
+    one its flag names, writing the manifest through uv without a relock,
+    and writes the release uv prints into the `thermur` entry of `uv.lock`
+    and the `version` of `CITATION.cff`, leaving every other pin and key as
+    it was.
     """
-    for flag in flags:
-        monkeypatch.setenv(f"usage_{flag}", "true")
+    for flag, given in flags.items():
+        monkeypatch.setenv(f"usage_{flag}", given)
 
     bump.main()
 
@@ -109,6 +111,23 @@ def test_the_bump_moves_each_file_to_the_release_its_flag_names(
         f"cff-version: 1.2.0\ndate-released: 2026-10-02\nversion: {version}\n"
     )
     assert capsys.readouterr().out == f"{version}\n"
+
+
+def test_a_citation_at_another_release_fails_before_the_lock_moves(
+    bump     : ModuleType,
+    tmp_path : Path
+):
+    """
+    Asserts that a `CITATION.cff` naming a release other than the manifest's
+    fails the bump on that file, leaving the `thermur` entry of `uv.lock`
+    where it stood.
+    """
+    (tmp_path / "CITATION.cff").write_text("version: 0.0.9\n")
+
+    with raises(ValueError, match="`CITATION.cff` names no `0.1.0`"):
+        bump.main()
+
+    assert (tmp_path / "uv.lock").read_text() == LOCK.format(version="0.1.0")
 
 
 def test_two_flags_exit_before_any_file_moves(

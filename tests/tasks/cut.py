@@ -133,7 +133,7 @@ def test_a_published_version_fails_naming_the_bump(
     cut.Draft(version="0.2.0").cut()
 
     assert capsys.readouterr().out.startswith(
-        "::error::0.2.0 is already published, so `mise bump`"
+        "::error::0.2.0 is already published, and `mise bump`"
     )
 
 

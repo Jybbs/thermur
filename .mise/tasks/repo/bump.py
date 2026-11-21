@@ -13,12 +13,11 @@ leaving every other pin where it stands. mise passes each flag the usage
 spec above declares through a `usage_` variable.
 """
 
-from os      import environ
-from pathlib import Path
-from sys     import stderr
+from os  import environ
+from sys import stderr
 
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Edit, Lock
+from thermur.repo.schemas  import Edit
 
 
 def main():
@@ -47,21 +46,16 @@ def main():
         "--short",
         capture = True
     ).stdout.strip()
-    for edit in [
-        Edit(
-            ahead   = "^version: ",
-            current = current,
-            file    = checkout.citation.file,
-            newest  = version
-        ),
-        Edit(
-            ahead   = r'^name = "thermur"\nversion = "',
-            current = current,
-            file    = Path(Lock.model_config["title"]),
-            newest  = version
-        )
+    for ahead, file in [
+        ("^version: ", checkout.citation.file),
+        (r'^name = "thermur"\nversion = "', checkout.lock.file)
     ]:
-        edit.write(checkout.root)
+        Edit(
+            ahead   = ahead,
+            current = current,
+            file    = file,
+            newest  = version
+        ).write(checkout.root)
 
     print(version)
 
