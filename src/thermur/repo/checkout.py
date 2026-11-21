@@ -83,11 +83,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         name the row's check run takes and the task the row runs, in the
         order the workflows and their rows declare them.
         """
-        return [
-            *workflow.checks
-            for workflow in self.workflows.values()
-            if workflow.on_pull_request
-        ]
+        return [*workflow.checks for workflow in self.pulls.values()]
 
     @cached_property
     def citation(self) -> Citation:
@@ -253,6 +249,17 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         """
         return {path: Page(text=self.read(path)) for path in self.tracked("*.md")}
 
+    @property
+    def pulls(self) -> dict[Path, Workflow]:
+        """
+        Keeps each workflow running on a pull request, by its path.
+        """
+        return {
+            path: workflow
+            for path, workflow in self.workflows.items()
+            if workflow.on_pull_request
+        }
+
     @cached_property
     def release(self) -> Release:
         """
@@ -401,9 +408,9 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         the task runs from, so uv reaches the root's own `.venv`.
 
         Args:
-            capture : Whether the output is captured rather than printed.
-            check   : Whether a nonzero exit raises.
-            folder  : The folder to run in, relative to the root.
+            capture: Whether the output is captured rather than printed.
+            check: Whether a nonzero exit raises.
+            folder: The folder to run in, relative to the root.
 
         Raises:
             CalledProcessError: Where `check` is set and the command exits

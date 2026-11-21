@@ -1,12 +1,15 @@
 """
 Holds the edits a case makes to its copy of the checkout before a check
 reads it, meaning text added to the end of a file, one string replaced in a
-file, a task file written fresh, a git command run under a fixed author, and
-a repository committing every file it holds to `main`, beside the writer of
-an executable file each of them and the stand-ins share.
+file, the holds `pyproject.toml` records, a task file written fresh, a git
+command run under a fixed author, and a repository committing every file it
+holds to `main`, beside the writer of an executable file each of them and
+the stand-ins share.
 """
 
+from json    import dumps
 from pathlib import Path
+from re      import sub
 
 from thermur.repo.checkout import Checkout
 
@@ -71,6 +74,26 @@ def git(checkout: Checkout, *arguments: str):
         "-c",
         "user.name=Thermur",
         *arguments
+    )
+
+
+def hold(checkout: Checkout, holds: dict[str, str]):
+    """
+    Writes `holds`, each pin's reason by the pin, as the
+    `[tool.thermur.holds]` table of the copy's `pyproject.toml`, in place of
+    the holds it records.
+    """
+    manifest = checkout.root / "pyproject.toml"
+    text     = sub(
+        r"(?ms)^\[tool\.thermur\.holds\]\n.*?(?=^\[)",
+        "",
+        manifest.read_text()
+    )
+    manifest.write_text(
+        text
+        + "\n[tool.thermur.holds]\n"
+        + "".join(f"{dumps(pin)} = {dumps(reason)}\n" for pin, reason in holds.items()),
+        encoding = "utf-8"
     )
 
 

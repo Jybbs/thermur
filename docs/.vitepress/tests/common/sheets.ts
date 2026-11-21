@@ -1,5 +1,17 @@
 import { Window } from 'happy-dom'
 
+import label from '../../../kit/src/styles/label.css?raw'
+
+/**
+ * The face, weight, spacing, and case every control's label is set at.
+ */
+export const CONTROL_LABEL = {
+  'font-family'    : 'var(--vp-font-family-mono)',
+  'font-weight'    : '500',
+  'letter-spacing' : '0.1em',
+  'text-transform' : 'uppercase'
+} as const
+
 /**
  * Opens a page holding the stylesheet whose text is `sheet`, for a reader who
  * prefers reduced motion where `reduced` holds.
@@ -48,6 +60,21 @@ function flattened(list: CSSRuleList): CSSStyleRule[] {
   return [...list].flatMap(rule =>
     'selectorText' in rule ? [rule as CSSStyleRule] : 'cssRules' in rule ? flattened((rule as CSSGroupingRule).cssRules) : []
   )
+}
+
+/**
+ * Reads the face, weight, spacing, and case `element` is set in, each from its
+ * inline style where it sets one and otherwise from the kit's label rule, or
+ * nothing where none of the rule's selectors matches it.
+ */
+export function labeled(element: SVGElement): Record<string, string> {
+  const [rule] = flattened(opened(label).style.sheet!.cssRules)
+  const keys   = Object.keys(CONTROL_LABEL)
+  return element.matches(rule!.selectorText)
+    ? Object.fromEntries(keys.map(key => [
+      key, element.style.getPropertyValue(key) || rule!.style.getPropertyValue(key)
+    ]))
+    : {}
 }
 
 /**

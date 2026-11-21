@@ -45,7 +45,10 @@ FOLDERS = [".mise/tasks", "src", "tests"]
         param(
             "coverage",
             None,
-            ["--cov", "--cov-report", "html", "--cov-report", "term", "--marker"],
+            [
+                "--cov", "--cov-fail-under=0", "--cov-report=", "--marker",
+                "html", "--fail-under=0", "report"
+            ],
             id = "coverage"
         )
     ]
@@ -59,15 +62,15 @@ def test_each_task_hands_its_program_every_argument(
     task         : str
 ):
     """
-    Asserts that each `py` task runs its program on the arguments it
-    fixes followed by every argument a reader adds, the formatter over
-    `.mise/tasks`, `src`, and `tests` and coverage writing its HTML and
-    terminal reports, with `py:check` passing `--output-format github` where
-    `GITHUB_ACTIONS` is set and `--output-format text` where it is empty
-    or unset.
+    Asserts that each `py` task runs its program on the arguments
+    it fixes followed by every argument a reader adds, the formatter
+    over `.mise/tasks`, `src`, and `tests` and coverage writing its
+    HTML and terminal reports from the data afterward, with `py:check`
+    passing `--output-format github` where `GITHUB_ACTIONS` is set and
+    `--output-format text` where it is empty or unset.
     """
     root = pytestconfig.rootpath
-    for program in ("prose", "pytest"):
+    for program in ("coverage", "prose", "pytest"):
         stand_in(program, 'printf "%s\\n" "$@"')
 
     if actions is not None:
@@ -82,6 +85,45 @@ def test_each_task_hands_its_program_every_argument(
     ).stdout.splitlines()
 
     assert printed == passed
+
+
+@mark.parametrize(
+    ("measured", "reported", "status"),
+    [
+        param(0, 0, 0, id="both-pass"),
+        param(1, 0, 1, id="a-test-fails"),
+        param(0, 2, 2, id="below-fail-under"),
+        param(1, 2, 2, id="both-fail")
+    ]
+)
+def test_the_coverage_reports_whatever_the_suite_returns(
+    measured     : int,
+    pytestconfig : Config,
+    reported     : int,
+    stand_in     : Callable[[str, str], StandIn],
+    status       : int
+):
+    """
+    Asserts that `py:coverage` writes the HTML report at any total and
+    runs the terminal report, which fails below `fail_under`, whether or
+    not a test failed, exiting with the report's status where it fails and
+    otherwise with the status of the suite.
+    """
+    stand_in("pytest", f"exit {measured}")
+    coverage = stand_in(
+        "coverage",
+        f'[ "$*" = "html --fail-under=0" ] || exit {reported}'
+    )
+    ran = run(
+        [pytestconfig.rootpath / ".mise/tasks/py/coverage"],
+        capture_output = True,
+        cwd            = pytestconfig.rootpath
+    )
+
+    assert (ran.returncode, coverage.commands) == (
+        status,
+        ["coverage html --fail-under=0", "coverage report"]
+    )
 
 
 @fixture

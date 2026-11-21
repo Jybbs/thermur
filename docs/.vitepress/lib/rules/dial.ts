@@ -203,11 +203,10 @@ export function drawFrame(layout: Layout, plot: SVGElement): SVGElement {
     const [x2, y2] = at(layout, outer + 2, degrees)
     plot.append(markup.svg('line', { 'stroke': markup.TONE.rule, 'stroke-width': 1, x1, x2, y1, y2 }))
   }
-  const rim   = { 'fill': 'none', 'stroke': markup.TONE.rule, 'stroke-width': 1 }
-  const named = { 'fill': markup.TONE.muted, 'letter-spacing': '0.08em' }
+  const rim = { 'fill': 'none', 'stroke': markup.TONE.rule, 'stroke-width': 1 }
   plot.append(
     markup.svg('path', { ...rim, d: arc(layout, outer + 6, 0, reach) }),
-    markup.text(markup.FACE.mono, 10.5, 'THE FIRST DRONE TURNS', center[0] + 26, 14, named)
+    markup.text(markup.FACE.mono, 10.5, 'THE FIRST DRONE TURNS', center[0] + 26, 14, markup.CAPTION)
   )
   return markup.svg('path', {
     'fill'             : 'none',

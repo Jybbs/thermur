@@ -14,6 +14,7 @@ from common.drones   import small
 from common.edits    import edit
 from common.runs     import computed
 from common.settings import Tuned
+from contextlib      import closing
 from dataclasses     import make_dataclass
 from decimal         import Decimal
 from enum            import IntEnum, StrEnum
@@ -29,7 +30,7 @@ from numpy          import float32, int32, int64, ones, zeros
 from pathlib        import Path
 from pydantic       import BaseModel, HttpUrl, create_model
 from pytest         import Config, MonkeyPatch, fixture, mark, param, raises
-from sqlite3        import connect
+from sqlite3        import OperationalError, connect
 from threading      import Thread
 from unittest.mock  import Mock
 from uuid           import UUID
@@ -253,12 +254,15 @@ def test_equal_values_fingerprint_alike(
     assert fingerprinted(made()) == fingerprinted(made())
 
 
-def test_a_call_naming_no_step_is_refused(graphed: Callable[..., Graph]):
+def test_a_cache_connection_that_fails_to_open_raises_only_its_error(tmp_path: Path):
     """
-    Asserts that a call naming no step raises a `ValueError` saying so.
+    Asserts that a `CacheConnection` on a path SQLite cannot open raises its
+    `OperationalError` and leaves nothing for its deallocator to report.
     """
-    with raises(ValueError, match="Name at least one step to compute"):
-        graphed().compute()
+    with raises(OperationalError):
+        connect(tmp_path / "missing/store.db", factory=CacheConnection)
+
+    collect()
 
 
 @mark.parametrize(
@@ -309,6 +313,14 @@ def test_the_saver_writes_a_file_its_loader_reads_back_whole(
         assert_identical(read, data)
 
 
+def test_a_call_naming_no_step_is_refused(graphed: Callable[..., Graph]):
+    """
+    Asserts that a call naming no step raises a `ValueError` saying so.
+    """
+    with raises(ValueError, match="Name at least one step to compute"):
+        graphed().compute()
+
+
 def test_a_component_s_code_change_computes_the_flight_again(
     clone       : Checkout,
     monkeypatch : MonkeyPatch
@@ -336,6 +348,34 @@ def test_a_component_s_code_change_computes_the_flight_again(
     assert {"composite", "flight"} <= computed(graph)
 
 
+@mark.parametrize("check_same_thread", [True, False])
+def test_a_freed_cache_connection_releases_the_lock_it_held(
+    check_same_thread : bool,
+    tmp_path          : Path
+):
+    """
+    Asserts that a `CacheConnection` freed by a collection on another thread
+    closes, releasing the lock its open transaction held, whichever thread
+    check its caller passes.
+    """
+    database = tmp_path / "store.db"
+    held     = connect(
+        database,
+        check_same_thread = check_same_thread,
+        factory           = CacheConnection
+    )
+    held.execute("begin exclusive")
+    cycle = [held]
+    cycle.append(cycle)
+    del cycle, held
+    collector = Thread(target=collect)
+    collector.start()
+    collector.join()
+
+    with closing(connect(database, timeout=0)) as probe:
+        probe.execute("begin exclusive")
+
+
 def test_a_failed_save_raises_its_own_error_where_the_run_began(
     clone       : Checkout,
     graphed     : Callable[..., Graph],
@@ -353,24 +393,6 @@ def test_a_failed_save_raises_its_own_error_where_the_run_began(
         graphed(recorded=True).compute("table")
 
     assert Path.cwd() == clone.root
-
-
-def test_a_freed_cache_connection_releases_the_lock_it_held(tmp_path: Path):
-    """
-    Asserts that a `CacheConnection` freed by a collection on another thread
-    closes, releasing the lock its open transaction held.
-    """
-    database = tmp_path / "store.db"
-    held     = connect(database, check_same_thread=False, factory=CacheConnection)
-    held.execute("begin exclusive")
-    cycle = [held]
-    cycle.append(cycle)
-    del cycle, held
-    collector = Thread(target=collect)
-    collector.start()
-    collector.join()
-
-    connect(database, factory=CacheConnection, timeout=0).execute("begin exclusive")
 
 
 def test_a_graph_reads_every_subpackage_s_steps_by_default(

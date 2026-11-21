@@ -8,7 +8,7 @@ pins through the command its source ships, and the lift finds each through
 """
 
 from collections.abc import Collection
-from datetime        import datetime
+from datetime        import UTC, datetime
 from json            import dumps, loads
 from pathlib         import Path
 from pydantic        import BaseModel, Field
@@ -46,7 +46,8 @@ def read_lags(fields: dict) -> list[Lag]:
 class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     Every pin the checkout declares that lags its newest release, which the
-    lift writes short of each pin `holds` names.
+    lift writes short of each pin `holds` names and each pin the checkout's
+    `[tool.thermur.holds]` records.
     """
 
     checkout: Checkout
@@ -65,6 +66,23 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     Every pin lagging its newest release, those of each manager in the order
     the managers are declared.
     """
+
+    @property
+    def recorded(self) -> frozendict[str, str]:
+        """
+        Reads the reason `[tool.thermur.holds]` in the checkout's
+        `pyproject.toml` gives for each pin it holds, by the pin.
+        """
+        return self.checkout.manifest.holds
+
+    @property
+    def stale(self) -> list[str]:
+        """
+        Lists each recorded hold naming no row of the table, meaning a pin
+        that no longer lags or that the checkout no longer declares, in
+        alphabetical order.
+        """
+        return sorted({*self.recorded} - {lag.pin for lag in self.lags})
 
     @property
     def unmatched(self) -> list[str]:
@@ -93,9 +111,14 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
 
     def lifted(self, held: Collection[str] = ()) -> list[Lag]:
         """
-        Keeps each lagging pin that neither `holds` nor `held` names.
+        Keeps each lagging pin that neither `holds`, the recorded holds, nor
+        `held` names.
         """
-        return [lag for lag in self.lags if lag.pin not in {*self.holds, *held}]
+        return [
+            lag
+            for lag in self.lags
+            if lag.pin not in {*self.holds, *self.recorded, *held}
+        ]
 
     def passes(self, held: Collection[str] = ()) -> bool:
         """
@@ -120,8 +143,9 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     def table(self, now: datetime) -> str:
         """
         Writes every lagging pin as one Markdown table, each newest
-        release's age counted in whole days up to `now`, or a sentence
-        saying no pin lags where none does.
+        release's age counted in whole days up to `now` and each recorded
+        hold's reason beside its pin, or a sentence saying no pin lags where
+        none does.
         """
         if not self.lags:
             return "Every pin stands at its newest release."
@@ -129,9 +153,9 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         return "\n".join(
             [
                 "| **Pin** | **Declared In** | **Current** | **Newest** | **Major** "
-                "| **Age in Days** | **Clears** |",
-                "|---|---|---|---|---|---|---|",
-                *(lag.row(now) for lag in self.lags)
+                "| **Age in Days** | **Clears** | **Held Because** |",
+                "|---|---|---|---|---|---|---|---|",
+                *(lag.row(now, self.recorded.get(lag.pin, "")) for lag in self.lags)
             ]
         )
 
@@ -143,10 +167,9 @@ class Lift(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         moves, and relocks every other lockfile through `lock:sync`.
 
         Raises:
-            CalledProcessError : Where a command the write runs exits
-                                 nonzero.
-            ValueError         : Where a file names no release an edit
-                                 lifts.
+            CalledProcessError: Where a command the write runs exits
+                                nonzero.
+            ValueError: Where a file names no release an edit lifts.
         """
         lifted = self.lifted(held)
         for lag in lifted:
@@ -573,9 +596,10 @@ class Scripts(Manager):
 
 class Site(Manager):
     """
-    Bun, reporting each exact pin in a manifest of the site's workspace that
-    `bun outdated` lists, and each exact release `overrides` holds a package
-    to, against the release its `latest` tag names.
+    Bun, reporting each exact pin in a manifest of the site's workspace
+    that `bun outdated` lists, and each exact release `overrides` holds a
+    package to, against its newest release older than the window `[tool.uv]`
+    declares.
     """
 
     closing: ClassVar[str] = '(?=")'
@@ -591,22 +615,41 @@ class Site(Manager):
     """
 
     @property
+    def age(self) -> str:
+        """
+        Writes the `--minimum-release-age` flag, in whole seconds, that
+        holds a Bun resolve to releases older than the window `[tool.uv]`
+        declares.
+        """
+        seconds = int(self.checkout.manifest.window.total_seconds())
+        return f"--minimum-release-age={seconds}"
+
+    @property
     def lags(self) -> list[Lag]:
         """
         Lists each package `bun outdated --filter=*` prints a row for at
         a release some manifest of the workspace declares, leaving out a
         range, then each package it lists no row for that `overrides` holds
         to an exact release behind its newest, beside the advisories the
-        lift clears on it.
+        lift clears on it. Each newest release is older than the window
+        `[tool.uv]` declares, so a package the window holds at its current
+        release makes no lag.
         """
         package = self.checkout.package
         listed  = {
             (name, current): newest
             for name, current, newest in findall(
                 rf"(?m)^\| (\S+)(?: \(\w+\))? +\| ({self.release}) +"
-                r"\| \S+ +\| (\S+) +\|(?: [^|\n]+\|)?$",
-                self.read("bun", "outdated", "--filter=*", folder=package.folder)
+                r"\| \S+(?: \*)? +\| (\S+)(?: \*)? +\|(?: [^|\n]+\|)?$",
+                self.read(
+                    "bun",
+                    "outdated",
+                    "--filter=*",
+                    self.age,
+                    folder = package.folder
+                )
             )
+            if newest != current
         }
         names = {name for name, _ in listed}
         pins  = listed | {
@@ -615,7 +658,8 @@ class Site(Manager):
             if name not in names
             and fullmatch(self.release, current)
             and Version.is_valid(current)
-            and Version.parse(newest := self.latest(name)) > current
+            and (newest := self.newest(name))
+            and Version.parse(newest) > current
         }
         return self.cleared(
             [
@@ -677,6 +721,7 @@ class Site(Manager):
                 "bun",
                 "install",
                 "--lockfile-only",
+                self.age,
                 capture = True,
                 folder  = package.folder
             )
@@ -708,6 +753,27 @@ class Site(Manager):
                 self.checkout.read(manifest)
             )
         }
+
+    def newest(self, name: str) -> str | None:
+        """
+        Reads the newest release of the npm package `name`, short of a
+        prerelease, that `bun info` dates at least the window `[tool.uv]`
+        declares ago, the release `bun outdated` reports under the window.
+        """
+        cutoff = datetime.now(UTC) - self.checkout.manifest.window
+        return max(
+            (
+                version
+                for version, published in loads(
+                    self.info(name, "time", "--json")
+                ).items()
+                if Version.is_valid(version)
+                and not Version.parse(version).prerelease
+                and datetime.fromisoformat(published) <= cutoff
+            ),
+            default = None,
+            key     = Version.parse
+        )
 
 
 class Tools(Manager):

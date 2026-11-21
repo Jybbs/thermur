@@ -259,15 +259,15 @@ class Radio(Module):
         until `hold_periods` packet periods pass with no packet from it.
 
         Args:
-            flock  : The state each drone broadcasts.
-            inbox  : What each drone heard by the step before.
-            key    : The key each packet's loss derives from.
-            lag    : The number of steps `Heading.lag_s` spans.
-            sent   : The flock at each of the last steps the radio keeps,
-                     each array laid out as `(n_kept, n_drones, 3)`, the
-                     step `s` under the index `s % n_kept`.
-            step   : The number of steps since launch.
-            step_s : The step of the integrator, in seconds.
+            flock: The state each drone broadcasts.
+            inbox: What each drone heard by the step before.
+            key: The key each packet's loss derives from.
+            lag: The number of steps `Heading.lag_s` spans.
+            sent: The flock at each of the last steps the radio keeps, each
+                  array laid out as `(n_kept, n_drones, 3)`, the step `s`
+                  under the index `s % n_kept`.
+            step: The number of steps since launch.
+            step_s: The step of the integrator, in seconds.
 
         Returns:
             What each drone heard by `step`, and the broadcasts kept with
@@ -467,12 +467,12 @@ class Observation(Module):
         mean over the neighbors.
 
         Args:
-            air    : The channels each drone reads at its position.
-            count  : The number of neighbors each drone senses.
-            cruise : The speed each drone cruises at, in meters per second.
-            flock  : The state each drone senses.
-            inbox  : The states each drone last heard of every other.
-            t      : The time, in seconds since the simulation started.
+            air: The channels each drone reads at its position.
+            count: The number of neighbors each drone senses.
+            cruise: The speed each drone cruises at, in meters per second.
+            flock: The state each drone senses.
+            inbox: The states each drone last heard of every other.
+            t: The time, in seconds since the simulation started.
 
         Returns:
             The observation of the flock, one row per drone.
@@ -563,9 +563,9 @@ class Heading(Component):
         the command whole, leaving the spin unchanged.
 
         Args:
-            increment   : The increment of the command across it, in meters
-                          per second.
-            observation : What the drone senses.
+            increment: The increment of the command across it, in meters
+                       per second.
+            observation: What the drone senses.
 
         Returns:
             The increment of the drone's command, in meters per second, and
@@ -580,9 +580,9 @@ class Heading(Component):
         `force` alone, holding the spin at zero.
 
         Args:
-            force       : The other slots' acceleration on the drone, in
-                          meters per second squared.
-            observation : What the drone senses, its weights set.
+            force: The other slots' acceleration on the drone, in meters per
+                   second squared.
+            observation: What the drone senses, its weights set.
 
         Returns:
             The rate of the drone's command, in meters per second squared,
@@ -633,13 +633,13 @@ class Noise(Component):
         leaving it as it stands for a slot whose state no step updates.
 
         Args:
-            delay_s     : The age of a broadcast as it arrives, in seconds.
-            draw        : A number drawn uniformly between zero and one.
-            observation : What the drone senses at the step's start, holding
-                          the state the step leaves it.
-            step_s      : The step of the integrator, in seconds.
-            turn        : The roost's acceleration on the drone, in meters
-                          per second squared.
+            delay_s: The age of a broadcast as it arrives, in seconds.
+            draw: A number drawn uniformly between zero and one.
+            observation: What the drone senses at the step's start, holding
+                         the state the step leaves it.
+            step_s: The step of the integrator, in seconds.
+            turn: The roost's acceleration on the drone, in meters per
+                  second squared.
         """
         return observation.force
 
@@ -873,8 +873,8 @@ def nearest(count: int, points: Array) -> ndarray:
     which `KDTree.query` may order ahead of it.
 
     Args:
-        count  : The number of neighbors per drone.
-        points : The positions, `(..., n_drones, 3)`.
+        count: The number of neighbors per drone.
+        points: The positions, `(..., n_drones, 3)`.
 
     Returns:
         The indices of each drone's neighbors in the order of their distance,

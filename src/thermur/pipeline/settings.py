@@ -185,12 +185,12 @@ class Settings(
         by default.
 
         The table comes from the `pyproject.toml` of the clone
-        `Checkout.installed` resolves, whatever the working directory.
+        `Checkout.installed` resolves, whatever the working directory,
+        leaving out the `holds` table `lock:lift` reads.
         """
-        return (
-            init_settings, env_settings,
-            PyprojectTomlConfigSettingsSource(
-                settings_cls,
-                Checkout.installed().root / Manifest.model_config["title"]
-            )
+        table = PyprojectTomlConfigSettingsSource(
+            settings_cls,
+            Checkout.installed().root / Manifest.model_config["title"]
         )
+        table.init_kwargs.pop("holds", None)
+        return init_settings, env_settings, table

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { fontStack }                  from '../../../lib/identity.ts'
-import source                         from '../../../lib/rendered/identity.json' with { type: 'json' }
-import values                         from '../../../theme/styles/values.css?raw'
-import { computed, declared, styled } from '../../common/sheets.ts'
+import { fontStack }                                 from '../../../lib/identity.ts'
+import source                                        from '../../../lib/rendered/identity.json' with { type: 'json' }
+import values                                        from '../../../theme/styles/values.css?raw'
+import { CONTROL_LABEL, computed, declared, styled } from '../../common/sheets.ts'
 
 /**
  * The rule setting the label of the fold holding every value as a table.
@@ -37,11 +37,11 @@ const VALUES = new Set(['.rules-chip-value'])
 describe('the fold’s label', () => {
   it('sets the identity’s mono face at 500, as every control’s label does', () => {
     expect(computed(FOLD, 'font-family', '#label', values)).toBe(fontStack(source.faces.mono).replaceAll('\'', '"'))
-    expect(computed(FOLD, 'font-weight', '#label', values)).toBe('500')
+    expect(computed(FOLD, 'font-weight', '#label', values)).toBe(CONTROL_LABEL['font-weight'])
   })
 
-  it.for([['letter-spacing', '0.1em'], ['text-transform', 'uppercase']] as const)('sets %s as every control’s label does', ([property, value]) => {
-    expect(declared(property, LABEL, values)).toBe(value)
+  it.for(['letter-spacing', 'text-transform'] as const)('sets %s as every control’s label does', property => {
+    expect(declared(property, LABEL, values)).toBe(CONTROL_LABEL[property])
   })
 })
 
@@ -52,7 +52,8 @@ describe('every control’s label', () => {
       .filter(rule => rule.style.getPropertyValue('text-transform') === 'uppercase')
       .filter(rule => !VALUES.has(rule.selectorText))
       .map(rule => [name, rule.selectorText.replaceAll(/\s+/gu, ' '), rule.style.getPropertyValue('letter-spacing')]))
-    expect(labels).toContainEqual(['./values.css', LABEL, '0.1em'])
-    expect(labels.filter(([, , spacing]) => spacing !== '0.1em')).toEqual([])
+    const { 'letter-spacing': spacing } = CONTROL_LABEL
+    expect(labels).toContainEqual(['./values.css', LABEL, spacing])
+    expect(labels.filter(([, , each]) => each !== spacing)).toEqual([])
   })
 })

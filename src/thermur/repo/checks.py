@@ -19,7 +19,7 @@ from yaml            import NodeEvent, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Parity, read_pin
+from thermur.repo.schemas  import Finding, Job, Parity, read_pin
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -162,6 +162,43 @@ class CommitCheck(Check):
         ]
 
 
+class DraftCheck(Check):
+    """
+    Every workflow running on a pull request runs as the pull request is
+    marked ready for review, keeps its runs on a draft in a concurrency
+    group of their own, and each of its jobs skips a draft, so a push to a
+    draft starts no job and cancels no run on the head marked ready.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each workflow running on a pull request that does not run as
+        it is marked ready or shares its concurrency group with a draft,
+        then each of its jobs carrying no guard skipping a draft.
+        """
+        for path, workflow in self.checkout.pulls.items():
+            if not workflow.on_ready:
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` runs on no `ready_for_review` pull request"
+                )
+
+            if not workflow.splits_drafts:
+                yield Finding(
+                    file    = path,
+                    message = f"`{path}` cancels a ready run from a draft, since its "
+                    f"concurrency group leaves out `{Job.draft.removeprefix('!')}`"
+                )
+
+            for key, job in workflow.jobs.items():
+                if not job.skips_drafts:
+                    yield Finding(
+                        file    = path,
+                        message = f"The `{key}` job in `{path}` runs on a draft, "
+                        f"since its condition carries no `{job.draft}`"
+                    )
+
+
 class FootnoteCheck(Check):
     """
     Every footnote marker a Markdown page carries under a study's key names
@@ -179,9 +216,10 @@ class FootnoteCheck(Check):
 
 class GateCheck(Check):
     """
-    Every workflow ends on a job under the key `gate`, which names the check
-    run it reports, runs under `always()`, and waits for every other job, so
-    the one check a ruleset requires carries every job's verdict.
+    Every workflow ends on a job under the key `gate`, which names the
+    check run it reports, runs under `always()`, alone or beside the guard
+    skipping a draft, and waits for every other job, so the one check a
+    ruleset requires carries every job's verdict.
 
     A gate job left out of a failed run is reported as skipped, which a
     ruleset counts as passing, so the gate runs whatever the other jobs
@@ -770,8 +808,8 @@ class RulesetCheck(Check):
         """
         gates = {
             workflow.gate.name
-            for workflow in self.checkout.workflows.values()
-            if workflow.on_pull_request and workflow.gate
+            for workflow in self.checkout.pulls.values()
+            if workflow.gate
         }
         for path, ruleset in self.checkout.rulesets.items():
             for context in sorted(ruleset.contexts - gates):
