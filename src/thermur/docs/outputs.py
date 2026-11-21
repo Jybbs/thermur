@@ -80,8 +80,8 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     Brownian increments, the uniform draw each drone's zig reads, and the
     flock one step of the package's composite moves it to, a run of the
     package's radio beside the draws each packet's loss reads, a run of it
-    losing no packet, and the order the package's `zorder` gives a cloud of
-    drones.
+    losing no packet, the order the package's `zorder` gives a cloud of
+    drones, and a launch of the package's plan beside the draws it reads.
     """
 
     threat: Path = Path("docs/.vitepress/lib/rendered/threat.json")
@@ -452,8 +452,8 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     its second, each value drawn in double precision and rounded to four
     decimals. A launch of 24 drones at a spacing of 120 m and a clearance
     of 1.5 deviations raises its center past `center_m` and sets two drones
-    on the ground, one of them drawn heading down, its draws taken in double
-    precision and written to eight decimals.
+    on the ground, one of them drawn heading down, the launch run in double
+    precision and the draws it reads written to eight decimals.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
@@ -505,7 +505,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     with enable_x64():
         where_key, heading_key = split(seeded(raised.seed))
         launch                 = raised.launched(seeded(raised.seed))
-        launches               = around(
+        drawn = around(
             [
                 normal(where_key, (raised.drones, 3)),
                 normal(heading_key, (raised.drones, 3))
@@ -563,7 +563,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
             )
         },
         "launch"   : {
-            "draws"      : launches.ravel().tolist(),
+            "draws"      : drawn.ravel().tolist(),
             "plan"       : raised.model_dump(
                 include = {"clearance_sd", "drones", "spacing_m"}
             ),
