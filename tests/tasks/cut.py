@@ -9,10 +9,15 @@ from collections.abc  import Callable
 from common.stand_ins import StandIn
 from json             import dumps
 from pathlib          import Path
-from pytest           import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
-from subprocess       import CalledProcessError
+from pytest           import (
+    CaptureFixture, Config, MonkeyPatch, fixture, mark, param, raises
+)
+from subprocess       import CalledProcessError, run
 from syrupy.assertion import SnapshotAssertion
+from sys              import executable
 from types            import ModuleType
+
+from thermur.repo.schemas import Workflow
 
 DRAFTED = "https://github.com/Jybbs/thermur/releases/tag/untagged-1"
 UPDATED = "https://github.com/Jybbs/thermur/releases/tag/untagged-2"
@@ -139,6 +144,7 @@ def test_a_published_version_fails_naming_the_bump(
 
 def test_a_release_listing_that_fails_fails_the_cut(
     cut         : ModuleType,
+    gh          : StandIn,
     monkeypatch : MonkeyPatch
 ):
     """
@@ -149,6 +155,8 @@ def test_a_release_listing_that_fails_fails_the_cut(
 
     with raises(CalledProcessError):
         cut.Draft(version="0.2.0").cut()
+
+    assert len(gh.commands) == 1
 
 
 def test_an_updated_draft_takes_the_notes_github_generates_now(
@@ -167,6 +175,19 @@ def test_an_updated_draft_takes_the_notes_github_generates_now(
     assert (tmp_path / "patched.json").read_text() == '{"body":"notes"}'
 
 
+def test_the_draft_runs_on_every_push_to_main_and_on_dispatch(pytestconfig: Config):
+    """
+    Asserts that `🐦‍⬛ Draft` runs on `workflow_dispatch` and on every push
+    to `main`, whatever files the push touches.
+    """
+    draft = Workflow.read(pytestconfig.rootpath, Path(".github/workflows/draft.yml"))
+
+    assert (sorted(draft.events), draft.events["push"].paths) == (
+        ["push", "workflow_dispatch"],
+        ()
+    )
+
+
 def test_the_outputs_print_where_no_runner_collects_them(
     capsys : CaptureFixture[str],
     cut    : ModuleType
@@ -182,3 +203,19 @@ def test_the_outputs_print_where_no_runner_collects_them(
         f"url={DRAFTED}",
         "version=0.2.0"
     ]
+
+
+def test_the_published_path_exits_the_task_with_status_1(
+    cut          : ModuleType,
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config
+):
+    """
+    Asserts that the task, run as its own process, exits with status `1` on
+    the published path, which fails the draft job and the gate after it.
+    """
+    monkeypatch.setenv("RELEASES", release(draft=False, url="https://u/published"))
+
+    task = pytestconfig.rootpath / ".mise/tasks/gha/cut.py"
+
+    assert run([executable, task], capture_output=True).returncode == 1

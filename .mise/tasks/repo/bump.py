@@ -7,10 +7,11 @@
 Moves the `[project].version` that `pyproject.toml` declares to the next
 minor release, or the next patch or major one under `--patch` or `--major`,
 as the `repo:bump` task. `uv version --bump --frozen` writes the manifest
-without resolving the lockfile again, and the task writes the same version
-into the `thermur` entry of `uv.lock` and the `version` of `CITATION.cff`,
-leaving every other pin where it stands. mise passes each flag the usage
-spec above declares through a `usage_` variable.
+without resolving the lockfile again, after the task has written the release
+`--dry-run` reads into the `version` of `CITATION.cff` and the `thermur`
+entry of `uv.lock`, so a citation naming another release fails the bump
+before any file moves, and every other pin stays where it stands. mise
+passes each flag the usage spec above declares through a `usage_` variable.
 """
 
 from os  import environ
@@ -37,15 +38,12 @@ def main():
 
     checkout = Checkout()
     current  = checkout.manifest.version
-    version  = checkout.run(
-        "uv",
-        "version",
-        "--bump",
+    bump     = (
+        "uv", "version", "--bump",
         next(iter(named), "minor"),
-        "--frozen",
-        "--short",
-        capture = True
-    ).stdout.strip()
+        "--frozen", "--short"
+    )
+    version = checkout.run(*bump, "--dry-run", capture=True).stdout.strip()
     for ahead, file in [
         ("^version: ", checkout.citation.file),
         (r'^name = "thermur"\nversion = "', checkout.lock.file)
@@ -57,6 +55,7 @@ def main():
             newest  = version
         ).write(checkout.root)
 
+    checkout.run(*bump, capture=True)
     print(version)
 
 

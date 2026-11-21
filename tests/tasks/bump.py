@@ -105,7 +105,10 @@ def test_the_bump_moves_each_file_to_the_release_its_flag_names(
 
     bump.main()
 
-    assert uv.commands == [f"uv version --bump {part} --frozen --short"]
+    assert uv.commands == [
+        f"uv version --bump {part} --frozen --short --dry-run",
+        f"uv version --bump {part} --frozen --short"
+    ]
     assert (tmp_path / "uv.lock").read_text() == LOCK.format(version=version)
     assert (tmp_path / "CITATION.cff").read_text() == (
         f"cff-version: 1.2.0\ndate-released: 2026-10-02\nversion: {version}\n"
@@ -115,12 +118,13 @@ def test_the_bump_moves_each_file_to_the_release_its_flag_names(
 
 def test_a_citation_at_another_release_fails_before_the_lock_moves(
     bump     : ModuleType,
-    tmp_path : Path
+    tmp_path : Path,
+    uv       : StandIn
 ):
     """
     Asserts that a `CITATION.cff` naming a release other than the manifest's
-    fails the bump on that file, leaving the `thermur` entry of `uv.lock`
-    where it stood.
+    fails the bump on that file before `uv` writes the manifest, leaving the
+    `thermur` entry of `uv.lock` where it stood.
     """
     (tmp_path / "CITATION.cff").write_text("version: 0.0.9\n")
 
@@ -128,6 +132,7 @@ def test_a_citation_at_another_release_fails_before_the_lock_moves(
         bump.main()
 
     assert (tmp_path / "uv.lock").read_text() == LOCK.format(version="0.1.0")
+    assert uv.commands == ["uv version --bump minor --frozen --short --dry-run"]
 
 
 def test_two_flags_exit_before_any_file_moves(
