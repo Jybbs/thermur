@@ -43,7 +43,7 @@ jobs:
           - name   : ☂️ Coverage
             report : coverage
             task   : py:coverage
-            tools  : bun node python uv
+            tools  : *package
           - name  : 🧯 Audit
             task  : repo:audit
             tools : *package

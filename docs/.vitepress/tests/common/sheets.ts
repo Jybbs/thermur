@@ -68,7 +68,7 @@ function flattened(list: CSSRuleList): CSSStyleRule[] {
  * nothing where none of the rule's selectors matches it.
  */
 export function labeled(element: SVGElement): Record<string, string> {
-  const [rule] = flattened(opened(label).style.sheet!.cssRules)
+  const [rule] = styled(label)
   const keys   = Object.keys(CONTROL_LABEL)
   return element.matches(rule!.selectorText)
     ? Object.fromEntries(keys.map(key => [
