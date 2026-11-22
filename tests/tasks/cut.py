@@ -216,6 +216,13 @@ def test_the_published_path_exits_the_task_with_status_1(
     """
     monkeypatch.setenv("RELEASES", release(draft=False, url="https://u/published"))
 
-    task = pytestconfig.rootpath / ".mise/tasks/gha/cut.py"
+    task = run(
+        [executable, pytestconfig.rootpath / ".mise/tasks/gha/cut.py"],
+        capture_output = True,
+        text           = True
+    )
 
-    assert run([executable, task], capture_output=True).returncode == 1
+    assert (task.returncode, task.stdout.splitlines()[1:]) == (
+        1,
+        ["state=published", "url=https://u/published", "version=0.2.0"]
+    )

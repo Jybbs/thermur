@@ -1,7 +1,7 @@
 """
 Pins what `repo:bump` moves for each flag it takes, meaning the release
 `uv version --bump` writes into `[project].version`, the `thermur` entry of
-`uv.lock` and the `version` of `CITATION.cff` the task writes after it, and
+`uv.lock` and the `version` of `CITATION.cff` the task writes before it, and
 the status it exits with where both flags are given.
 """
 

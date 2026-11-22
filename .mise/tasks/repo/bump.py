@@ -8,7 +8,7 @@ Moves the `[project].version` that `pyproject.toml` declares to the next
 minor release, or the next patch or major one under `--patch` or `--major`,
 as the `repo:bump` task. `uv version --bump --frozen` writes the manifest
 without resolving the lockfile again, after the task has written the release
-`--dry-run` reads into the `version` of `CITATION.cff` and the `thermur`
+`--dry-run` prints into the `version` of `CITATION.cff` and the `thermur`
 entry of `uv.lock`, so a citation naming another release fails the bump
 before any file moves, and every other pin stays where it stands. mise
 passes each flag the usage spec above declares through a `usage_` variable.
