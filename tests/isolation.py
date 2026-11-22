@@ -12,6 +12,7 @@ same name would hide from collection.
 """
 
 from collections.abc  import Iterator
+from common.edits     import committed
 from common.isolation import CLEARED, copied_once, pytest_collection_modifyitems
 from jax              import config
 from os               import environ
@@ -21,6 +22,8 @@ from pytest           import (
 )
 from pytest_socket import SocketBlockedError
 from socket        import create_connection, socketpair
+from subprocess    import run
+from sys           import executable
 
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
@@ -163,13 +166,41 @@ def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
     )
 
 
-def test_the_shared_copy_holds_no_value_an_earlier_case_cached(checked: Checkout):
+def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
+    pytestconfig : Config,
+    tmp_path     : Path
+):
     """
-    Asserts that the `Checkout` each case reads the shared copy through
-    holds only its fields as the case starts, so no `cached_property` an
-    earlier case read hides a patch on `Checkout` from this one.
+    Asserts that a case reading the shared copy after another case read a
+    `cached_property` through it finds only the fields of `Checkout` set,
+    in a suite of its own running the two in order on this conftest, so
+    no earlier case hides a patch on `Checkout` from a later one whichever
+    worker runs them.
     """
-    assert vars(checked).keys() == Checkout.model_fields.keys()
+    root = pytestconfig.rootpath
+    for path, text in {
+        ".mise/config.toml"    : (root / ".mise/config.toml").read_text(),
+        "tests/conftest.py"    : (root / "tests/conftest.py").read_text(),
+        "tests/test_cached.py" : (
+            "from thermur.repo.checkout import Checkout\n\n"
+            "def test_caches(checked):\n"
+            "    assert checked.config\n\n"
+            "def test_starts_clean(checked):\n"
+            "    assert vars(checked).keys() == Checkout.model_fields.keys()\n"
+        )
+    }.items():
+        (tmp_path / path).parent.mkdir(exist_ok=True, parents=True)
+        (tmp_path / path).write_text(text, encoding="utf-8")
+    committed(Checkout(root=tmp_path))
+    ran = run(
+        [executable, "-m", "pytest", "-p", "no:randomly", "-q", "tests"],
+        capture_output = True,
+        cwd            = tmp_path,
+        env            = {**environ, "PYTHONPATH": str(root / "tests")},
+        text           = True
+    )
+
+    assert ran.returncode == 0, ran.stdout
 
 
 def test_the_shared_copy_is_built_once_for_every_worker(

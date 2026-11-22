@@ -77,8 +77,8 @@ def site(tmp_path: Path) -> Path:
     Writes a `docs/` folder holding an empty `.vitepress`, an empty `kit`,
     a front page, and a `node_modules/.bin` holding a stand-in for each tool
     a `site` task runs, each printing its own name and every argument it
-    receives, beside a module under `src`, and commits them to `main` in a
-    git repository holding `docs/` and its stand-ins alone.
+    receives, beside a module under `src`, and commits the folder and the
+    module to `main` in a git repository of their own.
 
     Returns:
         The `docs/` folder, which every `site` task runs from.
