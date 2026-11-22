@@ -243,4 +243,6 @@ def test_the_task_exits_with_the_status_its_path_calls_for(
         text           = True
     )
 
-    assert (task.returncode, task.stdout.splitlines()[-3:]) == (status, outputs)
+    assert (task.returncode, task.stdout.splitlines()[-3:], task.stderr) == (
+        status, outputs, ""
+    )
