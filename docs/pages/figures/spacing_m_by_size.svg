@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 688 360" role="img" aria-label="Spacing by Flock Size">
+<rect width="688" height="360" fill="#f2f1ee"/>
+<text x="72" y="28" fill="#17171b" font-family="'Bellefair', Didot, Georgia, serif" font-size="20">Spacing by Flock Size</text>
+<rect x="72" y="65.7" width="592" height="220.7" fill="#17171b" fill-opacity="0.1"/>
+<line x1="72" x2="664" y1="188.3" y2="188.3" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="192.3" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">20</text>
+<line x1="72" x2="664" y1="65.7" y2="65.7" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="69.7" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">30</text>
+<text x="72.0" y="324" text-anchor="middle" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">10</text>
+<text x="354.5" y="324" text-anchor="middle" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">30</text>
+<text x="664.0" y="324" text-anchor="middle" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">100</text>
+<text x="368" y="348" fill="#17171b" font-family="'Crimson Pro', Georgia, serif" font-size="14" text-anchor="middle">Flock Size (drones, logarithmic)</text>
+<text transform="translate(18 176) rotate(-90)" fill="#17171b" font-family="'Crimson Pro', Georgia, serif" font-size="14" text-anchor="middle">Nearest-Neighbor Distance (m)</text>
+<polyline points="72.0,144.4 354.5,135.1 664.0,257.1" fill="none" stroke="#5069ad" stroke-width="2"/><line x1="72.0" x2="72.0" y1="188.1" y2="100.7" stroke="#5069ad" stroke-width="2"/><circle cx="72.0" cy="144.4" r="4" fill="#5069ad"/><line x1="354.5" x2="354.5" y1="189.6" y2="80.7" stroke="#5069ad" stroke-width="2"/><circle cx="354.5" cy="135.1" r="4" fill="#5069ad"/><line x1="664.0" x2="664.0" y1="264.6" y2="249.7" stroke="#5069ad" stroke-width="2"/><circle cx="664.0" cy="257.1" r="4" fill="#5069ad"/>
+<polyline points="72.0,150.8 354.5,122.1 664.0,247.8" fill="none" stroke="#6f7c00" stroke-width="2" stroke-dasharray="6 4"/><line x1="72.0" x2="72.0" y1="208.3" y2="93.3" stroke="#6f7c00" stroke-width="2"/><circle cx="72.0" cy="150.8" r="4" fill="#6f7c00"/><line x1="354.5" x2="354.5" y1="171.8" y2="72.4" stroke="#6f7c00" stroke-width="2"/><circle cx="354.5" cy="122.1" r="4" fill="#6f7c00"/><line x1="664.0" x2="664.0" y1="260.3" y2="235.3" stroke="#6f7c00" stroke-width="2"/><circle cx="664.0" cy="247.8" r="4" fill="#6f7c00"/>
+</svg>

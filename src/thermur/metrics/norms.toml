@@ -1,0 +1,65 @@
+[aspect_ratio]
+doi    = "10.1016/j.anbehav.2008.02.004"
+figure = 5.6
+flocks = 10
+kind   = "95% confidence interval"
+spread = 1.0
+system = "starlings"
+unit   = ""
+
+[border_density]
+above  = true
+doi    = "10.1016/j.anbehav.2008.02.004"
+figure = 1.0
+flocks = 10
+system = "starlings"
+unit   = ""
+
+[middle_aspect_ratio]
+doi    = "10.1016/j.anbehav.2008.02.004"
+figure = 2.8
+flocks = 10
+kind   = "95% confidence interval"
+spread = 0.4
+system = "starlings"
+unit   = ""
+
+[polarization]
+doi    = "10.1073/pnas.1005766107"
+figure = 0.96
+flocks = 24
+kind   = "standard deviation"
+spread = 0.03
+system = "starlings"
+unit   = ""
+
+[spacing_m]
+doi    = "10.1126/scirobotics.aat3536"
+figure = 21.0
+flocks = 1
+kind   = "half range"
+spread = 9.0
+system = "drones"
+unit   = "m"
+
+[speed_by_size]
+doi    = "10.1038/s41467-022-29883-4"
+figure = -0.13
+system = "starlings"
+unit   = ""
+
+[speed_correlation_ratio]
+doi    = "10.1073/pnas.1005766107"
+figure = 0.36
+flocks = 24
+system = "starlings"
+unit   = ""
+
+[wave_speed_m_s]
+doi    = "10.1038/nphys3035"
+figure = 30.0
+flocks = 12
+kind   = "half range"
+spread = 10.0
+system = "starlings"
+unit   = "m/s"

@@ -38,6 +38,7 @@ from numpy         import (
     where,
     zeros
 )
+from numpy.random  import default_rng
 from numpy.testing import assert_allclose, assert_array_equal
 from pytest        import FixtureRequest, fixture, mark, param
 
@@ -56,9 +57,20 @@ from thermur.controller.components import (
 from thermur.controller.schemas import Composite, Flock, Inbox, Radio, across
 from thermur.environment.plant  import Plant
 from thermur.environment.wrf    import WrfOutput
-from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response, stepped
-from thermur.metrics.schemas    import Plan
-from thermur.pipeline.settings  import Settings
+from thermur.metrics.flight     import (
+    Flight,
+    alpha_shape,
+    correlated,
+    crossed,
+    first_zero,
+    integrated,
+    kept,
+    ratio_on_border,
+    response,
+    stepped
+)
+from thermur.metrics.schemas   import Plan
+from thermur.pipeline.settings import Settings
 
 AIR = still_air()
 
@@ -203,9 +215,12 @@ def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
     center read an aspect ratio of three, the longest axis over the thinnest
     rather than over the middle one.
     """
-    spots = concat([diag([30.0, 20.0, 10.0]), -diag([30.0, 20.0, 10.0])] * 2)
+    spots  = concat([diag([30.0, 20.0, 10.0]), -diag([30.0, 20.0, 10.0])] * 2)
+    flight = laid(spots, [10.0, 0.0, 0.0])
 
-    assert_allclose(laid(spots, [10.0, 0.0, 0.0]).aspect_ratio, 3.0, rtol=1e-5)
+    assert_allclose(flight.aspect_ratio, 3.0, rtol=1e-5)
+    assert_allclose(flight.middle_aspect_ratio, 2.0, rtol=1e-5)
+    assert_allclose(flight.group_speed_m_s, 10.0)
 
 
 @mark.parametrize(
@@ -369,6 +384,59 @@ def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     assert (another.frames.positions != flight.frames.positions).any()
 
 
+def test_a_curve_integrates_up_to_its_first_zero():
+    """
+    Asserts that a curve falling from one to zero over two steps and rising
+    after integrates only the two steps before its zero.
+    """
+    assert_allclose(integrated(asarray([1.0, 0.5, 0.0, 0.5]), 0.1), 0.075)
+
+
+def test_speeds_rising_along_a_rod_cross_zero_at_its_finite_size_point():
+    """
+    Asserts that drones along a rod 1,000 m long, their speed rising
+    linearly along it, read a speed correlation positive near and negative
+    far, crossing zero at the length over one plus the square root of three,
+    where the mean over pairs a given distance apart of the product of two
+    fluctuations about the mean vanishes on a line, and an extent of the
+    rod's length.
+    """
+    rod = stack(meshgrid(10.0 * arange(101), [0.0, 1.0], [0.0, 1.0]), -1).reshape(-1, 3)
+    curve, extent, zero = correlated(rod, linspace(0.0, 1.0, 33), rod[:, 0])
+
+    assert curve[0] > 0 > curve[-1]
+    assert_allclose(extent, linalg.norm([1000.0, 1.0, 1.0]))
+    assert_allclose(zero, 1000.0 / (1 + 3**0.5), rtol=0.03)
+
+
+@mark.parametrize("speed_m_s", [10.0, 20.0, 40.0])
+def test_a_turn_spreading_from_the_center_reads_a_speed_in_proportion(speed_m_s: float):
+    """
+    Asserts that a lattice of 729 drones 10 m apart, each turning a quarter
+    circle once a turn spreading at `speed_m_s` from its center reaches
+    it, reads a crossing speed in a fixed proportion to `speed_m_s`, the
+    cube root of 4π/3 the sphere's volume adds, times the cube root of the
+    lattice's density over the α-shape's, which counts the drones on its
+    faces inside its volume.
+    """
+    steps  = 10.0 * arange(-4, 5)
+    cloud  = stack(meshgrid(steps, steps, steps), -1).reshape(-1, 3)
+    starts = 5.0 + linalg.norm(cloud, axis=1) / speed_m_s
+    angle  = pi / 2 / (1 + exp(-(0.1 * arange(200)[:, None] - starts) / 0.2))
+
+    assert_allclose(
+        crossed(
+            clouds     = broadcast_to(cloud, (200, *cloud.shape)),
+            frame_s    = 0.1,
+            reach_m    = 15.0,
+            velocities = 10.0 * stack([cos(angle), sin(angle), zeros(angle.shape)], -1),
+            window     = 20
+        ),
+        speed_m_s * (4 * pi / 3 * 512 / 729) ** (1 / 3),
+        rtol = 0.05
+    )
+
+
 def test_a_heading_swinging_back_and_forth_integrates_to_its_first_zero():
     """
     Asserts that half the drones swinging their heading one way and half
@@ -397,6 +465,23 @@ def test_a_heading_swinging_back_and_forth_integrates_to_its_first_zero():
     assert first_zero(curve) == 3
 
 
+def test_an_alpha_shape_leaves_out_the_gap_a_convex_hull_spans():
+    """
+    Asserts that two lattices of 64 cubic meters 10 m apart, each drone
+    shaken by up to a centimeter so no five sit on one sphere, read, under
+    an α-shape whose reach spans a lattice step but not the gap, the volume
+    of the two lattices alone and a border holding every drone on either
+    lattice's faces, the faces across the gap among them.
+    """
+    lattice        = stack(meshgrid(*[linspace(0.0, 4.0, 5)] * 3), -1).reshape(-1, 3)
+    shaken         = lattice + default_rng(0).uniform(-0.01, 0.01, lattice.shape)
+    border, volume = alpha_shape(concat([shaken, shaken + [14.0, 0.0, 0.0]]), 1.5)
+    faced          = ((lattice == 0.0) | (lattice == 4.0)).any(-1)
+
+    assert_allclose(volume, 128.0, rtol=0.01)
+    assert_array_equal(border, concat([faced, faced]))
+
+
 def test_a_lattice_s_border_is_as_dense_as_its_inside():
     """
     Asserts that a regular lattice, every drone a step from its nearest
@@ -406,8 +491,8 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
     lattice = stack(meshgrid(*[linspace(0.0, 4.0, 5)] * 3), -1).reshape(-1, 3)
     inside  = (abs(lattice - 2.0) < 2.0).all(-1)
 
-    assert_allclose(ratio_on_hull(lattice, ones(len(lattice))), 1.0)
-    assert ratio_on_hull(lattice, where(inside, 0.5, 1.0)) < 1.0
+    assert_allclose(ratio_on_border(lattice, 1.5, ones(len(lattice))), 1.0)
+    assert ratio_on_border(lattice, 1.5, where(inside, 0.5, 1.0)) < 1.0
 
 
 def test_a_push_across_the_command_keeps_each_drone_s_speed():
@@ -493,18 +578,51 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
+def test_two_clusters_past_the_radio_s_range_read_half_the_flock_connected():
+    """
+    Asserts that two strings of six drones 10 m apart, the strings 200 m
+    apart, past the radio's range of 50 m, read the largest group the radio
+    joins as half the flock.
+    """
+    string = stack([10.0 * arange(6), zeros(6), zeros(6)], -1)
+
+    assert_allclose(
+        laid(concat([string, string + [0.0, 200.0, 0.0]]), [10.0, 0.0, 0.0]).connected,
+        0.5
+    )
+
+
+def test_drones_holding_their_places_keep_every_neighbor_through_the_flight():
+    """
+    Asserts that drones holding their places keep each neighbor of the first
+    settled frame at every later frame, reading a rearrangement time of the
+    whole span of the settled frames.
+    """
+    flight = laid(
+        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
+        velocities = [10.0, 0.0, 0.0]
+    )
+    plan = flight.plan
+
+    assert_allclose(
+        flight.rearrangement_s,
+        (plan.frames - plan.framed(plan.settled_s) - 1) * plan.frame_s
+    )
+
+
 def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     """
     Asserts that drones on the corners of a box 100 m long and 10 m across,
     each 10 m from its nearest corner, around four drones on its axis 20 m
     apart, read a border density eight times the inside's from each drone's
-    nearest neighbor rather than its farthest.
+    nearest neighbor rather than its farthest, under an α-shape reaching far
+    enough to keep every tetrahedron, so its border is the box's hull.
     """
     corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
     axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
 
     assert_allclose(
-        laid(concat([corners, axis]), [10.0, 0.0, 0.0]).border_density,
+        laid(concat([corners, axis]), [10.0, 0.0, 0.0], spacing_m=1e3).border_density,
         8.0,
         rtol = 1e-5
     )
@@ -955,6 +1073,25 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
             short()
         ).frames.positions
     )
+
+
+def test_the_still_statistics_hold_each_statistic_by_seed(flight: Flight):
+    """
+    Asserts that the still-air statistics hold one value per seed of each
+    statistic set beside a norm, the speed correlation by the share of the
+    extent at each bin's center, and the largest radio group within the
+    flock.
+    """
+    table = flight.still_statistics
+
+    assert set(table.data_vars) == {
+        "aspect_ratio", "autocorrelation_s", "border_density", "connected", "extent_m",
+        "group_speed_m_s", "middle_aspect_ratio", "polarization", "rearrangement_s",
+        "spacing_m", "speed_correlation", "speed_correlation_ratio", "wave_speed_m_s"
+    }
+    assert dict(table.sizes) == {"seed": 2, "share": 32}
+    assert_allclose(table.share[[0, -1]], (1 / 64, 1 - 1 / 64))
+    assert ((table.connected > 0) & (table.connected <= 1)).all()
 
 
 def test_the_statistics_table_holds_each_statistic_by_seed(flight: Flight):

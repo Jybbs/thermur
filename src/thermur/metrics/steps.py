@@ -1,15 +1,17 @@
 """
 Declares the flight's Hamilton steps, meaning the reference flight the
-settings describe, its frames and its statistics as saved tables, and one
-step per open slot flying the slot's candidates against that reference.
+settings describe, its frames and its statistics as saved tables, one step
+per open slot flying the slot's candidates against that reference, and the
+sweep of flock sizes through still air.
 """
 
 from hamilton.function_modifiers import parameterize, value
-from xarray import Dataset
+from xarray import DataTree, Dataset
 
 from thermur.controller.schemas import Composite
 from thermur.environment.air    import Air
 from thermur.metrics.flight     import Flight
+from thermur.metrics.sweep      import Sweep
 from thermur.metrics.trials     import Trial
 from thermur.pipeline.settings  import Settings
 
@@ -54,3 +56,10 @@ def flown_trial(
     Flies one open slot's candidates against the reference.
     """
     return trial.flown(air, composite, settings.plan)
+
+
+def sweep(composite: Composite, metrics_digest: str, settings: Settings) -> DataTree:
+    """
+    Flies the composite through still air at each size of the sweep.
+    """
+    return Sweep().flown(composite, settings.plan)

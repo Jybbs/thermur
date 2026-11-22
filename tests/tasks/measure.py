@@ -1,33 +1,61 @@
 """
-Pins what `docs:measure` writes and prints, meaning the trials of the run
-its argument names, written where the rules page's charts read them.
+Pins what `docs:measure` writes and prints, meaning the trials and the sweep
+of the run its argument names, each written where its page's charts read it
+and only where the run saved it.
 """
 
 from collections.abc import Callable
 from json            import loads
 from pathlib         import Path
-from pytest          import CaptureFixture, MonkeyPatch
+from pytest          import CaptureFixture, MonkeyPatch, mark, param
 from types           import ModuleType
 
 from thermur.docs import measured
 
 
-def test_the_task_writes_the_run_named_and_prints_where(
+@mark.parametrize(
+    "tables",
+    [
+        param(("coupling_trial.nc",), id="trials"),
+        param(("sweep.nc",), id="sweep"),
+        param(("coupling_trial.nc", "sweep.nc"), id="both"),
+        param((), id="neither")
+    ]
+)
+def test_the_task_writes_what_the_run_named_saved_and_prints_where(
     capsys      : CaptureFixture[str],
     load_task   : Callable[[str], ModuleType],
     monkeypatch : MonkeyPatch,
+    tables      : tuple[str, ...],
     tmp_path    : Path
 ):
     """
-    Asserts that the task writes what `measured` reads from the run its
-    first argument names into the charts' file, creating its folder, and
-    prints the file's path.
+    Asserts that the task writes what `measured` and `still_air` read from
+    the run its first argument names into each chart file, creating its
+    folder, for each table the run saved, and prints each file's path.
     """
+    run = tmp_path / "runs" / "one"
+    run.mkdir(parents=True)
+    for table in tables:
+        (run / table).touch()
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.argv", ["measure", "runs/one"])
-    monkeypatch.setattr(measured, "measured", lambda run: {"run": str(run)})
+    monkeypatch.setattr(measured, "measured", lambda run: {"trials": str(run)})
+    monkeypatch.setattr(measured, "still_air", lambda run: {"sweep": str(run)})
 
     load_task(".mise/tasks/docs/measure.py").main()
 
-    assert capsys.readouterr().out == f"{measured.MEASURED}\n"
-    assert loads(measured.MEASURED.read_text()) == {"run": "runs/one"}
+    written = {
+        path: read
+        for path, read, table in (
+            (measured.MEASURED, {"trials": "runs/one"}, "coupling_trial.nc"),
+            (measured.STILL_AIR, {"sweep": "runs/one"}, "sweep.nc")
+        )
+        if table in tables
+    }
+    assert capsys.readouterr().out == "".join(f"{path}\n" for path in written)
+    assert {path: loads(path.read_text()) for path in written} == written
+    assert all(
+        path.exists() == (path in written)
+        for path in (measured.MEASURED, measured.STILL_AIR)
+    )

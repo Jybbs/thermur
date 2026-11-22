@@ -1,0 +1,594 @@
+{
+  "norms": {
+    "aspect_ratio": {
+      "doi": "10.1016/j.anbehav.2008.02.004",
+      "figure": 5.6,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 10,
+      "kind": "95% confidence interval",
+      "spread": 1.0
+    },
+    "border_density": {
+      "doi": "10.1016/j.anbehav.2008.02.004",
+      "figure": 1.0,
+      "system": "starlings",
+      "unit": "",
+      "above": true,
+      "flocks": 10,
+      "kind": null,
+      "spread": null
+    },
+    "middle_aspect_ratio": {
+      "doi": "10.1016/j.anbehav.2008.02.004",
+      "figure": 2.8,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 10,
+      "kind": "95% confidence interval",
+      "spread": 0.4
+    },
+    "polarization": {
+      "doi": "10.1073/pnas.1005766107",
+      "figure": 0.96,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 24,
+      "kind": "standard deviation",
+      "spread": 0.03
+    },
+    "spacing_m": {
+      "doi": "10.1126/scirobotics.aat3536",
+      "figure": 21.0,
+      "system": "drones",
+      "unit": "m",
+      "above": false,
+      "flocks": 1,
+      "kind": "half range",
+      "spread": 9.0
+    },
+    "speed_by_size": {
+      "doi": "10.1038/s41467-022-29883-4",
+      "figure": -0.13,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": null,
+      "kind": null,
+      "spread": null
+    },
+    "speed_correlation_ratio": {
+      "doi": "10.1073/pnas.1005766107",
+      "figure": 0.36,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 24,
+      "kind": null,
+      "spread": null
+    },
+    "wave_speed_m_s": {
+      "doi": "10.1038/nphys3035",
+      "figure": 30.0,
+      "system": "starlings",
+      "unit": "m/s",
+      "above": false,
+      "flocks": 12,
+      "kind": "half range",
+      "spread": 10.0
+    }
+  },
+  "runs": {
+    "10": {
+      "autocorrelation_s": 11.5425,
+      "duration_s": 60.0,
+      "rearrangement_s": 16.9446
+    },
+    "30": {
+      "autocorrelation_s": 13.1924,
+      "duration_s": 60.0,
+      "rearrangement_s": 14.811
+    },
+    "100": {
+      "autocorrelation_s": 14.0879,
+      "duration_s": 60.0,
+      "rearrangement_s": 14.6286
+    }
+  },
+  "sizes": [
+    10,
+    30,
+    100
+  ],
+  "slopes": {
+    "extent_m": {
+      "error": 0.1139,
+      "slope": 0.575
+    },
+    "speed_correlation_ratio": {
+      "error": 0.1147,
+      "slope": -0.0153
+    },
+    "aspect_ratio": {
+      "error": 0.0887,
+      "slope": 0.0561
+    },
+    "autocorrelation_s": {
+      "error": 0.1356,
+      "slope": 0.149
+    },
+    "border_density": {
+      "error": 1.0127,
+      "slope": -1.5621
+    },
+    "connected": {
+      "error": 0.0205,
+      "slope": -0.0028
+    },
+    "group_speed_m_s": {
+      "error": 0.0032,
+      "slope": 0.0001
+    },
+    "middle_aspect_ratio": {
+      "error": 0.1059,
+      "slope": 0.1742
+    },
+    "polarization": {
+      "error": 0.0032,
+      "slope": -0.0072
+    },
+    "rearrangement_s": {
+      "error": 0.0316,
+      "slope": -0.0986
+    },
+    "spacing_m": {
+      "error": 0.1174,
+      "slope": -0.2016
+    },
+    "wave_speed_m_s": {
+      "error": 0.2783,
+      "slope": 0.6374
+    }
+  },
+  "speed_by_size": {
+    "p": 1.0,
+    "rho": 0.0
+  },
+  "statistics": {
+    "extent_m": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 20.8452,
+          "mean": 127.6341
+        },
+        {
+          "size": 30,
+          "error": 53.147,
+          "mean": 298.3909
+        },
+        {
+          "size": 100,
+          "error": 19.0551,
+          "mean": 461.2946
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 4.7442,
+          "mean": 138.6294
+        },
+        {
+          "size": 30,
+          "error": 47.6992,
+          "mean": 294.9445
+        },
+        {
+          "size": 100,
+          "error": 16.1249,
+          "mean": 461.369
+        }
+      ]
+    },
+    "speed_correlation_ratio": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0466,
+          "mean": 0.2298
+        },
+        {
+          "size": 30,
+          "error": 0.0157,
+          "mean": 0.2315
+        },
+        {
+          "size": 100,
+          "error": 0.0287,
+          "mean": 0.2128
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0112,
+          "mean": 0.0785
+        },
+        {
+          "size": 30,
+          "error": 0.0005,
+          "mean": 0.0416
+        },
+        {
+          "size": 100,
+          "error": 0.0042,
+          "mean": 0.0341
+        }
+      ]
+    },
+    "aspect_ratio": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 1.1636,
+          "mean": 6.3041
+        },
+        {
+          "size": 30,
+          "error": 0.4339,
+          "mean": 5.6341
+        },
+        {
+          "size": 100,
+          "error": 0.3689,
+          "mean": 6.8089
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.8047,
+          "mean": 7.2646
+        },
+        {
+          "size": 30,
+          "error": 0.4476,
+          "mean": 5.6227
+        },
+        {
+          "size": 100,
+          "error": 0.3981,
+          "mean": 6.8483
+        }
+      ]
+    },
+    "autocorrelation_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 3.3142,
+          "mean": 15.5452
+        },
+        {
+          "size": 30,
+          "error": 3.8279,
+          "mean": 21.4198
+        },
+        {
+          "size": 100,
+          "error": 0.8299,
+          "mean": 20.1988
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.8111,
+          "mean": 18.8492
+        },
+        {
+          "size": 30,
+          "error": 3.1896,
+          "mean": 21.7107
+        },
+        {
+          "size": 100,
+          "error": 0.7679,
+          "mean": 20.6558
+        }
+      ]
+    },
+    "border_density": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 1110.3565,
+          "mean": 1369.5546
+        },
+        {
+          "size": 30,
+          "error": 71.0636,
+          "mean": 93.3796
+        },
+        {
+          "size": 100,
+          "error": 0.3326,
+          "mean": 1.2018
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 525.1001,
+          "mean": 652.5105
+        },
+        {
+          "size": 30,
+          "error": 41.575,
+          "mean": 53.7921
+        },
+        {
+          "size": 100,
+          "error": 0.2153,
+          "mean": 0.874
+        }
+      ]
+    },
+    "connected": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0272,
+          "mean": 0.9333
+        },
+        {
+          "size": 30,
+          "error": 0.0327,
+          "mean": 0.9222
+        },
+        {
+          "size": 100,
+          "error": 0.0213,
+          "mean": 0.9267
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0272,
+          "mean": 0.8667
+        },
+        {
+          "size": 30,
+          "error": 0.0181,
+          "mean": 0.9222
+        },
+        {
+          "size": 100,
+          "error": 0.0152,
+          "mean": 0.9167
+        }
+      ]
+    },
+    "group_speed_m_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0683,
+          "mean": 9.3919
+        },
+        {
+          "size": 30,
+          "error": 0.0107,
+          "mean": 9.3653
+        },
+        {
+          "size": 100,
+          "error": 0.0259,
+          "mean": 9.3921
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0002,
+          "mean": 9.992
+        },
+        {
+          "size": 30,
+          "error": 0.0002,
+          "mean": 9.9918
+        },
+        {
+          "size": 100,
+          "error": 0.0001,
+          "mean": 9.9918
+        }
+      ]
+    },
+    "middle_aspect_ratio": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.5646,
+          "mean": 2.155
+        },
+        {
+          "size": 30,
+          "error": 0.2436,
+          "mean": 2.7184
+        },
+        {
+          "size": 100,
+          "error": 0.0858,
+          "mean": 2.9474
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.5661,
+          "mean": 2.2889
+        },
+        {
+          "size": 30,
+          "error": 0.2986,
+          "mean": 2.8718
+        },
+        {
+          "size": 100,
+          "error": 0.0743,
+          "mean": 3.1325
+        }
+      ]
+    },
+    "polarization": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0023,
+          "mean": 0.9881
+        },
+        {
+          "size": 30,
+          "error": 0.0059,
+          "mean": 0.9717
+        },
+        {
+          "size": 100,
+          "error": 0.0018,
+          "mean": 0.9717
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0016,
+          "mean": 0.9851
+        },
+        {
+          "size": 30,
+          "error": 0.0055,
+          "mean": 0.9719
+        },
+        {
+          "size": 100,
+          "error": 0.0029,
+          "mean": 0.9685
+        }
+      ]
+    },
+    "rearrangement_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 1.0916,
+          "mean": 30.2911
+        },
+        {
+          "size": 30,
+          "error": 1.7555,
+          "mean": 26.7811
+        },
+        {
+          "size": 100,
+          "error": 0.2912,
+          "mean": 24.0824
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 1.9244,
+          "mean": 30.725
+        },
+        {
+          "size": 30,
+          "error": 1.1996,
+          "mean": 27.108
+        },
+        {
+          "size": 100,
+          "error": 0.3445,
+          "mean": 23.775
+        }
+      ]
+    },
+    "spacing_m": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 3.5669,
+          "mean": 23.5773
+        },
+        {
+          "size": 30,
+          "error": 4.4425,
+          "mean": 24.3331
+        },
+        {
+          "size": 100,
+          "error": 0.6075,
+          "mean": 14.385
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 4.6881,
+          "mean": 23.0532
+        },
+        {
+          "size": 30,
+          "error": 4.0568,
+          "mean": 25.3966
+        },
+        {
+          "size": 100,
+          "error": 1.0183,
+          "mean": 15.1453
+        }
+      ]
+    },
+    "wave_speed_m_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 8.8979,
+          "mean": 14.4597
+        },
+        {
+          "size": 30,
+          "error": 2.7964,
+          "mean": 13.5535
+        },
+        {
+          "size": 100,
+          "error": 4.9217,
+          "mean": 34.2598
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 1.5051,
+          "mean": 5.8742
+        },
+        {
+          "size": 30,
+          "error": 3.2243,
+          "mean": 20.7427
+        },
+        {
+          "size": 100,
+          "error": 6.0501,
+          "mean": 28.4601
+        }
+      ]
+    }
+  }
+}

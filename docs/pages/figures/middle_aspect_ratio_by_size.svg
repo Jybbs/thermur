@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 688 360" role="img" aria-label="Middle Aspect Ratio by Flock Size">
+<rect width="688" height="360" fill="#f2f1ee"/>
+<text x="72" y="28" fill="#17171b" font-family="'Bellefair', Didot, Georgia, serif" font-size="20">Middle Aspect Ratio by Flock Size</text>
+<rect x="72" y="66.6" width="592" height="109.2" fill="#17171b" fill-opacity="0.1"/>
+<line x1="72" x2="664" y1="298.7" y2="298.7" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="302.7" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">1.5</text>
+<line x1="72" x2="664" y1="230.4" y2="230.4" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="234.4" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">2</text>
+<line x1="72" x2="664" y1="162.2" y2="162.2" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="166.2" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">2.5</text>
+<line x1="72" x2="664" y1="93.9" y2="93.9" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="97.9" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">3</text>
+<text x="72.0" y="324" text-anchor="middle" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">10</text>
+<text x="354.5" y="324" text-anchor="middle" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">30</text>
+<text x="664.0" y="324" text-anchor="middle" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">100</text>
+<text x="368" y="348" fill="#17171b" font-family="'Crimson Pro', Georgia, serif" font-size="14" text-anchor="middle">Flock Size (drones, logarithmic)</text>
+<text transform="translate(18 176) rotate(-90)" fill="#17171b" font-family="'Crimson Pro', Georgia, serif" font-size="14" text-anchor="middle">Middle Axis over Thinnest</text>
+<polyline points="72.0,209.3 354.5,132.3 664.0,101.1" fill="none" stroke="#5069ad" stroke-width="2"/><line x1="72.0" x2="72.0" y1="286.3" y2="132.2" stroke="#5069ad" stroke-width="2"/><circle cx="72.0" cy="209.3" r="4" fill="#5069ad"/><line x1="354.5" x2="354.5" y1="165.6" y2="99.1" stroke="#5069ad" stroke-width="2"/><circle cx="354.5" cy="132.3" r="4" fill="#5069ad"/><line x1="664.0" x2="664.0" y1="112.8" y2="89.4" stroke="#5069ad" stroke-width="2"/><circle cx="664.0" cy="101.1" r="4" fill="#5069ad"/>
+<polyline points="72.0,191.0 354.5,111.4 664.0,75.8" fill="none" stroke="#6f7c00" stroke-width="2" stroke-dasharray="6 4"/><line x1="72.0" x2="72.0" y1="268.3" y2="113.7" stroke="#6f7c00" stroke-width="2"/><circle cx="72.0" cy="191.0" r="4" fill="#6f7c00"/><line x1="354.5" x2="354.5" y1="152.2" y2="70.6" stroke="#6f7c00" stroke-width="2"/><circle cx="354.5" cy="111.4" r="4" fill="#6f7c00"/><line x1="664.0" x2="664.0" y1="85.9" y2="65.7" stroke="#6f7c00" stroke-width="2"/><circle cx="664.0" cy="75.8" r="4" fill="#6f7c00"/>
+</svg>

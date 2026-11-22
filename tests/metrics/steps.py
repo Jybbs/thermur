@@ -1,15 +1,19 @@
 """
 Pins the flight's steps, meaning the reference flight the settings describe,
-its frames and statistics as tables, and one trial step per open slot.
+its frames and statistics as tables, one trial step per open slot, and the
+sweep through still air.
 """
 
 from common.drones import short, small, still_air
 from numpy.testing import assert_array_equal
+from pytest        import MonkeyPatch
+from xarray        import DataTree
 
 from thermur.controller.components import Elastic
 from thermur.controller.schemas    import Composite
 from thermur.metrics               import steps
 from thermur.metrics.flight        import Flight
+from thermur.metrics.sweep         import Sweep
 from thermur.metrics.trials        import Measure, Trial
 from thermur.pipeline.graph        import Graph
 from thermur.pipeline.settings     import Settings
@@ -71,3 +75,22 @@ def test_the_graph_flies_the_plan_the_settings_hold(clone: Checkout):
         computed["flight"].frames.positions
     )
     assert computed["statistics"].identical(computed["flight"].statistics)
+
+
+def test_the_sweep_step_flies_the_settings_composite_and_plan(monkeypatch: MonkeyPatch):
+    """
+    Asserts that the `sweep` step flies the default sweep under the
+    composite and the plan the settings hold, returning its tree.
+    """
+    settings  = Settings(plan=short())
+    composite = Composite.from_settings(settings)
+    tree      = DataTree()
+    monkeypatch.setattr(
+        Sweep,
+        "flown",
+        lambda sweep, flown, plan: tree
+        if (sweep, flown, plan) == (Sweep(), composite, settings.plan)
+        else None
+    )
+
+    assert steps.sweep(composite, "digest", settings) is tree

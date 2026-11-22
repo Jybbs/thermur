@@ -24,7 +24,8 @@ export interface Section {
 export const SECTIONS = [
   { name: 'data', question: 'Where the plume simulations come from and how to fetch them.' },
   { name: 'methods', question: 'How each drone reads its neighbors and the air around it.' },
-  { name: 'reference', question: 'What each color, face, and mark of the identity holds.' }
+  { name: 'reference', question: 'What each color, face, and mark of the identity holds.' },
+  { name: 'results', question: 'What the flock does when it flies, measured against starlings and drones.' }
 ] as const satisfies readonly Section[]
 
 /**

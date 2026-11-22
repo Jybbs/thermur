@@ -1,7 +1,7 @@
 """
-Pins `Air`, meaning the grid it lays a dataset's channels out on, the
-values it clips and the spacings it refuses, and the readings `sampled`
-interpolates at each drone's position and time.
+Pins `Air`, meaning the grid it lays a dataset's channels out on, the values
+it clips and the spacings it refuses, the readings `sampled` interpolates at
+each drone's position and time, and the still air `Air.still` builds.
 """
 
 from equinox       import filter_jit
@@ -189,6 +189,20 @@ def test_sampling_reads_an_axis_of_one_point_as_that_point_everywhere():
     )
 
     assert_allclose(readings["field"], [30.0 + 2 * 5.0 + 3 * 20.0 + 4 * 40.0])
+
+
+def test_still_air_reads_no_excess_and_no_wind_anywhere():
+    """
+    Asserts that still air reads zero on every channel a flight samples at
+    drones scattered across space and time.
+    """
+    readings = Air.still().sampled(
+        numpy.array([[0.0, 0.0, 0.0], [-5e3, 9e3, 400.0]]),
+        1e4
+    )
+
+    assert set(readings) == {"excess", "u", "v", "w"}
+    assert all((reading == 0).all() for reading in readings.values())
 
 
 @mark.parametrize(
