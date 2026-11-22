@@ -14,6 +14,8 @@
 
 ---
 
+<a id="quick-start"></a>
+
 ## ⌨️ Quick Start
 
 Clone *Thermur* and build its locked environment:
@@ -122,7 +124,7 @@ flowchart TB
 
 ### Core Scientific Contributions
 
-1. **Heterogeneous Behavioral Variance**: Individual noise amplitudes drawn from $`\eta_i \sim N(\mu=0.7, \sigma=0.20)`$ create the behavioral heterogeneity necessary for critical state dynamics. Based on the framework from with an optimized mean value, this continuous spectrum of responses, ranging from strongly aligning agents with low $`\eta_i`$ to weakly aligning agents with high $`\eta_i`$, maintains elevated susceptibility $`\chi \sim N`$ and enables the scale-free correlations observed in natural murmurations.
+1. **Heterogeneous Behavioral Variance**: Individual noise amplitudes drawn from $`\eta_i \sim N(\mu=0.7, \sigma=0.20)`$ create the behavioral heterogeneity necessary for critical state dynamics. With an optimized mean value, this continuous spectrum of responses, ranging from strongly aligning agents with low $`\eta_i`$ to weakly aligning agents with high $`\eta_i`$, maintains elevated susceptibility $`\chi \sim N`$ and enables the scale-free correlations observed in natural murmurations.
 
 2. **Topological Interactions**: Each agent responds to exactly $`k=7`$ nearest neighbors regardless of distance, matching empirical observations of starling behavior and enabling scale-free information transfer with propagation speeds of 15-45 m/s.
 
