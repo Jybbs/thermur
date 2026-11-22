@@ -81,8 +81,13 @@ def test_a_broken_checkout_fails_naming_each_finding(
         new = "`mise run lock:scan`",
         old = "`mise scan`"
     )
-    edit(checkout, action, new="default     : &depth '1'", old="default     : '1'")
-    edit(checkout, action, new="default     : *depth", old="default     : 'false'")
+    edit(
+        checkout,
+        action,
+        new = "default     : &save 'false'",
+        old = "default     : 'false'"
+    )
+    edit(checkout, action, new="default     : *save", old="default     : ''")
     for workflow in ("ci", "site"):
         edit(
             checkout,
@@ -134,10 +139,9 @@ def test_a_broken_checkout_fails_naming_each_finding(
     )
     edit(
         checkout = checkout,
-        new      = "uses : actions/checkout@0f0f\n\n      - name : Cut",
-        old = "uses : $/.github/actions/provision\n        with : { depth: '2' }\n\n"
-        "      - name : Cut",
-        path = draft
+        new      = "uses : actions/checkout@0f0f\n\n      - name : Create",
+        old      = "uses : $/.github/actions/provision\n\n      - name : Create",
+        path     = draft
     )
     for path in checkout.workflows:
         edit(

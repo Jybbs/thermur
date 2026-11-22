@@ -1,4 +1,4 @@
-::error file=.github/actions/provision/action.yml::`.github/actions/provision/action.yml` carries the YAML anchor `&depth`, which GitHub's action-manifest parser rejects
+::error file=.github/actions/provision/action.yml::`.github/actions/provision/action.yml` carries the YAML anchor `&save`, which GitHub's action-manifest parser rejects
 ::error file=.mise/bin/pytest::`.mise/bin/pytest` is a symlink rather than a copy
 ::error file=.github/workflows/draft.yml::The pin on `actions/checkout` in `.github/workflows/draft.yml` reads `0f0f`, where the pin on it in `.github/actions/provision/action.yml` reads `1f1f`
 ::error file=docs/pages/index.md::Line 7 of `docs/pages/index.md` cites `smith2020`, which names no entry in `docs/pages/references.bib`

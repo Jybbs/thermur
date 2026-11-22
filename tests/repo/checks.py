@@ -154,10 +154,10 @@ def test_a_check_declaring_nothing_makes_no_finding(checked: Checkout):
         ),
         param(
             "CITATION.cff",
-            "version: 0.1.0",
-            "version: 0.2.0",
-            "The `version` in `CITATION.cff` reads `0.2.0`, where the `version` in "
-            "`pyproject.toml` reads `0.1.0`",
+            "version: {version}",
+            "version: 9.9.9",
+            "The `version` in `CITATION.cff` reads `9.9.9`, where the `version` in "
+            "`pyproject.toml` reads `{version}`",
             id = "citation-version"
         ),
         param(
@@ -187,10 +187,10 @@ def test_a_check_declaring_nothing_makes_no_finding(checked: Checkout):
         ),
         param(
             "CITATION.cff",
-            "version: 0.1.0\n",
+            "version: {version}\n",
             "",
             "The `version` in `CITATION.cff` is missing, where the `version` in "
-            "`pyproject.toml` reads `0.1.0`",
+            "`pyproject.toml` reads `{version}`",
             id = "citation-version-missing"
         ),
         param(
@@ -729,8 +729,8 @@ def test_a_manifest_failing_to_read_is_named_for_its_problem(
     edit(
         checkout,
         ACTION,
-        new = f"The number{character}of commits",
-        old = "The number of commits"
+        new = f"A space-separated{character}subset",
+        old = "A space-separated subset"
     )
 
     assert AnchorCheck(checkout=checkout).findings == [
@@ -1708,8 +1708,8 @@ def test_a_file_disagreeing_with_the_label_registry_is_named(
             id = "python-floor"
         ),
         param(
-            'version         = "0.1.0"',
-            'version         = "0.2.0"',
+            'version         = "{version}"',
+            'version         = "9.9.9"',
             ["CITATION.cff"],
             id = "version"
         )
@@ -1837,7 +1837,7 @@ def test_a_document_failing_to_parse_is_named_on_its_file(
 @mark.parametrize(
     ("old", "new"),
     [
-        param("version: 0.1.0", 'version: "0.1.0"', id="version"),
+        param("version: {version}", 'version: "{version}"', id="version"),
         param("license: MIT", "license: 'MIT'", id="license"),
         param(
             "repository-code: https://github.com/Jybbs/thermur",
@@ -1850,14 +1850,15 @@ def test_a_document_failing_to_parse_is_named_on_its_file(
 def test_a_quoted_citation_value_reads_as_the_value_it_quotes(
     checkout : Checkout,
     old      : str,
-    new      : str
+    new      : str,
+    pins     : dict[str, str]
 ):
     """
     Asserts that a `CITATION.cff` value written in single or double quotes,
     which YAML reads as the same string, agrees with the manifest as the
     plain value does.
     """
-    edit(checkout, "CITATION.cff", new=new, old=old)
+    edit(checkout, "CITATION.cff", new=new.format_map(pins), old=old.format_map(pins))
 
     assert ParityCheck(checkout=checkout).findings == []
 
@@ -1956,8 +1957,8 @@ def test_a_tools_input_to_another_action_installs_no_subset(
     edit(
         checkout = checkout,
         new      = f"uses : actions/checkout@{pins['checkout']}\n"
-        "        with : { tools: bun }",
-        old  = "uses : $/.github/actions/provision\n        with : { depth: '2' }",
+        "        with : { tools: bun }\n\n",
+        old  = "uses : $/.github/actions/provision\n\n",
         path = DRAFT
     )
 
@@ -2145,8 +2146,8 @@ def test_an_action_pinned_to_a_second_commit_is_named(
     edit(
         checkout = checkout,
         new = "      - name : Check out again\n        uses : actions/checkout@0f0f\n\n"
-        "      - name : Cut the draft",
-        old  = "      - name : Cut the draft",
+        "      - name : Create the draft",
+        old  = "      - name : Create the draft",
         path = DRAFT
     )
 

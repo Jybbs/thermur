@@ -14,7 +14,9 @@
 
 ---
 
-## 🚀 Quick Start
+<a id="quick-start"></a>
+
+## ⌨️ Quick Start
 
 Clone *Thermur* and build its locked environment:
 
@@ -39,17 +41,17 @@ I've spent countless hours watching starling murmurations since my childhood in 
 
 ### From Tragedy to Technology
 
-On June 30, 2013, nineteen members of the Granite Mountain Hotshots were fatally overtaken by the Yarnell Hill Fire [^1]. The crew's lookout had lost visual contact, and by the time the fire's convective plume reappeared, its lethal speed and direction left no time for escape. That incident, my own visit to the entrapment site, and the ever-increasing incidence of destructive wildfires have profoundly shaped my perspective. They underscore an ethical obligation to orient my work in machine learning directly toward preventing this kind of tragedy.
+On June 30, 2013, nineteen members of the Granite Mountain Hotshots were fatally overtaken by the Yarnell Hill Fire. The crew's lookout had lost visual contact, and by the time the fire's convective plume reappeared, its lethal speed and direction left no time for escape. That incident, my own visit to the entrapment site, and the ever-increasing incidence of destructive wildfires have profoundly shaped my perspective. They underscore an ethical obligation to orient my work in machine learning directly toward preventing this kind of tragedy.
 
-What's fundamentally challenging about firefighter entrapments like these [^2] is that the most critical information on a fireground—the instantaneous, localized flow of heat and air—is dangerously invisible. Anemometers provide numbers, but the human brain is wired for something far more primitive and powerful: the perception of coherent motion [^3]. Classic studies have shown that we can recognize complex activity from just a few moving points of light, a phenomenon known as "biological motion" perception [^4].
+What's fundamentally challenging about firefighter entrapments like these is that the most critical information on a fireground—the instantaneous, localized flow of heat and air—is dangerously invisible. Anemometers provide numbers, but the human brain is wired for something far more primitive and powerful: the perception of coherent motion. Classic studies have shown that we can recognize complex activity from just a few moving points of light, a phenomenon known as "biological motion" perception.
 
 ### The Biomimetic Insight
 
-What if wildfire could be recast as the "predator" in this biological system? Could we create a flock of robots that responds to thermal threats the way starlings react to a predator? Could we model their movement, measure their cohesion, and coordinate their alignment within the context of their flock [^5]? And most critically, could this system translate an invisible threat into a visual language that firefighters could intuitively understand?
+What if wildfire could be recast as the "predator" in this biological system? Could we create a flock of robots that responds to thermal threats the way starlings react to a predator? Could we model their movement, measure their cohesion, and coordinate their alignment within the context of their flock? And most critically, could this system translate an invisible threat into a visual language that firefighters could intuitively understand?
 
-**Thermur** (a portmanteau of "thermal" and "murmuration") was born from this biomimetic insight. With modern micro-robotics now capable of surviving brief excursions up to 475K [^6], we can finally implement a system where:
+**Thermur** (a portmanteau of "thermal" and "murmuration") was born from this biomimetic insight. With modern micro-robotics now capable of surviving brief excursions up to 475K, we can finally implement a system where:
 
-> *A flock of robots, governed by the mathematical rules of a starling flock responding to a predator [^7], learns to move in such a way that it not only survives the thermal chaos of a wildfire but also translates that chaos into a dynamic visual display that is immediately legible to a human under pressure.*
+> *A flock of robots, governed by the mathematical rules of a starling flock responding to a predator, learns to move in such a way that it not only survives the thermal chaos of a wildfire but also translates that chaos into a dynamic visual display that is immediately legible to a human under pressure.*
 
 ---
 
@@ -122,13 +124,13 @@ flowchart TB
 
 ### Core Scientific Contributions
 
-1. **Heterogeneous Behavioral Variance**: Individual noise amplitudes drawn from $`\eta_i \sim N(\mu=0.7, \sigma=0.20)`$ create the behavioral heterogeneity necessary for critical state dynamics. Based on the framework from [^8] with an optimized mean value, this continuous spectrum of responses, ranging from strongly aligning agents with low $`\eta_i`$ to weakly aligning agents with high $`\eta_i`$, maintains elevated susceptibility $`\chi \sim N`$ [^9] and enables the scale-free correlations observed in natural murmurations [^10].
+1. **Heterogeneous Behavioral Variance**: Individual noise amplitudes drawn from $`\eta_i \sim N(\mu=0.7, \sigma=0.20)`$ create the behavioral heterogeneity necessary for critical state dynamics. With an optimized mean value, this continuous spectrum of responses, ranging from strongly aligning agents with low $`\eta_i`$ to weakly aligning agents with high $`\eta_i`$, maintains elevated susceptibility $`\chi \sim N`$ and enables the scale-free correlations observed in natural murmurations.
 
-2. **Topological Interactions**: Each agent responds to exactly $`k=7`$ nearest neighbors regardless of distance, matching empirical observations of starling behavior [^11] and enabling scale-free information transfer with propagation speeds of 15-45 m/s [^12].
+2. **Topological Interactions**: Each agent responds to exactly $`k=7`$ nearest neighbors regardless of distance, matching empirical observations of starling behavior and enabling scale-free information transfer with propagation speeds of 15-45 m/s.
 
-3. **Thermal Safety Constraints**: Smooth penalty-based safety using the Kreisselmeier-Steinhauser formulation [^13], ensuring agents avoid thermal limits ($`T < 475K`$) through gradient-based corrections that integrate seamlessly with neural network training.
+3. **Thermal Safety Constraints**: Smooth penalty-based safety using the Kreisselmeier-Steinhauser formulation, ensuring agents avoid thermal limits ($`T < 475K`$) through gradient-based corrections that integrate seamlessly with neural network training.
 
-4. **Graph Neural Networks**: Permutation-equivariant architecture [^14] that naturally handles dynamic flock topologies through message-passing on k-nearest neighbor graphs, implemented with PyTorch Geometric [^15].
+4. **Graph Neural Networks**: Permutation-equivariant architecture that naturally handles dynamic flock topologies through message-passing on k-nearest neighbor graphs, implemented with PyTorch Geometric.
 
 ---
 
@@ -138,7 +140,7 @@ The system bridges biological observation with robotic control through a unified
 
 ### Unified Murmuration Control Theorem
 
-Natural starling flocks achieve near-instantaneous information propagation through a delicate phase transition between order and disorder. We engineer this criticality through heterogeneous behavioral variance, where individual noise amplitudes $`\eta_i \sim N(\mu, \sigma=0.20)`$ create a continuous spectrum of responses [^8]. This heterogeneity, wherein some agents strongly align while others move more independently, generates the variance necessary for scale-free correlations.
+Natural starling flocks achieve near-instantaneous information propagation through a delicate phase transition between order and disorder. We engineer this criticality through heterogeneous behavioral variance, where individual noise amplitudes $`\eta_i \sim N(\mu, \sigma=0.20)`$ create a continuous spectrum of responses. This heterogeneity, wherein some agents strongly align while others move more independently, generates the variance necessary for scale-free correlations.
 
 Given $`N`$ agents with positions $`\mathbf{x}_i \in \mathbb{R}^3`$ and velocities $`\mathbf{v}_i \in \mathbb{R}^3`$, the control law:
 
@@ -157,26 +159,26 @@ $`
 \end{aligned}
 `$  
 
-The quartic speed confinement term [^16] and maximum entropy alignment [^17] work together to maintain critical dynamics.
+The quartic speed confinement term and maximum entropy alignment work together to maintain critical dynamics.
 <br>
 
 ### The Mechanism of Criticality
 
-In bird flocks, individuals exhibit varying degrees of alignment with their neighbors, creating a natural heterogeneity in the system. We model this through individual noise amplitudes drawn from a Gaussian distribution $`\eta_i \sim N(\mu, \sigma=0.20)`$, which enables continuous phase transitions [^8].
+In bird flocks, individuals exhibit varying degrees of alignment with their neighbors, creating a natural heterogeneity in the system. We model this through individual noise amplitudes drawn from a Gaussian distribution $`\eta_i \sim N(\mu, \sigma=0.20)`$, which enables continuous phase transitions.
 
 Agents with low noise amplitudes strongly align with their neighbors, while those with high amplitudes move more independently. This continuous spectrum of behaviors rather than discrete states creates the variance necessary for critical dynamics. The resulting susceptibility $`\chi`$ scales with flock size $`N`$, confirming the system remains at criticality without requiring explicit anti-alignment mechanisms.
 
-Each agent watches exactly 7 nearest neighbors regardless of distance [^11]. This "topological" rule means information spreads the same way whether the flock is spread out or compressed, enabling rapid response across the entire group.
+Each agent watches exactly 7 nearest neighbors regardless of distance. This "topological" rule means information spreads the same way whether the flock is spread out or compressed, enabling rapid response across the entire group.
 
 ### Speed Regulation Through Marginal Confinement
 
-Natural flocks maintain remarkably stable cruising speeds despite constant interactions and perturbations. This stability emerges from marginal speed confinement [^16], a mechanism where birds experience minimal resistance near their preferred velocity but increasingly strong restoring forces as they deviate further from it. The quartic potential structure, rather than the simpler quadratic forms often used in robotics, resolves a fundamental tension in collective behavior. It permits the speed fluctuations necessary for information propagation while preventing the flock from either dispersing into chaos or grinding to a halt.
+Natural flocks maintain remarkably stable cruising speeds despite constant interactions and perturbations. This stability emerges from marginal speed confinement, a mechanism where birds experience minimal resistance near their preferred velocity but increasingly strong restoring forces as they deviate further from it. The quartic potential structure, rather than the simpler quadratic forms often used in robotics, resolves a fundamental tension in collective behavior. It permits the speed fluctuations necessary for information propagation while preventing the flock from either dispersing into chaos or grinding to a halt.
 
 Our implementation uses this biologically-validated mechanism instead of artificial damping, ensuring agents achieve their full cruising speed of 11.1 m/s rather than being artificially capped at lower velocities.
 
 ### Aerodynamic Realism
 
-Starlings don't fly through still air. They navigate wind fields that constantly push and pull them, demanding continuous adjustment of their flight forces. Our physics incorporates realistic aerodynamic drag calibrated from wind tunnel measurements of European starlings [^18], wherein drag depends on motion through the air mass itself rather than motion relative to the ground.
+Starlings don't fly through still air. They navigate wind fields that constantly push and pull them, demanding continuous adjustment of their flight forces. Our physics incorporates realistic aerodynamic drag calibrated from wind tunnel measurements of European starlings, wherein drag depends on motion through the air mass itself rather than motion relative to the ground.
 
 This distinction matters profoundly. A bird flying at 11 m/s into a 5 m/s headwind experiences the same aerodynamic forces as one flying at 16 m/s in calm air. Our agents exploit tailwinds to conserve energy, work harder against headwinds to maintain speed, and allow crosswinds to naturally drift them sideways. 
 
@@ -184,19 +186,19 @@ These dynamics emerge naturally from the physics rather than being explicitly pr
 
 ### Density Waves and Thermal Response
 
-When starlings detect a hawk, waves of movement ripple through the flock at speeds of 15-45 m/s [^12], much faster than any individual bird flies. These waves create dark bands that look like ink spreading through water. We reproduce this effect using reaction-diffusion equations, where crowding in one area causes neighboring regions to spread out, creating visible waves.
+When starlings detect a hawk, waves of movement ripple through the flock at speeds of 15-45 m/s, much faster than any individual bird flies. These waves create dark bands that look like ink spreading through water. We reproduce this effect using reaction-diffusion equations, where crowding in one area causes neighboring regions to spread out, creating visible waves.
 
 When the flock encounters high temperatures, these density waves combine with temperature gradient following. The result is a flock that flows away from heat while the density waves make the danger visible through the pattern of movement.
 
 ### Safety Guarantees
 
-The thermal safety system uses smooth Kreisselmeier-Steinhauser penalties to guide agents away from dangerous temperatures [^13]. The gradient-based corrections create a continuous force field that intensifies near thermal boundaries, ensuring agents naturally avoid excessive heat without requiring optimization solvers.
+The thermal safety system uses smooth Kreisselmeier-Steinhauser penalties to guide agents away from dangerous temperatures. The gradient-based corrections create a continuous force field that intensifies near thermal boundaries, ensuring agents naturally avoid excessive heat without requiring optimization solvers.
 
 This guarantees agents never exceed 475 K, the maximum safe temperature for the hardware. Unlike rule-based systems that might fail in unexpected situations, this mathematical approach ensures safety in all conditions.
 
 ### Emergent Properties
 
-The unified control law produces emergent dynamics that match biological flocks without explicit programming. These properties arise naturally from the interplay between heterogeneous coupling, topological interactions, and active matter dynamics [^19]:
+The unified control law produces emergent dynamics that match biological flocks without explicit programming. These properties arise naturally from the interplay between heterogeneous coupling, topological interactions, and active matter dynamics:
 
 - **Critical State**: Maintained through heterogeneous noise $`\eta_i \sim N(\mu, \sigma=0.20)`$ creating behavioral variance
 - **Rapid Response**: Information propagates at 15-45 m/s through topological networks
@@ -376,11 +378,11 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 - **MAE/RMSE/R²**: Measure how accurately the policy reproduces expert actions, with MAE < 1.0 m/s² indicating excellent imitation
 
-- **Velocity**: Monitors mean flight speed remains realistic (9-12 m/s for starlings [^22])
+- **Velocity**: Monitors mean flight speed remains realistic (9-12 m/s for starlings)
 
 **Emergent Behavior Metrics:**
 
-- **Correlation Length $`\xi/L`$**: Measures normalized spatial scale where velocity correlations decay to threshold. The ratio $`\xi/L \approx 0.35`$ indicates near-critical scale-free correlations characteristic of natural murmurations [^10].
+- **Correlation Length $`\xi/L`$**: Measures normalized spatial scale where velocity correlations decay to threshold. The ratio $`\xi/L \approx 0.35`$ indicates near-critical scale-free correlations characteristic of natural murmurations.
 
 - **Effective Energy $`E = -\sum J_{ij} \mathbf{s}_i \cdot \mathbf{s}_j`$**: Tracks the maximum entropy energy function with uniform coupling, where behavioral variance from heterogeneous noise drives phase transitions.
 
@@ -388,7 +390,7 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 - **Noise Heterogeneity**: Monitors variance in individual noise amplitudes to maintain critical dynamics
 
-- **Susceptibility $`\chi`$**: Measures collective responsiveness via integrated velocity correlations $`\chi = (1/N) \sum_{i \neq j} \langle \delta \tilde{\phi}_i \cdot \delta \tilde{\phi}_j \rangle`$ within interaction radius. At criticality, $`\chi`$ scales with system size as $`\chi \sim N^{\gamma/3\nu}`$ [^12] [^10].
+- **Susceptibility $`\chi`$**: Measures collective responsiveness via integrated velocity correlations $`\chi = (1/N) \sum_{i \neq j} \langle \delta \tilde{\phi}_i \cdot \delta \tilde{\phi}_j \rangle`$ within interaction radius. At criticality, $`\chi`$ scales with system size as $`\chi \sim N^{\gamma/3\nu}`$.
 
 **Dynamic Response Metrics:**
 
@@ -398,7 +400,7 @@ The comprehensive metrics suite evaluates both imitation learning performance an
 
 - **Pairwise Coherence**: Quantifies local velocity alignment via mean pairwise dot products $`C = \langle \hat{v}_i \cdot \hat{v}_j \rangle_{i \neq j}`$, capturing coordination during maneuvers
 
-- **Polarization**: Measures global directional order via $`\Phi = |\langle \hat{v}_i \rangle|`$ with natural murmurations exhibiting $`\Phi \approx 0.96 \pm 0.03`$ [^10]
+- **Polarization**: Measures global directional order via $`\Phi = |\langle \hat{v}_i \rangle|`$ with natural murmurations exhibiting $`\Phi \approx 0.96 \pm 0.03`$
 
 - **Thermal Reactivity**: Quantifies collective threat response via velocity-temperature spatial correlation
 
@@ -446,6 +448,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise relock` | Re-resolves every lockfile after its manifest changes |
 | `mise scan` | Holds every package `uv.lock`, the lockfile beside each task script, and `docs/bun.lock` resolve to the published advisories through `uv audit` and `bun audit`, setting aside each `AUDIT_IGNORE` id no release fixes yet |
 | `mise lift` | Prints one table of every pin lagging its newest release across mise, uv, Bun, the actions the workflows pin, the runner image every job runs on, and the wrangler release `🐦‍⬛ Pages` deploys through, then tries the lift through `mise ci` in a scratch clone under `--try` and writes it under `--write`, leaving each pin a `--hold` names where it stands for that run, and each pin `[tool.thermur.holds]` in `pyproject.toml` records there on every run, its reason printed beside it |
+| `mise bump` | Moves `[project].version` in `pyproject.toml` to the next minor release, or the next patch or major one under `--patch` or `--major`, carrying `uv.lock` and the `version` of `CITATION.cff` with it |
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 | `mise fetch` | Downloads the WRF-SFIRE sample from the address its pinned digest keys and checks it against that digest before moving it into `data/samples/` |
 | `mise browse` | Opens Hamilton's experiment viewer over the runs `thermur fly` records under `data/runs/`, passing any further arguments to it |
@@ -539,56 +542,6 @@ To cite *Thermur*, use the *"Cite this repository"* link in the repository's sid
 
 ---
 
-## 📚 References
+## ©️ License
 
-[^1]: U.S. Fire Administration. 2013. "Yarnell Hill Fire, Arizona." *Wildland Fire Fatality Reports*.
-
-[^2]: Page, Wesley G., Patrick H. Freeborn, Bret W. Butler, and W. Matt Jolly. 2019. "A Review of US Wildland Firefighter Entrapments: Trends, Important Environmental Factors, and Research Needs." *International Journal of Wildland Fire* 28 (8): 551–69. https://doi.org/10.1071/WF19022
-
-[^3]: Wolfe, Jeremy M. 2020. "Visual Search: How Do We Find What We Are Looking For?" *Annual Review of Vision Science* 6: 539–62. https://doi.org/10.1146/annurev-vision-091718-015048
-
-[^4]: Johansson, Gunnar. 1973. "Visual Perception of Biological Motion and a Model for Its Analysis." *Perception & Psychophysics* 14 (2): 201–11. https://doi.org/10.3758/BF03212378
-
-[^5]: Reynolds, Craig W. 1987. "Flocks, Herds and Schools: A Distributed Behavioral Model." *ACM SIGGRAPH Computer Graphics* 21 (4): 25–34. https://doi.org/10.1145/37402.37406
-
-[^6]: Häusermann, D., et al. 2023. "FireDrone: Multi-Environment Thermally Agnostic Aerial Robot." *Advanced Intelligent Systems* 5 (23): 2300101. https://doi.org/10.1002/aisy.202300101
-
-[^7]: Bialek, William, Andrea Cavagna, Irene Giardina, Thierry Mora, Edmondo Silvestri, Massimiliano Viale, and Aleksandr M. Walczak. 2012. "Statistical Mechanics for Natural Flocks of Birds." *Proceedings of the National Academy of Sciences* 109 (13): 4786–91. https://doi.org/10.1073/pnas.1118633109
-
-[^8]: Guisandez, Leandro, Gabriel Baglietto, and Alejandro Rozenfeld. 2018. "Heterogeneity Promotes First to Second Order Phase Transition on Flocking Systems." arXiv:1711.11531. https://arxiv.org/abs/1711.11531
-
-[^9]: Attanasi, Alessandro, Andrea Cavagna, Lorenzo Del Castello, Irene Giardina, Stefano Melillo, Leonardo Parisi, Oliver Pohl, Bruno Rossaro, Edward Shen, Edmondo Silvestri, and Massimiliano Viale. 2014. "Finite-Size Scaling as a Way to Probe Near-Criticality in Natural Swarms." *Physical Review Letters* 113 (23): 238102. https://doi.org/10.1103/PhysRevLett.113.238102
-
-[^10]: Cavagna, Andrea, Alessio Cimarelli, Irene Giardina, Giorgio Parisi, Raffaele Santagati, Fabio Stefanini, and Massimiliano Viale. 2010. "Scale-Free Correlations in Starling Flocks." *PNAS* 107 (26): 11865–70. https://doi.org/10.1073/pnas.1005766107
-
-[^11]: Ballerini, M. et al. 2008. "Interaction Ruling Animal Collective Behavior Depends on Topological Rather than Metric Distance." *PNAS* 105 (4): 1232–37. https://doi.org/10.1073/pnas.0711437105
-
-[^12]: Attanasi, Alessandro, et al. 2014. "Information Transfer and Behavioural Inertia in Starling Flocks." *Nature Physics* 10 (9): 691–696. https://doi.org/10.1038/nphys3035
-
-[^13]: Kreisselmeier, G., and R. Steinhauser. 1979. "Systematic Control Design by Optimizing a Vector Performance Index." *IFAC Proceedings Volumes* 12 (7): 113–17. https://doi.org/10.1016/S1474-6670(17)65584-8
-
-[^14]: Gama, Fernando, Ekaterina Tolstaya, and Alejandro Ribeiro. 2021. "Graph Neural Networks for Decentralized Controllers." *ICASSP 2021 — 2021 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)*: 5260–5264. https://doi.org/10.1109/ICASSP39728.2021.9414563
-
-[^15]: Fey, Matthias, and Jan E. Lenssen. 2019. "Fast Graph Representation Learning with PyTorch Geometric." *arXiv* 1903.02428. https://doi.org/10.48550/arXiv.1903.02428
-
-[^16]: Cavagna, Andrea, Antonio Culla, Xiao Feng, Irene Giardina, Tomas S. Grigera, Willow Kion-Crosby, Stefania Melillo, Giulia Pisegna, Lorena Postiglione, and Pablo Villegas. 2022. "Marginal Speed Confinement Resolves the Conflict Between Correlation and Control in Collective Behaviour." *Nature Communications* 13 (1): 2315. https://doi.org/10.1038/s41467-022-29883-4
-
-[^17]: Heisenberg, Werner. 1928. "Zur Theorie des Ferromagnetismus." *Zeitschrift für Physik* 49 (9): 619–636. https://doi.org/10.1007/BF01328601
-
-[^18]: Nafi, Asif, Hadar Ben-Gida, Christopher G. Guglielmo, and Roi Gurka. 2020. "Aerodynamic Forces Acting on Birds During Flight: A Comparative Study of a Shorebird, Songbird and a Strigiform." *Experimental Thermal and Fluid Science* 113: 110018. https://doi.org/10.1016/j.expthermflusci.2019.110018
-
-[^19]: Ginelli, Francesco. 2016. "The Physics of the Vicsek Model." *The European Physical Journal Special Topics* 225 (11): 2099–2117. https://doi.org/10.1140/epjst/e2016-60066-8
-
-[^22]: Ballerini, M., et al. 2008. "Empirical Investigation of Starling Flocks: A Benchmark Study in Collective Animal Behaviour." *Animal Behaviour* 76 (1): 201–215. https://doi.org/10.1016/j.anbehav.2008.02.004
-
-[^23]: Brambilla, Manuele, Eliseo Ferrante, Mauro Birattari, and Marco Dorigo. 2013. "Swarm Robotics: A Review from the Swarm Engineering Perspective." *Swarm Intelligence* 7 (1): 1–41. https://doi.org/10.1007/s11721-012-0075-2
-
-[^24]: Couzin, Iain D. 2009. "Collective Cognition in Animal Groups." *Trends in Cognitive Sciences* 13 (1): 36–43. https://doi.org/10.1016/j.tics.2008.10.002
-
-[^25]: Heilman, Warren E. 2023. "Atmospheric Turbulence and Wildland Fires: A Review." *International Journal of Wildland Fire* 32 (4): 476–495. https://doi.org/10.1071/WF22053
-
-[^26]: Hoetzlein, Rama. 2024. "Flock2: A Model for Orientation-Based Social Flocking." *Journal of Theoretical Biology* 593: 111880. https://doi.org/10.1016/j.jtbi.2024.111880
-
-[^27]: Olfati-Saber, Reza. 2007. "Consensus and Cooperation in Networked Multi-Agent Systems." *Proceedings of the IEEE* 95 (1): 215–33. https://doi.org/10.1109/JPROC.2006.887293
-
----
+*Thermur* is released under the MIT License, whose full text is in [`LICENSE`](../LICENSE).
