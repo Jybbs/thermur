@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { computed, declared, source, styled } from '../../common/sheets.ts'
+import tables                         from '../../../theme/styles/tables.css?raw'
+import { computed, declared, styled } from '../../common/sheets.ts'
 
 /**
  * The selector of the dot between two values on a card's middle line.
@@ -12,7 +13,7 @@ const SEPARATOR = '.vp-doc td:not(:first-child, :last-child, :empty) + td:not(:l
  * selector list is `selector` inside its query for a phone's width.
  */
 function narrow(property: string, selector: string): string {
-  return styled('tables.css').find(rule =>
+  return styled(tables).find(rule =>
     (rule.parentRule as CSSMediaRule | null)?.conditionText === '(width < 40rem)'
     && rule.selectorText.replaceAll(/\s+/gu, ' ') === selector
   )!.style.getPropertyValue(property)
@@ -20,14 +21,14 @@ function narrow(property: string, selector: string): string {
 
 describe('a chip in a table', () => {
   it('keeps the first column’s chip whole, since no rule at any width lets it break', () => {
-    const wraps = styled('tables.css')
+    const wraps = styled(tables)
       .filter(rule => rule.selectorText.includes(':first-child code'))
       .map(rule => rule.style.getPropertyValue('overflow-wrap'))
     expect(wraps).toEqual(['normal'])
   })
 
   it('breaks a chip in any other column at any character', () => {
-    expect(declared('overflow-wrap', '.vp-doc td code', 'tables.css')).toBe('anywhere')
+    expect(declared('overflow-wrap', '.vp-doc td code', tables)).toBe('anywhere')
   })
 })
 
@@ -39,7 +40,7 @@ describe('a table at a phone’s width', () => {
 
   it('keeps the columns side by side wider than a phone', () => {
     const page = '<div class="vp-doc"><table id="table"><tbody><tr><td>x</td></tr></tbody></table></div>'
-    expect(computed(page, 'display', '#table', 'tables.css')).toBe('table')
+    expect(computed(page, 'display', '#table', tables)).toBe('table')
   })
 
   it('opens a gap between two cards and none after the last', () => {
@@ -61,7 +62,7 @@ describe('a table at a phone’s width', () => {
   })
 
   it('declares the dot without alternative text first, for a browser that drops the form with it', () => {
-    expect(source('tables.css')).toMatch(/content\s*:\s*' · ';\s*content\s*:\s*' · ' \/ '';/u)
+    expect(tables).toMatch(/content\s*:\s*' · ';\s*content\s*:\s*' · ' \/ '';/u)
   })
 })
 

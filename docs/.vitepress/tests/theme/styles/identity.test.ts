@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { computed, declared, source, styled } from '../../common/sheets.ts'
+import palette                        from '../../../theme/styles/identity/palette.css?raw'
+import { computed, declared, styled } from '../../common/sheets.ts'
 
 /**
  * A chart series' switch, turned off.
@@ -8,21 +9,26 @@ import { computed, declared, source, styled } from '../../common/sheets.ts'
 const OFF = '<button class="identity-switch" role="switch" aria-checked="false">'
           + '<span class="identity-caps">Chart 1</span><svg class="identity-spark"></svg></button>'
 /**
- * The sheets the identity's widgets are drawn in.
+ * The text of each sheet the identity's widgets are drawn in, by its name.
  */
-const SHEETS = ['faces', 'heat', 'marks', 'palette', 'specimen'].map(name => `identity/${name}.css`)
+const SHEETS = import.meta.glob<string>('./{faces,heat,marks,palette,specimen}.css', {
+  base   : '../../../theme/styles/identity/',
+  eager  : true,
+  import : 'default',
+  query  : '?raw'
+})
 
 /**
  * Reads the stroke width the palette's sheet sets for part `part` of a level.
  */
 const widthOf = (part: string): number =>
-  Number(declared('stroke-width', `.identity-level-${part}`, 'identity/palette.css'))
+  Number(declared('stroke-width', `.identity-level-${part}`, palette))
 
-describe.for(SHEETS)('%s', sheet => {
-  const text = source(sheet)
+describe.for(Object.keys(SHEETS))('%s', name => {
+  const sheet = SHEETS[name]!
 
   it('closes every block it opens', () => {
-    expect(text.split('{').length).toBe(text.split('}').length)
+    expect(sheet.split('{').length).toBe(sheet.split('}').length)
   })
 
   it('times every transition and animation by the site’s settle time', () => {
@@ -37,8 +43,8 @@ describe.for(SHEETS)('%s', sheet => {
 })
 
 it('dims only the spark of a series switched off, leaving its label at full strength', () => {
-  expect(computed(OFF, 'opacity', '.identity-switch', 'identity/palette.css')).toBe('')
-  expect(computed(OFF, 'opacity', '.identity-spark', 'identity/palette.css')).toBe('0.45')
+  expect(computed(OFF, 'opacity', '.identity-switch', palette)).toBe('')
+  expect(computed(OFF, 'opacity', '.identity-spark', palette)).toBe('0.45')
 })
 
 it('outlines each level line wider than the stroke drawn over it', () => {

@@ -289,8 +289,8 @@ export class Composite {
   }
 
   /**
-   * Opens the radio on the flock as it stands, every drone having heard each
-   * other drone within the radio's range.
+   * Opens the radio on the flock as it stands, every drone holding in its
+   * table the radio's `slots` nearest other drones within its range.
    */
   open(): void {
     this.#radio.open(this.#broadcast)

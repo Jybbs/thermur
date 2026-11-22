@@ -11,6 +11,13 @@ import { FACTS }               from '../common/facts.ts'
 
 const config = themeConfig(FACTS, pagesDir(import.meta.url))
 
+/**
+ * Declares to `vitest --changed` each page `sidebarOf` titles its links from
+ * and the public folder holding the wordmark, so a change to one selects this
+ * test.
+ */
+import.meta.glob(['../../../pages/*/*.md', '../../../pages/public/*'], { query: '?raw' })
+
 describe('themeConfig', () => {
   it('sets the wordmark in place of the site’s title, a file the public folder holds per scheme', () => {
     expect(config.siteTitle).toBe(false)

@@ -1,14 +1,25 @@
-import fs   from 'node:fs'
-import path from 'node:path'
-
 import { describe, expect, it } from 'vitest'
 
-import { pageData }          from '../../lib/page-data.ts'
-import { docsDir, pagesDir } from '../../lib/paths.ts'
-import source                from '../../lib/rendered/identity.json' with { type: 'json' }
+import front        from '../../../pages/index.md?raw'
+import { pageData } from '../../lib/page-data.ts'
+import { docsDir }  from '../../lib/paths.ts'
+import source       from '../../lib/rendered/identity.json' with { type: 'json' }
 
 const REPOSITORY = 'https://github.com/example/flock'
 const DOCS       = docsDir(import.meta.url)
+
+/**
+ * Declares to `vitest --changed` each file `pageData` reads off the site
+ * through `kitData`, meaning each piece's declaration and each module
+ * `READING` names outside `LEFT`, so a change to one selects this test.
+ */
+import.meta.glob([
+  '../../../kit/src/*/*.json',
+  '../../lib/**/*.ts',
+  '../../theme/**/*.ts',
+  '!../../lib/kit/**',
+  '!../../theme/kit/**'
+], { query: '?raw' })
 
 describe('pageData', () => {
   it('lays the front page out as the home page with its class, its button, and its title alone', async () => {
@@ -34,7 +45,6 @@ describe('pageData', () => {
   })
 
   it('finds the front page opening on the tagline the identity declares', () => {
-    const front = fs.readFileSync(path.join(pagesDir(import.meta.url), 'index.md'), 'utf8')
     expect(front.split('\n\n')[1]).toBe(`*${source.tagline.text}*`)
   })
 })

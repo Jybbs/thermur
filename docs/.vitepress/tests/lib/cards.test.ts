@@ -37,6 +37,12 @@ const places = source.palette.series.slice(1).map((_, index) => index + 1)
 const KINDS = [['a section card', SECTION], ['the main card', undefined]] as const
 
 /**
+ * Declares to `vitest --changed` each face and mark `Cards.under` reads, so a
+ * change to one selects this test.
+ */
+import.meta.glob(['../../../../src/thermur/identity/fonts/**', '../../../pages/public/*'], { query: '?raw' })
+
+/**
  * Finds the element of a card whose only child is `text`.
  */
 function holding(node: Element, text: string): Element | undefined {
