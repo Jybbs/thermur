@@ -205,16 +205,37 @@ def test_the_outputs_print_where_no_runner_collects_them(
     ]
 
 
-def test_the_published_path_exits_the_task_with_status_1(
+@mark.parametrize(
+    ("releases", "outputs", "status"),
+    [
+        param(
+            "",
+            ["state=created", f"url={DRAFTED}", "version=0.2.0"],
+            0,
+            id = "created"
+        ),
+        param(
+            release(draft=False, url="https://u/published"),
+            ["state=published", "url=https://u/published", "version=0.2.0"],
+            1,
+            id = "published"
+        )
+    ]
+)
+def test_the_task_exits_with_the_status_its_path_calls_for(
     cut          : ModuleType,
     monkeypatch  : MonkeyPatch,
-    pytestconfig : Config
+    outputs      : list[str],
+    pytestconfig : Config,
+    releases     : str,
+    status       : int
 ):
     """
-    Asserts that the task, run as its own process, exits with status `1` on
-    the published path, which fails the draft job and the gate after it.
+    Asserts that the task, run as its own process, prints the path, the URL,
+    and the version and exits with status `0` on the created path and `1` on
+    the published one, which fails the draft job and the gate after it.
     """
-    monkeypatch.setenv("RELEASES", release(draft=False, url="https://u/published"))
+    monkeypatch.setenv("RELEASES", releases)
 
     task = run(
         [executable, pytestconfig.rootpath / ".mise/tasks/gha/cut.py"],
@@ -222,7 +243,4 @@ def test_the_published_path_exits_the_task_with_status_1(
         text           = True
     )
 
-    assert (task.returncode, task.stdout.splitlines()[1:]) == (
-        1,
-        ["state=published", "url=https://u/published", "version=0.2.0"]
-    )
+    assert (task.returncode, task.stdout.splitlines()[-3:]) == (status, outputs)
