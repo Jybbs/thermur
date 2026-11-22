@@ -83,9 +83,10 @@ class Measure(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
     The value a flatness reads its spread about, as the root-mean-square
     departure from it across every condition, or `None` for the statistic's
-    own mean, its standard deviation. About `POLARIZATION`, the polarization's
-    flatness compares order across densities within the ordered phase, as
-    Ginelli and Chaté read local order against local density
+    own mean, its standard deviation. About `POLARIZATION`, the departure
+    grows with the polarization's distance from a starling flock's order at
+    each condition as well as with its spread, after Ginelli and Chaté's
+    comparison of order across densities within the ordered phase
     (https://doi.org/10.1103/PhysRevLett.105.168103).
     """
 

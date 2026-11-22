@@ -312,8 +312,10 @@ def test_every_listed_trial_flies_the_sizes_its_tables_were_measured_at():
 def test_the_coupling_trial_favors_a_flat_polarization_only_near_a_starling_flock():
     """
     Asserts that the coupling trial scores a flock holding a disordered
-    polarization of 0.15 at every spacing below one holding a polarization
-    near `POLARIZATION` that changes modestly across the spacings.
+    polarization of 0.15 at every spacing, and one holding 0.999, below one
+    holding a polarization near `POLARIZATION` that changes modestly across
+    the spacings, and that one holding `POLARIZATION` everywhere scores
+    zero.
     """
     table = Dataset(
         {
@@ -322,23 +324,26 @@ def test_the_coupling_trial_favors_a_flat_polarization_only_near_a_starling_floc
                 array(
                     [
                         [[0.15], [0.15], [0.15]],
-                        [[POLARIZATION + 0.02], [POLARIZATION], [POLARIZATION - 0.03]]
+                        [[POLARIZATION + 0.02], [POLARIZATION], [POLARIZATION - 0.03]],
+                        [[0.999], [0.999], [0.999]],
+                        [[POLARIZATION], [POLARIZATION], [POLARIZATION]]
                     ]
                 )
             )
         },
         coords = {
-            "candidate" : ["disordered", "ordered"],
+            "candidate" : ["disordered", "ordered", "saturated", "starling"],
             "condition" : ["dense", "middle", "sparse"]
         }
     )
-    disordered, ordered = (
+    disordered, ordered, saturated, starling = (
         measure_of("coupling", "polarization")
         .score(table)
         .values.ravel()
     )
 
     assert disordered < ordered
+    assert saturated < ordered < starling == 0
 
 
 def test_the_heading_trial_favors_a_spontaneous_spectral_peak_nearest_zero():
