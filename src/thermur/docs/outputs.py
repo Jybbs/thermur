@@ -443,8 +443,8 @@ def normed(norms: Norms) -> str:
             [
                 f"`{statistic}`",
                 f"{'above ' * norm.above}{norm.figure:g} {norm.unit}".strip(),
-                f"±{norm.spread:g}, {norm.kind}" if norm.kind else "",
-                str(norm.flocks or ""),
+                f"±{norm.spread:g}, {norm.kind}" if norm.kind else "none stated",
+                str(norm.flocks or "not stated"),
                 norm.system,
                 f"[{norm.doi}](https://doi.org/{norm.doi})"
             ]

@@ -13,12 +13,12 @@ The table is written from `norms.toml`, and `mise render` rewrites it.
 | **Statistic** | **Norm** | **Spread** | **Flocks** | **System** | **Source** |
 |---|---|---|---|---|---|
 | `aspect_ratio` | 5.6 | ±1, 95% confidence interval | 10 | starlings | [10.1016/j.anbehav.2008.02.004](https://doi.org/10.1016/j.anbehav.2008.02.004) |
-| `border_density` | above 1 |  | 10 | starlings | [10.1016/j.anbehav.2008.02.004](https://doi.org/10.1016/j.anbehav.2008.02.004) |
+| `border_density` | above 1 | none stated | 10 | starlings | [10.1016/j.anbehav.2008.02.004](https://doi.org/10.1016/j.anbehav.2008.02.004) |
 | `middle_aspect_ratio` | 2.8 | ±0.4, 95% confidence interval | 10 | starlings | [10.1016/j.anbehav.2008.02.004](https://doi.org/10.1016/j.anbehav.2008.02.004) |
 | `polarization` | 0.96 | ±0.03, standard deviation | 24 | starlings | [10.1073/pnas.1005766107](https://doi.org/10.1073/pnas.1005766107) |
 | `spacing_m` | 21 m | ±9, half range | 1 | drones | [10.1126/scirobotics.aat3536](https://doi.org/10.1126/scirobotics.aat3536) |
-| `speed_by_size` | -0.13 |  |  | starlings | [10.1038/s41467-022-29883-4](https://doi.org/10.1038/s41467-022-29883-4) |
-| `speed_correlation_ratio` | 0.36 |  | 24 | starlings | [10.1073/pnas.1005766107](https://doi.org/10.1073/pnas.1005766107) |
+| `speed_by_size` | -0.13 | none stated | not stated | starlings | [10.1038/s41467-022-29883-4](https://doi.org/10.1038/s41467-022-29883-4) |
+| `speed_correlation_ratio` | 0.36 | none stated | 24 | starlings | [10.1073/pnas.1005766107](https://doi.org/10.1073/pnas.1005766107) |
 | `wave_speed_m_s` | 30 m/s | ±10, half range | 12 | starlings | [10.1038/nphys3035](https://doi.org/10.1038/nphys3035) |
 
 <!-- /norms -->
