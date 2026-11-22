@@ -83,11 +83,9 @@ class Measure(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
     The value a flatness reads its spread about, as the root-mean-square
     departure from it across every condition, or `None` for the statistic's
-    own mean, its standard deviation. A flatness of the polarization about
-    `POLARIZATION` grows with the flock's distance from a starling flock's
-    order as well as with its change across densities, comparing order
-    against density only within the ordered phase, as Ginelli and Chaté
-    compare a topological flock's local order against its local density
+    own mean, its standard deviation. About `POLARIZATION`, the polarization's
+    flatness compares order across densities within the ordered phase, as
+    Ginelli and Chaté read local order against local density
     (https://doi.org/10.1103/PhysRevLett.105.168103).
     """
 
@@ -97,11 +95,14 @@ class Measure(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         favored, by candidate and seed.
         """
         values = table[self.statistic]
-        center = values.mean("condition") if self.level is None else self.level
-        picked = (
-            sqrt(((values - center) ** 2).mean("condition")) if self.condition is None
-            else values.sel(condition=self.condition, drop=True)
-        )
+        if self.condition is None:
+            picked = (
+                values.std("condition") if self.level is None
+                else sqrt(((values - self.level) ** 2).mean("condition"))
+            )
+        else:
+            picked = values.sel(condition=self.condition, drop=True)
+
         means = picked.mean(
             [dim for dim in picked.dims if dim not in ("candidate", "seed")]
         )
