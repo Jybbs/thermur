@@ -29,6 +29,7 @@ from numpy         import (
     linspace,
     log,
     meshgrid,
+    ndarray,
     ones,
     pi,
     sin,
@@ -181,6 +182,14 @@ class Drawn(White):
         Holds `draw` east as the force.
         """
         return array([1.0, 0.0, 0.0]) * draw
+
+
+def gridded(*axes: object) -> ndarray:
+    """
+    Lays a point at every combination of the three `axes`' values, one row
+    per point.
+    """
+    return stack(meshgrid(*axes), -1).reshape(-1, 3)
 
 
 def laid(
@@ -401,7 +410,7 @@ def test_speeds_rising_along_a_rod_cross_zero_at_its_finite_size_point():
     fluctuations about the mean vanishes on a line, and an extent of the
     rod's length.
     """
-    rod = stack(meshgrid(10.0 * arange(101), [0.0, 1.0], [0.0, 1.0]), -1).reshape(-1, 3)
+    rod                 = gridded(10.0 * arange(101), [0.0, 1.0], [0.0, 1.0])
     curve, extent, zero = correlated(rod, linspace(0.0, 1.0, 33), rod[:, 0])
 
     assert curve[0] > 0 > curve[-1]
@@ -420,7 +429,7 @@ def test_a_turn_spreading_from_the_center_reads_a_speed_in_proportion(speed_m_s:
     faces inside its volume.
     """
     steps  = 10.0 * arange(-4, 5)
-    cloud  = stack(meshgrid(steps, steps, steps), -1).reshape(-1, 3)
+    cloud  = gridded(steps, steps, steps)
     starts = 5.0 + linalg.norm(cloud, axis=1) / speed_m_s
     angle  = pi / 2 / (1 + exp(-(0.1 * arange(200)[:, None] - starts) / 0.2))
 
@@ -434,6 +443,43 @@ def test_a_turn_spreading_from_the_center_reads_a_speed_in_proportion(speed_m_s:
         ),
         speed_m_s * (4 * pi / 3 * 512 / 729) ** (1 / 3),
         rtol = 0.05
+    )
+
+
+def test_speeds_alternating_along_a_rod_cross_zero_in_the_first_bin():
+    """
+    Asserts that drones along a rod whose speeds alternate between neighbors
+    read a speed correlation already negative in its first bin, so its zero
+    falls at that bin's center.
+    """
+    rod = stack(
+        [arange(64.0), *default_rng(0).uniform(-0.01, 0.01, (2, 64))],
+        -1
+    )
+    curve, extent, zero = correlated(rod, linspace(0.0, 1.0, 33), rod[:, 0] % 2)
+
+    assert curve[0] < 0
+    assert_allclose(zero, extent / 64)
+
+
+def test_a_flock_turning_at_once_reads_no_crossing_speed():
+    """
+    Asserts that a lattice whose drones all turn together, so no drone leads
+    another, reads `nan` for the speed of its turn.
+    """
+    steps = 10.0 * arange(-2, 3)
+    cloud = gridded(steps, steps, steps)
+    angle = pi / 2 / (1 + exp(-(0.1 * arange(200) - 10.0) / 0.2))
+    flown = stack([cos(angle), sin(angle), zeros(angle.shape)], -1)
+
+    assert isnan(
+        crossed(
+            clouds     = broadcast_to(cloud, (200, *cloud.shape)),
+            frame_s    = 0.1,
+            reach_m    = 15.0,
+            velocities = 10.0 * broadcast_to(flown[:, None], (200, len(cloud), 3)),
+            window     = 20
+        )
     )
 
 
@@ -473,7 +519,7 @@ def test_an_alpha_shape_leaves_out_the_gap_a_convex_hull_spans():
     of the two lattices alone and a border holding every drone on either
     lattice's faces, the faces across the gap among them.
     """
-    lattice        = stack(meshgrid(*[linspace(0.0, 4.0, 5)] * 3), -1).reshape(-1, 3)
+    lattice        = gridded(*[linspace(0.0, 4.0, 5)] * 3)
     shaken         = lattice + default_rng(0).uniform(-0.01, 0.01, lattice.shape)
     border, volume = alpha_shape(concat([shaken, shaken + [14.0, 0.0, 0.0]]), 1.5)
     faced          = ((lattice == 0.0) | (lattice == 4.0)).any(-1)
@@ -488,11 +534,30 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
     neighbor, reads a border density equal to its inside's, and a cloud
     whose inside sits at half the step reads its border sparser.
     """
-    lattice = stack(meshgrid(*[linspace(0.0, 4.0, 5)] * 3), -1).reshape(-1, 3)
+    lattice = gridded(*[linspace(0.0, 4.0, 5)] * 3)
     inside  = (abs(lattice - 2.0) < 2.0).all(-1)
 
     assert_allclose(ratio_on_border(lattice, 1.5, ones(len(lattice))), 1.0)
     assert ratio_on_border(lattice, 1.5, where(inside, 0.5, 1.0)) < 1.0
+
+
+def test_a_cloud_lying_wholly_on_its_border_reads_no_border_density():
+    """
+    Asserts that five drones in general position, each a corner of the
+    α-shape, read `nan` for their border density, which leaves no inside to
+    divide by.
+    """
+    cloud = array(
+        [
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0]
+        ]
+    )
+
+    assert isnan(ratio_on_border(asarray(cloud), 10.0, ones(5)))
 
 
 def test_a_push_across_the_command_keeps_each_drone_s_speed():
@@ -618,7 +683,7 @@ def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     nearest neighbor rather than its farthest, under an α-shape reaching far
     enough to keep every tetrahedron, so its border is the box's hull.
     """
-    corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
+    corners = gridded([0.0, 100.0], [0.0, 10.0], [0.0, 10.0])
     axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
 
     assert_allclose(

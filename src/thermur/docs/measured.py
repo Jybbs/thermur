@@ -1,7 +1,7 @@
 """
-Holds `measured`, which reads the means and standard errors the charts on
-The Interaction Rules draw out of the coupling and heading trials a run
-saved, `still_air`, which reads those The Flock in Still Air draws out
+Holds `measured`, which reads the means and standard errors the charts
+on The Interaction Rules draw out of the coupling and heading trials a
+run saved, `swept`, which reads those The Flock in Still Air draws out
 of the sweep a run saved, and `MEASURED` and `STILL_AIR`, the files the
 `docs:measure` task writes them into.
 """
@@ -31,14 +31,6 @@ DIGITS = 4
 """
 The decimal places each mean and standard error keeps.
 """
-
-
-def kept(value: float) -> float | None:
-    """
-    Leaves `value` as it is, or `None` where it is `nan`, which JSON holds
-    no literal for.
-    """
-    return None if isnan(value) else value
 
 
 def measured(run: Path) -> dict[str, dict[str, dict[str, dict[str, float]]]]:
@@ -75,7 +67,15 @@ def measured(run: Path) -> dict[str, dict[str, dict[str, dict[str, float]]]]:
     }
 
 
-def still_air(run: Path) -> dict[str, object]:
+def nullable(value: float) -> float | None:
+    """
+    Leaves `value` as it is, or `None` where it is `nan`, which JSON holds
+    no literal for.
+    """
+    return None if isnan(value) else value
+
+
+def swept(run: Path) -> dict[str, object]:
     """
     Reads each statistic's mean and standard error across seeds at each
     size of the sweep a run saved, for the composite and for its fixed-speed
@@ -89,43 +89,41 @@ def still_air(run: Path) -> dict[str, object]:
              that `thermur fly sweep` saves.
     """
     tree   = open_datatree(run / "sweep.nc")
-    sizes  = sorted(int(node.attrs["drones"]) for node in tree.children.values())
     tables = {
         flight: {
-            size: (
-                tree[str(size) if flight == "flocking" else f"{size}/{CONTROL}"]
-                .to_dataset()
-                .astype("float64")
+            size: table.astype("float64")
+            for size, table in (
+                Sweep.sized(tree, None if flight == "flocking" else flight)
+                     .items()
             )
-            for size in sizes
         }
         for flight in ("flocking", CONTROL)
     }
+    sizes    = list(tables["flocking"])
     flocking = tables["flocking"]
     speeds   = [
         (size, float(value))
         for size, table in flocking.items()
         for value in table["group_speed_m_s"].values
     ]
-    slopes = Sweep.slopes(tree).round(DIGITS)
     ranked = spearmanr(*zip(*speeds, strict=True))
     return {
-        "norms"         : Norms.shipped().model_dump(mode="json"),
-        "runs"          : {
+        "norms"  : Norms.shipped().model_dump(mode="json"),
+        "runs"   : {
             str(size): {
-                name: round(float(tree[str(size)].attrs[name]), DIGITS)
-                for name in ("autocorrelation_s", "duration_s", "rearrangement_s")
+                name: round(float(value), DIGITS)
+                for name, value in table.attrs.items()
+                if name != "drones"
             }
-            for size in sizes
+            for size, table in flocking.items()
         },
-        "sizes"         : sizes,
-        "slopes"        : {
-            str(name): {
-                "error" : float(slopes.error.sel(statistic=name)),
-                "slope" : float(slopes.slope.sel(statistic=name))
-            }
-            for name in slopes.statistic.values
-        },
+        "sizes"  : sizes,
+        "slopes" : (
+            Sweep.slopes(tree)
+                 .round(DIGITS)
+                 .to_dataframe()
+                 .to_dict("index")
+        ),
         "speed_by_size" : {
             "p"   : round(float(ranked.pvalue), DIGITS),
             "rho" : round(float(ranked.statistic), DIGITS)
@@ -134,7 +132,7 @@ def still_air(run: Path) -> dict[str, object]:
             str(name): {
                 flight: [
                     {"size": size} | {
-                        key: kept(float(value))
+                        key: nullable(float(value))
                         for key, value in (
                             summarized(table[size][name])
                             .round(DIGITS)

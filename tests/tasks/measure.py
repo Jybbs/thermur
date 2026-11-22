@@ -30,9 +30,9 @@ def test_the_task_writes_what_the_run_named_saved_and_prints_where(
     tmp_path    : Path
 ):
     """
-    Asserts that the task writes what `measured` and `still_air` read from
-    the run its first argument names into each chart file, creating its
-    folder, for each table the run saved, and prints each file's path.
+    Asserts that the task writes what `measured` and `swept` read from the
+    run its first argument names into each chart file, creating its folder,
+    for each table the run saved, and prints each file's path.
     """
     run = tmp_path / "runs" / "one"
     run.mkdir(parents=True)
@@ -41,7 +41,7 @@ def test_the_task_writes_what_the_run_named_saved_and_prints_where(
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.argv", ["measure", "runs/one"])
     monkeypatch.setattr(measured, "measured", lambda run: {"trials": str(run)})
-    monkeypatch.setattr(measured, "still_air", lambda run: {"sweep": str(run)})
+    monkeypatch.setattr(measured, "swept", lambda run: {"sweep": str(run)})
 
     load_task(".mise/tasks/docs/measure.py").main()
 

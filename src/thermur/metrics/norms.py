@@ -32,43 +32,43 @@ class Norm(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
 
     doi: str
     """
-    Whether the source states only that the statistic exceeds `figure`.
+    The DOI of the study the measurement comes from.
     """
 
     figure: float
     """
-    The DOI of the study the measurement comes from.
+    The measured value, or the middle of a measured range.
     """
 
     system: Literal["drones", "starlings"]
     """
-    The measured value, or the middle of a measured range.
+    The kind of flock measured.
     """
 
     unit: str
+    """
+    The unit of `figure` and `spread`, empty for a dimensionless one.
+    """
+
+    above: bool = False
+    """
+    Whether the source states only that the statistic exceeds `figure`.
+    """
+
+    flocks: Count | None = None
     """
     The number of flocks the measurement spans, or `None` where the source
     states none.
     """
 
-    above: bool = False
+    kind: Spread | None = None
     """
     What `spread` measures, or `None` for a figure stated with no spread.
     """
 
-    flocks: Count | None = None
-    """
-    The spread about `figure` that `kind` names, or `None` for none.
-    """
-
-    kind: Spread | None = None
-    """
-    The kind of flock measured.
-    """
-
     spread: Positive | None = None
     """
-    The unit of `figure` and `spread`, empty for a dimensionless one.
+    The spread about `figure` that `kind` names, or `None` for none.
     """
 
     @property

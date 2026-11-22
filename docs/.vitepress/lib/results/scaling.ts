@@ -4,7 +4,7 @@ import { type Identity, type Scheme, fontStack, seriesOf, shadeOf } from '../ide
 import source                                                     from '../rendered/identity.json' with { type: 'json' }
 
 /**
- * One size's statistic as a figure reads it: the mean across seeds beside its
+ * One size's statistic as a figure reads it, meaning the mean across seeds beside its
  * standard error, both `null` where no seed measured it.
  */
 interface Point {
@@ -14,7 +14,7 @@ interface Point {
 }
 
 /**
- * A norm as a figure draws it: its figure, the spread about it, and whether
+ * A norm as a figure draws it, meaning its figure, the spread about it, and whether
  * the source states only that the statistic exceeds the figure.
  */
 interface Norm {
@@ -24,7 +24,7 @@ interface Norm {
 }
 
 /**
- * One figure: the statistic of the composite's flights and of its fixed-speed
+ * One figure, holding the statistic of the composite's flights and of its fixed-speed
  * control by size, the norm it is set beside where one is declared, its title,
  * and the label of its vertical axis.
  */
@@ -58,6 +58,12 @@ const WORDS: Readonly<Record<string, Pick<Scaling, 'label' | 'title'>>> = {
   speed_correlation_ratio : { label: 'Correlation Length over Extent', title: 'Speed Correlation Length by Flock Size' },
   wave_speed_m_s          : { label: 'Turning Wave Speed (m/s)', title: 'Turning Wave Speed by Flock Size' }
 }
+
+/**
+ * Writes a coordinate to one decimal place, the precision a figure's SVG
+ * keeps.
+ */
+const at = (value: number) => value.toFixed(1)
 
 /**
  * Lays out between four and ten ticks across `low` to `high` at a step of one,
@@ -94,16 +100,18 @@ export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = sou
   const faces  = identity.faces
   const series = kept.map((points, place) => {
     const color = seriesOf(place + 1, scheme, identity)
-    const line  = points.map(point => `${x(point.size).toFixed(1)},${y(point.mean!).toFixed(1)}`).join(' ')
+    const line  = points.map(point => `${at(x(point.size))},${at(y(point.mean!))}`).join(' ')
     const bars  = points.map(({ error, mean, size }) =>
-      `<line x1="${x(size).toFixed(1)}" x2="${x(size).toFixed(1)}" y1="${y(mean! - (error ?? 0)).toFixed(1)}" y2="${y(mean! + (error ?? 0)).toFixed(1)}" stroke="${color}" stroke-width="2"/>`
-      + `<circle cx="${x(size).toFixed(1)}" cy="${y(mean!).toFixed(1)}" r="4" fill="${color}"/>`)
+      `<line x1="${at(x(size))}" x2="${at(x(size))}" y1="${at(y(mean! - (error ?? 0)))}" y2="${at(y(mean! + (error ?? 0)))}" stroke="${color}" stroke-width="2"/>`
+      + `<circle cx="${at(x(size))}" cy="${at(y(mean!))}" r="4" fill="${color}"/>`)
     return `<polyline points="${line}" fill="none" stroke="${color}" stroke-width="2"${place ? ' stroke-dasharray="6 4"' : ''}/>${bars.join('')}`
   })
+  const across = (value: number, attributes: string) =>
+    `<line x1="${left}" x2="${width - right}" y1="${at(y(value))}" y2="${at(y(value))}" stroke="${ink}" ${attributes}/>`
   const band = norm === undefined ? ''
     : norm.spread === null
-      ? `<line x1="${left}" x2="${width - right}" y1="${y(norm.figure).toFixed(1)}" y2="${y(norm.figure).toFixed(1)}" stroke="${ink}" stroke-opacity="0.5" stroke-dasharray="2 4"/>`
-      : `<rect x="${left}" y="${y(bounds[1]!).toFixed(1)}" width="${width - left - right}" height="${(y(bounds[0]!) - y(bounds[1]!)).toFixed(1)}" fill="${ink}" fill-opacity="0.1"/>`
+      ? across(norm.figure, 'stroke-opacity="0.5" stroke-dasharray="2 4"')
+      : `<rect x="${left}" y="${at(y(bounds[1]!))}" width="${width - left - right}" height="${at(y(bounds[0]!) - y(bounds[1]!))}" fill="${ink}" fill-opacity="0.1"/>`
   const tick = (attributes: string, words: string) =>
     `<text ${attributes} fill="${ink}" font-family="${fontStack(faces.mono)}" font-size="12">${words}</text>`
   return [
@@ -112,9 +120,9 @@ export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = sou
     `<text x="${left}" y="28" fill="${ink}" font-family="${fontStack(faces.display)}" font-size="20">${chart.title}</text>`,
     band,
     ...ticks(...range).map(value =>
-      `<line x1="${left}" x2="${width - right}" y1="${y(value).toFixed(1)}" y2="${y(value).toFixed(1)}" stroke="${ink}" stroke-opacity="0.12"/>`
-      + tick(`x="${left - 8}" y="${(y(value) + 4).toFixed(1)}" text-anchor="end"`, String(value))),
-    ...sizes.map(size => tick(`x="${x(size).toFixed(1)}" y="${height - bottom + 20}" text-anchor="middle"`, size.toLocaleString('en-US'))),
+      across(value, 'stroke-opacity="0.12"')
+      + tick(`x="${left - 8}" y="${at(y(value) + 4)}" text-anchor="end"`, String(value))),
+    ...sizes.map(size => tick(`x="${at(x(size))}" y="${height - bottom + 20}" text-anchor="middle"`, size.toLocaleString('en-US'))),
     `<text x="${(left + width - right) / 2}" y="${height - 12}" fill="${ink}" font-family="${fontStack(faces.body)}" font-size="14" text-anchor="middle">Flock Size (drones, logarithmic)</text>`,
     `<text transform="translate(18 ${(top + height - bottom) / 2}) rotate(-90)" fill="${ink}" font-family="${fontStack(faces.body)}" font-size="14" text-anchor="middle">${chart.label}</text>`,
     ...series,

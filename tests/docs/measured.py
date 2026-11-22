@@ -1,14 +1,14 @@
 """
 Pins `measured`, meaning the summary by rule and condition it reads out of
-the trial tables a run saved, and `still_air`, the summary by statistic,
-flight, and size it reads out of the sweep a run saved.
+the trial tables a run saved, and `swept`, the summary by statistic, flight,
+and size it reads out of the sweep a run saved.
 """
 
 from numpy   import array, nan
 from pathlib import Path
 from xarray  import DataTree, Dataset
 
-from thermur.docs.measured  import measured, still_air
+from thermur.docs.measured  import measured, swept
 from thermur.metrics.sweep  import CONTROL
 from thermur.metrics.trials import REFERENCE
 
@@ -39,22 +39,22 @@ def test_the_sweep_reads_each_statistic_by_flight_and_size(tmp_path: Path):
         }
     ).to_netcdf(tmp_path / "sweep.nc")
 
-    swept = still_air(tmp_path)
+    summary = swept(tmp_path)
 
-    assert swept["sizes"] == [10, 100]
-    assert swept["runs"]["100"] == {
+    assert summary["sizes"] == [10, 100]
+    assert summary["runs"]["100"] == {
         "autocorrelation_s" : 2.0,
         "duration_s"        : 30.0,
         "rearrangement_s"   : 3.0
     }
-    assert swept["statistics"]["group_speed_m_s"]["flocking"][1] == {
+    assert summary["statistics"]["group_speed_m_s"]["flocking"][1] == {
         "error" : 0.3536,
         "mean"  : 100.5,
         "size"  : 100
     }
-    assert swept["statistics"]["wave_speed_m_s"][CONTROL][0]["mean"] is None
-    assert set(swept["slopes"]) == {"group_speed_m_s"}
-    assert swept["speed_by_size"]["rho"] == 0.8944
+    assert summary["statistics"]["wave_speed_m_s"][CONTROL][0]["mean"] is None
+    assert set(summary["slopes"]) == {"group_speed_m_s"}
+    assert summary["speed_by_size"]["rho"] == 0.8944
 
 
 def test_the_trials_read_by_slot_rule_and_condition(tmp_path: Path):

@@ -40,7 +40,7 @@ class Sweep(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
     pilot_s: Positive = 120.0
     """
     The length of the pilot flight each size's relaxation times are read
-    from, in seconds.
+    from, and the shortest run past the settling a size flies, in seconds.
     """
 
     pilot_seeds: Count = 2
@@ -91,7 +91,10 @@ class Sweep(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             }
             run = sized.changed(
                 duration_s = sized.settled_s
-                + min(self.spans * max(times.values()), self.longest_s)
+                + min(
+                    max(self.spans * max(times.values()), self.pilot_s),
+                    self.longest_s
+                )
             )
             nodes[str(size)] = Flight.flown(
                 air,
@@ -107,6 +110,23 @@ class Sweep(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         return DataTree.from_dict(nodes)
 
     @staticmethod
+    def sized(tree: DataTree, flight: str | None = None) -> dict[int, Dataset]:
+        """
+        Reads each size's statistics out of a tree `flown` returns, by size
+        in ascending order, the composite's by default, or the child's that
+        `flight` names under each size, keeping each size's attributes.
+        """
+        return dict(
+            sorted(
+                (
+                    int(node.attrs["drones"]),
+                    (node[flight] if flight else node).to_dataset()
+                )
+                for node in tree.children.values()
+            )
+        )
+
+    @staticmethod
     def slopes(tree: DataTree) -> Dataset:
         """
         Fits each statistic of the composite's flights against the size
@@ -118,10 +138,7 @@ class Sweep(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
             statistic positive wherever it is measured and measured at two
             sizes or more.
         """
-        tables = {
-            int(node.attrs["drones"]): node.to_dataset()
-            for node in tree.children.values()
-        }
+        tables = Sweep.sized(tree)
         points = {
             name: [
                 (size, value)

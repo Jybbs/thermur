@@ -1,6 +1,6 @@
 # The Flock in Still Air
 
-*Thermur* claims a murmuration, so this page flies its flock through air with neither fire nor wind at six sizes from 10 to 3,000 drones and sets each statistic beside what was measured on starling flocks and on an outdoor flock of drones. Every statistic is computed on the flights the pipeline flies, and every norm is declared once in `thermur.metrics` and read from there.
+*Thermur* sets out to fly a murmuration, so this page flies its flock through air with neither fire nor wind at six sizes from 10 to 3,000 drones and sets each statistic beside what was measured on starling flocks and on an outdoor flock of drones. Every statistic is computed on the flights the pipeline flies, and every norm is declared once in `thermur.metrics` and read from there.
 
 ## The Norms
 
@@ -25,14 +25,14 @@ The table is written from `norms.toml`, and `mise render` rewrites it.
 
 ## The Sweep
 
-`Sweep` flies each size with its seeds batched together, first over a short pilot flight and then over a run whose length the pilot sets. A run spans ten of the slower of two relaxation times past its first 20 s, the heading's autocorrelation time and the time over which each drone's seven neighbors rearrange, the alignment and network relaxation times a starling flock shows[^mora2016]. Each time is the integral of its autocorrelation up to the curve's first zero, the estimator that holds the noise past that zero out of the sum. Every size then flies again with each drone held at its cruise speed, which leaves no speed to fluctuate, so its speed correlation is the negative control a measured correlation is read against[^cavagna2010]. The table is written from `Sweep`, and `mise render` rewrites it.
+`Sweep` flies each size with its seeds batched together, first over a short pilot flight and then over a run whose length the pilot sets. A run spans ten of the slower of two relaxation times past its first 20 s, the heading's autocorrelation time and the time over which each drone's seven neighbors rearrange, the alignment and network relaxation times a starling flock shows[^mora2016]. Each time is the integral of its autocorrelation up to the curve's first zero, which leaves the noise past that zero out of the sum. Every size then flies again with each drone held at its cruise speed, which leaves no speed to fluctuate, so its speed correlation is the negative control a measured correlation is read against[^cavagna2010]. The table is written from `Sweep`, and `mise render` rewrites it.
 
 <!-- sweep -->
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
 | `longest_s` | `600.0` | above 0 | The longest run past the settling a size flies, in seconds, which holds the sweep's wall time and the frames a size keeps in memory bounded |
-| `pilot_s` | `120.0` | above 0 | The length of the pilot flight each size's relaxation times are read from, in seconds |
+| `pilot_s` | `120.0` | above 0 | The length of the pilot flight each size's relaxation times are read from, and the shortest run past the settling a size flies, in seconds |
 | `pilot_seeds` | `2` | at least 1 | The launches each size's pilot flight flies |
 | `seeds` | `10` | at least 1 | The launches each size flies together under `vmap` |
 | `sizes` | `[10, 30, 100, 300, 1000, 3000]` |  | The flock sizes, about evenly spaced on a logarithmic axis |
@@ -40,9 +40,9 @@ The table is written from `norms.toml`, and `mise render` rewrites it.
 
 <!-- /sweep -->
 
-Each statistic is measured on the drones' velocities through the air, which still air leaves equal to their velocities over the ground. The speed correlation sums the products of each pair's fluctuations within each of 32 bins across the flock's extent through a weighted `KDTree.count_neighbors`, divides by the pairs in each bin and by the variance of the fluctuations, and reads the zero between the two bins about it, averaged over frames a second apart. The shape reads the axes of the flock's gyration tensor, a stand-in for the axes the source measures from the border of each flock[^ballerini2008b]. The border is that of an α-shape over the flock's `Delaunay` triangulation, keeping each tetrahedron whose circumscribed sphere is narrower than three launch spacings, 45 m, the hop under which two drones fly in one group, and the density at each drone is the cube of its nearest-neighbor distance inverted. The source names no α, so the border, and with it the density ratio, moves with that choice.
+Each statistic is measured on the drones' velocities through the air, which still air leaves equal to their velocities over the ground. The speed correlation sums the products of each pair's fluctuations within each of 32 bins across the flock's extent through a weighted `KDTree.count_neighbors`, divides by the pairs in each bin and by the variance of the fluctuations, and reads the zero between the two bins about it, averaged over frames a second apart. The shape reads the axes of the flock's gyration tensor, a stand-in for the axes the source measures from the border of each flock[^ballerini2008b]. The border is that of an α-shape over the flock's `Delaunay` triangulation, keeping each tetrahedron whose circumscribed sphere is narrower than three launch spacings, 45 m, the hop under which two drones fly in one group, and the density at each drone is the inverse cube of its nearest-neighbor distance. The source names no α, so the border, and with it the density ratio, moves with that choice.
 
-The turning wave follows the source's method[^attanasi2014]. Within the frames where the flock's mean heading turns fastest, each pair's delay is the lag maximizing the normalized cross-correlation of their radial accelerations, each drone ranks by how many drones it leads less how many lead it, and its turning time is the mean, over each drone ranked ahead, of that drone's time plus the pair's delay. The distance the turn has crossed is the cube root of the drones turned over the flock's density inside its α-shape, and its speed is the slope of that distance against the turning time over the first half of the ranks. The radio's connectivity is the share of the flock in the largest group two drones within the radio's 50 m range join.
+The turning wave follows the source's method[^attanasi2014]. Within the frames where the flock's mean heading turns fastest, each pair's delay is the lag maximizing the normalized cross-correlation of their radial accelerations, each drone ranks by how many drones it leads less how many lead it, and its turning time is the mean, over each drone ranked ahead, of that drone's time plus the pair's delay. The distance the turn has crossed is the cube root of the drones turned over the flock's density inside its α-shape, and its speed is the slope of that distance against the turning time over the first half of the ranks. The radio's connectivity is the share of the flock in its largest group, two drones joined wherever they fly within the radio's 50 m range.
 
 [^cavagna2010]: Cavagna et al. 2010. "Scale-free correlations in starling flocks." *Proceedings of the National Academy of Sciences* 107(26): 11865–11870. <https://doi.org/10.1073/pnas.1005766107>
 

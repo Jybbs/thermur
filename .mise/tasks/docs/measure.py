@@ -14,7 +14,7 @@ from json    import dumps
 from pathlib import Path
 from sys     import argv
 
-from thermur.docs.measured import MEASURED, STILL_AIR, measured, still_air
+from thermur.docs.measured import MEASURED, STILL_AIR, measured, swept
 
 
 def main():
@@ -26,7 +26,7 @@ def main():
     run = Path(argv[1])
     for path, read, table in (
         (MEASURED, measured, "coupling_trial.nc"),
-        (STILL_AIR, still_air, "sweep.nc")
+        (STILL_AIR, swept, "sweep.nc")
     ):
         if (run / table).exists():
             path.parent.mkdir(exist_ok=True, parents=True)

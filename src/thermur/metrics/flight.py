@@ -1,7 +1,7 @@
 """
 Holds `Flight`, a `lax.scan` over diffrax's `Euler().step` flying one
 flock per seed, beside each statistic its frames give, which the `flight`,
-`frames`, and `statistics` steps and `thermur fly` read.
+`frames`, `statistics`, and `sweep` steps and `thermur fly` read.
 """
 
 from collections.abc import Callable
@@ -201,7 +201,7 @@ class Flight(Module):
         """
         return asarray(
             [
-                bincount(self.grouped(cloud, self.composite.radio.range_m)).max()
+                bincount(grouped(cloud, self.composite.radio.range_m)).max()
                 / len(cloud)
                 for cloud in asarray(self.frames.positions)[:, -1]
             ]
@@ -260,7 +260,7 @@ class Flight(Module):
         per seed.
         """
         return [
-            self.grouped(cloud, self.reach_m)
+            grouped(cloud, self.reach_m)
             for cloud in asarray(self.frames.positions)[:, -1]
         ]
 
@@ -348,9 +348,9 @@ class Flight(Module):
         leaves and up to its first zero, the time over which the neighbors a
         drone reads rearrange, in seconds.
         """
-        count = self.plan.neighbors
-        floor = count / (self.plan.drones - 1)
-        kept  = asarray(
+        count  = self.plan.neighbors
+        floor  = count / (self.plan.drones - 1)
+        stayed = asarray(
             [
                 (
                     found[..., newaxis] == found[0, :, newaxis, :]
@@ -361,7 +361,7 @@ class Flight(Module):
         return asarray(
             [
                 integrated(curve, self.plan.frame_s)
-                for curve in (kept - floor) / (1 - floor)
+                for curve in (stayed - floor) / (1 - floor)
             ]
         )
 
@@ -688,21 +688,11 @@ class Flight(Module):
             unturned  = tree.map(lambda leaf: leaf[1], lanes) if plan.turn_deg else None
         )
 
-    def grouped(self, cloud: ndarray, hop_m: float) -> ndarray:
-        """
-        Labels the group each drone of `cloud` flies in, two drones sharing
-        a group where a chain of hops under `hop_m` joins them.
-        """
-        return connected_components(
-            (tree := KDTree(cloud)).sparse_distance_matrix(tree, hop_m),
-            directed = False
-        )[1]
-
     def largest(self, frame: int, seed: int) -> Flock:
         """
         Keeps the largest group one seed's frame splits into.
         """
-        labels = self.grouped(asarray(self.frames.positions)[seed, frame], self.reach_m)
+        labels = grouped(asarray(self.frames.positions)[seed, frame], self.reach_m)
         return tree.map(
             lambda frames: frames[seed, frame, labels == bincount(labels).argmax()],
             self.frames
@@ -762,21 +752,20 @@ def alpha_shape(cloud: ndarray, reach_m: float) -> tuple[ndarray, float]:
     edges     = corners[:, 1:] - corners[:, :1]
     volumes   = abs(linalg.det(edges)) / 6
     solid     = volumes > 0
+    squared   = (corners[solid] ** 2).sum(-1)
     centers   = linalg.solve(
         2 * edges[solid],
-        ((corners[solid, 1:] ** 2).sum(-1) - (corners[solid, :1] ** 2).sum(
-            -1
-        ))[..., newaxis]
+        (squared[:, 1:] - squared[:, :1])[..., newaxis]
     )[..., 0]
     radii        = full(len(simplices), inf)
     radii[solid] = linalg.norm(centers - corners[solid, 0], axis=-1)
+    held         = radii < reach_m
     faces        = sort(
-        simplices[radii < reach_m][:, list(combinations(range(4), 3))].reshape(-1, 3),
+        simplices[held][:, list(combinations(range(4), 3))].reshape(-1, 3),
         axis = 1
     )
     found, counts = unique(faces, axis=0, return_counts=True)
-    border        = isin(arange(len(cloud)), found[counts == 1])
-    return border, float(volumes[radii < reach_m].sum())
+    return isin(arange(len(cloud)), found[counts == 1]), float(volumes[held].sum())
 
 
 def correlated(
@@ -916,6 +905,17 @@ def first_zero(curve: ndarray) -> int:
     """
     crossed = flatnonzero(curve <= 0)
     return crossed[0] if crossed.size else curve.size
+
+
+def grouped(cloud: ndarray, hop_m: float) -> ndarray:
+    """
+    Labels the group each drone of `cloud` flies in, two drones sharing a
+    group where a chain of hops under `hop_m` joins them.
+    """
+    return connected_components(
+        (tree := KDTree(cloud)).sparse_distance_matrix(tree, hop_m),
+        directed = False
+    )[1]
 
 
 def integrated(curve: ndarray, step: float) -> float:
