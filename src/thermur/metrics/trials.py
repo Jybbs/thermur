@@ -69,8 +69,8 @@ class Measure(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
 
     condition: str | None = None
     """
-    The condition the statistic reads, or `None` for its spread across every
-    condition, which `goal` then reads as a flatness.
+    The condition the statistic reads, or `None` for its spread about `level`
+    across every condition, which `goal` then reads as a flatness.
     """
 
     goal: float = 0.0
@@ -79,16 +79,31 @@ class Measure(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     infinity where a larger or a smaller value is favored.
     """
 
+    level: float | None = None
+    """
+    The value a flatness reads its spread about, as the root-mean-square
+    departure from it across every condition, or `None` for the statistic's
+    own mean, its standard deviation. About `POLARIZATION`, the departure
+    grows with the polarization's distance from a starling flock's order at
+    each condition as well as with its spread, after Ginelli and Chaté's
+    comparison of order across densities within the ordered phase
+    (https://doi.org/10.1103/PhysRevLett.105.168103).
+    """
+
     def score(self, table: Dataset) -> DataArray:
         """
         Reads the measurement from a trial's `table` so a larger value is
         favored, by candidate and seed.
         """
         values = table[self.statistic]
-        picked = (
-            values.std("condition") if self.condition is None
-            else values.sel(condition=self.condition, drop=True)
-        )
+        if self.condition is None:
+            picked = (
+                values.std("condition") if self.level is None
+                else sqrt(((values - self.level) ** 2).mean("condition"))
+            )
+        else:
+            picked = values.sel(condition=self.condition, drop=True)
+
         means = picked.mean(
             [dim for dim in picked.dims if dim not in ("candidate", "seed")]
         )
@@ -279,7 +294,7 @@ class Trial(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
                     "sparse" : {"spacing_m": 25.0}
                 },
                 measures = (
-                    Measure(statistic="polarization"),
+                    Measure(level=POLARIZATION, statistic="polarization"),
                     Measure(statistic="alignment_by_rank")
                 ),
                 slot = "coupling"

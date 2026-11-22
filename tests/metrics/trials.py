@@ -6,8 +6,9 @@ table a flown trial returns, and the mean and standard error across seeds.
 
 from common.drones import short, still_air
 from dataclasses   import fields
-from math          import inf
+from math          import inf, sqrt
 from numpy         import array
+from numpy.testing import assert_allclose
 from pytest        import MonkeyPatch, mark, param, raises
 from types         import SimpleNamespace
 from xarray        import Dataset, concat
@@ -17,7 +18,7 @@ from thermur.controller.schemas    import Composite
 from thermur.environment.air       import Air
 from thermur.metrics.flight        import Flight
 from thermur.metrics.schemas       import Plan
-from thermur.metrics.trials        import Measure, REFERENCE, SIZES, Trial, summarized
+from thermur.metrics.trials        import Measure, POLARIZATION, REFERENCE, SIZES, Trial, summarized
 from thermur.pipeline.settings     import Settings
 
 TABLE = Dataset(
@@ -50,9 +51,24 @@ TABLE = Dataset(
             id = "nearest"
         ),
         param(
+            Measure(
+                condition = "sparse",
+                goal      = 2.0,
+                level     = 9.0,
+                statistic = "spacing_m"
+            ),
+            [[-1.0, -1.0], [-2.0, -2.0]],
+            id = "level-unread-by-a-condition"
+        ),
+        param(
             Measure(statistic="spacing_m"),
             [[-1.5, -2.5], [-1.0, -1.0]],
             id = "flattest"
+        ),
+        param(
+            Measure(level=2.0, statistic="spacing_m"),
+            [[-sqrt(2.5), -sqrt(8.5)], [-sqrt(2.0), -sqrt(2.0)]],
+            id = "flattest-about-level"
         )
     ]
 )
@@ -62,10 +78,22 @@ def test_a_measure_scores_each_candidate_and_seed_so_larger_is_favored(
 ):
     """
     Asserts that a measure reads its condition, or the spread across every
-    condition, and scores it so a larger score is favored, toward infinity,
-    away from it, or nearest its goal.
+    condition about its mean or its level, and scores it so a larger score
+    is favored, toward infinity, away from it, or nearest its goal.
     """
-    assert measure.score(TABLE).values.tolist() == expected
+    assert_allclose(measure.score(TABLE), expected)
+
+
+def measure_of(slot: str, statistic: str) -> Measure:
+    """
+    Reads the measure of `statistic` the listed trial of `slot` holds.
+    """
+    (measure,) = (
+        each
+        for held in Trial.listed() if held.slot == slot
+        for each in held.measures if each.statistic == statistic
+    )
+    return measure
 
 
 def test_a_flown_trial_tables_every_flight_beside_its_ranks():
@@ -88,21 +116,6 @@ def test_a_flown_trial_tables_every_flight_beside_its_ranks():
     assert list(flown.model.values) == [REFERENCE, "elastic"]
     assert flown.log_likelihood.dims == ("candidate", "model")
     assert not flown.favored.sel(candidate=REFERENCE)
-
-
-def test_a_summary_reads_the_mean_across_seeds_beside_its_standard_error():
-    """
-    Asserts that the summary keeps every dimension but the seed, the mean of
-    each pair of seeds beside half their population spread over the root of
-    the count.
-    """
-    summary = summarized(TABLE["spacing_m"])
-
-    assert summary["mean"].values.tolist() == [[5.0, 1.0], [2.0, 2.0]]
-    assert summary["error"].values.tolist() == [
-        [1 / 2**0.5, 0.0],
-        [0.0, 2 / 2**0.5]
-    ]
 
 
 @mark.parametrize(
@@ -203,6 +216,21 @@ def test_a_trial_flies_its_own_flock_size_unless_its_condition_sets_one(
     assert sizes == [drones, 9]
 
 
+def test_a_summary_reads_the_mean_across_seeds_beside_its_standard_error():
+    """
+    Asserts that the summary keeps every dimension but the seed, the mean of
+    each pair of seeds beside half their population spread over the root of
+    the count.
+    """
+    summary = summarized(TABLE["spacing_m"])
+
+    assert summary["mean"].values.tolist() == [[5.0, 1.0], [2.0, 2.0]]
+    assert summary["error"].values.tolist() == [
+        [1 / 2**0.5, 0.0],
+        [0.0, 2 / 2**0.5]
+    ]
+
+
 def test_a_trial_flies_the_reference_then_each_candidate_then_each_control():
     """
     Asserts that a trial lays out the reference first, each candidate in the
@@ -281,17 +309,51 @@ def test_every_listed_trial_flies_the_sizes_its_tables_were_measured_at():
     } <= {size["drones"] for size in SIZES.values()}
 
 
+def test_the_coupling_trial_favors_a_flat_polarization_only_near_a_starling_flock():
+    """
+    Asserts that the coupling trial scores a flock holding a disordered
+    polarization of 0.15 at every spacing, and one holding 0.999, below one
+    holding a polarization near `POLARIZATION` that changes modestly across
+    the spacings, and that one holding `POLARIZATION` everywhere scores
+    zero.
+    """
+    table = Dataset(
+        {
+            "polarization": (
+                ("candidate", "condition", "seed"),
+                array(
+                    [
+                        [[0.15], [0.15], [0.15]],
+                        [[POLARIZATION + 0.02], [POLARIZATION], [POLARIZATION - 0.03]],
+                        [[0.999], [0.999], [0.999]],
+                        [[POLARIZATION], [POLARIZATION], [POLARIZATION]]
+                    ]
+                )
+            )
+        },
+        coords = {
+            "candidate" : ["disordered", "ordered", "saturated", "starling"],
+            "condition" : ["dense", "middle", "sparse"]
+        }
+    )
+    disordered, ordered, saturated, starling = (
+        measure_of("coupling", "polarization")
+        .score(table)
+        .values.ravel()
+    )
+
+    assert disordered < ordered
+    assert saturated < ordered < starling == 0
+
+
 def test_the_heading_trial_favors_a_spontaneous_spectral_peak_nearest_zero():
     """
     Asserts that the heading trial scores a spontaneous correlation peaking
     at zero frequency, the overdamped form measured on starling flocks,
     above one peaking at a traveling wave's 0.45 Hz.
     """
-    (heading,) = (trial for trial in Trial.listed() if trial.slot == "heading")
-    (measure,) = (
-        each for each in heading.measures if each.statistic == "spectral_peak_hz"
-    )
-    table = Dataset(
+    measure = measure_of("heading", "spectral_peak_hz")
+    table   = Dataset(
         {
             "spectral_peak_hz": (
                 ("candidate", "condition", "seed"),
