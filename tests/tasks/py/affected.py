@@ -301,7 +301,7 @@ def test_the_affected_tests_are_those_opening_a_changed_file(
 ):
     """
     Asserts that `py:affected` runs only the tests that opened a changed
-    file other than Python, the test opening a copy the `Opened` hook maps
+    file other than Python, each test opening a copy the `Opened` hook maps
     back onto that file and each test requesting a session fixture that
     opened it included, and the test opening it while the hook is paused
     left out. It runs none for a file no test opened or one pytest-testmon
