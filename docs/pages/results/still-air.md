@@ -40,13 +40,13 @@ The table is written from `norms.toml`, and `mise render` rewrites it.
 
 <!-- /sweep -->
 
-Each statistic is measured on the drones' velocities through the air, which still air leaves equal to their velocities over the ground. The speed correlation sums the products of each pair's fluctuations within each of 32 bins across the flock's extent through a weighted `KDTree.count_neighbors`, divides by the pairs in each bin and by the variance of the fluctuations, and reads the zero between the two bins about it, averaged over frames a second apart. The shape reads the axes of the flock's gyration tensor, a stand-in for the axes the source measures from the border of each flock[^ballerini2008b]. The border is that of an α-shape over the flock's `Delaunay` triangulation, keeping each tetrahedron whose circumscribed sphere is narrower than three launch spacings, 45 m, the hop under which two drones fly in one group, and the density at each drone is the inverse cube of its nearest-neighbor distance. The source names no α, so the border, and with it the density ratio, moves with that choice.
+Each statistic is measured on the drones' velocities through the air, which still air leaves equal to their velocities over the ground. The speed correlation sums the products of each pair's fluctuations within each of 32 bins across the flock's extent through a weighted `KDTree.count_neighbors`, divides by the pairs in each bin and by the variance of the fluctuations, and reads the zero between the two bins about it, averaged over frames a second apart. The shape reads the axes of the flock's gyration tensor, a stand-in for the axes the source measures from the border of each flock[^ballerini2008b]. The border is that of an α-shape over the flock's `Delaunay` triangulation, keeping each tetrahedron whose circumscribed sphere is narrower than three launch spacings, 45 m, the hop under which two drones fly in one group, and the density at each drone is the inverse cube of its nearest-neighbor distance, the inside counting only drones a kept tetrahedron reaches. The source names no α, so the border, and with it the density ratio, moves with that choice.
 
 The turning wave follows the source's method[^attanasi2014]. Within the frames where the flock's mean heading turns fastest, each pair's delay is the lag maximizing the normalized cross-correlation of their radial accelerations, each drone ranks by how many drones it leads less how many lead it, and its turning time is the mean, over each drone ranked ahead, of that drone's time plus the pair's delay. The distance the turn has crossed is the cube root of the drones turned over the flock's density inside its α-shape, and its speed is the slope of that distance against the turning time over the first half of the ranks. The radio's connectivity is the share of the flock in its largest group, two drones joined wherever they fly within the radio's 50 m range.
 
 ## The Run
 
-The figures and the table below come from one run of `thermur fly sweep` under the default composite and plan at sizes of 10, 30, 100, 300, 1,000, and 3,000 drones, ten seeds each, beside the same seeds held at the cruise speed, a full sweep with no size or seed left out. Each size flew a pilot of 120 s over two seeds, and then a run of 410 to 620 s, the first 20 s of it settling, which spans ten of the slower relaxation time at every size but 10 drones, whose 79 s rearrangement time the 600 s cap cut to under eight. The sweep took 2 h 27 min on one machine. `mise measure` writes each mean and its standard error across the ten seeds out of that run.
+The figures and the table below come from one run of `thermur fly sweep` under the default composite and plan at sizes of 10, 30, 100, 300, 1,000, and 3,000 drones, ten seeds each, beside the same seeds held at the cruise speed, a full sweep with no size or seed left out. Each size flew a pilot of 120 s over two seeds, and then a run of 410 to 620 s, the first 20 s of it settling, which spans ten of the slower relaxation time the pilot read at every size but 10 drones, whose 79 s rearrangement time the 600 s cap cut to under eight. Each run reads longer times than its pilot, a rearrangement time of 184 s at 10 drones and an autocorrelation time of 54 s at 3,000, so by its own reading a run spans 3.3 to 7.7 of the slower time, and a time near the length of the pilot's 100 s of settled frames is read from too few of them to pin. The sweep took 2 h 11 min on one machine. `mise measure` writes each mean and its standard error across the ten seeds out of that run.
 
 Each statistic over its norm, by flock size, sets the flock beside the starlings in one unit, so 1.00 is the norm's own figure and the density ratio, whose norm is any value above 1, stands as measured.
 
@@ -56,13 +56,13 @@ Each statistic over its norm, by flock size, sets the flock beside the starlings
 | `speed_correlation_ratio` | 0.72 | 0.41 | 0.30 | 0.34 | 0.36 | 0.42 |
 | `aspect_ratio` | 7.95 | 5.14 | 5.99 | 5.70 | 4.88 | 4.21 |
 | `middle_aspect_ratio` | 2.30 | 3.01 | 2.69 | 2.84 | 2.60 | 2.72 |
-| `wave_speed_m_s` | 0.11 | 0.18 | 0.46 | 1.11 | 1.80 | 2.63 |
+| `wave_speed_m_s` | 0.12 | 0.20 | 0.47 | 1.12 | 1.81 | 2.64 |
 | `spacing_m` | 4.72 | 1.96 | 1.25 | 0.81 | 0.51 | 0.39 |
-| `border_density` | 778,948 | 117 | 1.19 | 1.13 | 0.23 | 0.17 |
+| `border_density` | 1.06 | 3.87 | 0.92 | 1.07 | 0.23 | 0.17 |
 
 ## What the Flock Does
 
-`mise measure` and the site suite's snapshot cases redraw each figure below from the run, the flock in a solid line, its fixed-speed control dashed, each bar a standard error across seeds, and the norm a gray band across its spread or a dotted line where it states none.
+`mise measure` and the site suite's snapshot cases redraw each figure below from the run, the flock in a solid line, its fixed-speed control dashed, each bar a standard error across seeds, and the norm a gray band across its spread or a dotted line where it states none, a statistic spanning more than a decade on a logarithmic vertical axis.
 
 ![Polarization by flock size](../figures/polarization_by_size.svg)
 
@@ -72,7 +72,7 @@ The sweep's speed correlation length is drawn from the same run.
 
 ![Speed correlation length by flock size](../figures/speed_correlation_ratio_by_size.svg)
 
-The length over which speeds correlate stays a near-constant share of the extent from 100 drones up, 0.11 to 0.15, with a slope against size on logarithmic axes of $`-0.05 \pm 0.02`$ across all six sizes, a length that grows with the flock as a scale-free correlation does, at under half the starlings' $`0.36`$. The control, whose speeds hold only numerical noise about the cruise, reads 0.03 to 0.05 up to 300 drones and climbs to 0.13 at 3,000, so at the largest size the flock's share stands only 0.02 above what the flock's shape alone gives.
+The length over which speeds correlate stays a near-constant share of the extent from 100 drones up, 0.11 to 0.15, with a slope against size on logarithmic axes of $`-0.05 \pm 0.02`$ across all six sizes, a length that grows with the flock as a scale-free correlation does, at under half the starlings' $`0.36`$. The control, whose speeds hold only numerical noise about the cruise, reads 0.03 to 0.06 up to 300 drones and climbs to 0.13 at 3,000, so at the largest size the flock's share stands only 0.02 above what the flock's shape alone gives.
 
 The group speed is drawn from the same run.
 
@@ -84,7 +84,7 @@ The turning wave is drawn from the same run.
 
 ![Turning wave speed by flock size](../figures/wave_speed_m_s_by_size.svg)
 
-The crossing speed rises from 3 m/s at 10 drones to 79 m/s at 3,000, a slope of $`0.61 \pm 0.03`$, and passes through the starlings' 20 to 40 m/s near 300 drones. The control reads the same speeds within their errors up to 1,000 drones, so this estimator here reads how the flock's extent grows against the times its drones turn rather than a turn handed from drone to drone through speed, and it says nothing yet on information transfer.
+The crossing speed rises from 4 m/s at 10 drones to 79 m/s at 3,000, a slope of $`0.60 \pm 0.03`$, and passes through the starlings' 20 to 40 m/s near 300 drones. The control reads the same speeds within their errors up to 1,000 drones and 59 m/s at 3,000, so this estimator here reads how the flock's extent grows against the times its drones turn rather than a turn handed from drone to drone through speed, and it says nothing yet on information transfer.
 
 The shape comes from the same run.
 
@@ -100,7 +100,7 @@ The spacing and the border come from the same run.
 
 ![Border density by flock size](../figures/border_density_by_size.svg)
 
-The nearest-neighbor distance falls from 99 m at 10 drones to 8 m at 3,000, inside the outdoor drone flock's 12 to 30 m at 100 and 300 drones. Below 100 drones the drones sit farther apart than the α-shape's 45 m, so its tetrahedra hold few drones and the border density runs to the thousands, a reading of the α rather than of the flock. From 100 drones up the border reads 1.19 and 1.13 times as dense as the inside at 100 and 300, as a starling flock's is, and 0.23 and 0.17 at 1,000 and 3,000, where a denser core than border reverses it.
+The nearest-neighbor distance falls from 99 m at 10 drones to 8 m at 3,000, inside the outdoor drone flock's 12 to 30 m at 100 and 300 drones. At 10 and 30 drones the drones sit 99 m and 41 m apart against the α-shape's 45 m, so its tetrahedra hold few drones and the border reads $`1.06 \pm 0.59`$ and $`3.87 \pm 1.93`$ times as dense as the inside, a reading of the α rather than of the flock. At 100 and 300 drones it reads $`0.92 \pm 0.21`$ and $`1.07 \pm 0.40`$, within a standard error of an even density rather than the denser border of a starling flock, and 0.23 and 0.17 at 1,000 and 3,000, where the core is denser than the border.
 
 The radio's connectivity comes from the same run.
 

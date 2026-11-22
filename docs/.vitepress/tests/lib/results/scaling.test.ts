@@ -32,6 +32,15 @@ describe('the ticks across a range', () => {
   })
 })
 
+describe('the ticks across a logarithmic range', () => {
+  it.for([
+    { high: 30, low: 0.15, want: [0.2, 0.5, 1, 2, 5, 10, 20] },
+    { high: 4e6, low: 0.1, want: [0.1, 1, 10, 100, 1000, 10000, 100000, 1000000] }
+  ])('lays $low to $high out by decade', ({ high, low, want }) => {
+    expect(scaling.decades(low, high)).toEqual(want)
+  })
+})
+
 describe('a figure of a statistic by flock size', () => {
   it('draws a point and a bar per measured size, leaving out a size no seed measured', () => {
     const drawn = scaling.scaling(CHART, 'light')
@@ -52,6 +61,15 @@ describe('a figure of a statistic by flock size', () => {
     const large = CHART.flocking.map(point => ({ ...point, mean: point.mean! * 4e6 }))
 
     expect(scaling.scaling({ ...CHART, fixed: large, flocking: large }, 'light')).toContain('>3M</text>')
+  })
+
+  it('draws a positive statistic spanning decades on a logarithmic axis, keeping small values apart', () => {
+    const wide  = [0.2, 1.2, 8e5].map((mean, place) => ({ error: null, mean, size: CHART.flocking[place]!.size }))
+    const drawn = scaling.scaling({ ...CHART, fixed: wide, flocking: wide }, 'light')
+    const rows  = new Set([...drawn.matchAll(/<circle[^>]* cy="([^"]+)"/gu)].map(match => match[1]))
+
+    expect(rows.size).toBe(3)
+    expect(drawn).toContain('>100K</text>')
   })
 
   it('draws a statistic holding one value throughout', () => {

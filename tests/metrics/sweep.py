@@ -69,6 +69,31 @@ def test_a_pilot_reading_no_relaxation_still_flies_the_pilot_s_length(
     assert tree["9"].attrs["duration_s"] == plan.settled_s + 3.0
 
 
+def test_a_run_spans_its_share_of_the_slower_relaxation_time(monkeypatch: MonkeyPatch):
+    """
+    Asserts that a size whose pilot reads an autocorrelation time of 1 s
+    and a rearrangement time of 5 s flies `spans` of the slower past the
+    settling.
+    """
+    plan = short()
+    monkeypatch.setattr(
+        Flight,
+        "flown",
+        lambda air, composite, run: SimpleNamespace(
+            autocorrelation_s = array([1.0]),
+            rearrangement_s   = array([5.0]),
+            still_statistics  = Dataset()
+        )
+    )
+
+    tree = Sweep(pilot_s=3.0, sizes=(9,), spans=2.0).flown(
+        Composite.from_settings(Settings(plan=plan)),
+        plan
+    )
+
+    assert tree["9"].attrs["duration_s"] == plan.settled_s + 10.0
+
+
 def test_a_statistic_growing_as_a_power_of_the_size_reads_that_power():
     """
     Asserts that a statistic growing as the square root of the size reads a

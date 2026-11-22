@@ -139,8 +139,8 @@
       "slope": 0.002
     },
     "border_density": {
-      "error": 0.2116,
-      "slope": -1.5801
+      "error": 0.0816,
+      "slope": -0.3986
     },
     "connected": {
       "error": 0.0169,
@@ -167,8 +167,8 @@
       "slope": -0.3837
     },
     "wave_speed_m_s": {
-      "error": 0.028,
-      "slope": 0.6141
+      "error": 0.0279,
+      "slope": 0.599
     }
   },
   "speed_by_size": {
@@ -444,65 +444,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 479055.9491,
-          "mean": 778947.9105
+          "error": 0.5921,
+          "mean": 1.059
         },
         {
           "size": 30,
-          "error": 97.3549,
-          "mean": 116.6522
+          "error": 1.9264,
+          "mean": 3.8736
         },
         {
           "size": 100,
-          "error": 0.2511,
-          "mean": 1.1916
+          "error": 0.2067,
+          "mean": 0.9178
         },
         {
           "size": 300,
-          "error": 0.4166,
-          "mean": 1.1349
+          "error": 0.4033,
+          "mean": 1.0729
         },
         {
           "size": 1000,
-          "error": 0.0212,
-          "mean": 0.2337
+          "error": 0.0209,
+          "mean": 0.2308
         },
         {
           "size": 3000,
           "error": 0.0241,
-          "mean": 0.1675
+          "mean": 0.167
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 1299099.8393,
-          "mean": 2092227.5906
+          "error": 4.5761,
+          "mean": 6.2092
         },
         {
           "size": 30,
-          "error": 1328.5406,
-          "mean": 1625.4736
+          "error": 0.4499,
+          "mean": 1.166
         },
         {
           "size": 100,
-          "error": 0.0866,
-          "mean": 0.3852
+          "error": 0.0484,
+          "mean": 0.2849
         },
         {
           "size": 300,
-          "error": 0.1202,
-          "mean": 0.6381
+          "error": 0.1055,
+          "mean": 0.5719
         },
         {
           "size": 1000,
-          "error": 0.0837,
-          "mean": 0.4879
+          "error": 0.082,
+          "mean": 0.4694
         },
         {
           "size": 3000,
-          "error": 0.0266,
-          "mean": 0.2308
+          "error": 0.026,
+          "mean": 0.2272
         }
       ]
     },
@@ -906,65 +906,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 0.6416,
-          "mean": 3.3436
+          "error": 0.7565,
+          "mean": 3.6837
         },
         {
           "size": 30,
-          "error": 0.8694,
-          "mean": 5.4672
+          "error": 0.9223,
+          "mean": 5.8506
         },
         {
           "size": 100,
-          "error": 1.673,
-          "mean": 13.7568
+          "error": 1.7259,
+          "mean": 14.2039
         },
         {
           "size": 300,
-          "error": 2.7597,
-          "mean": 33.2434
+          "error": 2.7955,
+          "mean": 33.6262
         },
         {
           "size": 1000,
-          "error": 3.264,
-          "mean": 54.0822
+          "error": 3.2736,
+          "mean": 54.4342
         },
         {
           "size": 3000,
-          "error": 2.8611,
-          "mean": 78.934
+          "error": 2.8531,
+          "mean": 79.1555
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 1.6608,
-          "mean": 3.6112
+          "error": 1.7125,
+          "mean": 3.872
         },
         {
           "size": 30,
-          "error": 0.8247,
-          "mean": 5.6538
+          "error": 0.8841,
+          "mean": 6.0405
         },
         {
           "size": 100,
-          "error": 2.4544,
-          "mean": 15.886
+          "error": 2.5531,
+          "mean": 16.497
         },
         {
           "size": 300,
-          "error": 3.9182,
-          "mean": 31.6908
+          "error": 3.9915,
+          "mean": 32.1541
         },
         {
           "size": 1000,
-          "error": 4.3369,
-          "mean": 53.1049
+          "error": 4.3616,
+          "mean": 53.4697
         },
         {
           "size": 3000,
-          "error": 2.9616,
-          "mean": 59.2464
+          "error": 2.9641,
+          "mean": 59.4005
         }
       ]
     }

@@ -42,6 +42,7 @@ from numpy         import (
 from numpy.random  import default_rng
 from numpy.testing import assert_allclose, assert_array_equal
 from pytest        import FixtureRequest, fixture, mark, param
+from scipy.spatial import KDTree
 
 from thermur.controller.components import (
     Centroid,
@@ -73,8 +74,7 @@ from thermur.metrics.flight     import (
 from thermur.metrics.schemas   import Plan
 from thermur.pipeline.settings import Settings
 
-AIR = still_air()
-
+AIR   = still_air()
 STILL = Composite(
     cohesion = Centroid(stiffness_per_s2=0.0),
     contact  = HardSphere(weight_m_s2=0.0),
@@ -517,15 +517,20 @@ def test_an_alpha_shape_leaves_out_the_gap_a_convex_hull_spans():
     shaken by up to a centimeter so no five sit on one sphere, read, under
     an α-shape whose reach spans a lattice step but not the gap, the volume
     of the two lattices alone and a border holding every drone on either
-    lattice's faces, the faces across the gap among them.
+    lattice's faces, the faces across the gap among them, every other drone
+    inside.
     """
-    lattice        = gridded(*[linspace(0.0, 4.0, 5)] * 3)
-    shaken         = lattice + default_rng(0).uniform(-0.01, 0.01, lattice.shape)
-    border, volume = alpha_shape(concat([shaken, shaken + [14.0, 0.0, 0.0]]), 1.5)
-    faced          = ((lattice == 0.0) | (lattice == 4.0)).any(-1)
+    lattice = gridded(*[linspace(0.0, 4.0, 5)] * 3)
+    shaken  = lattice + default_rng(0).uniform(-0.01, 0.01, lattice.shape)
+    border, inside, volume = alpha_shape(
+        concat([shaken, shaken + [14.0, 0.0, 0.0]]),
+        1.5
+    )
+    faced = ((lattice == 0.0) | (lattice == 4.0)).any(-1)
 
     assert_allclose(volume, 128.0, rtol=0.01)
     assert_array_equal(border, concat([faced, faced]))
+    assert_array_equal(inside, ~border)
 
 
 def test_a_lattice_s_border_is_as_dense_as_its_inside():
@@ -539,6 +544,45 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
 
     assert_allclose(ratio_on_border(lattice, 1.5, ones(len(lattice))), 1.0)
     assert ratio_on_border(lattice, 1.5, where(inside, 0.5, 1.0)) < 1.0
+
+
+def test_a_rod_s_speed_correlation_length_reads_its_share_of_the_extent():
+    """
+    Asserts that a rod 1 km long whose speed rises evenly along it reads its
+    speed correlation length, where the correlation of the deviations from
+    the mean speed first crosses zero, as that length's share of the rod's
+    extent.
+    """
+    rod    = gridded(10.0 * arange(101), [0.0, 1.0], [0.0, 1.0])
+    flying = stack([10.0 + rod[:, 0] / 100, zeros(len(rod)), zeros(len(rod))], -1)
+
+    assert_allclose(
+        laid(rod, flying).speed_correlation.speed_correlation_ratio,
+        1000.0 / (1 + 3**0.5) / linalg.norm([1000.0, 1.0, 1.0]),
+        rtol = 0.03
+    )
+
+
+def test_stragglers_past_the_shape_s_reach_leave_the_border_density_alone():
+    """
+    Asserts that a jittered lattice reads the same border density, each
+    drone's from its nearest-neighbor distance, with five sparse drones 20 m
+    past it, which no tetrahedron narrower than the reach holds, as without
+    them.
+    """
+    lattice = gridded(*[linspace(0.0, 4.0, 5)] * 3) + default_rng(0).uniform(
+        -0.01,
+        0.01,
+        (125, 3)
+    )
+    strays = concat([lattice, 20.0 + 5.0 * arange(5.0)[:, None] * ones(3)])
+
+    assert_allclose(
+        *(
+            ratio_on_border(cloud, 1.5, KDTree(cloud).query(cloud, 2)[0][:, 1])
+            for cloud in (strays, lattice)
+        )
+    )
 
 
 def test_a_cloud_lying_wholly_on_its_border_reads_no_border_density():

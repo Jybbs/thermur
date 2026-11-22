@@ -737,7 +737,7 @@ class Flight(Module):
         )
 
 
-def alpha_shape(cloud: ndarray, reach_m: float) -> tuple[ndarray, float]:
+def alpha_shape(cloud: ndarray, reach_m: float) -> tuple[ndarray, ndarray, float]:
     """
     Builds the α-shape of `cloud` at `reach_m`, the tetrahedra of its
     `Delaunay` triangulation whose circumscribed sphere is narrower than
@@ -745,7 +745,10 @@ def alpha_shape(cloud: ndarray, reach_m: float) -> tuple[ndarray, float]:
 
     Returns:
         Whether each drone sits on a triangle exactly one kept tetrahedron
-        holds, the shape's border, and the shape's volume, in cubic meters.
+        holds, the shape's border, whether each sits inside the shape, a
+        corner of a kept tetrahedron off the border, so a drone no kept
+        tetrahedron reaches counts as neither, and the shape's volume, in
+        cubic meters.
     """
     simplices = Delaunay(cloud).simplices
     corners   = cloud[simplices]
@@ -765,7 +768,12 @@ def alpha_shape(cloud: ndarray, reach_m: float) -> tuple[ndarray, float]:
         axis = 1
     )
     found, counts = unique(faces, axis=0, return_counts=True)
-    return isin(arange(len(cloud)), found[counts == 1]), float(volumes[held].sum())
+    border        = isin(arange(len(cloud)), found[counts == 1])
+    return (
+        border,
+        isin(arange(len(cloud)), simplices[held]) & ~border,
+        float(volumes[held].sum())
+    )
 
 
 def correlated(
@@ -889,12 +897,14 @@ def crossed(
         ahead        = order[:rank]
         times[drone] = (times[ahead] + delays[ahead, drone]).mean()
 
-    volume = alpha_shape(clouds[peak + window // 2], reach_m)[1]
-    turned = sort(times)[: len(times) // 2]
+    border, inside, volume = alpha_shape(clouds[peak + window // 2], reach_m)
+    turned                 = sort(times)[: len(times) // 2]
     if turned.std() == 0 or volume == 0:
         return nan
 
-    reached = (arange(1, turned.size + 1) * volume / len(times)) ** (1 / 3)
+    reached = (
+        arange(1, turned.size + 1) * volume / (border | inside).sum()
+    ) ** (1 / 3)
     return float(linregress(turned, reached).slope)
 
 
@@ -1024,14 +1034,15 @@ def ratio_on_border(cloud: ndarray, reach_m: float, spacings: ndarray) -> float:
     """
     Divides the mean density of the drones on the border of the α-shape
     of `cloud` at `reach_m` by that of the rest, each from the cube of its
-    distance in `spacings` to its nearest neighbor, `nan` where every drone
-    or none sits on the border.
+    distance in `spacings` to its nearest neighbor, leaving out a drone the
+    shape does not reach, `nan` where no drone sits on the border or none
+    inside it.
     """
-    border  = alpha_shape(cloud, reach_m)[0]
-    density = spacings**-3.0
+    border, inside, _ = alpha_shape(cloud, reach_m)
+    density           = spacings**-3.0
     return (
-        density[border].mean() / density[~border].mean()
-        if 0 < border.sum() < border.size else nan
+        density[border].mean() / density[inside].mean()
+        if border.any() and inside.any() else nan
     )
 
 

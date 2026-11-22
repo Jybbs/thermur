@@ -21,17 +21,23 @@ def main():
     """
     Writes the trials of the run the first argument names into `MEASURED`
     where the run saved them, and its sweep into `STILL_AIR` where it saved
-    one, printing each path written.
+    one, printing each path written, and exits on a run that saved neither.
     """
-    run = Path(argv[1])
-    for path, read, table in (
-        (MEASURED, measured, "coupling_trial.nc"),
-        (STILL_AIR, swept, "sweep.nc")
-    ):
-        if (run / table).exists():
-            path.parent.mkdir(exist_ok=True, parents=True)
-            path.write_text(dumps(read(run), indent=2) + "\n", encoding="utf-8")
-            print(path)
+    run   = Path(argv[1])
+    saved = [
+        (path, read)
+        for path, read, table in (
+            (MEASURED, measured, "coupling_trial.nc"),
+            (STILL_AIR, swept, "sweep.nc")
+        )
+        if (run / table).exists()
+    ]
+    if not saved:
+        raise SystemExit(f"{run} holds neither a trial nor a sweep")
+    for path, read in saved:
+        path.parent.mkdir(exist_ok=True, parents=True)
+        path.write_text(dumps(read(run), indent=2) + "\n", encoding="utf-8")
+        print(path)
 
 
 if __name__ == "__main__":

@@ -1,13 +1,14 @@
 """
 Pins what `docs:measure` writes and prints, meaning the trials and the sweep
 of the run its argument names, each written where its page's charts read it
-and only where the run saved it.
+and only where the run saved it, failing on a run that saved neither.
 """
 
 from collections.abc import Callable
+from contextlib      import nullcontext
 from json            import loads
 from pathlib         import Path
-from pytest          import CaptureFixture, MonkeyPatch, mark, param
+from pytest          import CaptureFixture, MonkeyPatch, mark, param, raises
 from types           import ModuleType
 
 from thermur.docs import measured
@@ -32,7 +33,8 @@ def test_the_task_writes_what_the_run_named_saved_and_prints_where(
     """
     Asserts that the task writes what `measured` and `swept` read from the
     run its first argument names into each chart file, creating its folder,
-    for each table the run saved, and prints each file's path.
+    for each table the run saved, and prints each file's path, exiting
+    naming the run and writing nothing where it saved neither.
     """
     run = tmp_path / "runs" / "one"
     run.mkdir(parents=True)
@@ -43,7 +45,11 @@ def test_the_task_writes_what_the_run_named_saved_and_prints_where(
     monkeypatch.setattr(measured, "measured", lambda run: {"trials": str(run)})
     monkeypatch.setattr(measured, "swept", lambda run: {"sweep": str(run)})
 
-    load_task(".mise/tasks/docs/measure.py").main()
+    with nullcontext() if tables else raises(
+        SystemExit,
+        match = "runs/one holds neither"
+    ):
+        load_task(".mise/tasks/docs/measure.py").main()
 
     written = {
         path: read
@@ -59,3 +65,4 @@ def test_the_task_writes_what_the_run_named_saved_and_prints_where(
         path.exists() == (path in written)
         for path in (measured.MEASURED, measured.STILL_AIR)
     )
+

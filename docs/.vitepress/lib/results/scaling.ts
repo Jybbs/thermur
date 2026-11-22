@@ -86,10 +86,28 @@ export function ticks(low: number, high: number): number[] {
 }
 
 /**
+ * Lays out the ticks of a logarithmic axis across `low` to `high`, one, two,
+ * and five times each power of ten inside it, or the powers alone where
+ * those run past nine.
+ */
+export function decades(low: number, high: number): number[] {
+  const powers = Array.from(
+    { length: Math.floor(Math.log10(high)) - Math.floor(Math.log10(low)) + 1 },
+    (_, index) => 10 ** (Math.floor(Math.log10(low)) + index)
+  )
+  const within = (values: number[]) => values.filter(each => each >= low && each <= high)
+  const steps  = within(powers.flatMap(power => [1, 2, 5].map(each => +(each * power).toPrecision(12))))
+  return steps.length > 9 ? within(powers) : steps
+}
+
+/**
  * Draws one figure as SVG in `scheme`: the composite's mean by size on a
  * logarithmic axis joined by a line, its control's dashed, each with its
- * standard error as a bar, over a band across the norm's spread or a dashed
- * line at a figure stated alone, and a size no seed measured left out.
+ * standard error as a bar, over a band across the norm's spread or a dotted
+ * line at a figure stated alone, and a size no seed measured left out. A
+ * statistic positive throughout and spanning more than a decade reads on a
+ * logarithmic vertical axis too, so a value far from the rest leaves the
+ * others apart.
  */
 export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = source): string {
   const { bottom, height, left, right, top, width } = FRAME
@@ -98,12 +116,15 @@ export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = sou
   const norm   = chart.norm
   const bounds = norm === undefined ? [] : [norm.figure - (norm.spread ?? 0), norm.figure + (norm.spread ?? 0)]
   const span   = [Math.min(...values, ...bounds), Math.max(...values, ...bounds)] as const
-  const pad    = (span[1] - span[0] || Math.abs(span[0]) || 1) * 0.08
-  const range  = [span[0] - pad, span[1] + pad] as const
+  const logged = span[0] > 0 && span[1] / span[0] > 10
+  const scale  = (value: number) => logged ? Math.log10(Math.max(value, span[0])) : value
+  const ends   = [scale(span[0]), scale(span[1])] as const
+  const pad    = (ends[1] - ends[0] || Math.abs(ends[0]) || 1) * 0.08
+  const range  = [ends[0] - pad, ends[1] + pad] as const
   const sizes  = chart.flocking.map(point => point.size)
   const logs   = [Math.log(Math.min(...sizes)), Math.log(Math.max(...sizes))] as const
   const x      = (size: number) => left + (Math.log(size) - logs[0]) / (logs[1] - logs[0]) * (width - left - right)
-  const y      = (value: number) => height - bottom - (value - range[0]) / (range[1] - range[0]) * (height - top - bottom)
+  const y      = (value: number) => height - bottom - (scale(value) - range[0]) / (range[1] - range[0]) * (height - top - bottom)
   const ink    = shadeOf('ink', scheme, identity)
   const faces  = identity.faces
   const series = kept.map((points, place) => {
@@ -127,7 +148,7 @@ export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = sou
     `<rect width="${width}" height="${height}" fill="${shadeOf('ground', scheme, identity)}"/>`,
     `<text x="${left}" y="28" fill="${ink}" font-family="${fontStack(faces.display)}" font-size="20">${chart.title}</text>`,
     band,
-    ...ticks(...range).map(value =>
+    ...(logged ? decades(10 ** range[0], 10 ** range[1]) : ticks(...range)).map(value =>
       across(value, 'stroke-opacity="0.12"')
       + tick(`x="${left - 8}" y="${at(y(value) + 4)}" text-anchor="end"`, COMPACT.format(value))),
     ...sizes.map(size => tick(`x="${at(x(size))}" y="${height - bottom + 20}" text-anchor="middle"`, size.toLocaleString('en-US'))),
