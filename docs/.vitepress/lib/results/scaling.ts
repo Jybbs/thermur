@@ -60,17 +60,25 @@ const WORDS: Readonly<Record<string, Pick<Scaling, 'label' | 'title'>>> = {
 }
 
 /**
+ * Sets a tick's value in at most three significant digits, a large value
+ * with its suffix, so a figure reaching millions keeps its labels inside
+ * the room the left side leaves.
+ */
+const COMPACT = new Intl.NumberFormat('en-US', { maximumSignificantDigits: 3, notation: 'compact' })
+
+/**
  * Writes a coordinate to one decimal place, the precision a figure's SVG
  * keeps.
  */
 const at = (value: number) => value.toFixed(1)
 
 /**
- * Lays out between four and ten ticks across `low` to `high` at a step of one,
- * two, or five times a power of ten.
+ * Lays out between three and nine ticks across `low` to `high` at a step of
+ * one, two, or five times a power of ten, the first such step past an eighth
+ * of the span.
  */
 export function ticks(low: number, high: number): number[] {
-  const rough = (high - low) / 4
+  const rough = (high - low) / 8
   const power = 10 ** Math.floor(Math.log10(rough))
   const step  = [1, 2, 5, 10].map(each => each * power).find(each => each >= rough)!
   const first = Math.ceil(low / step)
@@ -121,7 +129,7 @@ export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = sou
     band,
     ...ticks(...range).map(value =>
       across(value, 'stroke-opacity="0.12"')
-      + tick(`x="${left - 8}" y="${at(y(value) + 4)}" text-anchor="end"`, String(value))),
+      + tick(`x="${left - 8}" y="${at(y(value) + 4)}" text-anchor="end"`, COMPACT.format(value))),
     ...sizes.map(size => tick(`x="${at(x(size))}" y="${height - bottom + 20}" text-anchor="middle"`, size.toLocaleString('en-US'))),
     `<text x="${(left + width - right) / 2}" y="${height - 12}" fill="${ink}" font-family="${fontStack(faces.body)}" font-size="14" text-anchor="middle">Flock Size (drones, logarithmic)</text>`,
     `<text transform="translate(18 ${(top + height - bottom) / 2}) rotate(-90)" fill="${ink}" font-family="${fontStack(faces.body)}" font-size="14" text-anchor="middle">${chart.label}</text>`,

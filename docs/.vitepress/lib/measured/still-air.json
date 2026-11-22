@@ -83,114 +83,162 @@
   },
   "runs": {
     "10": {
-      "autocorrelation_s": 11.5425,
-      "duration_s": 60.0,
-      "rearrangement_s": 16.9446
+      "duration_s": 620.0,
+      "autocorrelation_s": 15.2554,
+      "rearrangement_s": 79.1295
     },
     "30": {
-      "autocorrelation_s": 13.1924,
-      "duration_s": 60.0,
-      "rearrangement_s": 14.811
+      "duration_s": 574.892,
+      "autocorrelation_s": 48.5917,
+      "rearrangement_s": 55.4892
     },
     "100": {
-      "autocorrelation_s": 14.0879,
-      "duration_s": 60.0,
-      "rearrangement_s": 14.6286
+      "duration_s": 442.0798,
+      "autocorrelation_s": 41.2694,
+      "rearrangement_s": 42.208
+    },
+    "300": {
+      "duration_s": 413.5914,
+      "autocorrelation_s": 39.3591,
+      "rearrangement_s": 36.5114
+    },
+    "1000": {
+      "duration_s": 409.9699,
+      "autocorrelation_s": 38.997,
+      "rearrangement_s": 32.0541
+    },
+    "3000": {
+      "duration_s": 438.6147,
+      "autocorrelation_s": 41.8615,
+      "rearrangement_s": 31.4477
     }
   },
   "sizes": [
     10,
     30,
-    100
+    100,
+    300,
+    1000,
+    3000
   ],
   "slopes": {
     "extent_m": {
-      "error": 0.1139,
-      "slope": 0.575
+      "error": 0.0283,
+      "slope": 0.1525
     },
     "speed_correlation_ratio": {
-      "error": 0.1147,
-      "slope": -0.0153
+      "error": 0.0226,
+      "slope": -0.0538
     },
     "aspect_ratio": {
-      "error": 0.0887,
-      "slope": 0.0561
+      "error": 0.0271,
+      "slope": -0.0516
     },
     "autocorrelation_s": {
-      "error": 0.1356,
-      "slope": 0.149
+      "error": 0.0237,
+      "slope": 0.002
     },
     "border_density": {
-      "error": 1.0127,
-      "slope": -1.5621
+      "error": 0.2116,
+      "slope": -1.5801
     },
     "connected": {
-      "error": 0.0205,
-      "slope": -0.0028
+      "error": 0.0169,
+      "slope": 0.0662
     },
     "group_speed_m_s": {
-      "error": 0.0032,
-      "slope": 0.0001
+      "error": 0.001,
+      "slope": -0.0209
     },
     "middle_aspect_ratio": {
-      "error": 0.1059,
-      "slope": 0.1742
+      "error": 0.0314,
+      "slope": 0.0684
     },
     "polarization": {
-      "error": 0.0032,
-      "slope": -0.0072
+      "error": 0.0071,
+      "slope": -0.0465
     },
     "rearrangement_s": {
-      "error": 0.0316,
-      "slope": -0.0986
+      "error": 0.0268,
+      "slope": -0.2637
     },
     "spacing_m": {
-      "error": 0.1174,
-      "slope": -0.2016
+      "error": 0.0285,
+      "slope": -0.3837
     },
     "wave_speed_m_s": {
-      "error": 0.2783,
-      "slope": 0.6374
+      "error": 0.028,
+      "slope": 0.6141
     }
   },
   "speed_by_size": {
-    "p": 1.0,
-    "rho": 0.0
+    "p": 0.0,
+    "rho": -0.9433
   },
   "statistics": {
     "extent_m": {
       "flocking": [
         {
           "size": 10,
-          "error": 20.8452,
-          "mean": 127.6341
+          "error": 107.21,
+          "mean": 801.9571
         },
         {
           "size": 30,
-          "error": 53.147,
-          "mean": 298.3909
+          "error": 84.4882,
+          "mean": 1101.0043
         },
         {
           "size": 100,
-          "error": 19.0551,
-          "mean": 461.2946
+          "error": 34.1858,
+          "mean": 1276.5402
+        },
+        {
+          "size": 300,
+          "error": 22.4911,
+          "mean": 1398.2252
+        },
+        {
+          "size": 1000,
+          "error": 10.6353,
+          "mean": 1564.2269
+        },
+        {
+          "size": 3000,
+          "error": 8.8207,
+          "mean": 1671.2274
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 4.7442,
-          "mean": 138.6294
+          "error": 110.0426,
+          "mean": 802.863
         },
         {
           "size": 30,
-          "error": 47.6992,
-          "mean": 294.9445
+          "error": 63.234,
+          "mean": 1149.1753
         },
         {
           "size": 100,
-          "error": 16.1249,
-          "mean": 461.369
+          "error": 16.1018,
+          "mean": 1289.0419
+        },
+        {
+          "size": 300,
+          "error": 18.1988,
+          "mean": 1410.9794
+        },
+        {
+          "size": 1000,
+          "error": 10.632,
+          "mean": 1573.6038
+        },
+        {
+          "size": 3000,
+          "error": 7.8064,
+          "mean": 1692.5125
         }
       ]
     },
@@ -198,35 +246,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 0.0466,
-          "mean": 0.2298
+          "error": 0.0501,
+          "mean": 0.2588
         },
         {
           "size": 30,
-          "error": 0.0157,
-          "mean": 0.2315
+          "error": 0.0129,
+          "mean": 0.1492
         },
         {
           "size": 100,
-          "error": 0.0287,
-          "mean": 0.2128
+          "error": 0.0046,
+          "mean": 0.1083
+        },
+        {
+          "size": 300,
+          "error": 0.0068,
+          "mean": 0.1235
+        },
+        {
+          "size": 1000,
+          "error": 0.0052,
+          "mean": 0.1288
+        },
+        {
+          "size": 3000,
+          "error": 0.0059,
+          "mean": 0.151
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.0112,
-          "mean": 0.0785
+          "error": 0.011,
+          "mean": 0.0556
         },
         {
           "size": 30,
-          "error": 0.0005,
-          "mean": 0.0416
+          "error": 0.0012,
+          "mean": 0.0327
         },
         {
           "size": 100,
-          "error": 0.0042,
-          "mean": 0.0341
+          "error": 0.0012,
+          "mean": 0.0362
+        },
+        {
+          "size": 300,
+          "error": 0.0027,
+          "mean": 0.0537
+        },
+        {
+          "size": 1000,
+          "error": 0.0011,
+          "mean": 0.0938
+        },
+        {
+          "size": 3000,
+          "error": 0.0016,
+          "mean": 0.1319
         }
       ]
     },
@@ -234,35 +312,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 1.1636,
-          "mean": 6.3041
+          "error": 6.0105,
+          "mean": 44.5338
         },
         {
           "size": 30,
-          "error": 0.4339,
-          "mean": 5.6341
+          "error": 3.1567,
+          "mean": 28.7951
         },
         {
           "size": 100,
-          "error": 0.3689,
-          "mean": 6.8089
+          "error": 1.8673,
+          "mean": 33.5494
+        },
+        {
+          "size": 300,
+          "error": 0.4929,
+          "mean": 31.9403
+        },
+        {
+          "size": 1000,
+          "error": 0.1759,
+          "mean": 27.3194
+        },
+        {
+          "size": 3000,
+          "error": 0.0956,
+          "mean": 23.5929
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.8047,
-          "mean": 7.2646
+          "error": 8.0328,
+          "mean": 49.9193
         },
         {
           "size": 30,
-          "error": 0.4476,
-          "mean": 5.6227
+          "error": 4.1745,
+          "mean": 38.7963
         },
         {
           "size": 100,
-          "error": 0.3981,
-          "mean": 6.8483
+          "error": 2.6,
+          "mean": 34.6953
+        },
+        {
+          "size": 300,
+          "error": 0.4478,
+          "mean": 33.5563
+        },
+        {
+          "size": 1000,
+          "error": 0.1794,
+          "mean": 28.8859
+        },
+        {
+          "size": 3000,
+          "error": 0.1179,
+          "mean": 26.8505
         }
       ]
     },
@@ -270,35 +378,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 3.3142,
-          "mean": 15.5452
+          "error": 5.9431,
+          "mean": 58.1919
         },
         {
           "size": 30,
-          "error": 3.8279,
-          "mean": 21.4198
+          "error": 1.9986,
+          "mean": 62.5573
         },
         {
           "size": 100,
-          "error": 0.8299,
-          "mean": 20.1988
+          "error": 1.8226,
+          "mean": 73.1878
+        },
+        {
+          "size": 300,
+          "error": 0.6298,
+          "mean": 64.3401
+        },
+        {
+          "size": 1000,
+          "error": 0.2641,
+          "mean": 56.7493
+        },
+        {
+          "size": 3000,
+          "error": 0.27,
+          "mean": 54.1075
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.8111,
-          "mean": 18.8492
+          "error": 6.9624,
+          "mean": 58.7233
         },
         {
           "size": 30,
-          "error": 3.1896,
-          "mean": 21.7107
+          "error": 2.1649,
+          "mean": 64.0248
         },
         {
           "size": 100,
-          "error": 0.7679,
-          "mean": 20.6558
+          "error": 1.8515,
+          "mean": 78.605
+        },
+        {
+          "size": 300,
+          "error": 0.2777,
+          "mean": 73.5143
+        },
+        {
+          "size": 1000,
+          "error": 0.2161,
+          "mean": 70.1646
+        },
+        {
+          "size": 3000,
+          "error": 0.1399,
+          "mean": 71.1021
         }
       ]
     },
@@ -306,35 +444,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 1110.3565,
-          "mean": 1369.5546
+          "error": 479055.9491,
+          "mean": 778947.9105
         },
         {
           "size": 30,
-          "error": 71.0636,
-          "mean": 93.3796
+          "error": 97.3549,
+          "mean": 116.6522
         },
         {
           "size": 100,
-          "error": 0.3326,
-          "mean": 1.2018
+          "error": 0.2511,
+          "mean": 1.1916
+        },
+        {
+          "size": 300,
+          "error": 0.4166,
+          "mean": 1.1349
+        },
+        {
+          "size": 1000,
+          "error": 0.0212,
+          "mean": 0.2337
+        },
+        {
+          "size": 3000,
+          "error": 0.0241,
+          "mean": 0.1675
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 525.1001,
-          "mean": 652.5105
+          "error": 1299099.8393,
+          "mean": 2092227.5906
         },
         {
           "size": 30,
-          "error": 41.575,
-          "mean": 53.7921
+          "error": 1328.5406,
+          "mean": 1625.4736
         },
         {
           "size": 100,
-          "error": 0.2153,
-          "mean": 0.874
+          "error": 0.0866,
+          "mean": 0.3852
+        },
+        {
+          "size": 300,
+          "error": 0.1202,
+          "mean": 0.6381
+        },
+        {
+          "size": 1000,
+          "error": 0.0837,
+          "mean": 0.4879
+        },
+        {
+          "size": 3000,
+          "error": 0.0266,
+          "mean": 0.2308
         }
       ]
     },
@@ -342,35 +510,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 0.0272,
-          "mean": 0.9333
+          "error": 0.0633,
+          "mean": 0.77
         },
         {
           "size": 30,
-          "error": 0.0327,
-          "mean": 0.9222
+          "error": 0.0503,
+          "mean": 0.7067
         },
         {
           "size": 100,
-          "error": 0.0213,
-          "mean": 0.9267
+          "error": 0.0522,
+          "mean": 0.615
+        },
+        {
+          "size": 300,
+          "error": 0.0427,
+          "mean": 0.7323
+        },
+        {
+          "size": 1000,
+          "error": 0.0118,
+          "mean": 0.9524
+        },
+        {
+          "size": 3000,
+          "error": 0.0024,
+          "mean": 0.9885
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.0272,
-          "mean": 0.8667
+          "error": 0.0448,
+          "mean": 0.77
         },
         {
           "size": 30,
-          "error": 0.0181,
-          "mean": 0.9222
+          "error": 0.0452,
+          "mean": 0.7067
         },
         {
           "size": 100,
-          "error": 0.0152,
-          "mean": 0.9167
+          "error": 0.0456,
+          "mean": 0.618
+        },
+        {
+          "size": 300,
+          "error": 0.0349,
+          "mean": 0.5667
+        },
+        {
+          "size": 1000,
+          "error": 0.0201,
+          "mean": 0.5453
+        },
+        {
+          "size": 3000,
+          "error": 0.0148,
+          "mean": 0.576
         }
       ]
     },
@@ -378,35 +576,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 0.0683,
-          "mean": 9.3919
+          "error": 0.0272,
+          "mean": 9.4256
         },
         {
           "size": 30,
-          "error": 0.0107,
-          "mean": 9.3653
+          "error": 0.009,
+          "mean": 9.4218
         },
         {
           "size": 100,
-          "error": 0.0259,
-          "mean": 9.3921
+          "error": 0.066,
+          "mean": 9.1045
+        },
+        {
+          "size": 300,
+          "error": 0.0372,
+          "mean": 8.9284
+        },
+        {
+          "size": 1000,
+          "error": 0.0152,
+          "mean": 8.6989
+        },
+        {
+          "size": 3000,
+          "error": 0.0147,
+          "mean": 8.3917
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.0002,
-          "mean": 9.992
+          "error": 0.0001,
+          "mean": 9.9909
         },
         {
           "size": 30,
-          "error": 0.0002,
-          "mean": 9.9918
+          "error": 0.0001,
+          "mean": 9.9911
         },
         {
           "size": 100,
+          "error": 0.0,
+          "mean": 9.991
+        },
+        {
+          "size": 300,
+          "error": 0.0,
+          "mean": 9.9909
+        },
+        {
+          "size": 1000,
           "error": 0.0001,
-          "mean": 9.9918
+          "mean": 9.9903
+        },
+        {
+          "size": 3000,
+          "error": 0.0,
+          "mean": 9.9894
         }
       ]
     },
@@ -414,35 +642,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 0.5646,
-          "mean": 2.155
+          "error": 1.5997,
+          "mean": 6.4295
         },
         {
           "size": 30,
-          "error": 0.2436,
-          "mean": 2.7184
+          "error": 1.5146,
+          "mean": 8.4181
         },
         {
           "size": 100,
-          "error": 0.0858,
-          "mean": 2.9474
+          "error": 0.4755,
+          "mean": 7.5393
+        },
+        {
+          "size": 300,
+          "error": 0.2555,
+          "mean": 7.9452
+        },
+        {
+          "size": 1000,
+          "error": 0.1146,
+          "mean": 7.2848
+        },
+        {
+          "size": 3000,
+          "error": 0.117,
+          "mean": 7.6275
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.5661,
-          "mean": 2.2889
+          "error": 1.3399,
+          "mean": 5.4924
         },
         {
           "size": 30,
-          "error": 0.2986,
-          "mean": 2.8718
+          "error": 1.1278,
+          "mean": 8.1211
         },
         {
           "size": 100,
-          "error": 0.0743,
-          "mean": 3.1325
+          "error": 0.4195,
+          "mean": 7.4404
+        },
+        {
+          "size": 300,
+          "error": 0.2757,
+          "mean": 8.0697
+        },
+        {
+          "size": 1000,
+          "error": 0.0548,
+          "mean": 7.7733
+        },
+        {
+          "size": 3000,
+          "error": 0.066,
+          "mean": 9.3333
         }
       ]
     },
@@ -450,35 +708,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 0.0023,
-          "mean": 0.9881
+          "error": 0.0405,
+          "mean": 0.8558
         },
         {
           "size": 30,
-          "error": 0.0059,
-          "mean": 0.9717
+          "error": 0.0262,
+          "mean": 0.8791
         },
         {
           "size": 100,
-          "error": 0.0018,
-          "mean": 0.9717
+          "error": 0.0275,
+          "mean": 0.746
+        },
+        {
+          "size": 300,
+          "error": 0.0158,
+          "mean": 0.7007
+        },
+        {
+          "size": 1000,
+          "error": 0.01,
+          "mean": 0.6995
+        },
+        {
+          "size": 3000,
+          "error": 0.0058,
+          "mean": 0.6747
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 0.0016,
-          "mean": 0.9851
+          "error": 0.0338,
+          "mean": 0.8683
         },
         {
           "size": 30,
-          "error": 0.0055,
-          "mean": 0.9719
+          "error": 0.0268,
+          "mean": 0.8208
         },
         {
           "size": 100,
-          "error": 0.0029,
-          "mean": 0.9685
+          "error": 0.0253,
+          "mean": 0.7696
+        },
+        {
+          "size": 300,
+          "error": 0.0123,
+          "mean": 0.6878
+        },
+        {
+          "size": 1000,
+          "error": 0.008,
+          "mean": 0.6509
+        },
+        {
+          "size": 3000,
+          "error": 0.0039,
+          "mean": 0.6409
         }
       ]
     },
@@ -486,35 +774,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 1.0916,
-          "mean": 30.2911
+          "error": 36.3283,
+          "mean": 183.7854
         },
         {
           "size": 30,
-          "error": 1.7555,
-          "mean": 26.7811
+          "error": 19.1351,
+          "mean": 160.6325
         },
         {
           "size": 100,
-          "error": 0.2912,
-          "mean": 24.0824
+          "error": 4.8324,
+          "mean": 97.9019
+        },
+        {
+          "size": 300,
+          "error": 1.6854,
+          "mean": 65.5472
+        },
+        {
+          "size": 1000,
+          "error": 0.315,
+          "mean": 43.9879
+        },
+        {
+          "size": 3000,
+          "error": 0.2108,
+          "mean": 38.0051
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 1.9244,
-          "mean": 30.725
+          "error": 39.8785,
+          "mean": 213.6107
         },
         {
           "size": 30,
-          "error": 1.1996,
-          "mean": 27.108
+          "error": 16.6082,
+          "mean": 168.8917
         },
         {
           "size": 100,
-          "error": 0.3445,
-          "mean": 23.775
+          "error": 4.9181,
+          "mean": 95.2894
+        },
+        {
+          "size": 300,
+          "error": 1.2236,
+          "mean": 66.0527
+        },
+        {
+          "size": 1000,
+          "error": 0.3142,
+          "mean": 45.1351
+        },
+        {
+          "size": 3000,
+          "error": 0.1813,
+          "mean": 40.3094
         }
       ]
     },
@@ -522,35 +840,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 3.5669,
-          "mean": 23.5773
+          "error": 17.9502,
+          "mean": 99.2218
         },
         {
           "size": 30,
-          "error": 4.4425,
-          "mean": 24.3331
+          "error": 3.7385,
+          "mean": 41.1874
         },
         {
           "size": 100,
-          "error": 0.6075,
-          "mean": 14.385
+          "error": 2.2686,
+          "mean": 26.1709
+        },
+        {
+          "size": 300,
+          "error": 0.8925,
+          "mean": 17.0616
+        },
+        {
+          "size": 1000,
+          "error": 0.2475,
+          "mean": 10.7414
+        },
+        {
+          "size": 3000,
+          "error": 0.1052,
+          "mean": 8.1103
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 4.6881,
-          "mean": 23.0532
+          "error": 16.0339,
+          "mean": 79.4041
         },
         {
           "size": 30,
-          "error": 4.0568,
-          "mean": 25.3966
+          "error": 5.1004,
+          "mean": 39.64
         },
         {
           "size": 100,
-          "error": 1.0183,
-          "mean": 15.1453
+          "error": 2.1231,
+          "mean": 21.4824
+        },
+        {
+          "size": 300,
+          "error": 0.6227,
+          "mean": 17.5781
+        },
+        {
+          "size": 1000,
+          "error": 0.3243,
+          "mean": 12.9542
+        },
+        {
+          "size": 3000,
+          "error": 0.0612,
+          "mean": 9.5239
         }
       ]
     },
@@ -558,35 +906,65 @@
       "flocking": [
         {
           "size": 10,
-          "error": 8.8979,
-          "mean": 14.4597
+          "error": 0.6416,
+          "mean": 3.3436
         },
         {
           "size": 30,
-          "error": 2.7964,
-          "mean": 13.5535
+          "error": 0.8694,
+          "mean": 5.4672
         },
         {
           "size": 100,
-          "error": 4.9217,
-          "mean": 34.2598
+          "error": 1.673,
+          "mean": 13.7568
+        },
+        {
+          "size": 300,
+          "error": 2.7597,
+          "mean": 33.2434
+        },
+        {
+          "size": 1000,
+          "error": 3.264,
+          "mean": 54.0822
+        },
+        {
+          "size": 3000,
+          "error": 2.8611,
+          "mean": 78.934
         }
       ],
       "fixed": [
         {
           "size": 10,
-          "error": 1.5051,
-          "mean": 5.8742
+          "error": 1.6608,
+          "mean": 3.6112
         },
         {
           "size": 30,
-          "error": 3.2243,
-          "mean": 20.7427
+          "error": 0.8247,
+          "mean": 5.6538
         },
         {
           "size": 100,
-          "error": 6.0501,
-          "mean": 28.4601
+          "error": 2.4544,
+          "mean": 15.886
+        },
+        {
+          "size": 300,
+          "error": 3.9182,
+          "mean": 31.6908
+        },
+        {
+          "size": 1000,
+          "error": 4.3369,
+          "mean": 53.1049
+        },
+        {
+          "size": 3000,
+          "error": 2.9616,
+          "mean": 59.2464
         }
       ]
     }

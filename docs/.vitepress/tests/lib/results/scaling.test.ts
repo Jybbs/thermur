@@ -22,10 +22,11 @@ const CHART: scaling.Scaling = {
 
 describe('the ticks across a range', () => {
   it.for([
-    { high: 1, low: 0, want: [0, 0.5, 1] },
-    { high: 0.98, low: 0.91, want: [0.92, 0.94, 0.96, 0.98] },
-    { high: 3000, low: 10, want: [1000, 2000, 3000] },
-    { high: 2.5, low: -0.5, want: [0, 1, 2] }
+    { high: 1, low: 0, want: [0, 0.2, 0.4, 0.6, 0.8, 1] },
+    { high: 0.98, low: 0.91, want: [0.91, 0.92, 0.93, 0.94, 0.95, 0.96, 0.97, 0.98] },
+    { high: 3000, low: 10, want: [500, 1000, 1500, 2000, 2500, 3000] },
+    { high: 2.5, low: -0.5, want: [-0.5, 0, 0.5, 1, 1.5, 2, 2.5] },
+    { high: 86, low: -4, want: [0, 20, 40, 60, 80] }
   ])('lays $low to $high out at a round step', ({ high, low, want }) => {
     expect(scaling.ticks(low, high)).toEqual(want)
   })
@@ -45,6 +46,12 @@ describe('a figure of a statistic by flock size', () => {
     { norm: { above: true, figure: 0.6, spread: null }, want: 'stroke-dasharray="2 4"' }
   ])('draws a norm with a spread as a band and one without as a line', ({ norm, want }) => {
     expect(scaling.scaling({ ...CHART, norm }, 'dark')).toContain(want)
+  })
+
+  it('sets a tick in the millions with its suffix', () => {
+    const large = CHART.flocking.map(point => ({ ...point, mean: point.mean! * 4e6 }))
+
+    expect(scaling.scaling({ ...CHART, fixed: large, flocking: large }, 'light')).toContain('>3M</text>')
   })
 
   it('draws a statistic holding one value throughout', () => {

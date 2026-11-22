@@ -44,6 +44,82 @@ Each statistic is measured on the drones' velocities through the air, which stil
 
 The turning wave follows the source's method[^attanasi2014]. Within the frames where the flock's mean heading turns fastest, each pair's delay is the lag maximizing the normalized cross-correlation of their radial accelerations, each drone ranks by how many drones it leads less how many lead it, and its turning time is the mean, over each drone ranked ahead, of that drone's time plus the pair's delay. The distance the turn has crossed is the cube root of the drones turned over the flock's density inside its α-shape, and its speed is the slope of that distance against the turning time over the first half of the ranks. The radio's connectivity is the share of the flock in its largest group, two drones joined wherever they fly within the radio's 50 m range.
 
+## The Run
+
+The figures and the table below come from one run of `thermur fly sweep` under the default composite and plan at sizes of 10, 30, 100, 300, 1,000, and 3,000 drones, ten seeds each, beside the same seeds held at the cruise speed, a full sweep with no size or seed left out. Each size flew a pilot of 120 s over two seeds, and then a run of 410 to 620 s, the first 20 s of it settling, which spans ten of the slower relaxation time at every size but 10 drones, whose 79 s rearrangement time the 600 s cap cut to under eight. The sweep took 2 h 27 min on one machine. `mise measure` writes each mean and its standard error across the ten seeds out of that run.
+
+Each statistic over its norm, by flock size, sets the flock beside the starlings in one unit, so 1.00 is the norm's own figure and the density ratio, whose norm is any value above 1, stands as measured.
+
+| **Statistic** | **10** | **30** | **100** | **300** | **1,000** | **3,000** |
+|---|---|---|---|---|---|---|
+| `polarization` | 0.89 | 0.92 | 0.78 | 0.73 | 0.73 | 0.70 |
+| `speed_correlation_ratio` | 0.72 | 0.41 | 0.30 | 0.34 | 0.36 | 0.42 |
+| `aspect_ratio` | 7.95 | 5.14 | 5.99 | 5.70 | 4.88 | 4.21 |
+| `middle_aspect_ratio` | 2.30 | 3.01 | 2.69 | 2.84 | 2.60 | 2.72 |
+| `wave_speed_m_s` | 0.11 | 0.18 | 0.46 | 1.11 | 1.80 | 2.63 |
+| `spacing_m` | 4.72 | 1.96 | 1.25 | 0.81 | 0.51 | 0.39 |
+| `border_density` | 778,948 | 117 | 1.19 | 1.13 | 0.23 | 0.17 |
+
+## What the Flock Does
+
+`mise measure` and the site suite's snapshot cases redraw each figure below from the run, the flock in a solid line, its fixed-speed control dashed, each bar a standard error across seeds, and the norm a gray band across its spread or a dotted line where it states none.
+
+![Polarization by flock size](../figures/polarization_by_size.svg)
+
+The flock holds a polarization of 0.86 at 10 drones and falls to 0.67 at 3,000, below the starlings' $`0.96 \pm 0.03`$ at every size. The control falls alike, so holding the speed fixed changes how well the flock aligns by at most 0.06.
+
+The sweep's speed correlation length is drawn from the same run.
+
+![Speed correlation length by flock size](../figures/speed_correlation_ratio_by_size.svg)
+
+The length over which speeds correlate stays a near-constant share of the extent from 100 drones up, 0.11 to 0.15, with a slope against size on logarithmic axes of $`-0.05 \pm 0.02`$ across all six sizes, a length that grows with the flock as a scale-free correlation does, at under half the starlings' $`0.36`$. The control, whose speeds hold only numerical noise about the cruise, reads 0.03 to 0.05 up to 300 drones and climbs to 0.13 at 3,000, so at the largest size the flock's share stands only 0.02 above what the flock's shape alone gives.
+
+The group speed is drawn from the same run.
+
+![Group speed by flock size](../figures/group_speed_m_s_by_size.svg)
+
+The flock's mean speed falls from 9.43 m/s at 10 drones to 8.39 m/s at 3,000, a Spearman rank correlation with size of $`-0.94`$ across the sixty flights, where starlings show none, at $`-0.13`$[^cavagna2022]. Its speed is not confined the way a starling flock's is, and the sweep does not measure why.
+
+The turning wave is drawn from the same run.
+
+![Turning wave speed by flock size](../figures/wave_speed_m_s_by_size.svg)
+
+The crossing speed rises from 3 m/s at 10 drones to 79 m/s at 3,000, a slope of $`0.61 \pm 0.03`$, and passes through the starlings' 20 to 40 m/s near 300 drones. The control reads the same speeds within their errors up to 1,000 drones, so this estimator here reads how the flock's extent grows against the times its drones turn rather than a turn handed from drone to drone through speed, and it says nothing yet on information transfer.
+
+The shape comes from the same run.
+
+![Aspect ratio by flock size](../figures/aspect_ratio_by_size.svg)
+
+![Middle aspect ratio by flock size](../figures/middle_aspect_ratio_by_size.svg)
+
+The flock is far longer than a starling flock, its longest axis 24 to 45 times its thinnest against the starlings' 5.6, while its middle axis over its thinnest, 6.4 to 8.4, stands near three times the starlings' 2.8. Both read the gyration tensor rather than the border the source measures, which weighs a long tail of drones more heavily.
+
+The spacing and the border come from the same run.
+
+![Spacing by flock size](../figures/spacing_m_by_size.svg)
+
+![Border density by flock size](../figures/border_density_by_size.svg)
+
+The nearest-neighbor distance falls from 99 m at 10 drones to 8 m at 3,000, inside the outdoor drone flock's 12 to 30 m at 100 and 300 drones. Below 100 drones the drones sit farther apart than the α-shape's 45 m, so its tetrahedra hold few drones and the border density runs to the thousands, a reading of the α rather than of the flock. From 100 drones up the border reads 1.19 and 1.13 times as dense as the inside at 100 and 300, as a starling flock's is, and 0.23 and 0.17 at 1,000 and 3,000, where a denser core than border reverses it.
+
+The radio's connectivity comes from the same run.
+
+![Radio connectivity by flock size](../figures/connected_by_size.svg)
+
+The largest radio group holds 0.62 to 0.77 of the flock up to 300 drones and 0.95 and 0.99 at 1,000 and 3,000, where the spacing falls well inside the radio's range. The control's falls to 0.55 to 0.58 from 300 drones up, so the speed slot is what keeps a large flock in one radio group.
+
+## Whether the Flock Sits Near a Critical Point
+
+The starling studies read a correlation length growing with the flock and a speed held in a narrow band as a sign that the flock is poised near a critical point, where a small push reaches every bird[^cavagna2010][^bialek2014][^cavagna2022]. The sweep supports the first half only in part: from 100 drones up the length grows with the extent as a scale-free length does, but at under half the starlings' share, and the control's own share climbs to meet it at 3,000. It contradicts the second half, since the group speed falls with size where a starling flock's holds. So the sweep does not show the flock near a critical point, and the polarization below the starlings' at every size points to a flock less ordered than a starling flock.
+
+## What the Sweep Cannot Show
+
+- It flies one composite at its default settings, so it cannot say whether another setting of any slot brings the flock nearer a critical point, which only a sweep across the slots' settings would show
+- It measures no susceptibility or response to a push, the direct test of a critical point the starling studies infer from correlations
+- Its turns are the flock's own, with no predator or threat, so they are not the startled turns the wave speed norm measures, and the control shows the estimator cannot yet tell the two apart
+- Its sizes stop at 3,000 drones and its seeds at ten, so a trend past 3,000 or a spread across launches wider than ten seeds show is outside what it measured
+- Its shape reads the gyration tensor's axes in place of the border's, and its border an α at three launch spacings, so both ratios move with those choices
+
 [^cavagna2010]: Cavagna et al. 2010. "Scale-free correlations in starling flocks." *Proceedings of the National Academy of Sciences* 107(26): 11865–11870. <https://doi.org/10.1073/pnas.1005766107>
 
 [^cavagna2022]: Cavagna et al. 2022. "Marginal speed confinement resolves the conflict between correlation and control in collective behaviour." *Nature Communications* 13(1): 2315. <https://doi.org/10.1038/s41467-022-29883-4>
@@ -55,3 +131,5 @@ The turning wave follows the source's method[^attanasi2014]. Within the frames w
 [^vasarhelyi2018]: Vásárhelyi et al. 2018. "Optimized flocking of autonomous drones in confined environments." *Science Robotics* 3(20): eaat3536. <https://doi.org/10.1126/scirobotics.aat3536>
 
 [^mora2016]: Mora et al. 2016. "Local equilibrium in bird flocks." *Nature Physics* 12(12): 1153–1157. <https://doi.org/10.1038/nphys3846>
+
+[^bialek2014]: Bialek et al. 2014. "Social interactions dominate speed control in poising natural flocks near criticality." *Proceedings of the National Academy of Sciences* 111(20): 7212–7217. <https://doi.org/10.1073/pnas.1324045111>
