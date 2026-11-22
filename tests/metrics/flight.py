@@ -566,9 +566,9 @@ def test_a_rod_s_speed_correlation_length_reads_its_share_of_the_extent():
 def test_stragglers_past_the_shape_s_reach_leave_the_border_density_alone():
     """
     Asserts that a jittered lattice reads the same border density, each
-    drone's from its nearest-neighbor distance, with five sparse drones 20 m
-    past it, which no tetrahedron narrower than the reach holds, as without
-    them.
+    drone's from its nearest-neighbor distance, with five drones 8.7 m apart
+    along its diagonal from (20, 20, 20), which no tetrahedron narrower than
+    the reach holds, as without them.
     """
     lattice = gridded(*[linspace(0.0, 4.0, 5)] * 3) + default_rng(0).uniform(
         -0.01,
@@ -582,6 +582,40 @@ def test_stragglers_past_the_shape_s_reach_leave_the_border_density_alone():
             ratio_on_border(cloud, 1.5, KDTree(cloud).query(cloud, 2)[0][:, 1])
             for cloud in (strays, lattice)
         )
+    )
+
+
+def test_stragglers_past_the_shape_s_reach_leave_the_crossing_speed_alone():
+    """
+    Asserts that a lattice of 729 drones 10 m apart, each turning once a
+    turn spreading at 20 m/s from its center reaches it, reads the same
+    crossing speed beside 300 drones 104 m apart along a diagonal 500 m out,
+    which no tetrahedron narrower than the reach holds and which turn after
+    every drone of the lattice, as alone.
+    """
+    steps   = 10.0 * arange(-4, 5)
+    lattice = gridded(steps, steps, steps)
+
+    def spread(cloud: ndarray) -> float:
+        """
+        Reads the crossing speed of `cloud`, its drones past the lattice
+        turning at 8.5 s.
+        """
+        starts                = 5.0 + linalg.norm(cloud, axis=1) / 20.0
+        starts[len(lattice):] = 8.5
+        angle = pi / 2 / (1 + exp(-(0.1 * arange(200)[:, None] - starts) / 0.2))
+        return crossed(
+            clouds     = broadcast_to(cloud, (200, *cloud.shape)),
+            frame_s    = 0.1,
+            reach_m    = 15.0,
+            velocities = 10.0 * stack([cos(angle), sin(angle), zeros(angle.shape)], -1),
+            window     = 20
+        )
+
+    assert_allclose(
+        spread(concat([lattice, 500.0 + 60.0 * arange(300.0)[:, None] * ones(3)])),
+        spread(lattice),
+        rtol = 0.02
     )
 
 

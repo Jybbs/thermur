@@ -2,7 +2,7 @@
 <rect width="688" height="360" fill="#f2f1ee"/>
 <text x="72" y="28" fill="#17171b" font-family="'Bellefair', Didot, Georgia, serif" font-size="20">Turning Wave Speed by Flock Size</text>
 <rect x="72" y="109.2" width="592" height="42.1" fill="#17171b" fill-opacity="0.1"/>
-<line x1="72" x2="664" y1="286.3" y2="286.3" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="290.3" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">2</text>
+<line x1="72" x2="664" y1="291.0" y2="291.0" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="295.0" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">2</text>
 <line x1="72" x2="664" y1="235.4" y2="235.4" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="239.4" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">5</text>
 <line x1="72" x2="664" y1="193.3" y2="193.3" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="197.3" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">10</text>
 <line x1="72" x2="664" y1="151.3" y2="151.3" stroke="#17171b" stroke-opacity="0.12"/><text x="64" y="155.3" text-anchor="end" fill="#17171b" font-family="'JetBrains Mono', ui-monospace, Menlo, monospace" font-size="12">20</text>

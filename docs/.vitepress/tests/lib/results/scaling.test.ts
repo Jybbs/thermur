@@ -72,6 +72,14 @@ describe('a figure of a statistic by flock size', () => {
     expect(drawn).toContain('>100K</text>')
   })
 
+  it('draws a statistic reaching zero on a linear axis', () => {
+    const zeroed = [0, 0.5, 1].map((mean, place) => ({ error: null, mean, size: CHART.flocking[place]!.size }))
+    const drawn  = scaling.scaling({ ...CHART, fixed: zeroed, flocking: zeroed }, 'light')
+
+    expect(drawn).not.toContain('NaN')
+    expect(drawn).toContain('>0.4</text>')
+  })
+
   it('draws a statistic holding one value throughout', () => {
     const flat = CHART.flocking.map(point => ({ ...point, error: 0, mean: 0 }))
 

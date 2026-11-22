@@ -46,7 +46,7 @@ The turning wave follows the source's method[^attanasi2014]. Within the frames w
 
 ## The Run
 
-The figures and the table below come from one run of `thermur fly sweep` under the default composite and plan at sizes of 10, 30, 100, 300, 1,000, and 3,000 drones, ten seeds each, beside the same seeds held at the cruise speed, a full sweep with no size or seed left out. Each size flew a pilot of 120 s over two seeds, and then a run of 410 to 620 s, the first 20 s of it settling, which spans ten of the slower relaxation time the pilot read at every size but 10 drones, whose 79 s rearrangement time the 600 s cap cut to under eight. Each run reads longer times than its pilot, a rearrangement time of 184 s at 10 drones and an autocorrelation time of 54 s at 3,000, so by its own reading a run spans 3.3 to 7.7 of the slower time, and a time near the length of the pilot's 100 s of settled frames is read from too few of them to pin. The sweep took 2 h 11 min on one machine. `mise measure` writes each mean and its standard error across the ten seeds out of that run.
+The figures and the table below come from one run of `thermur fly sweep` under the default composite and plan at sizes of 10, 30, 100, 300, 1,000, and 3,000 drones, ten seeds each, beside the same seeds held at the cruise speed, a full sweep with no size or seed left out. Each size flew a pilot of 120 s over two seeds, and then a run of 410 to 620 s, the first 20 s of it settling, which spans ten of the slower relaxation time the pilot read at every size but 10 drones, whose 79 s rearrangement time the 600 s cap cut to under eight. Each run reads longer times than its pilot, a rearrangement time of 184 s at 10 drones and an autocorrelation time of 54 s at 3,000, so by its own reading a run spans 3.3 to 7.7 of the slower time, and a time near the length of the pilot's 100 s of settled frames is read from too few of them to pin. The sweep took 2 h 11 min on one machine. `mise measure` writes each mean and its standard error across the seeds that measured it out of that run, all ten but for the border density at 10 and 30 drones, 2 and 8, and the turning wave at 10 drones, 9.
 
 Each statistic over its norm, by flock size, sets the flock beside the starlings in one unit, so 1.00 is the norm's own figure and the density ratio, whose norm is any value above 1, stands as measured.
 
@@ -62,7 +62,7 @@ Each statistic over its norm, by flock size, sets the flock beside the starlings
 
 ## What the Flock Does
 
-`mise measure` and the site suite's snapshot cases redraw each figure below from the run, the flock in a solid line, its fixed-speed control dashed, each bar a standard error across seeds, and the norm a gray band across its spread or a dotted line where it states none, a statistic spanning more than a decade on a logarithmic vertical axis.
+`mise measure` and the site suite's snapshot cases redraw each figure below from the run, the flock in a solid line, its fixed-speed control dashed, each bar a standard error across seeds, and the norm a gray band across its spread or a dotted line where it states none, the vertical axis logarithmic wherever the bars and the norm together span more than a decade.
 
 ![Polarization by flock size](../figures/polarization_by_size.svg)
 
@@ -100,7 +100,7 @@ The spacing and the border come from the same run.
 
 ![Border density by flock size](../figures/border_density_by_size.svg)
 
-The nearest-neighbor distance falls from 99 m at 10 drones to 8 m at 3,000, inside the outdoor drone flock's 12 to 30 m at 100 and 300 drones. At 10 and 30 drones the drones sit 99 m and 41 m apart against the α-shape's 45 m, so its tetrahedra hold few drones and the border reads $`1.06 \pm 0.59`$ and $`3.87 \pm 1.93`$ times as dense as the inside, a reading of the α rather than of the flock. At 100 and 300 drones it reads $`0.92 \pm 0.21`$ and $`1.07 \pm 0.40`$, within a standard error of an even density rather than the denser border of a starling flock, and 0.23 and 0.17 at 1,000 and 3,000, where the core is denser than the border.
+The nearest-neighbor distance falls from 99 m at 10 drones to 8 m at 3,000, inside the outdoor drone flock's 12 to 30 m at 100 and 300 drones. At 10 and 30 drones the drones sit 99 m and 41 m apart against the α-shape's 45 m, so its tetrahedra hold few drones, and only 2 and 8 of the ten seeds hold a drone inside the shape at each of the last ten frames, over which the border reads $`1.06 \pm 0.59`$ and $`3.87 \pm 1.93`$ times as dense as the inside, a reading of the α rather than of the flock. At 100 and 300 drones it reads $`0.92 \pm 0.21`$ and $`1.07 \pm 0.40`$, within a standard error of an even density rather than the denser border of a starling flock, and 0.23 and 0.17 at 1,000 and 3,000, where the core is denser than the border.
 
 The radio's connectivity comes from the same run.
 

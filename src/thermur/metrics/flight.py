@@ -167,9 +167,10 @@ class Flight(Module):
     def border_density(self) -> ndarray:
         """
         Divides the density of the drones on the border of the flock's
-        α-shape at `reach_m` by that of the rest, each from the cube of its
-        nearest-neighbor distance, which holds a border drone's reading free
-        of the empty space beyond the border, over the last frames.
+        α-shape at `reach_m` by that of the drones inside it, each from the
+        cube of its nearest-neighbor distance, which holds a border drone's
+        reading free of the empty space beyond the border, over the last
+        frames.
         """
         return asarray(
             [
@@ -1032,17 +1033,16 @@ def kept(
 
 def ratio_on_border(cloud: ndarray, reach_m: float, spacings: ndarray) -> float:
     """
-    Divides the mean density of the drones on the border of the α-shape
-    of `cloud` at `reach_m` by that of the rest, each from the cube of its
-    distance in `spacings` to its nearest neighbor, leaving out a drone the
-    shape does not reach, `nan` where no drone sits on the border or none
-    inside it.
+    Divides the mean density of the drones on the border of the α-shape of
+    `cloud` at `reach_m` by that of the drones inside it, each from the cube
+    of its distance in `spacings` to its nearest neighbor, `nan` where no
+    drone sits inside it.
     """
     border, inside, _ = alpha_shape(cloud, reach_m)
     density           = spacings**-3.0
     return (
         density[border].mean() / density[inside].mean()
-        if border.any() and inside.any() else nan
+        if inside.any() else nan
     )
 
 

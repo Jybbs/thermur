@@ -105,9 +105,9 @@ export function decades(low: number, high: number): number[] {
  * logarithmic axis joined by a line, its control's dashed, each with its
  * standard error as a bar, over a band across the norm's spread or a dotted
  * line at a figure stated alone, and a size no seed measured left out. A
- * statistic positive throughout and spanning more than a decade reads on a
- * logarithmic vertical axis too, so a value far from the rest leaves the
- * others apart.
+ * figure whose bars and norm lie above zero and together span more than a
+ * decade reads on a logarithmic vertical axis too, so a value far from the
+ * rest leaves the others apart.
  */
 export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = source): string {
   const { bottom, height, left, right, top, width } = FRAME
@@ -117,7 +117,7 @@ export function scaling(chart: Scaling, scheme: Scheme, identity: Identity = sou
   const bounds = norm === undefined ? [] : [norm.figure - (norm.spread ?? 0), norm.figure + (norm.spread ?? 0)]
   const span   = [Math.min(...values, ...bounds), Math.max(...values, ...bounds)] as const
   const logged = span[0] > 0 && span[1] / span[0] > 10
-  const scale  = (value: number) => logged ? Math.log10(Math.max(value, span[0])) : value
+  const scale  = (value: number) => logged ? Math.log10(value) : value
   const ends   = [scale(span[0]), scale(span[1])] as const
   const pad    = (ends[1] - ends[0] || Math.abs(ends[0]) || 1) * 0.08
   const range  = [ends[0] - pad, ends[1] + pad] as const

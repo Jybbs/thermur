@@ -65,4 +65,3 @@ def test_the_task_writes_what_the_run_named_saved_and_prints_where(
         path.exists() == (path in written)
         for path in (measured.MEASURED, measured.STILL_AIR)
     )
-
