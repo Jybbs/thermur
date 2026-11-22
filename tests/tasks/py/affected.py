@@ -163,10 +163,11 @@ def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
     """
     Commits to the `branch` repository a `README.md`, a `guide.md`, a
     `notes.md`, a `NOTICE`, a `mark.png` holding bytes UTF-8 cannot decode,
-    the suite's own conftest, and a suite of nine tests:
+    the suite's own conftest, and a suite of ten tests:
 
     - One opening the README
     - One opening the copy of it `checkout` makes, which the hook maps back onto it
+    - One opening the copy of it `shared` holds, which the hook maps back onto it
     - One opening the README while the hook is paused
     - One opening the README before it requests a fixture by name
     - Two requesting a session fixture that opens the guide once
@@ -199,6 +200,8 @@ def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
             "    assert Path('README.md').read_text()\n\n"
             "def test_copies(checkout):\n"
             "    assert (checkout.root / 'README.md').read_text()\n\n"
+            "def test_shares(checked):\n"
+            "    assert (checked.root / 'README.md').read_text()\n\n"
             "def test_guides_first(guide):\n"
             "    assert guide\n\n"
             "def test_guides_second(guide):\n"
@@ -256,7 +259,8 @@ def test_the_affected_tests_fail_where_no_main_resolves(
             "README.md",
             [
                 "tests/test_flock.py::test_copies", "tests/test_flock.py::test_reads",
-                "tests/test_flock.py::test_reads_then_requests"
+                "tests/test_flock.py::test_reads_then_requests",
+                "tests/test_flock.py::test_shares"
             ],
             id = "read"
         ),
@@ -282,7 +286,8 @@ def test_the_affected_tests_fail_where_no_main_resolves(
                 "tests/test_flock.py::test_reads_nothing",
                 "tests/test_flock.py::test_reads_notice",
                 "tests/test_flock.py::test_reads_paused",
-                "tests/test_flock.py::test_reads_then_requests"
+                "tests/test_flock.py::test_reads_then_requests",
+                "tests/test_flock.py::test_shares"
             ],
             id = "lockfile"
         )
