@@ -2,10 +2,6 @@ name        : Provision
 description : Check the repository out and, where `tools` names any, install mise at the `min_version` floor `.mise/config.toml` sets and then those tools, restoring their archive and saving it again only where `save` is `'true'`.
 
 inputs:
-  depth:
-    default     : '1'
-    description : The number of commits the checkout fetches, which the draft job raises to `'2'` so it reads the version the previous commit declared.
-
   save:
     default     : 'false'
     description : Whether the archive of `tools` is saved once installed, which only the Kit jobs of `🐦‍⬛ Warm` pass as `'true'`, so a pull request restores an archive and never writes one.
@@ -20,7 +16,7 @@ runs:
   steps:
     - name : Check out the repository
       uses : actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      with : { fetch-depth: "${{ inputs.depth }}", persist-credentials: false }
+      with : { persist-credentials: false }
 
     - name  : Read the mise floor `.mise/config.toml` sets
       id    : floor

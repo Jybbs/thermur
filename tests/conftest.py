@@ -175,8 +175,9 @@ def pins(pytestconfig: Config) -> dict[str, str]:
         release `uv.lock` resolves, the `node` major, `python`, and `uv`
         mise pins, the `@types/node`, `knip`, and `vitest` releases the
         site pins, the `glob` release its `overrides` holds, the
-        `@zag-js/toggle` release the kit pins as `toggle`, and each build
-        requirement and constraint, by its package's name.
+        `@zag-js/toggle` release the kit pins as `toggle`, the
+        `[project].version` the manifest declares, and each build requirement
+        and constraint, by its package's name.
     """
     worktree = Checkout(root=pytestconfig.rootpath)
     manifest = worktree.manifest
@@ -197,6 +198,7 @@ def pins(pytestconfig: Config) -> dict[str, str]:
         "toggle"    : kit["@zag-js/toggle"],
         "types"     : site["@types/node"],
         "uv"        : tools["uv"],
+        "version"   : manifest.version,
         "vitest"    : site["vitest"],
         **{
             requirement.name: read_pin(requirement)

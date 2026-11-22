@@ -4,7 +4,7 @@ Every change to *Thermur* starts from an issue, lands on a branch named for that
 
 ## Setting Up the Clone
 
-1. Build the locked environment through the commands under [Quick Start](README.md#-quick-start) in the README, which install every tool `.mise/config.toml` pins and then the packages `uv.lock` resolves.
+1. Build the locked environment through the commands under [Quick Start](README.md#quick-start) in the README, which install every tool `.mise/config.toml` pins and then the packages `uv.lock` resolves.
 2. Run `mise doctor project`, which names any condition the clone still lacks beside the command that supplies it.
 
 ## From an Issue to a Pull Request
