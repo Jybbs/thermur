@@ -167,15 +167,18 @@ def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
 
 
 def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
-    pytestconfig : Config,
-    tmp_path     : Path
+    checked          : Checkout,
+    pytestconfig     : Config,
+    tmp_path         : Path,
+    tmp_path_factory : TempPathFactory
 ):
     """
     Asserts that a case reading the shared copy after another case read a
     `cached_property` through it finds only the fields of `Checkout` set,
     in a suite of its own running the two in order on this conftest, so
     no earlier case hides a patch on `Checkout` from a later one whichever
-    worker runs them.
+    worker runs them. It reads its own `checked` as well, holding only those
+    fields, so `py:affected` runs it on any change to that fixture.
     """
     root = pytestconfig.rootpath
     for path, text in {
@@ -193,13 +196,18 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
         (tmp_path / path).write_text(text, encoding="utf-8")
     committed(Checkout(root=tmp_path))
     ran = run(
-        [executable, "-m", "pytest", "-p", "no:randomly", "-q", "tests"],
+        [
+            executable, "-m", "pytest", "--basetemp",
+            tmp_path_factory.mktemp("inner"),
+            "-p", "no:randomly", "-q", "tests"
+        ],
         capture_output = True,
         cwd            = tmp_path,
         env            = {**environ, "PYTHONPATH": str(root / "tests")},
         text           = True
     )
 
+    assert vars(checked).keys() == Checkout.model_fields.keys()
     assert ran.returncode == 0, ran.stdout
 
 
@@ -223,11 +231,12 @@ def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     Asserts that none of these variables reaches a test, covering the
     ones that set whether a console prints color and whether a task prints
     its GitHub Actions form, the files a GitHub Actions runner collects
-    a workflow step's outputs and a workflow run's summary page from, the
-    branch and the commit `gha:brief` prefers, the ones naming where a tool
-    keeps its cache, configuration, data, and state, a variable opening on
-    the `env_prefix` of `Settings` in either case, which sets a setting, and
-    one opening on `usage_`, through which mise hands a task its flags.
+    a workflow step's outputs and a workflow run's summary page from,
+    the branch and the commit `gha:brief` prefers, the one adding options
+    to each pytest run a case starts, the ones naming where a tool keeps
+    its cache, configuration, data, and state, a variable opening on the
+    `env_prefix` of `Settings` in either case, which sets a setting, and one
+    opening on `usage_`, through which mise hands a task its flags.
     """
     assert name not in environ
 

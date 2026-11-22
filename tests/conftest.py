@@ -100,16 +100,18 @@ def environment(
     tmp_path_factory : TempPathFactory
 ):
     """
-    Clears every shell variable `CLEARED` names, any of which would let
-    the machine running the suite change a result. Some set whether a
-    console prints color, `GITHUB_ACTIONS` sets whether a task prints its
-    GitHub Actions form, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name the
-    files a GitHub Actions runner collects a workflow step's outputs and
-    a workflow run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT`
-    name the branch and the commit `gha:brief` prefers over the ones a case
-    sets. `CI`, which a GitHub Actions runner sets, and `MISE_YES` each
-    turn on mise's `yes` setting, which answers a task's `confirm` prompt
-    without asking. The rest name the folders where a tool keeps its cache,
+    Clears every shell variable `CLEARED` names, any of which would let the
+    machine running the suite change a result. Some set whether a console
+    prints color, `GITHUB_ACTIONS` sets whether a task prints its GitHub
+    Actions form, `GITHUB_OUTPUT` and `GITHUB_STEP_SUMMARY` name the files a
+    GitHub Actions runner collects a workflow step's outputs and a workflow
+    run's summary page from, and `GITHUB_HEAD_REF` and `COMMIT` name the
+    branch and the commit `gha:brief` prefers over the ones a case sets.
+    `CI`, which a GitHub Actions runner sets, and `MISE_YES` each turn on
+    mise's `yes` setting, which answers a task's `confirm` prompt without
+    asking. `PYTEST_ADDOPTS` adds its options to each pytest run a case
+    starts, where `--numprocesses` would split the cases of one inner run
+    across workers. The rest name the folders where a tool keeps its cache,
     configuration, data, and state, which the XDG convention defines. It
     also clears every variable opening on the `env_prefix` of `Settings`,
     which pydantic-settings matches to the field it names whatever its case,
