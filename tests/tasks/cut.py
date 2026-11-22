@@ -232,8 +232,9 @@ def test_the_task_exits_with_the_status_its_path_calls_for(
 ):
     """
     Asserts that the task, run as its own process, prints the path, the URL,
-    and the version and exits with status `0` on the created path and `1` on
-    the published one, which fails the draft job and the gate after it.
+    and the version, prints nothing on stderr, and exits with status `0` on
+    the created path and `1` on the published one, which fails the draft job
+    and the gate after it.
     """
     monkeypatch.setenv("RELEASES", releases)
 
