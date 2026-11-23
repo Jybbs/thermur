@@ -102,10 +102,9 @@ def environment(
     sets. `CI`, which a GitHub Actions runner sets, and `MISE_YES` each
     turn on mise's `yes` setting, which answers a task's `confirm` prompt
     without asking. `UV_OFFLINE` and `MISE_OFFLINE` keep uv and mise off
-    the network, so a command a test starts would refuse even the hosts its
-    socket marks allow. The rest name the folders where a tool keeps its
-    cache, configuration, data, and state, which the XDG convention defines.
-    It also clears every variable opening on the `env_prefix` of `Settings`,
+    the network. The rest name the folders where a tool keeps its cache,
+    configuration, data, and state, which the XDG convention defines. It
+    also clears every variable opening on the `env_prefix` of `Settings`,
     which pydantic-settings matches to the field it names whatever its case,
     and every one opening on `usage_`, through which mise hands a task each
     flag its usage spec declares and which every program the task starts

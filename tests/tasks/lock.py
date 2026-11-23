@@ -449,8 +449,8 @@ def test_the_sync_leaves_a_release_newer_than_the_window_out_of_uv_lock(
     declares ago and `2.0.0` half of it ago, locks `1.0.0` in `uv.lock`,
     reading the window the worktree's `pyproject.toml` declares.
 
-    The manifest sets `offline` to `false`, which outranks a user or system
-    `uv.toml` keeping uv offline, so uv reaches the registry on `127.0.0.1`.
+    The manifest sets `offline` to `false`, which outranks the same key in a
+    system `uv.toml` such as `/etc/uv/uv.toml`.
     """
     window   = Checkout(root=copy).manifest.window
     now      = datetime.now(UTC)
