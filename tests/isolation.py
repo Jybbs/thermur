@@ -12,6 +12,7 @@ same name would hide from collection.
 """
 
 from collections.abc  import Iterator
+from common.children  import runs
 from common.edits     import committed
 from common.isolation import CLEARED, copied_once, pytest_collection_modifyitems
 from jax              import config
@@ -179,8 +180,10 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
     in a suite of its own running the two in order on this conftest, so
     no earlier case hides a patch on `Checkout` from a later one whichever
     worker runs them. The suite carries an empty `pytest.toml`, so pytest
-    reads no configuration from a folder above it. It requests `checked` as
-    well, so `py:affected` runs it on any change to that fixture.
+    reads no configuration from a folder above it. The case requests
+    `checked` as well, so `py:affected` runs it on any change to that
+    fixture, and calls `runs` on the modules declaring the records the inner
+    suite reads, so a change to the top-level block of either runs it too.
     """
     root = pytestconfig.rootpath
     for path, text in {
@@ -190,7 +193,8 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
         "tests/test_cached.py" : (
             "from thermur.repo.checkout import Checkout\n\n"
             "def test_caches(checked):\n"
-            "    assert checked.config\n\n"
+            "    assert checked.config\n"
+            "    assert 'config' in vars(checked)\n\n"
             "def test_starts_clean(checked):\n"
             "    assert vars(checked).keys() == Checkout.model_fields.keys()\n"
         )
@@ -198,6 +202,7 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
         (tmp_path / path).parent.mkdir(exist_ok=True, parents=True)
         (tmp_path / path).write_text(text, encoding="utf-8")
     committed(Checkout(root=tmp_path))
+    runs("thermur.repo.checkout", "thermur.repo.schemas")
     ran = run(
         [
             executable, "-m", "pytest", "--basetemp",
