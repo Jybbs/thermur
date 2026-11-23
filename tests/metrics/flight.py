@@ -296,6 +296,40 @@ def test_a_flight_of_100_drones_keeps_a_starling_flock_s_shape(hundred: Flight):
 
 
 @mark.slow
+@mark.parametrize(
+    ("drones", "duration_s"),
+    [
+        param(448, 120.0, id="448-for-two-minutes"),
+        param(448, 300.0, id="448-for-five-minutes"),
+        param(1000, 120.0, id="1000-for-two-minutes")
+    ]
+)
+def test_a_larger_flight_keeps_a_starling_flock_s_shape(
+    composite  : Composite,
+    drones     : int,
+    duration_s : float
+):
+    """
+    Asserts that a flight of 448 drones, the smallest of the starling
+    flocks the span is read from, and one of 1000 hold the largest group's
+    longest axis within 4.02 to 6.94 times its thinnest, averaged as at 100
+    drones, whereas a roost pulling toward one height with no band about it
+    stretches 448 past the span.
+
+    The flight of 1000 runs two minutes rather than five, which keeps the
+    suite inside its CI job's limit.
+    """
+    settings = Settings()
+    flight   = Flight.flown(
+        WrfOutput.from_settings(settings).air,
+        composite,
+        settings.plan.changed(drones=drones, duration_s=duration_s)
+    )
+
+    assert 4.02 <= flight.group_aspect_ratios.mean(0)[2] <= 6.94
+
+
+@mark.slow
 def test_a_flight_of_100_drones_sets_off_zigs(hundred: Flight):
     """
     Asserts that some drone of a flight of 100 drones after two minutes and
@@ -320,12 +354,12 @@ def test_a_flight_of_100_drones_keeps_the_outdoor_drone_flock_s_spacing(
 @mark.slow
 def test_a_flight_of_100_drones_keeps_every_drone_over_the_roost(hundred: Flight):
     """
-    Asserts that every drone of a flight of 100 drones after two minutes
-    and after five sits within the roost's radius of its center and above
-    the ground.
+    Asserts that every drone of a flight of 100 drones through two minutes
+    and through five sits within the roost's radius of its center and above
+    the ground at every kept frame.
     """
     roost = Settings().roost
-    spots = asarray(hundred.frames.positions)[:, -1]
+    spots = asarray(hundred.frames.positions)
 
     assert (
         linalg.norm(spots[..., :2] - asarray(roost.center_m), axis=-1) <= roost.radius_m

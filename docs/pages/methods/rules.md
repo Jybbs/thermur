@@ -24,8 +24,8 @@ The table is written from the record each flight reads, set under `[tool.thermur
 |---|---|---|---|
 | `airspeeds_m_s` | `[6.9, 15.2]` |  | The slowest and the fastest speed at which a drone's speed stays stable under one step of the integrator, in meters per second, the range the centers of starling flocks fly at |
 | `axes` | `[5.6, 2.8, 1.0]` |  | The launch cloud's length, width, and depth, in proportion, the thin horizontal shape measured on starling flocks, whose long axis holds no fixed bearing to their motion, launched with its long axis along the course and its thin axis vertical |
-| `center_m` | `[1000.0, 1000.0, 100.0]` |  | The center of the launch cloud, east, north, and above the ground, in meters, by default on the parametric threat's course to the front it crosses within two minutes, its height the lowest the launch's center takes, which `clearance_sd` raises for a deeper cloud |
-| `clearance_sd` | `4.0` | above 0 | The vertical standard deviations of the launch cloud its center sits at least above the ground, by default 4, past which a Gaussian draw falls for 0.003% of drones, so about one flock of 1,000 in 32 sets a drone on the ground |
+| `center_m` | `[1000.0, 1000.0, 150.0]` |  | The center of the launch cloud, east, north, and above the ground, in meters, by default on the parametric threat's course to the front it crosses within two minutes, its height the lowest the launch's center takes, which `clearance_sd` raises for a deeper cloud |
+| `clearance_sd` | `4.0` | above 0 | The vertical standard deviations of the launch cloud its center sits at least above the ground, by default 4, past which a Gaussian draw falls for 0.003% of drones, so about one flock of 2,000 in 16 sets a drone on the ground |
 | `course_deg` | `180.0` |  | The launch heading in degrees counterclockwise from east, by default west |
 | `cruise_m_s` | `10.0` | above 0 | The speed each drone launches and cruises at, in meters per second |
 | `drones` | `1000` | at least 1 | The size of the flock, by default near the median of the ten starling flocks of 448 to 2,631 birds the topological interaction was measured on |
@@ -94,11 +94,12 @@ The roost slot keeps the flock flat through the vertical part of the starling mo
 
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
+| `band_m` | `5.33` | at least 0 | The depth of the band centered on `height_m` that no pull acts in, in meters, at a starling's scale, by default the thickness measured on the starling flock of 781 birds, which the model's flock setting that scale is matched to |
 | `bound_m_s2` | `5.0` | above 0 | The largest turning acceleration, in meters per second squared, by default the plant's bound on a horizontal acceleration |
 | `center_m` | `[1000.0, 1000.0]` |  | The disk's center east and north, in meters, by default the launch's |
-| `height_m` | `100.0` |  | The height the drone is pulled toward, in meters above the ground, by default that of the launch's center, which a flock of more than 304 drones launches above |
+| `height_m` | `150.0` |  | The height of the band's middle, in meters above the ground, by default that of the launch's center, which a flock of more than 1,026 drones launches above |
 | `radius_m` | `1000.0` | above 0 | The disk's radius, in meters |
-| `stiffness_per_s2` | `2.5` | at least 0 | The acceleration toward the height per meter away from it, in reciprocal square seconds, at a starling's scale, by default the starling model's vertical weight of 0.2 newtons per meter over its bird's mass of 80 grams, read per meter since the model multiplies it by the height away, although its table of parameters lists it in newtons |
+| `stiffness_per_s2` | `2.5` | at least 0 | The acceleration toward the band per meter outside it, in reciprocal square seconds, at a starling's scale, by default the starling model's vertical weight of 0.2 newtons per meter over its bird's mass of 80 grams, read per meter since the model multiplies it by the height away, although its table of parameters lists it in newtons |
 | `turn` | `0.94` | at least 0 | The turn rate times the time to reach the rim, in radians, by default the strength fitted to fish turning from the wall of their tank |
 
 <!-- /roost -->

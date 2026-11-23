@@ -71,9 +71,10 @@ export function excited(
 
 /**
  * Writes the roost's acceleration on the drone at `at` of `positions` and
- * `commands` into `into` at the same place: the pull toward the height `place`
- * sets, damped against its climb, and the turn away from the rim of the disk
- * `place` sets that its course would reach, as the package's `Home` gives.
+ * `commands` into `into` at the same place: the pull toward the band about the
+ * height `place` sets, damped against its climb, and the turn away from the
+ * rim of the disk `place` sets that its course would reach, as the package's
+ * `Home` gives.
  */
 export function home(
   at        : number,
@@ -84,6 +85,8 @@ export function home(
   roost     : Model['roost']
 ): void {
   const { center_m, height_m, radius_m } = place
+  const half    = roost.band_m / 2
+  const away    = positions[at + 2]! - height_m
   const gx      = commands[at]!, gy = commands[at + 1]!
   const ox      = positions[at]! - center_m[0], oy = positions[at + 1]! - center_m[1]
   const along   = ox * gx + oy * gy
@@ -100,7 +103,7 @@ export function home(
   const lateral = -Math.min(rate, roost.bound_m_s2) / Math.max(Math.hypot(px, py), TINY)
   into[at]      = lateral * px
   into[at + 1]  = lateral * py
-  into[at + 2]  = -roost.stiffness_per_s2 * (positions[at + 2]! - height_m)
+  into[at + 2]  = -roost.stiffness_per_s2 * (away - Math.min(Math.max(away, -half), half))
                 - 2 * Math.sqrt(roost.stiffness_per_s2) * commands[at + 2]!
 }
 
