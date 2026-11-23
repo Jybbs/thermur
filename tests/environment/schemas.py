@@ -5,9 +5,9 @@ Pins the records the fire data is read through:
 - The points and sizes of the `Grid` a threat lays its dataset out on
 - The dataset a `ParametricThreat` builds under WRF's names, and the reach
   its validator holds the front to
-- The address and length of the `Sample`, the request it sends, the fetch
-  that checks and moves its file into place, and the checks it holds a
-  window's figures to
+- The address, interval, and length of the `Sample`, the credit it gives,
+  the request it sends, the fetch that checks and moves its file into place,
+  and the checks it holds a window's figures to
 - The docstring `documented` gives each field of a record
 """
 
@@ -31,9 +31,11 @@ from thermur.environment.schemas import (
     BASE_K,
     Crop,
     DRY_AIR_J_KG_K,
+    Deposit,
     GRAVITY_M_S2,
     Grid,
     HEAT_CAPACITY_J_KG_K,
+    License,
     ParametricThreat,
     REFERENCE_PA,
     Sample,
@@ -304,16 +306,31 @@ def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
     sample holds, crediting no creator the dataset does not name.
     """
     assert Sample(
-        dataset    = "Test Dataset by A. Author, https://doi.org/10.0000/test",
-        license    = "CC0 1.0",
+        dataset = Deposit(
+            creators = ("Ada Author", "Bo de Brie"),
+            doi      = "10.0000/test",
+            title    = "Test Dataset"
+        ),
+        license    = License(address="https://license.test", name="CC0 1.0"),
         simulation = "wrfout_W3F1R0"
     ).attributes == {
-        "license" : "CC0 1.0",
+        "license" : "CC0 1.0, https://license.test",
         "source"  : (
-            "Cut from wrfout_W3F1R0 of the Test Dataset by A. Author, "
-            "https://doi.org/10.0000/test"
+            "Cut from wrfout_W3F1R0 of the Test Dataset by Ada Author and "
+            "Bo de Brie, https://doi.org/10.0000/test"
         )
     }
+
+
+def test_a_sample_measures_its_interval_between_its_snapshots():
+    """
+    Asserts that a sample's interval is the one gap its snapshots stand at,
+    and that snapshots at more than one gap are refused.
+    """
+    assert Sample(times_s=(0.0, 30.0, 60.0)).interval_s == 30.0
+
+    with raises(ValueError, match="too many values to unpack"):
+        _ = Sample(times_s=(0.0, 30.0, 45.0)).interval_s
 
 
 def test_a_sample_measures_its_length_across_its_rectangle():

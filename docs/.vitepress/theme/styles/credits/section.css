@@ -1,0 +1,23 @@
+.credits-section {
+  align-items           : center;
+  display               : grid;
+  gap                   : 1rem 1.75rem;
+  grid-template-columns : 9rem minmax(0, 1fr);
+  margin                : 1.5rem 0;
+}
+
+.vp-doc .credits-lines ul {
+  list-style : none;
+  margin     : 0;
+  padding    : 0;
+}
+
+.credits-lines { overflow-wrap: anywhere; }
+
+.vp-doc .credits-lines code { white-space: nowrap; }
+
+@media (width < 40rem) {
+  .credits-section { grid-template-columns: minmax(0, 1fr); }
+
+  .credits-seal { justify-self: center; }
+}

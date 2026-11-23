@@ -3,8 +3,9 @@ Holds `Outputs`, the files the `docs:render` task writes into the site
 and every Markdown page git tracks, which `repo:audit` holds the committed
 copies to, beside `tabled`, which lays a record's fields out as the table a
 page's region holds, `specimens`, which lays out the identity as the regions
-of The Visual Identity, and `pieces`, which lays out the kit's pieces as the
-region of The Kit.
+of The Visual Identity, `pieces`, which lays out the kit's pieces as the
+region of The Kit, and `credited`, which lays out the plume dataset's credit
+as the lines closing the Data page.
 """
 
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
@@ -61,6 +62,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
     The file the site's flocks read each default slot's kind and parameters
     from, beside the fields of the plan their launch and their step read.
+    """
+
+    credit: Path = Path("docs/.vitepress/lib/rendered/credit.json")
+    """
+    The file the Data page's seal and band of snapshots, and the link closing
+    each figure drawn from the sample, read the plume dataset's credit from.
     """
 
     crop: Path = Path("docs/.vitepress/lib/rendered/crop.json")
@@ -133,15 +140,16 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     @cached_property
     def regions(self) -> dict[Path, dict[str, str]]:
         """
-        Renders the body of each region the render task writes into a page,
-        by the page's path and then by the region's name, meaning the fields
-        `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
-        Data page, on The Interaction Rules the fields `Plan`, the contact,
-        the plant, the radio, and the roost declare beside those of each
-        open slot's default and each of its candidates, every one named for
-        its component, on The Visual Identity the identity as `specimens`
-        lays it out, and on The Kit the pieces each declaration in the clone
-        records.
+        Renders the body of each region the render task writes into a
+        page, by the page's path and then by the region's name, meaning
+        on the Data page the fields `Sample`, `Crop`, `Ranges`, and
+        `ParametricThreat` declare beside the plume dataset's credit as
+        `credited` lays it out, on The Interaction Rules the fields `Plan`,
+        the contact, the plant, the radio, and the roost declare beside
+        those of each open slot's default and each of its candidates, every
+        one named for its component, on The Visual Identity the identity as
+        `specimens` lays it out, and on The Kit the pieces each declaration
+        in the clone records.
         """
         defaults = Settings()
         return {
@@ -150,10 +158,11 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 "pieces": pieces(Piece.declared(self.checkout.root))
             },
             Path("docs/pages/data/index.md")         : {
-                "crop"   : tabled(Crop),
-                "ranges" : tabled(Ranges),
-                "sample" : tabled(Sample),
-                "threat" : tabled(ParametricThreat)
+                "credits" : credited(Sample()),
+                "crop"    : tabled(Crop),
+                "ranges"  : tabled(Ranges),
+                "sample"  : tabled(Sample),
+                "threat"  : tabled(ParametricThreat)
             },
             Path("docs/pages/methods/rules.md")      : {
                 slot.name: tabled(type(getattr(defaults, slot.name)))
@@ -202,12 +211,13 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         """
         Renders the text of each file the render task writes, by its path,
         the identity as JSON with its fields in the order the records
-        declare them, the crop's heights as JSON beside the sample's length
-        and snapshot times, the default threat as JSON beside the constants
-        its air is worked out from, the changes each condition of each trial
-        makes to the plan as JSON by slot, and each page with its regions
-        as `Page.filled` writes them and its definitions as `Page.cited`
-        writes them.
+        declare them, the plume dataset's credit as JSON beside the count
+        of the sample's snapshots, the crop's heights as JSON beside the
+        sample's length and snapshot times, the default threat as JSON
+        beside the constants its air is worked out from, the changes each
+        condition of each trial makes to the plan as JSON by slot, and
+        each page with its regions as `Page.filled` writes them and its
+        definitions as `Page.cited` writes them.
         """
         crop   = Crop().model_dump(include={"floor_m", "levels", "spacing_m"})
         sample = Sample()
@@ -238,6 +248,16 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 },
                 default = float,
                 indent  = 2
+            ) + "\n",
+            self.credit    : dumps(
+                {
+                    "license"   : sample.license.name,
+                    "snapshots" : len(sample.times_s),
+                    "surnames"  : sample.dataset.surnames,
+                    "title"     : sample.dataset.title,
+                    "year"      : sample.dataset.year
+                },
+                indent = 2
             ) + "\n",
             self.crop      : dumps(
                 crop | {"length_m": sample.length_m, "times_s": sample.times_s},
@@ -297,6 +317,30 @@ def colored(name: str, palette: Palette) -> str:
     code, such as ``Fire Lord Deep `#995500` `` for `fire-lord-deep`.
     """
     return f"{name.replace('-', ' ').title()} `{palette.colors[name]}`"
+
+
+def credited(sample: Sample) -> str:
+    """
+    Lays out the credit CC BY 4.0 asks of a modified work as the list
+    closing the Data page: the dataset `sample` is cut from, its creators,
+    its publisher and year, its license, and what the cut keeps and the
+    format it is written in, the `snapshots` marker standing where the site
+    draws the snapshots.
+    """
+    dataset = sample.dataset
+    return "\n".join(
+        (
+            f"- [{dataset.title}]({dataset.address})",
+            f"- Created by {dataset.authors}",
+            f"- Published by {dataset.publisher} in {dataset.year}",
+            f"- Licensed under [{sample.license.name}]({sample.license.address})",
+            f"- Cut from the dataset's `{sample.simulation}` to "
+            f"{len(sample.times_s)} snapshots `{sample.interval_s:g} s` apart, from "
+            f"{sample.window_s[0]:,.0f}\N{NO-BREAK SPACE}s <!-- snapshots --> to "
+            f"{sample.window_s[1]:,.0f}\N{NO-BREAK SPACE}s, and "
+            f"rewritten as {sample.format}"
+        )
+    )
 
 
 def described(kind: type[BaseModel], name: str) -> str:

@@ -1,0 +1,20 @@
+.vp-doc .credits-snapshots {
+  --credits-cool : var(--th-heat-5);
+  --credits-hot  : var(--th-heat-3);
+  --credits-mid  : var(--th-heat-4);
+  display        : inline-block;
+  height         : 0.45em;
+  vertical-align : baseline;
+}
+
+.dark .vp-doc .credits-snapshots {
+  --credits-cool : var(--th-heat-3);
+  --credits-hot  : var(--th-heat-1);
+  --credits-mid  : var(--th-heat-2);
+}
+
+.credits-cool { stop-color: var(--credits-cool); }
+
+.credits-hot { stop-color: var(--credits-hot); }
+
+.credits-mid { stop-color: var(--credits-mid); }

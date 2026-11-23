@@ -1,0 +1,25 @@
+.credits-caption {
+  color : var(--vp-c-text-2);
+  font  : 400 0.95rem / 1.5rem var(--vp-font-family-base);
+}
+
+.vp-doc .credits-link {
+  color           : var(--vp-c-text-3);
+  display         : inline-block;
+  font            : 500 0.66rem / 1.5rem var(--vp-font-family-mono);
+  letter-spacing  : 0.1em;
+  margin-left     : 0.25rem;
+  min-height      : 1.5rem;
+  text-decoration : none;
+  text-transform  : uppercase;
+  transition      : color var(--th-settle) var(--th-settle-curve);
+  white-space     : nowrap;
+}
+
+.vp-doc .credits-link:is(:hover, :focus-visible, :active) { color: var(--vp-c-text-1); }
+
+.vp-doc .credits-link:focus-visible {
+  border-radius  : 2px;
+  outline        : 2px solid var(--th-lead);
+  outline-offset : 3px;
+}

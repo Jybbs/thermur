@@ -2,13 +2,13 @@
 Pins what the render task writes and how it reads the copies the
 repository holds:
 
-- The identity as JSON, the crop with the shape of the sample as JSON, the
-  threat with the constants of its air as JSON, the conditions of each trial
-  as JSON, the default slots and the plan the site's flocks fly as JSON
-  beside one step of three small flocks under them and a run of the radio,
-  the zig drawn in place of the key moving as the step's own, and each page
-  carrying the definition of every study it cites and each region written
-  from its record
+- The identity as JSON, the plume dataset's credit as JSON, the crop with
+  the shape of the sample as JSON, the threat with the constants of its air
+  as JSON, the conditions of each trial as JSON, the default slots and the
+  plan the site's flocks fly as JSON beside one step of three small flocks
+  under them and a run of the radio, the zig drawn in place of the key
+  moving as the step's own, and each page carrying the definition of every
+  study it cites and each region written from its record
 - A drifted or missing copy reported, and only a drifted copy written again
 - Each marker naming no entry listed on its page, and each region missing
   its pair of markers refused
@@ -29,13 +29,15 @@ from typing       import Annotated
 from thermur.controller.components import HardSphere, Home
 from thermur.controller.schemas    import Composite, Flock, Radio
 from thermur.docs.kit              import Piece
-from thermur.docs.outputs          import Outputs, flown, markdown_table, pieces, specimens, tabled
+from thermur.docs.outputs          import Outputs, credited, flown, markdown_table, pieces, specimens, tabled
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas import (
     BASE_K,
     Crop,
+    Deposit,
     GRAVITY_M_S2,
     HEAT_CAPACITY_J_KG_K,
+    License,
     ParametricThreat,
     Ranges,
     Sample
@@ -132,7 +134,7 @@ def test_a_missing_page_refuses_each_of_its_regions(checkout: Checkout):
     assert [finding.message for finding in Outputs(checkout=checkout).refused] == [
         f"`{DATA}` does not carry the opening and then the closing marker of its "
         f"`{name}` region once each, so `mise render` leaves the region as it stands"
-        for name in ("crop", "ranges", "sample", "threat")
+        for name in ("credits", "crop", "ranges", "sample", "threat")
     ]
 
 
@@ -172,6 +174,38 @@ def test_a_region_missing_its_pair_of_markers_is_refused_and_left(checkout: Chec
     assert outputs.write() == [DATA]
     assert f"\n\n{tabled(Crop)}\n\n" in checkout.read(DATA)
     assert "<!-- /sample -->" not in checkout.read(DATA)
+
+
+def test_a_sample_s_credit_is_laid_out_line_by_line():
+    """
+    Asserts that the credit links the dataset's title to its DOI and the
+    license to its terms, names the creators, the publisher, and the year,
+    and closes on the simulation, its snapshots, and the format, with the
+    marker of the snapshots between the first time and the last.
+    """
+    assert credited(
+        Sample(
+            dataset = Deposit(
+                creators  = ("Ada Author", "Bo Brie"),
+                doi       = "10.0000/test",
+                publisher = "Test Repository",
+                title     = "Test Dataset",
+                year      = 1999
+            ),
+            format     = "Zarr",
+            license    = License(address="https://license.test", name="CC0 1.0"),
+            simulation = "wrfout_W3F1R0",
+            times_s    = (990.0, 1020.0)
+        )
+    ).split("\n") == [
+        "- [Test Dataset](https://doi.org/10.0000/test)",
+        "- Created by Ada Author and Bo Brie",
+        "- Published by Test Repository in 1999",
+        "- Licensed under [CC0 1.0](https://license.test)",
+        "- Cut from the dataset's `wrfout_W3F1R0` to 2 snapshots `30 s` apart, from "
+        "990\N{NO-BREAK SPACE}s <!-- snapshots --> to 1,020\N{NO-BREAK SPACE}s, and "
+        "rewritten as Zarr"
+    ]
 
 
 def test_a_table_bolds_each_heading_above_its_rows():
@@ -284,18 +318,19 @@ def test_each_marker_naming_no_entry_is_listed_on_its_page(checkout: Checkout):
 
 def test_each_region_is_written_from_its_record(checkout: Checkout):
     """
-    Asserts that the Data page carries the fields `Sample`, `Crop`,
-    `Ranges`, and `ParametricThreat` declare, and that every region of every
-    page sits between its pair of markers as the render writes it, so the
-    copies the repository holds have not drifted.
+    Asserts that the Data page carries the plume dataset's credit and the
+    fields `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare, and
+    that every region of every page sits between its pair of markers as the
+    render writes it, so the copies the repository holds have not drifted.
     """
     outputs = Outputs(checkout=checkout)
 
     assert outputs.regions[DATA] == {
-        "crop"   : tabled(Crop),
-        "ranges" : tabled(Ranges),
-        "sample" : tabled(Sample),
-        "threat" : tabled(ParametricThreat)
+        "credits" : credited(Sample()),
+        "crop"    : tabled(Crop),
+        "ranges"  : tabled(Ranges),
+        "sample"  : tabled(Sample),
+        "threat"  : tabled(ParametricThreat)
     }
     assert all(
         f"<!-- {name} -->\n\n{body}\n\n<!-- /{name} -->" in checkout.read(page)
@@ -469,6 +504,26 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     assert curve["points"][1] == curve["points"][2]
     assert sorted(curve["order"]) == list(range(len(curve["points"])))
     assert outputs.parity not in outputs.drifted
+
+
+def test_the_render_writes_the_credit_the_site_draws(checkout: Checkout):
+    """
+    Asserts that the credit's file holds the dataset's title, its creators'
+    surnames, its year, its license, and the count of the sample's
+    snapshots, and that neither its copy nor the Data page's has drifted,
+    so a change to the record's credit or license fails here until both are
+    rendered again.
+    """
+    outputs, sample = Outputs(checkout=checkout), Sample()
+
+    assert loads(outputs.written[outputs.credit]) == {
+        "license"   : sample.license.name,
+        "snapshots" : len(sample.times_s),
+        "title"     : sample.dataset.title,
+        "year"      : sample.dataset.year,
+        "surnames"  : ["Moisseeva", "Stull"]
+    }
+    assert not {DATA, outputs.credit} & set(outputs.drifted)
 
 
 def test_the_render_writes_the_crop_beside_the_shape_of_the_sample():

@@ -31,13 +31,19 @@ The table below pins the snapshots the window holds, the area of the cells whose
 | **Field** | **Default** | **Bound** | **Holds** |
 |---|---|---|---|
 | `burning_m2` | `[1272000.0, 1443200.0]` |  | The area of the cells whose ground heat flux shows burning, in the first snapshot and in the last, in square meters |
-| `dataset` | `WRF-SFIRE LES Synthetic Wildfire Plume Dataset by Nadya Moisseeva and Roland Stull, https://doi.org/10.20383/102.0314` |  | The credit of the dataset the sample is cut from, naming its title, its creators, and its DOI |
+| `dataset.creators` | `['Nadya Moisseeva', 'Roland Stull']` |  | The dataset's creators, in the order its record lists them |
+| `dataset.doi` | `10.20383/102.0314` |  | The DOI the dataset is registered under |
+| `dataset.publisher` | `Federated Research Data Repository / dépôt fédéré de données de recherche` |  | The repository publishing the dataset |
+| `dataset.title` | `WRF-SFIRE LES Synthetic Wildfire Plume Dataset` |  | The dataset's title |
+| `dataset.year` | `2020` | at least 1 | The year the dataset was published |
 | `digest` | `6e9eed4b67be50f4fe4509b198f30df85261c2347e5ca3c27f117dd5d22c82df` |  | The SHA-256 digest of the file |
 | `file` | `wrf_sample.nc` |  | The file the bucket serves the sample as, under the name the fetch writes it by |
 | `folder` | `data/samples` |  | The folder the fetch writes the file into, relative to the clone |
+| `format` | `NetCDF-4` |  | The format the cut writes the file in |
 | `host` | `https://data.thermur.fyi` |  | The address of the public Cloudflare R2 bucket serving the file, on its custom domain |
 | `hottest_k` | `322.0` | above 0 | The hottest air on the fixed heights in any snapshot, in kelvin |
-| `license` | `CC BY 4.0, https://creativecommons.org/licenses/by/4.0/` |  | The license the dataset is published under, which the sample stays under |
+| `license.address` | `https://creativecommons.org/licenses/by/4.0/` |  | The address of the license's terms |
+| `license.name` | `CC BY 4.0` |  | The license's name |
 | `simulation` | `wrfout_W5F7R4` |  | The output of the plume dataset the sample is cut from |
 | `timeout_s` | `60.0` | above 0 | The longest the download waits on the connection or on one read, in seconds |
 | `times_s` | `[4680.0, 4695.0, 4710.0, 4725.0, 4740.0, 4755.0, 4770.0, 4785.0, 4800.0]` |  | The time of each snapshot the output holds, in seconds since the simulation started |
@@ -120,6 +126,20 @@ The drawing below runs the threat's own formula at ten times its pace, so the ho
 | `speed_m_s` | `1.0` | at least 0 | The speed at which the front advances east, in meters per second |
 
 <!-- /threat -->
+
+## Credits
+
+The sample is a modified copy of the dataset, so it carries the attribution CC BY 4.0 asks of one. The lines below are written from the record the package pins the sample in, and `mise render` rewrites them.
+
+<!-- credits -->
+
+- [WRF-SFIRE LES Synthetic Wildfire Plume Dataset](https://doi.org/10.20383/102.0314)
+- Created by Nadya Moisseeva and Roland Stull
+- Published by Federated Research Data Repository / dépôt fédéré de données de recherche in 2020
+- Licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Cut from the dataset's `wrfout_W5F7R4` to 9 snapshots `15 s` apart, from 4,680 s <!-- snapshots --> to 4,800 s, and rewritten as NetCDF-4
+
+<!-- /credits -->
 
 [^moisseeva2021]: Moisseeva and Stull 2021. "Wildfire smoke-plume rise: a simple energy balance parameterization." *Atmospheric Chemistry and Physics* 21(3): 1407–1425. <https://doi.org/10.5194/acp-21-1407-2021>
 

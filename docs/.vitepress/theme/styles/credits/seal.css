@@ -1,0 +1,68 @@
+.credits-seal {
+  display  : block;
+  overflow : visible;
+  width    : 9rem;
+}
+
+.credits-ring-core,
+.credits-ring-edge,
+.credits-ring-hair {
+  fill         : none;
+  stroke       : var(--th-lead);
+  stroke-width : 1.4;
+}
+
+.credits-ring-hair {
+  stroke       : var(--vp-c-border);
+  stroke-width : 0.7;
+}
+
+.credits-ring-core {
+  fill         : color-mix(in srgb, var(--th-lead) 7%, transparent);
+  stroke-width : 0.8;
+}
+
+.credits-rim {
+  fill           : var(--vp-c-text-1);
+  font           : 600 10.5px / 1 var(--vp-font-family-base);
+  letter-spacing : 0.1em;
+  text-anchor    : middle;
+  text-transform : uppercase;
+}
+
+.credits-dot { fill: var(--th-lead); }
+
+.credits-glow {
+  stop-color   : var(--th-heat-2);
+  stop-opacity : 0.6;
+}
+
+.credits-glow:nth-child(2) {
+  stop-color   : var(--th-heat-1);
+  stop-opacity : 0.22;
+}
+
+.credits-glow:nth-child(3) {
+  stop-color   : var(--th-heat-1);
+  stop-opacity : 0;
+}
+
+.credits-ground {
+  fill         : none;
+  stroke       : var(--vp-c-text-3);
+  stroke-width : 0.8;
+}
+
+.credits-flame,
+.credits-flame-ember {
+  fill           : none;
+  stroke         : light-dark(var(--th-heat-3), var(--th-heat-1));
+  stroke-linecap : round;
+  stroke-width   : 2;
+}
+
+.credits-flame-ember {
+  stroke         : var(--th-heat-2);
+  stroke-opacity : 0.35;
+  stroke-width   : 5;
+}
