@@ -72,6 +72,14 @@ describe('a figure of a statistic by flock size', () => {
     expect(drawn).toContain('>100K</text>')
   })
 
+  it('spaces a tick below the lowest bar by its own logarithm', () => {
+    const wide  = [0.22, 2.2, 22].map((mean, place) => ({ error: null, mean, size: CHART.flocking[place]!.size }))
+    const drawn = scaling.scaling({ ...CHART, fixed: wide, flocking: wide }, 'light')
+    const row   = (words: string) => Number(drawn.match(new RegExp(`y="([^"]+)"[^>]*>${words}</text>`, 'u'))![1])
+
+    expect(row('0.2') - row('2')).toBeCloseTo(row('2') - row('20'), 0)
+  })
+
   it('draws a statistic reaching zero on a linear axis', () => {
     const zeroed = [0, 0.5, 1].map((mean, place) => ({ error: null, mean, size: CHART.flocking[place]!.size }))
     const drawn  = scaling.scaling({ ...CHART, fixed: zeroed, flocking: zeroed }, 'light')

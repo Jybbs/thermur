@@ -5,11 +5,12 @@ the first drone's turn, one step moving a flock along its old velocities,
 the replay ranking composites, and the helpers each statistic reads.
 """
 
-from common.drones import flock_of, short, still_air
-from dataclasses   import replace
-from jax           import Array, jit
-from jax.numpy     import array
-from jax.random    import key, split
+from common.drones  import flock_of, short, still_air
+from dataclasses    import replace
+from emcee.autocorr import function_1d, integrated_time
+from jax            import Array, jit
+from jax.numpy      import array
+from jax.random     import key, split
 from numpy         import (
     allclose,
     arange,
@@ -35,13 +36,13 @@ from numpy         import (
     sin,
     sort,
     stack,
-    trapezoid,
     where,
     zeros
 )
 from numpy.random  import default_rng
 from numpy.testing import assert_allclose, assert_array_equal
 from pytest        import FixtureRequest, fixture, mark, param
+from scipy.signal  import lfilter
 from scipy.spatial import KDTree
 
 from thermur.controller.components import (
@@ -393,12 +394,17 @@ def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     assert (another.frames.positions != flight.frames.positions).any()
 
 
-def test_a_curve_integrates_up_to_its_first_zero():
+def test_a_curve_integrates_over_the_window_emcee_takes():
     """
-    Asserts that a curve falling from one to zero over two steps and rising
-    after integrates only the two steps before its zero.
+    Asserts that a curve falling from one to a half and then to zero reads
+    one plus twice the half, two steps, and a series of 4,096 values each
+    half the last plus noise reads from its own autocorrelation the time
+    emcee's `integrated_time` reads from the series.
     """
-    assert_allclose(integrated(asarray([1.0, 0.5, 0.0, 0.5]), 0.1), 0.075)
+    series = lfilter([1.0], [1.0, -0.5], default_rng(0).normal(size=4096))
+
+    assert_allclose(integrated(asarray([1.0, 0.5, *zeros(20)]), 0.1), 0.2)
+    assert_allclose(integrated(function_1d(series), 1.0), integrated_time(series)[0])
 
 
 def test_speeds_rising_along_a_rod_cross_zero_at_its_finite_size_point():
@@ -483,32 +489,23 @@ def test_a_flock_turning_at_once_reads_no_crossing_speed():
     )
 
 
-def test_a_heading_swinging_back_and_forth_integrates_to_its_first_zero():
+def test_headings_fluctuating_afresh_each_frame_relax_within_one_frame():
     """
-    Asserts that half the drones swinging their heading one way and half
-    the other, over a period of ten frames, integrate their autocorrelation
-    only up to the first lag at which it falls to zero, each lag's product
-    averaged over the frames it spans.
+    Asserts that 48 drones whose headings fluctuate about the course afresh
+    at each frame, with no memory of the last, read an autocorrelation time
+    of one frame.
     """
-    swing  = cos(2 * pi * arange(20) / 10)[:, None] * where(arange(12) < 6, 1.0, -1.0)
+    plan   = short(drones=48, duration_s=40.0)
     flight = laid(
-        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
-        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
+        positions  = stack([10.0 * arange(48), zeros(48), zeros(48)], -1),
+        velocities = [10.0, 0.0, 0.0] + default_rng(0).normal(
+            size = (plan.frames, 48, 3)
+        ),
+        drones     = 48,
+        duration_s = 40.0
     )
-    headings = asarray(flight.settled.headings)[0]
-    relative = headings - headings.mean(1, keepdims=True)
-    curve    = [
-        (relative[lag:] * relative[: 15 - lag]).sum((1, 2)).mean()
-        for lag in range(15)
-    ]
-    curve = asarray(curve) / curve[0]
 
-    assert_allclose(
-        flight.autocorrelation_s,
-        trapezoid(curve[: first_zero(curve)], dx=0.1),
-        rtol = 1e-5
-    )
-    assert first_zero(curve) == 3
+    assert_allclose(flight.autocorrelation_s, plan.frame_s, rtol=0.1)
 
 
 def test_an_alpha_shape_leaves_out_the_gap_a_convex_hull_spans():
@@ -589,9 +586,9 @@ def test_stragglers_past_the_shape_s_reach_leave_the_crossing_speed_alone():
     """
     Asserts that a lattice of 729 drones 10 m apart, each turning once a
     turn spreading at 20 m/s from its center reaches it, reads the same
-    crossing speed beside 300 drones 104 m apart along a diagonal 500 m out,
-    which no tetrahedron narrower than the reach holds and which turn after
-    every drone of the lattice, as alone.
+    crossing speed beside 300 drones 104 m apart along the diagonal from
+    (500, 500, 500), which no tetrahedron narrower than the reach holds and
+    which turn while the lattice turns, as alone.
     """
     steps   = 10.0 * arange(-4, 5)
     lattice = gridded(steps, steps, steps)
@@ -599,10 +596,10 @@ def test_stragglers_past_the_shape_s_reach_leave_the_crossing_speed_alone():
     def spread(cloud: ndarray) -> float:
         """
         Reads the crossing speed of `cloud`, its drones past the lattice
-        turning at 8.5 s.
+        turning at 6.5 s.
         """
         starts                = 5.0 + linalg.norm(cloud, axis=1) / 20.0
-        starts[len(lattice):] = 8.5
+        starts[len(lattice):] = 6.5
         angle = pi / 2 / (1 + exp(-(0.1 * arange(200)[:, None] - starts) / 0.2))
         return crossed(
             clouds     = broadcast_to(cloud, (200, *cloud.shape)),
@@ -738,8 +735,9 @@ def test_two_clusters_past_the_radio_s_range_read_half_the_flock_connected():
 def test_drones_holding_their_places_keep_every_neighbor_through_the_flight():
     """
     Asserts that drones holding their places keep each neighbor of the first
-    settled frame at every later frame, reading a rearrangement time of the
-    whole span of the settled frames.
+    settled frame at every later frame, so no lag closes the estimator's
+    window and the rearrangement time reads one plus twice the settled
+    frames past the first.
     """
     flight = laid(
         positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
@@ -749,7 +747,7 @@ def test_drones_holding_their_places_keep_every_neighbor_through_the_flight():
 
     assert_allclose(
         flight.rearrangement_s,
-        (plan.frames - plan.framed(plan.settled_s) - 1) * plan.frame_s
+        (2 * (plan.frames - plan.framed(plan.settled_s)) - 1) * plan.frame_s
     )
 
 

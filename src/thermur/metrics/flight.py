@@ -6,6 +6,7 @@ flock per seed, beside each statistic its frames give, which the `flight`,
 
 from collections.abc import Callable
 from diffrax         import AbstractPath, ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
+from emcee.autocorr  import auto_window, integrated_time
 from equinox         import Module, field, tree_at
 from itertools       import combinations
 from jax             import Array, jit, lax, tree, vmap
@@ -22,6 +23,7 @@ from numpy           import (
     asarray,
     bincount,
     clip,
+    cumsum,
     diff,
     divide,
     einsum,
@@ -49,7 +51,6 @@ from numpy           import (
     sqrt,
     stack,
     take_along_axis,
-    trapezoid,
     unique,
     zeros
 )
@@ -133,20 +134,20 @@ class Flight(Module):
     @property
     def autocorrelation_s(self) -> ndarray:
         """
-        Integrates the autocorrelation of each drone's heading relative to
-        the flock's, up to its first zero, in seconds.
+        Reads the integrated autocorrelation time of each drone's heading
+        relative to the flock's through emcee's `integrated_time`, each
+        component of each drone's heading a walker, in seconds.
+
+        A settled run spans fewer than the 50 times the estimator trusts, so
+        emcee logs a warning in place of raising.
         """
         headings = asarray(self.settled.headings)
-        relative = headings - headings.mean(2, keepdims=True)
-        frames   = relative.shape[1]
-        spectrum = fft.rfft(relative, 2 * frames, axis=1)
-        lagged   = fft.irfft(abs(spectrum) ** 2, axis=1)[:, :frames].sum(-1).mean(-1)
         return asarray(
             [
-                integrated(curve, self.plan.frame_s)
-                for curve in lagged / (frames - arange(frames)) / lagged[:, :1] * frames
+                integrated_time(seed.reshape(len(seed), -1), quiet=True)[0]
+                for seed in headings - headings.mean(2, keepdims=True)
             ]
-        )
+        ) * self.plan.frame_s
 
     @property
     def axes(self) -> tuple[str, ...]:
@@ -170,7 +171,8 @@ class Flight(Module):
         α-shape at `reach_m` by that of the drones inside it, each from the
         cube of its nearest-neighbor distance, which holds a border drone's
         reading free of the empty space beyond the border, over the last
-        frames.
+        frames, `nan` for a seed any of whose last frames holds no drone
+        inside the shape.
         """
         return asarray(
             [
@@ -346,8 +348,8 @@ class Flight(Module):
         """
         Integrates the share of each drone's neighbors at the first settled
         frame still among its neighbors, above the share a random reshuffle
-        leaves and up to its first zero, the time over which the neighbors a
-        drone reads rearrange, in seconds.
+        leaves, over the window `integrated`'s estimator takes, the time
+        over which the neighbors a drone reads rearrange, in seconds.
         """
         count  = self.plan.neighbors
         floor  = count / (self.plan.drones - 1)
@@ -850,7 +852,7 @@ def crossed(
     ahead, of that drone's time plus the pair's delay, and the distance
     the turn has crossed by then is the cube root of the drones turned over
     the flock's density inside its α-shape at `reach_m`, fitted against the
-    times of the first half of the ranks.
+    times of the first half of the ranks of the drones the shape reaches.
 
     Args:
         clouds: The drones' positions at each frame, in meters, `(n_frames,
@@ -862,8 +864,8 @@ def crossed(
         window: The frames the rotation of the mean heading is read over.
 
     Returns:
-        The speed of the turn, in meters per second, `nan` where every
-        drone's turning time is the same.
+        The speed of the turn, in meters per second, `nan` where the shape
+        reaches no drone or every drone it reaches turns at the same time.
     """
     headings = asarray(unit(velocities.mean(1)))
     rotation = arccos(
@@ -899,13 +901,12 @@ def crossed(
         times[drone] = (times[ahead] + delays[ahead, drone]).mean()
 
     border, inside, volume = alpha_shape(clouds[peak + window // 2], reach_m)
-    turned                 = sort(times)[: len(times) // 2]
-    if turned.std() == 0 or volume == 0:
+    held   = border | inside
+    turned = sort(times[held])[: held.sum() // 2]
+    if volume == 0 or turned.std() == 0:
         return nan
 
-    reached = (
-        arange(1, turned.size + 1) * volume / (border | inside).sum()
-    ) ** (1 / 3)
+    reached = (arange(1, turned.size + 1) * volume / held.sum()) ** (1 / 3)
     return float(linregress(turned, reached).slope)
 
 
@@ -931,11 +932,13 @@ def grouped(cloud: ndarray, hop_m: float) -> ndarray:
 
 def integrated(curve: ndarray, step: float) -> float:
     """
-    Integrates `curve` sampled every `step` up to its first zero, the
-    estimator an autocorrelation time takes before the noise past that zero
-    dominates the sum.
+    Reads the integrated time of a normalized autocorrelation `curve`
+    sampled every `step` as emcee's `integrated_time` does, one plus twice
+    the sum over the first lags, up to the first lag at least five times
+    that time, past which the noise dominates the sum.
     """
-    return trapezoid(curve[: first_zero(curve)], dx=step)
+    times = 2 * cumsum(curve) - 1
+    return times[auto_window(times, 5)] * step
 
 
 def kept(

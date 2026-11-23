@@ -9,6 +9,7 @@ dependencies    = [
     "bibtexparser",
     "cyclopts",
     "diffrax",
+    "emcee",
     "equinox",
     "jax",
     "lineax",
