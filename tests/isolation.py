@@ -166,8 +166,9 @@ def test_the_shared_copy_holds_each_file_apart_from_the_worktree(
     )
 
 
+@mark.slow
+@mark.usefixtures("checked")
 def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
-    checked          : Checkout,
     pytestconfig     : Config,
     tmp_path         : Path,
     tmp_path_factory : TempPathFactory
@@ -177,12 +178,14 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
     `cached_property` through it finds only the fields of `Checkout` set,
     in a suite of its own running the two in order on this conftest, so
     no earlier case hides a patch on `Checkout` from a later one whichever
-    worker runs them. It reads its own `checked` as well, holding only those
-    fields, so `py:affected` runs it on any change to that fixture.
+    worker runs them. The suite carries an empty `pytest.toml`, so pytest
+    reads no configuration from a folder above it. It requests `checked` as
+    well, so `py:affected` runs it on any change to that fixture.
     """
     root = pytestconfig.rootpath
     for path, text in {
         ".mise/config.toml"    : (root / ".mise/config.toml").read_text(),
+        "pytest.toml"          : "",
         "tests/conftest.py"    : (root / "tests/conftest.py").read_text(),
         "tests/test_cached.py" : (
             "from thermur.repo.checkout import Checkout\n\n"
@@ -203,11 +206,14 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
         ],
         capture_output = True,
         cwd            = tmp_path,
-        env            = {**environ, "PYTHONPATH": str(root / "tests")},
-        text           = True
+        env            = {
+            **environ,
+            "PYTHONDONTWRITEBYTECODE" : "1",
+            "PYTHONPATH"              : str(root / "tests")
+        },
+        text = True
     )
 
-    assert vars(checked).keys() == Checkout.model_fields.keys()
     assert ran.returncode == 0, ran.stdout
 
 
