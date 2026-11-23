@@ -324,13 +324,28 @@ def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
 
 def test_a_sample_measures_its_interval_between_its_snapshots():
     """
-    Asserts that a sample's interval is the one gap its snapshots stand at,
-    and that snapshots at more than one gap are refused.
+    Asserts that a sample's interval is the one gap its snapshots stand at.
     """
     assert Sample(times_s=(0.0, 30.0, 60.0)).interval_s == 30.0
 
-    with raises(ValueError, match="too many values to unpack"):
-        _ = Sample(times_s=(0.0, 30.0, 45.0)).interval_s
+
+@mark.parametrize(
+    ("message", "times_s"),
+    [
+        param("not enough values to unpack", (0.0,), id="a-lone-snapshot"),
+        param("too many values to unpack", (0.0, 30.0, 45.0), id="two-gaps")
+    ]
+)
+def test_a_sample_refuses_snapshots_at_no_one_gap(
+    message : str,
+    times_s : tuple[float, ...]
+):
+    """
+    Asserts that a sample whose snapshots stand at no gap, or at more than
+    one, has no interval.
+    """
+    with raises(ValueError, match=message):
+        _ = Sample(times_s=times_s).interval_s
 
 
 def test_a_sample_measures_its_length_across_its_rectangle():

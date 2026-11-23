@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { SEAL, groundOf, rimOf, rimPath } from '../../../lib/credits/seal.ts'
+import { GROUND, SEAL, rimOf, rimPath } from '../../../lib/credits/seal.ts'
 import source                             from '../../../lib/rendered/credit.json' with { type: 'json' }
 
 /**
@@ -37,6 +37,6 @@ describe('the rim’s arcs', () => {
 })
 
 it('runs the ground from the middle to the core’s ring', () => {
-  expect(groundOf() ** 2 + (SEAL.flame.y - SEAL.center) ** 2).toBeCloseTo(SEAL.core ** 2)
-  expect(groundOf()).toBeGreaterThan(SEAL.flame.glow)
+  expect(GROUND ** 2 + (SEAL.flame.y - SEAL.center) ** 2).toBeCloseTo(SEAL.core ** 2)
+  expect(GROUND).toBeGreaterThan(SEAL.flame.glow)
 })

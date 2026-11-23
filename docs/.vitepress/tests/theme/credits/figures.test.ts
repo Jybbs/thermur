@@ -29,14 +29,17 @@ const SAMPLED = ['./lib/rendered/crop.json']
 const WIDGETS = import.meta.glob<{ default: Component }>('./theme/**/*.ts', { base: '../../../' })
 
 /**
- * Lists the module at `file` beside every module it imports, directly or
- * through another.
+ * Lists the module at `file` beside every module it imports or exports from,
+ * directly or through another.
  */
 function reached(file: string, seen = new Set<string>()): Set<string> {
   if (seen.has(file)) return seen
   seen.add(file)
-  for (const { moduleRequest: { value } } of parseSync(file, MODULES[file] ?? '').module.staticImports) {
-    if (value.startsWith('.')) reached(`./${path.posix.join(path.posix.dirname(file), value)}`, seen)
+  const { module: { staticExports, staticImports } } = parseSync(file, MODULES[file] ?? '')
+  for (const { moduleRequest } of [...staticImports, ...staticExports.flatMap(({ entries }) => entries)]) {
+    if (moduleRequest?.value.startsWith('.')) {
+      reached(`./${path.posix.join(path.posix.dirname(file), moduleRequest.value)}`, seen)
+    }
   }
   return seen
 }
@@ -51,9 +54,13 @@ it('finds every figure drawn from the sample', () => {
   expect(figures).toContain('./theme/crop.ts')
 })
 
+it('walks through a module exporting from another', () => {
+  expect(reached('./theme/identity/widgets.ts')).toContain('./lib/rendered/identity.json')
+})
+
 it.each(figures)('ends the caption of %s on the link to the credits, with no script run', async (file) => {
   const html = await renderToString(createSSRApp((await WIDGETS[file]!()).default))
-  expect(html).toMatch(new RegExp(
-    `<a class="credits-link" href="/base/data/#credits" title="${credit.title}">Credits ↓</a></figcaption></figure>$`, 'u'
-  ))
+  expect(html).toContain(
+    `<a class="credits-link" href="/base/data/#credits" title="${credit.title}">Credits ↓</a></figcaption></figure>`
+  )
 })

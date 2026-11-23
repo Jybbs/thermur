@@ -560,7 +560,8 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
         seconds.
 
         Raises:
-            ValueError: The snapshots stand at more than one gap.
+            ValueError: Where the snapshots stand at no gap, or at more
+                        than one.
         """
         (interval,) = {after - before for before, after in pairwise(self.times_s)}
         return interval

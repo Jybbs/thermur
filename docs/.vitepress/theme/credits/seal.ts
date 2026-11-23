@@ -1,6 +1,6 @@
 import { type VNode, defineComponent, h, useId } from 'vue'
 
-import { SEAL, groundOf, rimOf, rimPath } from '../../lib/credits/seal.ts'
+import { GROUND, SEAL, rimOf, rimPath } from '../../lib/credits/seal.ts'
 
 /**
  * Lays out the site's short fire at the seal's middle, a hairline of flame on
@@ -8,13 +8,12 @@ import { SEAL, groundOf, rimOf, rimPath } from '../../lib/credits/seal.ts'
  */
 function flame(glow: string): VNode[] {
   const { center, flame: { glow: reach, half, rise, y } } = SEAL
-  const ground = groundOf()
-  const crest  = (wide: number): string => `M${center - wide} ${y}Q${center} ${y - 2 * rise} ${center + wide} ${y}`
+  const crest = `M${center - half} ${y}Q${center} ${y - 2 * rise} ${center + half} ${y}`
   return [
     h('path', { d: `M${center - reach} ${y}a${reach} ${reach} 0 0 1 ${2 * reach} 0z`, fill: `url(#${glow})` }),
-    h('path', { class: 'credits-ground', d: `M${center - ground} ${y}h${2 * ground}` }),
-    h('path', { class: 'credits-flame-ember', d: crest(half) }),
-    h('path', { class: 'credits-flame', d: crest(half * 0.9) })
+    h('path', { class: 'credits-ground', d: `M${center - GROUND} ${y}h${2 * GROUND}` }),
+    h('path', { class: 'credits-flame-ember', d: crest }),
+    h('path', { class: 'credits-flame', d: crest })
   ]
 }
 
@@ -57,7 +56,7 @@ export default defineComponent({
       ...flame(`${id}-glow`),
       ...arc('top', top),
       ...arc('foot', foot),
-      ...[-1, 1].map(side => h('circle', { class: 'credits-dot', cx: center + side * rim.dot, cy: center, r: 1.1 }))
+      ...[-1, 1].map(side => h('circle', { class: 'credits-dot', cx: center + side * rim.side, cy: center, r: rim.dot }))
     ])
   }
 })

@@ -2,6 +2,7 @@
 import { createMarkdownRenderer, disposeMdItInstance } from 'vitepress'
 import { afterAll, describe, expect, it, vi }          from 'vitest'
 
+import page              from '../../../../pages/data/index.md?raw'
 import credit            from '../../../lib/rendered/credit.json' with { type: 'json' }
 import { creditCaption } from '../../../theme/credits/caption.ts'
 import caption           from '../../../theme/styles/credits/caption.css?raw'
@@ -13,22 +14,6 @@ vi.mock(import('vitepress'), async original => ({ ...await original(), withBase:
  * The selector of the link closing a caption.
  */
 const LINK = '.vp-doc .credits-link'
-/**
- * The Data page as Markdown.
- */
-const [PAGE] = Object.values(import.meta.glob<string>('../../../../pages/data/index.md', {
-  eager  : true,
-  import : 'default',
-  query  : '?raw'
-}))
-
-/**
- * Renders the section closing the Data page the way VitePress renders it.
- */
-async function closing(): Promise<string> {
-  const html = await (await createMarkdownRenderer(process.cwd())).renderAsync(PAGE!)
-  return html.slice(html.lastIndexOf('<h2 '))
-}
 
 afterAll(() => {
   disposeMdItInstance()
@@ -41,7 +26,8 @@ it('closes the caption’s own words on a link to the Data page’s credits, nam
 })
 
 it('reaches the page’s last heading, over the lines naming the record’s dataset and its license', async () => {
-  const section = await closing()
+  const html    = await (await createMarkdownRenderer(process.cwd())).renderAsync(page)
+  const section = html.slice(html.lastIndexOf('<h2 '))
   expect(section).toMatch(/^<h2 id="credits"/u)
   expect(section).toContain(`>${credit.title}</a>`)
   expect(section).toContain(`>${credit.license}</a>`)
