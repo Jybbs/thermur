@@ -98,14 +98,8 @@ def test_home_is_an_empty_folder():
 
 def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     """
-    Asserts that none of these variables reaches a test, covering the ones
-    that set whether a console prints color and whether a task prints its
-    GitHub Actions form, the two that turn on mise's `yes` setting, the
-    files a GitHub Actions runner collects a workflow step's outputs and a
-    workflow run's summary page from, the branch and the commit `gha:brief`
-    prefers, the ones keeping uv and mise off the network, the ones naming
-    where a tool keeps its cache, configuration, data, and state, a variable
-    opening on `THERMUR_` in either case, which sets a setting, and one
-    opening on `usage_`, through which mise hands a task a flag.
+    Asserts that no variable `CLEARED` names reaches a test, nor one opening
+    on `THERMUR_` in either case, which sets a setting, nor one opening on
+    `usage_`, through which mise hands a task a flag.
     """
     assert name not in environ

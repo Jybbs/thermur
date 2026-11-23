@@ -115,8 +115,9 @@ def environment(
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
     developer's own configuration above the checkout as an ordinary ancestor
     rather than as the global file, and mise stops on it as one it was never
-    told to trust. The two `MISE_` variables name that file as one to skip
-    and this checkout as one to trust, so a test can run mise over it.
+    told to trust. `MISE_IGNORED_CONFIG_PATHS` names that file as one to
+    skip and `MISE_TRUSTED_CONFIG_PATHS` this checkout as one to trust, so a
+    test can run mise over it.
     """
     prefixes = (Settings.model_config["env_prefix"].lower(), "usage_")
     for name in [
