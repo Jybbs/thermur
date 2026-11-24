@@ -161,7 +161,7 @@ def test_a_broken_checkout_fails_naming_each_finding(
         "docs/pages/index.md",
         "\nA study[^smith2020] beside[^cavagna2010].\n"
     )
-    task(checkout, "py/sweep", '#!/bin/sh\n#MISE alias = "audit"\ntrue\n')
+    task(checkout, "py/sweep", '#!/bin/sh\n#MISE alias = ["inspect", "use"]\ntrue\n')
 
     status, printed = audited()
 

@@ -17,7 +17,7 @@ from os           import X_OK, access, pathsep
 from pathlib      import Path
 from pytest       import Config, MonkeyPatch, TempPathFactory, mark, param, raises
 from re           import findall
-from subprocess   import CalledProcessError, check_output
+from subprocess   import CalledProcessError, CompletedProcess, check_output
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
@@ -248,6 +248,34 @@ def test_steps_lists_the_actions_ahead_of_the_workflows(checkout: Checkout):
 
     assert paths == sorted(paths)
     assert set(paths) == {*checkout.actions, *checkout.workflows}
+
+
+def test_subcommands_reads_each_command_and_alias_the_help_lists(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that every command the `Commands` section of `mise --help` lists
+    is read beside each alias, one wrapped onto the next line among them,
+    and that no word from a section after it is.
+    """
+    printed = (
+        "Usage: mise [OPTIONS] [TASK] [COMMAND]\n\nCommands:\n"
+        "  audit         Check tool versions\n"
+        "  backends      Manage backends [aliases: b, backend,\n"
+        "                backend-list]\n"
+        "  self-update   Update mise itself\n\n"
+        "Flags:\n  -C, --cd <DIR>  Run as if mise were started in DIR\n"
+    )
+    monkeypatch.setattr(
+        Checkout,
+        "run",
+        lambda checkout, *command, **options: CompletedProcess(command, 0, printed)
+    )
+
+    assert checkout.subcommands == {
+        "audit", "b", "backend", "backend-list", "backends", "self-update"
+    }
 
 
 def test_tasks_carries_the_lines_a_toml_task_runs(checkout: Checkout):

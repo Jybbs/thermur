@@ -15,6 +15,7 @@ from shutil       import copystat
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import (
+    AliasCheck,
     AnchorCheck,
     BinCheck,
     Check,
@@ -1491,12 +1492,37 @@ def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkou
     an alias two tasks share, is named on the file holding the task at the
     severity mise reports.
     """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "inspect"\ntrue\n')
 
     assert [
         (finding.file, finding.level)
         for finding in TaskCheck(checkout=checkout).findings
     ] == [(path, Level.ERROR)]
+
+
+@mark.parametrize("alias", ["use", "x"], ids=["command", "alias"])
+def test_a_task_alias_naming_a_command_of_mise_s_own_is_named(
+    alias    : str,
+    checkout : Checkout
+):
+    """
+    Asserts that a task taking as its alias a command `mise --help` lists,
+    or one of that command's aliases, is named on the file holding the task,
+    while the alias beside it that mise leaves free is not.
+    """
+    path = task(
+        checkout,
+        "py/sweep",
+        f'{SHELL}#MISE alias = ["sweep", "{alias}"]\ntrue\n'
+    )
+
+    assert AliasCheck(checkout=checkout).findings == [
+        Finding(
+            file    = path,
+            message = f"`py:sweep` takes the alias `{alias}`, a command of mise's own "
+            f"that `mise {alias}` runs in place of the task"
+        )
+    ]
 
 
 @mark.parametrize(
