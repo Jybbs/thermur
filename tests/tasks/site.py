@@ -247,31 +247,41 @@ def test_the_type_check_refuses_a_single_file_component(
     assert checked.stderr.rstrip().endswith(component)
 
 
+@mark.parametrize("held", [0, 1])
 def test_the_link_check_reads_the_built_site_and_the_guides_offline(
+    held         : int,
     pytestconfig : Config,
     site         : Path,
     stand_in     : Callable[[str, str], StandIn]
 ):
     """
-    Asserts that the link check runs lychee offline over the built site,
-    the README, and the contributor guide, resolving an absolute link under
+    Asserts that the link check holds each fragment of the README and the
+    contributor guide to the headings GitHub writes, then runs lychee
+    offline over the built site and both guides whether or not a fragment
+    failed, leaving those fragments out, resolving an absolute link under
     the built site and mapping each address under the homepage Node prints
-    onto it.
+    onto it, and exits with the fragment check's status.
     """
     dist = site / ".vitepress/dist"
     stand_in("lychee", 'printf "%s\\n" "$@"')
-    stand_in("node", "echo https://example.org/")
+    stand_in(
+        "node",
+        '[ $# -eq 3 ] && echo https://example.org/ && exit\n'
+        f'shift 2; printf "%s\\n" "$@"; exit {held}'
+    )
+    checked = ran(site, pytestconfig, "links")
 
-    assert ran(site, pytestconfig, "links").stdout.splitlines() == [
-        "--fallback-extensions", "html", "--include-fragments", "--index-files",
-        "index.html", "--no-progress", "--offline", "--remap",
-        f"^https://example.org/ file://{dist}/",
+    assert (checked.returncode, checked.stdout.splitlines()) == (held, [
+        "--input-type=module", ".github/README.md", ".github/CONTRIBUTING.md",
+        "--exclude", "^file://.*\\.md#", "--fallback-extensions", "html",
+        "--include-fragments", "--index-files", "index.html", "--no-progress",
+        "--offline", "--remap", f"^https://example.org/ file://{dist}/",
         "--root-dir",
         str(dist),
         "--marker",
         str(dist),
         "../.github/README.md", "../.github/CONTRIBUTING.md"
-    ]
+    ])
 
 
 @mark.parametrize(
