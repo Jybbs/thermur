@@ -1525,6 +1525,22 @@ def test_a_task_alias_naming_a_command_of_mise_s_own_is_named(
     ]
 
 
+def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+    """
+    Asserts that a Markdown template opening on no front matter is named on
+    its file rather than read as naming no label.
+    """
+    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
+            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
+            "front matter"
+        )
+    ]
+
+
 @mark.parametrize(
     ("path", "old", "new", "findings"),
     [
@@ -1782,19 +1798,21 @@ def test_a_moved_manifest_declaration_names_every_copy(
     ]
 
 
-def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+def test_a_toml_task_alias_naming_a_command_of_mise_s_own_is_named_on_its_configuration(
+    checkout: Checkout
+):
     """
-    Asserts that a Markdown template opening on no front matter is named on
-    its file rather than read as naming no label.
+    Asserts that a task `.mise/config.toml` declares in TOML, taking as its
+    alias a command `mise --help` lists, is named on that configuration.
     """
-    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+    append(
+        checkout,
+        ".mise/config.toml",
+        '\n[tasks."py:sweep"]\nalias = "use"\nrun = "true"\n'
+    )
 
-    assert LabelCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
-            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
-            "front matter"
-        )
+    assert [finding.file for finding in AliasCheck(checkout=checkout).findings] == [
+        Path(".mise/config.toml")
     ]
 
 

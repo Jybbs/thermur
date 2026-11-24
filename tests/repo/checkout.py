@@ -270,7 +270,11 @@ def test_subcommands_reads_each_command_and_alias_the_help_lists(
     monkeypatch.setattr(
         Checkout,
         "run",
-        lambda checkout, *command, **options: CompletedProcess(command, 0, printed)
+        lambda checkout, *command, capture: CompletedProcess(
+            command,
+            0,
+            {("mise", "--help"): printed}[command]
+        )
     )
 
     assert checkout.subcommands == {
