@@ -239,15 +239,9 @@ def test_the_shared_copy_is_built_once_for_every_worker(
 
 def test_the_shell_carries_no_variable_that_changes_a_result(name: str):
     """
-    Asserts that none of these variables reaches a test, covering the
-    ones that set whether a console prints color and whether a task prints
-    its GitHub Actions form, the files a GitHub Actions runner collects
-    a workflow step's outputs and a workflow run's summary page from,
-    the branch and the commit `gha:brief` prefers, the one adding options
-    to each pytest run a case starts, the ones naming where a tool keeps
-    its cache, configuration, data, and state, a variable opening on the
-    `env_prefix` of `Settings` in either case, which sets a setting, and one
-    opening on `usage_`, through which mise hands a task its flags.
+    Asserts that no variable `CLEARED` names reaches a test, nor one opening
+    on the `env_prefix` of `Settings` in either case, which sets a setting,
+    nor one opening on `usage_`, through which mise hands a task its flags.
     """
     assert name not in environ
 
