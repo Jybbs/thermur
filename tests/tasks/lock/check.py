@@ -1,9 +1,9 @@
 """
 Pins the path `lock:check` takes for each answer `uv`, `mise`, and `bun`
-give it, each case running a copy of the task beside a lockfile of its own,
-and what the real mise answers for the committed lockfile online, for one
-missing a platform entry, a checksum, or a pin's entry offline, and for a
-pin moved with its entry to a release that does not exist, where
+give it, each case running a copy of the task beside a lockfile of its
+own, and what the real mise answers for the committed lockfile online,
+for one missing a platform entry, a checksum, or a pin's entry offline,
+and for a pin moved with its entry to a release that does not exist, where
 `lock:check` fails on each pinned version `mise ls-remote` does not list.
 """
 
@@ -17,13 +17,13 @@ from shlex            import quote
 from shutil           import which
 from tomllib          import loads
 
-CONFIG      = ".mise/config.toml"
-FROZEN      = "error: lockfile had changes, but lockfile is frozen"
-LOCK        = ".mise/mise.lock"
-LYCHEE      = '[tools."aqua:lycheeverse/lychee"."platforms.macos-x64"]'
+CONFIG  = ".mise/config.toml"
+FROZEN  = "error: lockfile had changes, but lockfile is frozen"
+LOCK    = ".mise/mise.lock"
+LYCHEE  = '[tools."aqua:lycheeverse/lychee"."platforms.macos-x64"]'
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
-PIN         = "uv  0.13.8 (missing)  .mise/config.toml  0.13.8"
-STALE       = "zizmor@0.0.1 is not in the lockfile"
+PIN     = "uv  0.13.8 (missing)  .mise/config.toml  0.13.8"
+STALE   = "zizmor@0.0.1 is not in the lockfile"
 UNREACHABLE = "mise ERROR unable to fetch versions for uv: error sending request"
 UNREADABLE  = "mise ERROR failed to parse .mise/config.toml"
 
