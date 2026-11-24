@@ -197,14 +197,6 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
 
     @property
-    def cutoff(self) -> datetime:
-        """
-        Reads the instant the window `[tool.uv]` declares opens on, so a
-        release published after it is inside the window.
-        """
-        return datetime.now(UTC) - self.checkout.manifest.window
-
-    @property
     def lags(self) -> list[Lag]:
         """
         Lists each pin the manager reports lagging, which a manager reading
@@ -220,6 +212,15 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         reads under an `s`.
         """
         return int(self.checkout.manifest.window.total_seconds())
+
+    def aged(self, published: str) -> bool:
+        """
+        Reads whether a release published at the instant `published` names
+        is older than the window `[tool.uv]` declares.
+        """
+        return datetime.fromisoformat(published) <= (
+            datetime.now(UTC) - self.checkout.manifest.window
+        )
 
     def audit(self, *arguments: str | Path) -> Audit:
         """
@@ -404,7 +405,6 @@ class Actions(Manager):
             CalledProcessError: Where `gh` or `git` fails.
         """
         repository = "/".join(action.split("/")[:2])
-        cutoff     = self.cutoff
         newest     = max(
             (
                 release
@@ -421,7 +421,7 @@ class Actions(Manager):
                         repository
                     )
                 )
-                if datetime.fromisoformat(release["publishedAt"]) <= cutoff
+                if self.aged(release["publishedAt"])
             ),
             default = None,
             key     = lambda release: read_release(release["tagName"])
@@ -801,7 +801,6 @@ class Site(Manager):
         prerelease, that `bun info` dates at least the window `[tool.uv]`
         declares ago, the release `bun outdated` reports under the window.
         """
-        cutoff = self.cutoff
         return max(
             (
                 version
@@ -810,7 +809,7 @@ class Site(Manager):
                 ).items()
                 if Version.is_valid(version)
                 and not Version.parse(version).prerelease
-                and datetime.fromisoformat(published) <= cutoff
+                and self.aged(published)
             ),
             default = None,
             key     = Version.parse
@@ -914,11 +913,10 @@ class Tools(Manager):
     def outdated(self, *arguments: str) -> dict[str, dict]:
         """
         Reads what `mise outdated --bump --json` reports for `arguments`
-        under `minimum_release_age` set to the window, each tool by its name
-        where the newest release it reports is ahead of the release it is
-        asked about. mise also lists a tool it finds no installed release
-        of, as the floor always is, at a release that can be the one asked
-        about or one behind it.
+        under `minimum_release_age` set to the window, keeping each tool,
+        by its name, whose newest release is ahead of the one asked about,
+        since mise also lists an uninstalled tool such as the floor at or
+        behind it.
         """
         return {
             name: tool

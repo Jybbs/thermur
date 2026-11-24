@@ -61,13 +61,13 @@ PAGES   = Path(".github/workflows/pages.yml")
 
 
 @fixture
-def age(checkout: Checkout) -> str:
+def age(seconds: int) -> str:
     """
     Writes the `--minimum-release-age` flag, in whole seconds, that holds
     a Bun resolve to releases older than the window the copy's `[tool.uv]`
     declares.
     """
-    return f"--minimum-release-age={int(checkout.manifest.window.total_seconds())}"
+    return f"--minimum-release-age={seconds}"
 
 
 @fixture
@@ -95,6 +95,24 @@ def answer(stand_in: Callable[[str, str], StandIn]) -> Callable[..., StandIn]:
         )
 
     return write
+
+
+@fixture
+def recent(checkout: Checkout) -> str:
+    """
+    Writes the instant half the window the copy's `[tool.uv]` declares ago,
+    as a registry dates a release, so a release published then is inside
+    the window.
+    """
+    return f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}"
+
+
+@fixture
+def seconds(checkout: Checkout) -> int:
+    """
+    Reads the window the copy's `[tool.uv]` declares in whole seconds.
+    """
+    return int(checkout.manifest.window.total_seconds())
 
 
 @fixture
@@ -746,7 +764,8 @@ def test_site_reads_each_package_bun_outdated_lists(
 def test_site_reads_each_release_overrides_holds_a_package_to(
     age      : str,
     answer   : Callable[..., StandIn],
-    checkout : Checkout
+    checkout : Checkout,
+    recent   : str
 ):
     """
     Asserts that `Site` reports each package `overrides` holds to a release
@@ -782,9 +801,8 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             "vue"        : vue
         }
     )
-    old    = "2026-03-02T00:00:00Z"
-    recent = f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}"
-    times  = {
+    old   = "2026-03-02T00:00:00Z"
+    times = {
         "chokidar"   : {"2.0.0": old, "2.1.0-beta.1": old},
         "fflate"     : {"0.7.5": old, "0.8.3": "2026-05-16T00:14:03Z"},
         "minimatch"  : {"11.0.8": old, "modified": old},
@@ -847,7 +865,7 @@ def test_site_runs_each_bun_command_from_the_folder_holding_the_site_s_manifest(
     """
     pins = override(checkout, {})["devDependencies"]
     here = (
-        f'test "${{PWD##*/}}" = {checkout.package.folder.name} -a -f package.json '
+        f'test "${{PWD##*/}}" = {checkout.package.folder.name} && test -f package.json '
         "|| { echo elsewhere; exit 1; };"
     )
     table = (
@@ -952,7 +970,8 @@ def test_actions_reads_each_action_its_latest_release_moves(
 def test_actions_reads_the_newest_release_older_than_the_window(
     ahead    : bool,
     answer   : Callable[..., StandIn],
-    checkout : Checkout
+    checkout : Checkout,
+    recent   : str
 ):
     """
     Asserts that `Actions` reads the release whose tag reads as the
@@ -965,13 +984,12 @@ def test_actions_reads_the_newest_release_older_than_the_window(
     pinned = dict(step.pin for _, step in checkout.steps if step.pin)[
         "actions/upload-artifact"
     ]
-    recent = datetime.now(UTC) - checkout.manifest.window / 2
-    gh     = answer(
+    gh = answer(
         "gh",
         answers = {
             "*upload-artifact" : printed(
                 value = [
-                    {"publishedAt": f"{recent:%FT%TZ}", "tagName": "v9.0.0"},
+                    {"publishedAt": recent, "tagName": "v9.0.0"},
                     {"publishedAt": "2026-10-02T00:00:00Z", "tagName": "v7.9.9"},
                     {"publishedAt": "2026-10-01T00:00:00Z", "tagName": "v8.0.0"}
                 ]
@@ -1183,7 +1201,8 @@ def test_the_table_lists_each_lag_or_says_none_lags(checkout: Checkout):
 
 def test_tools_holds_each_tool_and_the_floor_to_the_window(
     answer   : Callable[..., StandIn],
-    checkout : Checkout
+    checkout : Checkout,
+    seconds  : int
 ):
     """
     Asserts that `Tools` asks `mise outdated` under `minimum_release_age`
@@ -1196,8 +1215,7 @@ def test_tools_holds_each_tool_and_the_floor_to_the_window(
     """
     config = checkout.config
     pinned = from_toml(checkout.read(CONFIG))["tools"]
-    window = f"{int(checkout.manifest.window.total_seconds())}s"
-    held   = f'test "$MISE_MINIMUM_RELEASE_AGE" = {window} || exit 1;'
+    held   = f'test "$MISE_MINIMUM_RELEASE_AGE" = {seconds}s || exit 1;'
     tools  = {
         "bun"    : {"latest": pinned["bun"], "requested": pinned["bun"]},
         "uv"     : {"latest": "9.0.0", "requested": config.uv},
