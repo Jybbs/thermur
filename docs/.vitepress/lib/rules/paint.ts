@@ -19,9 +19,8 @@ export interface Rect {
  */
 const DASH = [5, 4]
 /**
- * The opacity of each strip's sample counting none in each scheme, the least
- * in steps of 0.05 holding every count at the 3:1 WCAG 2.2 sets for a graphic
- * against the panel.
+ * The opacity of each strip's sample counting none in each scheme, which
+ * holds every count at the 3:1 WCAG 2.2 sets for a graphic against the panel.
  */
 const FLOOR: Record<Geometry['scheme'], { ranged: number, seven: number }> = {
   dark  : { ranged: 0.8, seven: 0.6 },
@@ -186,7 +185,7 @@ export class Strips {
     ctx.fillStyle = color
     for (let k = 0; k < count; k++) {
       const value     = trace[(this.#traced + k) % count]!
-      ctx.globalAlpha = floor + (1 - floor) * common.clamp(value / common.NEIGHBORS)
+      ctx.globalAlpha = common.lerp(floor, 1, common.clamp(value / common.NEIGHBORS))
       ctx.fillRect(left + k * width, top, width + 0.5, tall)
     }
     ctx.globalAlpha = 1

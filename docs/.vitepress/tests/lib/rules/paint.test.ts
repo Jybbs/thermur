@@ -12,22 +12,27 @@ import { FLOORS, laid }  from '../../common/contrast.ts'
 import { geometry }      from '../../common/front.ts'
 
 /**
- * One fill a paint lays down: its color and the opacity it is laid at, and for
- * a word, its text and the halo stroked under it.
+ * One fill a paint lays down: its color and the opacity it is laid at.
  */
-interface Laid {
+interface Fill {
   alpha : number
-  halo  : string
   style : string
-  text  : string
+}
+
+/**
+ * One word a paint writes, filled over the halo stroked under it.
+ */
+interface Word extends Fill {
+  halo : string
+  text : string
 }
 
 /**
  * What one paint of the strips lays down: every rectangle and every word.
  */
 interface Painted {
-  rects : Laid[]
-  words : Laid[]
+  rects : Fill[]
+  words : Word[]
 }
 
 /**
@@ -57,7 +62,7 @@ function painted(built: Strips, scheme: Scheme, ranged: string, seven: string): 
     globalAlpha : 1,
     strokeStyle : '',
     fillRect    : (): void => {
-      laidDown.rects.push({ alpha: pen.globalAlpha, halo: '', style: pen.fillStyle, text: '' })
+      laidDown.rects.push({ alpha: pen.globalAlpha, style: pen.fillStyle })
     },
     fillText    : (text: string): void => {
       laidDown.words.push({ alpha: pen.globalAlpha, halo: pen.strokeStyle, style: pen.fillStyle, text })
@@ -70,10 +75,10 @@ function painted(built: Strips, scheme: Scheme, ranged: string, seven: string): 
 }
 
 /**
- * Reads the color `fill` paints over `under`, its own opacity and the
+ * Reads the color a fill paints over `under`, its style's own opacity and the
  * context's taken together.
  */
-function over(under: string, { alpha, style }: Laid): string {
+function over(under: string, { alpha, style }: Fill): string {
   const color = rgb(style)!
   return laid(under, formatHex(color), alpha * (color.alpha ?? 1))
 }
@@ -98,15 +103,22 @@ describe('Strips', () => {
     expect(shades('ranged')).toEqual([5, 5, 5, 4].map(count => expect.closeTo(0.8 + 0.2 * count / NEIGHBORS, 6)))
   })
 
-  it('reuses each count’s word on a repeated paint at an unchanged count, writing a new one once a count changes', () => {
+  it('writes each count’s word unchanged on a repeated paint at an unchanged count, and the new count’s once it changes', () => {
     const built = strips(new Tones())
     built.sample(4, 3)
     const texts = (): string[] => painted(built, 'dark', 'ranged', 'seven').words.map(word => word.text)
     const first = texts()
     expect(first).toEqual(['4 s ago', 'now', 'by rank, 3', 'within range, 4'])
     expect(texts()).toEqual(first)
-    built.sample(4, 6)
-    expect(texts()).toEqual(['4 s ago', 'now', 'by rank, 6', 'within range, 4'])
+    built.sample(9, 6)
+    expect(texts()).toEqual(['4 s ago', 'now', 'by rank, 6', 'within range, 9'])
+  })
+
+  it('shades a range counting more than seven at full opacity', () => {
+    const built = strips(new Tones())
+    built.sample(12, 3)
+    const { rects } = painted(built, 'light', 'ranged', 'seven')
+    expect(rects.findLast(rect => rect.style === 'ranged')!.alpha).toBe(1)
   })
 })
 
@@ -116,7 +128,7 @@ describe.for(SCHEMES)('the strips under the %s scheme', scheme => {
   const ranged = seriesOf(RANGED, scheme)
   const seven  = tones.flock(scheme, ALONG.seven, 1)
 
-  it.for([...Array.from({ length: NEIGHBORS + 1 }).keys()])('hold a count of %i at a graphic’s contrast against the panel', count => {
+  it.for(Array.from({ length: NEIGHBORS + 1 }, (_, count) => count))('hold a count of %i at a graphic’s contrast against the panel', count => {
     const built = strips(tones)
     built.sample(count, count)
     const [panel, ...rects] = painted(built, scheme, ranged, seven).rects
