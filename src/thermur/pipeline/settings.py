@@ -169,6 +169,24 @@ class Settings(
 
         return self
 
+    @model_validator(mode="after")
+    def held(self) -> Self:
+        """
+        Holds the radio's table to at least `plan.neighbors` senders, the
+        count each drone ranks from it.
+
+        Raises:
+            ValueError: Where the table holds fewer senders than a drone
+                        has neighbors.
+        """
+        if self.radio.slots < self.plan.neighbors:
+            raise ValueError(
+                f"A table of {self.radio.slots} senders holds too few for "
+                f"{self.plan.neighbors} neighbors each"
+            )
+
+        return self
+
     @classmethod
     def settings_customise_sources(
         cls,

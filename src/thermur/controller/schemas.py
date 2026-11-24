@@ -188,24 +188,27 @@ class Inbox(Module):
     def from_broadcast(
         cls,
         earlier : Flock,
-        range_m : float,
-        sent    : Flock,
-        slots   : int | None = None
+        radio   : Radio,
+        sent    : Flock
     ) -> Self:
         """
         Builds the inbox in which every drone last heard the broadcast
-        `sent` from its `slots` nearest other drones within `range_m` of
-        it as `sent` went out, by default the radio's own `slots`, each
-        sender's velocity `Heading.lag_s` before it read from `earlier`, and
-        each packet taken at step zero.
+        `sent` from the `radio.slots` nearest other drones within
+        `radio.range_m` of it as `sent` went out, each sender's velocity
+        `Heading.lag_s` before it read from `earlier`, and each packet taken
+        at step zero.
 
         The search compares every pair of drones once, and a flight runs it
         only as it opens or replays a frame.
         """
-        slots    = slots or Radio.slots
+        slots    = radio.slots
         drones   = sent.positions.shape[-2]
         apart    = linalg.norm(sent.positions[:, newaxis] - sent.positions, axis=-1)
-        distance = where((apart <= range_m) & ~eye(drones, dtype=bool), apart, inf)
+        distance = where(
+            (apart <= radio.range_m) & ~eye(drones, dtype=bool),
+            apart,
+            inf
+        )
         indices, heard = closest(
             count     = slots,
             distances = concatenate(
@@ -279,14 +282,14 @@ class Radio(Module):
     The number of packets each drone sends each second.
     """
 
-    slots: ClassVar[int] = 16
+    slots: Count = field(default=16, static=True)
     """
     The number of senders each drone's table holds, at least the plan's
-    `neighbors`, the smallest of 8, 12, 16, and 24 at which the seven
-    nearest senders a table yields matched an exact search over the same
-    broadcasts for more than 99.5% of the neighbors, measured at 1,000 and
-    3,000 drones whose velocities scatter by 1.5 m/s, after 12 s under the
-    default link.
+    `neighbors`, by default the smallest of 8, 12, 16, and 24 at which the
+    seven nearest senders a table yields matched an exact search over the
+    same broadcasts for more than 99.5% of the neighbors, measured at 1,000
+    and 3,000 drones whose velocities scatter by 1.5 m/s, after 12 s under
+    the default link, where it matched 99.70% and 99.65% of them.
     """
 
     def delay_steps(self, step_s: float) -> int:
@@ -507,7 +510,7 @@ class Radio(Module):
             What each drone heard at launch, and the broadcasts kept.
         """
         kept  = self.delay_steps(step_s) + lag + 1
-        inbox = Inbox.from_broadcast(flock, self.range_m, flock, self.slots)
+        inbox = Inbox.from_broadcast(flock, self, flock)
         return tree_at(
             lambda table: table.lists,
             inbox,

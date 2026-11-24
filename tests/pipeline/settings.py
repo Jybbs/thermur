@@ -91,6 +91,34 @@ def test_a_key_no_field_declares_fails(installed: Checkout):
     ]
 
 
+@mark.parametrize(
+    ("plan", "slots"),
+    [
+        param({}, 7, id="at-the-neighbors"),
+        param({"neighbors": 3}, 3, id="fewer-neighbors")
+    ]
+)
+def test_a_radio_table_holding_the_plan_s_neighbors_holds(
+    installed : Checkout,
+    plan      : dict[str, int],
+    slots     : int
+):
+    """
+    Asserts that a radio whose table holds as many senders as a drone has
+    neighbors passes validation, at the default count and below it.
+    """
+    assert Tuned(plan=plan, radio={"slots": slots}).radio.slots == slots
+
+
+def test_a_radio_table_smaller_than_the_plan_s_neighbors_fails(installed: Checkout):
+    """
+    Asserts that a radio whose table holds fewer senders than a drone has
+    neighbors fails validation.
+    """
+    with raises(ValidationError, match="A table of 6 senders holds too few for 7"):
+        Tuned(radio={"slots": 6})
+
+
 def test_a_speed_slot_cruising_at_the_plan_s_speed_holds(installed: Checkout):
     """
     Asserts that a speed slot and a plan set to one cruise speed together

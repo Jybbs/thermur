@@ -88,7 +88,7 @@ def acted(
         NEIGHBORS,
         Plan().cruise_m_s,
         flock,
-        Inbox.from_broadcast(flock, composite.radio.range_m, flock),
+        Inbox.from_broadcast(flock, composite.radio, flock),
         0.0
     )
     accelerations, spun = vmap(composite)(sensed)

@@ -223,7 +223,6 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
             for slot in fields(Composite)
             if (component := getattr(composite, slot.name))
         }
-        model["radio"]["slots"] = composite.radio.slots
         return {
             self.composite : dumps(
                 model
@@ -366,7 +365,7 @@ def flown(
         default_rng(plan.seed).normal(size=flock.forces.shape) * sqrt(plan.step_s),
         4
     )
-    inbox = Inbox.from_broadcast(flock, composite.radio.range_m, flock)
+    inbox = Inbox.from_broadcast(flock, composite.radio, flock)
     key   = seeded(plan.seed)
     still = jnp.zeros_like(flock.positions)
     t     = jnp.asarray(0.0)
@@ -490,7 +489,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     radio = posed(
         center_m  = roost.center_m,
         composite = composite,
-        forces    = zeros((Radio.slots + 8, 3)),
+        forces    = zeros((composite.radio.slots + 8, 3)),
         plan      = plan,
         spacing_m = 4.0
     )

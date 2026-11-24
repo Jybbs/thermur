@@ -109,10 +109,11 @@ def test_a_drone_learns_a_sender_beyond_its_table_from_a_member_s_list():
         delay_s = 0.0,
         loss    = 0.0,
         range_m = 100.0,
-        rate_hz = 10.0
+        rate_hz = 10.0,
+        slots   = 2
     )
     _, sent = radio.opened(flock, 0, 0.1)
-    table   = Inbox.from_broadcast(flock, radio.range_m, flock, 2)
+    table   = Inbox.from_broadcast(flock, radio, flock)
     listed  = table.senders.at[1].set(array([3, 3]))
     inbox   = replace(
         table,
@@ -141,10 +142,11 @@ def test_a_drone_learns_only_the_list_a_member_broadcast_its_delay_earlier():
         delay_s = 0.1,
         loss    = 0.0,
         range_m = 100.0,
-        rate_hz = 10.0
+        rate_hz = 10.0,
+        slots   = 2
     )
     _, sent = radio.opened(flock, 0, 0.1)
-    table   = Inbox.from_broadcast(flock, radio.range_m, flock, 2)
+    table   = Inbox.from_broadcast(flock, radio, flock)
     inbox   = replace(
         table,
         heard   = table.heard.at[0].set(array([True, False])),
@@ -329,7 +331,7 @@ def test_diffusion_drives_the_command_and_the_force_and_never_a_position():
         7,
         10.0,
         EASTWARD,
-        Inbox.from_broadcast(EASTWARD, inf, EASTWARD),
+        Inbox.from_broadcast(EASTWARD, Radio(range_m=inf), EASTWARD),
         0.0
     )
     increment = tree.map(ones_like, EASTWARD)
@@ -379,7 +381,7 @@ def test_diffusion_under_a_spin_drives_the_spin_rather_than_the_heading():
             7,
             10.0,
             EASTWARD,
-            Inbox.from_broadcast(EASTWARD, inf, EASTWARD),
+            Inbox.from_broadcast(EASTWARD, Radio(range_m=inf), EASTWARD),
             0.0
         )
     ).mv(
@@ -407,7 +409,7 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
         7,
         12.0,
         flock,
-        Inbox.from_broadcast(flock, inf, flock),
+        Inbox.from_broadcast(flock, Radio(range_m=inf), flock),
         0.0
     )
     slots = composite(noise=Persistent(persistence_s=2.0))
@@ -463,7 +465,7 @@ def test_exciting_the_flock_copies_a_zig_sooner_by_the_radio_s_delay():
             2,
             10.0,
             flock,
-            Inbox.from_broadcast(flock, built.radio.range_m, flock),
+            Inbox.from_broadcast(flock, built.radio, flock),
             0.0
         ),
         0.1
@@ -506,7 +508,7 @@ def test_exciting_the_flock_counts_down_and_starts_a_zig_at_the_rim():
             2,
             10.0,
             flock,
-            Inbox.from_broadcast(flock, built.radio.range_m, flock),
+            Inbox.from_broadcast(flock, built.radio, flock),
             0.0
         ),
         0.1
@@ -632,14 +634,17 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
     positions  = array([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [3.0, 0.0, 0.0]])
     velocities = array([[1.0, 0.0, 0.0], [2.0, 0.0, 0.0], [3.0, 0.0, 0.0]])
     flock      = flock_of(positions, velocities, 5 * velocities)
-    sent       = flock_of(positions - array([0.5, 0.0, 0.0]), 3 * velocities)
 
     sensed = Observation.sensed(
         still_air(5.0),
         2,
         10.0,
         flock,
-        Inbox.from_broadcast(flock_of(positions, 2 * velocities), inf, sent),
+        Inbox.from_broadcast(
+            earlier = flock_of(positions, 2 * velocities),
+            radio   = Radio(range_m=inf),
+            sent    = flock_of(positions - array([0.5, 0.0, 0.0]), 3 * velocities)
+        ),
         0.0
     )
 
@@ -704,7 +709,7 @@ def test_sensing_ranks_neighbors_by_the_positions_the_drone_heard():
         2,
         10.0,
         flock,
-        Inbox.from_broadcast(flock, inf, sent),
+        Inbox.from_broadcast(flock, Radio(range_m=inf), sent),
         0.0
     )
 
@@ -726,7 +731,7 @@ def test_sensing_reads_a_neighbor_out_of_range_as_one_on_the_drone():
         2,
         10.0,
         flock,
-        Inbox.from_broadcast(flock, 10.0, flock),
+        Inbox.from_broadcast(flock, Radio(range_m=10.0), flock),
         0.0
     )
 
@@ -763,7 +768,7 @@ def test_sensing_reads_centrality_over_every_held_sender():
         1,
         10.0,
         flock,
-        Inbox.from_broadcast(flock, 10.0, flock),
+        Inbox.from_broadcast(flock, Radio(range_m=10.0), flock),
         0.0
     )
 
