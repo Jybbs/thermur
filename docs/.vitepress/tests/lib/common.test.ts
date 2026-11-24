@@ -88,7 +88,8 @@ describe('ridgeline', () => {
   it('stands at its base where its waves cancel and within its amplitude everywhere', () => {
     const ridge = common.ridgeline({ amplitude: 18, base: 100, periods: [140, 61, 23], phases: [0, 0, 0] })
     expect(ridge(0)).toBe(100)
-    for (let x = 0; x <= 1200; x += 10) expect(Math.abs(ridge(x) - 100)).toBeLessThanOrEqual(18)
+    const columns = Array.from({ length: 121 }, (_, step) => step * 10)
+    expect(columns.filter(x => Math.abs(ridge(x) - 100) > 18)).toStrictEqual([])
   })
 })
 

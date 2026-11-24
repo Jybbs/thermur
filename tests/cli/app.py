@@ -17,20 +17,15 @@ from syrupy.assertion   import SnapshotAssertion
 
 
 @fixture
-def printed(
-    capsys      : CaptureFixture[str],
-    monkeypatch : MonkeyPatch
-) -> Callable[..., str]:
+def printed(capsys: CaptureFixture[str]) -> Callable[..., str]:
     """
     Loads `thermur.cli` afresh, so no command an earlier case ran has
-    resolved its import path, and sets the console's width to 80 columns,
-    whatever the shell running the suite sets.
+    resolved its import path.
 
     Returns:
         A runner taking the tokens of one call of the command line, which it
         runs in this process, returning what the call prints.
     """
-    monkeypatch.setenv("COLUMNS", "80")
     app = reload(import_module("thermur.cli")).app
 
     def call(*tokens: str) -> str:
