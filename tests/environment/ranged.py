@@ -14,17 +14,21 @@ over HTTP, served here from the loopback address by `Served`:
   the range or leaves a range out of its multipart answer
 - The record `Served` keeps of each range, written before the client can
   read the range
+- The traceback `Served` prints for a failure in its handler, beside the
+  silence of a connection the client closed or reset
 """
 
 from collections.abc import Iterable, Iterator
 from common.served   import Served
 from contextlib      import closing, suppress
-from http.client     import HTTPException
+from http.client     import HTTPException, RemoteDisconnected
 from io              import BytesIO
 from math            import prod
 from numpy           import arange, full, int16
 from pathlib         import Path
-from pytest          import FixtureRequest, fixture, mark, param, raises
+from pytest          import CaptureFixture, FixtureRequest, fixture, mark, param, raises
+from socket          import SOL_SOCKET, SO_LINGER
+from struct          import pack
 from time            import sleep
 from xarray          import Dataset, open_dataset
 from xarray.testing  import assert_identical
@@ -140,6 +144,27 @@ def written(request: FixtureRequest, tmp_path: Path) -> Path:
     return path
 
 
+def test_a_connection_the_client_resets_ends_with_nothing_printed(
+    capsys : CaptureFixture[str],
+    served : Served
+):
+    """
+    Asserts that a client resetting its connection once it has read an
+    answer, closing it with a linger of no seconds rather than closing it in
+    order, ends the connection with nothing printed.
+    """
+    with served.serving() as address:
+        remote = Remote.from_url(address)
+
+        assert remote.fetch([(0, 4)]) == b"CDF\x02"
+
+        connection = remote.idle.get()
+        connection.sock.setsockopt(SOL_SOCKET, SO_LINGER, pack("ii", 1, 0))
+        connection.close()
+
+    assert capsys.readouterr().err == ""
+
+
 def test_a_crop_across_columns_requests_each_row_in_one_multipart_request(
     served : Served,
     threat : Path
@@ -192,6 +217,24 @@ def test_a_failed_range_is_requested_again(fault: str, remote: Remote, served: S
     assert remote.fetch([(0, 4)]) == b"CDF\x02"
 
 
+def test_a_failure_in_the_handler_prints_its_traceback(
+    capsys   : CaptureFixture[str],
+    tmp_path : Path
+):
+    """
+    Asserts that a request the handler of `Served` fails on, here for a file
+    gone from the disk, closes the connection with no answer and prints the
+    traceback of the failure.
+    """
+    with (
+        Served(path=tmp_path / "missing").serving() as address,
+        raises(RemoteDisconnected)
+    ):
+        Remote.from_url(address)
+
+    assert "FileNotFoundError" in capsys.readouterr().err
+
+
 def test_a_failure_on_every_attempt_is_raised(remote: Remote, served: Served):
     """
     Asserts that a range failing on each of `Remote.attempts` raises the
@@ -201,15 +244,6 @@ def test_a_failure_on_every_attempt_is_raised(remote: Remote, served: Served):
 
     with raises(HTTPException, match="503"):
         remote.fetch([(0, 4)])
-
-
-def test_a_file_in_another_format_is_refused_naming_its_magic_number():
-    """
-    Asserts that a file opening on another magic number than the classic or
-    the 64-bit offset format's, such as HDF5's, is refused naming it.
-    """
-    with raises(ValueError, match=r"opens on b'\\x89HDF'"):
-        Header.from_file(BytesIO(b"\x89HDF\r\n\x1a\n"))
 
 
 @mark.parametrize(
@@ -267,6 +301,15 @@ def test_a_selection_requests_one_range_per_record_it_covers(
     ]
 
 
+def test_a_file_in_another_format_is_refused_naming_its_magic_number():
+    """
+    Asserts that a file opening on another magic number than the classic or
+    the 64-bit offset format's, such as HDF5's, is refused naming it.
+    """
+    with raises(ValueError, match=r"opens on b'\\x89HDF'"):
+        Header.from_file(BytesIO(b"\x89HDF\r\n\x1a\n"))
+
+
 def test_a_file_served_over_http_reads_as_the_netcdf4_engine_reads_it(written: Path):
     """
     Asserts that a file opened through `RangedBackend` reads, attributes
@@ -322,15 +365,21 @@ def test_a_range_is_recorded_before_its_answer_is_read(remote: Remote, served: S
     assert (served.requests, served.sent) == (["bytes=0-3"], [(0, 4)])
 
 
-def test_a_server_ignoring_the_range_is_refused(remote: Remote, served: Served):
+def test_a_server_ignoring_the_range_is_refused(
+    capsys : CaptureFixture[str],
+    served : Served
+):
     """
     Asserts that a server answering a range request with the whole file and
-    a status of 200 is refused, naming the status.
+    a status of 200 is refused, naming the status, and prints nothing once
+    the client resets the connection it refused the answer on.
     """
     served.faults[:] = ["whole"]
+    with served.serving() as address, closing(Remote.from_url(address)) as remote:
+        with raises(ValueError, match="status 200 rather than 206"):
+            remote.fetch([(0, 4)])
 
-    with raises(ValueError, match="status 200 rather than 206"):
-        remote.fetch([(0, 4)])
+    assert capsys.readouterr().err == ""
 
 
 def test_a_stalled_read_is_requested_again_over_a_new_connection(threat: Path):
