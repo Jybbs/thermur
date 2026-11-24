@@ -12,19 +12,23 @@ and the pipeline:
   it makes of itself
 """
 
-from common.edits import append, task
-from os           import X_OK, access, pathsep
-from pathlib      import Path
-from pytest       import Config, MonkeyPatch, TempPathFactory, mark, param, raises
-from re           import findall
-from subprocess   import CalledProcessError, CompletedProcess, check_output
+from common.declarations import DECLARED
+from common.edits        import append, task
+from os         import X_OK, access, pathsep
+from pathlib    import Path
+from pytest     import Config, MonkeyPatch, Subtests, TempPathFactory, mark, param, raises
+from re         import findall
+from subprocess import CalledProcessError, CompletedProcess, check_output
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
 
+pytestmark = mark.reads(*DECLARED)
+
 
 def test_a_clone_carries_the_checkouts_changes_and_its_programs_modes(
     clone            : Checkout,
+    subtests         : Subtests,
     tmp_path_factory : TempPathFactory
 ):
     """
@@ -45,7 +49,9 @@ def test_a_clone_carries_the_checkouts_changes_and_its_programs_modes(
     )
     assert copied.read(Path("notes.md")) == "An untracked note.\n"
     assert not (copied.root / "LICENSE").exists()
-    assert all(access(copied.root / path, X_OK) for path in copied.scripts)
+    for path in copied.scripts:
+        with subtests.test(path=str(path)):
+            assert access(copied.root / path, X_OK)
 
 
 def test_commit_outside_a_clone_stops_on_the_error_git_exits_with(tmp_path: Path):
@@ -194,13 +200,13 @@ def test_rows_lists_the_checks_of_pull_request_workflows_alone(checkout: Checkou
     assert checkout.rows == ["b:two", "a:one"]
 
 
-def test_rulesets_reads_each_ruleset_by_its_path(checkout: Checkout):
+def test_rulesets_reads_each_ruleset_by_its_path(checked: Checkout):
     """
     Asserts that the rulesets are the JSON files under `.github/rulesets/`,
     each by its path from the root in path order and validated under the
     name it carries on GitHub.
     """
-    assert [(path, ruleset.name) for path, ruleset in checkout.rulesets.items()] == [
+    assert [(path, ruleset.name) for path, ruleset in checked.rulesets.items()] == [
         (Path(".github/rulesets/main.json"), "main branch protection"),
         (Path(".github/rulesets/tags.json"), "release tag protection")
     ]
@@ -239,15 +245,15 @@ def test_run_runs_in_its_folder_and_raises_only_where_checked(checkout: Checkout
         checkout.run("false")
 
 
-def test_steps_lists_the_actions_ahead_of_the_workflows(checkout: Checkout):
+def test_steps_lists_the_actions_ahead_of_the_workflows(checked: Checkout):
     """
     Asserts that every step reads beside its file's path from the root, the
     composite action's steps ahead of the workflows' in path order.
     """
-    paths = [path for path, _ in checkout.steps]
+    paths = [path for path, _ in checked.steps]
 
     assert paths == sorted(paths)
-    assert set(paths) == {*checkout.actions, *checkout.workflows}
+    assert set(paths) == {*checked.actions, *checked.workflows}
 
 
 def test_subcommands_reads_each_command_and_alias_the_help_lists(
@@ -343,20 +349,20 @@ def test_tasks_lists_a_hidden_task(checkout: Checkout):
     ) in checkout.tasks
 
 
-def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
+def test_tasks_lists_every_task_file_under_the_root(checked: Checkout):
     """
     Asserts that each executable file under `.mise/tasks/` reads as a task
     held in that file and declared there, at the path mise resolves, named
     for its folder and its stem, beside the alias its `MISE alias` line
     declares.
     """
-    folder = checkout.root / ".mise/tasks"
+    folder = checked.root / ".mise/tasks"
     files  = {path for path in folder.rglob("*") if path.is_file() and access(
         path,
         X_OK
     )}
 
-    assert set(checkout.tasks) == {
+    assert set(checked.tasks) == {
         Task(
             aliases = tuple(
                 findall(r'(?m)^# ?MISE alias *= "([^"]+)"', path.read_text())
@@ -370,17 +376,17 @@ def test_tasks_lists_every_task_file_under_the_root(checkout: Checkout):
     }
 
 
-def test_the_bibliography_reads_each_study_the_file_holds(checkout: Checkout):
+def test_the_bibliography_reads_each_study_the_file_holds(checked: Checkout):
     """
     Asserts that the bibliography holds one study for each entry
     `docs/pages/references.bib` opens.
     """
     entries = findall(
         r"(?m)^@\w+\{(\w+),",
-        checkout.read(Path("docs/pages/references.bib"))
+        checked.read(Path("docs/pages/references.bib"))
     )
 
-    assert list(checkout.bibliography.studies) == entries
+    assert list(checked.bibliography.studies) == entries
 
 
 @mark.parametrize(

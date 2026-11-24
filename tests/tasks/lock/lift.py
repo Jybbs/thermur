@@ -12,18 +12,21 @@ spec, over a clone of the checkout whose one lag lifts the `uv` mise pins:
   trial passes where both are given
 """
 
-from collections.abc  import Callable
-from common.edits     import hold
-from common.lags      import BREAKING, uv_lag
-from common.stand_ins import StandIn
-from contextlib       import nullcontext
-from functools        import partial
-from pytest           import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
-from types            import ModuleType
+from collections.abc     import Callable
+from common.declarations import RENDERED
+from common.edits        import hold
+from common.lags         import BREAKING, uv_lag
+from common.stand_ins    import StandIn
+from contextlib          import nullcontext
+from functools           import partial
+from pytest              import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.lift     import Lift
 from thermur.repo.schemas  import Config
+
+pytestmark = mark.reads(*RENDERED)
 
 
 @fixture

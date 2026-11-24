@@ -19,14 +19,18 @@ const config = themeConfig(FACTS, pagesDir(import.meta.url))
 import.meta.glob(['../../../pages/*/*.md', '../../../pages/public/*'], { query: '?raw' })
 
 describe('themeConfig', () => {
-  it('sets the wordmark in place of the site’s title, a file the public folder holds per scheme', () => {
+  it('sets the wordmark in place of the site’s title, one per scheme', () => {
     expect(config.siteTitle).toBe(false)
     const { dark, light } = source.marks.wordmark
     expect(config.logo).toEqual({ alt: 'Thermur', dark: `/${dark}`, light: `/${light}` })
-    for (const file of Object.values(source.marks.wordmark)) {
+  })
+
+  it.each(Object.entries(source.marks.wordmark))(
+    'sets the %s wordmark from a file the public folder holds',
+    (_, file) => {
       expect(fs.existsSync(path.join(publicDir(import.meta.url), file))).toBe(true)
     }
-  })
+  )
 
   it('links the repository the manifest names', () => {
     expect(config.socialLinks).toEqual([{ icon: 'github', link: 'https://github.com/example/flock' }])
