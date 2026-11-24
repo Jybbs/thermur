@@ -114,6 +114,7 @@ test.for([
     [
       '.vitepress/tests/config.test.ts',
       '.vitepress/tests/lib/kit/readers.test.ts',
+      '.vitepress/tests/lib/markdown.test.ts',
       '.vitepress/tests/lib/math.test.ts',
       '.vitepress/tests/lib/page-data.test.ts'
     ]
