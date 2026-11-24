@@ -39,7 +39,9 @@ from thermur.environment.schemas import (
 )
 from thermur.identity.schemas  import Identity, Pair, Palette
 from thermur.metrics.flight    import stepped
+from thermur.metrics.norms     import Norms
 from thermur.metrics.schemas   import Plan
+from thermur.metrics.sweep     import Sweep
 from thermur.metrics.trials    import Trial
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
@@ -140,8 +142,9 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         the plant, the radio, and the roost declare beside those of each
         open slot's default and each of its candidates, every one named for
         its component, on The Visual Identity the identity as `specimens`
-        lays it out, and on The Kit the pieces each declaration in the clone
-        records.
+        lays it out, on The Kit the pieces each declaration in the clone
+        records, and on The Flock in Still Air each norm `Norms` declares
+        beside the fields `Sweep` declares.
         """
         defaults = Settings()
         return {
@@ -154,6 +157,10 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 "ranges" : tabled(Ranges),
                 "sample" : tabled(Sample),
                 "threat" : tabled(ParametricThreat)
+            },
+            Path("docs/pages/results/still-air.md")  : {
+                "norms" : normed(Norms.shipped()),
+                "sweep" : tabled(Sweep)
             },
             Path("docs/pages/methods/rules.md")      : {
                 slot.name: tabled(type(getattr(defaults, slot.name)))
@@ -356,12 +363,7 @@ def flown(
         flock the step reads, and its increments, beside the flock the step
         moves it to, rounded to four decimals.
     """
-    air = Air(
-        channels = zeros((4, 1, 1, 1, 1), dtype="float32"),
-        names    = ("excess", "u", "v", "w"),
-        origin   = (0.0, 0.0, 0.0, 0.0),
-        spacing  = (1.0, 1.0, 1.0, 1.0)
-    )
+    air        = Air.still()
     increments = around(
         default_rng(plan.seed).normal(size=flock.forces.shape) * sqrt(plan.step_s),
         4
@@ -426,6 +428,28 @@ def markdown_table(header: Collection[str], rows: Iterable[Iterable[str]]) -> st
             "|---" * len(header) + "|",
             *(f"| {' | '.join(row)} |" for row in rows)
         ]
+    )
+
+
+def normed(norms: Norms) -> str:
+    """
+    Lays out each norm as a row of a Markdown table, by the statistic it is
+    set beside, its figure with its spread and the spread's kind, the flocks
+    and the kind of flock it spans, and a link to its study's DOI.
+    """
+    return markdown_table(
+        header = ["Statistic", "Norm", "Spread", "Flocks", "System", "Source"],
+        rows   = (
+            [
+                f"`{statistic}`",
+                f"{'above ' * norm.above}{norm.figure:g} {norm.unit}".strip(),
+                f"±{norm.spread:g}, {norm.kind}" if norm.kind else "none stated",
+                str(norm.flocks or "not stated"),
+                norm.system,
+                f"[{norm.doi}](https://doi.org/{norm.doi})"
+            ]
+            for statistic, norm in norms.root.items()
+        )
     )
 
 

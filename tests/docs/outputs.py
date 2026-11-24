@@ -29,7 +29,7 @@ from typing       import Annotated
 from thermur.controller.components import HardSphere, Home
 from thermur.controller.schemas    import Composite, Flock, Radio
 from thermur.docs.kit              import Piece
-from thermur.docs.outputs          import Outputs, flown, markdown_table, pieces, specimens, tabled
+from thermur.docs.outputs          import Outputs, flown, markdown_table, normed, pieces, specimens, tabled
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas import (
     BASE_K,
@@ -41,6 +41,7 @@ from thermur.environment.schemas import (
     Sample
 )
 from thermur.identity.schemas  import Identity
+from thermur.metrics.norms     import Norm, Norms, Spread
 from thermur.metrics.schemas   import Plan
 from thermur.metrics.trials    import Trial
 from thermur.pipeline.settings import Settings
@@ -133,6 +134,48 @@ def test_a_missing_page_refuses_each_of_its_regions(checkout: Checkout):
         f"`{DATA}` does not carry the opening and then the closing marker of its "
         f"`{name}` region once each, so `mise render` leaves the region as it stands"
         for name in ("crop", "ranges", "sample", "threat")
+    ]
+
+
+def test_a_norm_row_names_each_part_and_words_an_unstated_one():
+    """
+    Asserts that each norm lays out as a row naming its statistic, its
+    figure with its unit or its lower bound, its spread with the spread's
+    kind, its flocks, its system, and a link to its DOI, a spread or a count
+    of flocks the source leaves out written as words so no cell is empty.
+    """
+    table = normed(
+        Norms(
+            {
+                "border_density" : Norm(
+                    above  = True,
+                    doi    = "10.1/a",
+                    figure = 1.0,
+                    system = "starlings",
+                    unit   = ""
+                ),
+                "wave_speed_m_s" : Norm(
+                    doi    = "10.1/b",
+                    figure = 30.0,
+                    flocks = 12,
+                    kind   = Spread.RANGE,
+                    spread = 10.0,
+                    system = "starlings",
+                    unit   = "m/s"
+                )
+            }
+        )
+    )
+
+    assert [row.strip("| ").split(" | ") for row in table.splitlines()[2:]] == [
+        [
+            "`border_density`", "above 1", "none stated",
+            "not stated", "starlings", "[10.1/a](https://doi.org/10.1/a)"
+        ],
+        [
+            "`wave_speed_m_s`", "30 m/s", "±10, half range",
+            "12", "starlings", "[10.1/b](https://doi.org/10.1/b)"
+        ]
     ]
 
 

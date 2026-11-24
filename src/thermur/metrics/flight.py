@@ -1,16 +1,18 @@
 """
 Holds `Flight`, a `lax.scan` over diffrax's `Euler().step` flying one
 flock per seed, beside each statistic its frames give, which the `flight`,
-`frames`, and `statistics` steps and `thermur fly` read.
+`frames`, `statistics`, and `sweep` steps and `thermur fly` read.
 """
 
 from collections.abc import Callable
 from diffrax         import AbstractPath, ControlTerm, Euler, MultiTerm, ODETerm, VirtualBrownianTree
+from emcee.autocorr  import auto_window, integrated_time
 from equinox         import Module, field, tree_at
+from itertools       import combinations
 from jax             import Array, jit, lax, tree, vmap
 from jax.numpy       import cross, where
 from jax.random      import fold_in, key as seeded, split
-from numpy         import (
+from numpy           import (
     angle,
     arange,
     arccos,
@@ -21,12 +23,20 @@ from numpy         import (
     asarray,
     bincount,
     clip,
+    cumsum,
     diff,
+    divide,
     einsum,
     exp,
     fft,
+    finfo,
     flatnonzero,
+    full,
+    gradient,
     histogram,
+    inf,
+    interp,
+    isfinite,
     isin,
     linalg,
     linspace,
@@ -36,14 +46,18 @@ from numpy         import (
     newaxis,
     ones,
     pi,
+    sign,
+    sort,
+    sqrt,
     stack,
     take_along_axis,
-    trapezoid
+    unique,
+    zeros
 )
 from scipy.ndimage          import uniform_filter1d
-from scipy.signal           import find_peaks
+from scipy.signal           import find_peaks, peak_widths
 from scipy.sparse.csgraph   import connected_components
-from scipy.spatial          import ConvexHull, KDTree
+from scipy.spatial          import ConvexHull, Delaunay, KDTree
 from scipy.spatial.distance import pdist
 from scipy.stats            import linregress
 from typing                 import Self
@@ -120,20 +134,20 @@ class Flight(Module):
     @property
     def autocorrelation_s(self) -> ndarray:
         """
-        Integrates the autocorrelation of each drone's heading relative to
-        the flock's, up to its first zero, in seconds.
+        Reads the integrated autocorrelation time of each drone's heading
+        relative to the flock's through emcee's `integrated_time`, each
+        component of each drone's heading a walker, in seconds.
+
+        A settled run spans fewer than the 50 times the estimator trusts, so
+        emcee logs a warning in place of raising.
         """
         headings = asarray(self.settled.headings)
-        relative = headings - headings.mean(2, keepdims=True)
-        frames   = relative.shape[1]
-        spectrum = fft.rfft(relative, 2 * frames, axis=1)
-        lagged   = fft.irfft(abs(spectrum) ** 2, axis=1)[:, :frames].sum(-1).mean(-1)
         return asarray(
             [
-                trapezoid(curve[: first_zero(curve)], dx=self.plan.frame_s)
-                for curve in lagged / (frames - arange(frames)) / lagged[:, :1] * frames
+                integrated_time(seed.reshape(len(seed), -1), quiet=True)[0]
+                for seed in headings - headings.mean(2, keepdims=True)
             ]
-        )
+        ) * self.plan.frame_s
 
     @property
     def axes(self) -> tuple[str, ...]:
@@ -153,15 +167,17 @@ class Flight(Module):
     @property
     def border_density(self) -> ndarray:
         """
-        Divides the density of the drones on the flock's convex hull by that
-        of the rest, each from the cube of its nearest-neighbor distance,
-        which holds a border drone's reading free of the empty space beyond
-        the hull, over the last frames.
+        Divides the density of the drones on the border of the flock's
+        α-shape at `reach_m` by that of the drones inside it, each from the
+        cube of its nearest-neighbor distance, which holds a border drone's
+        reading free of the empty space beyond the border, over the last
+        frames, `nan` for a seed any of whose last frames holds no drone
+        inside the shape.
         """
         return asarray(
             [
                 [
-                    ratio_on_hull(cloud, spacing)
+                    ratio_on_border(cloud, self.reach_m, spacing)
                     for cloud, spacing in zip(frames, spacings, strict=True)
                 ]
                 for frames, spacings in zip(
@@ -178,6 +194,21 @@ class Flight(Module):
         Finds the center of each bin `bins` lays out, in meters.
         """
         return (self.bins[1:] + self.bins[:-1]) / 2
+
+    @property
+    def connected(self) -> ndarray:
+        """
+        Divides the largest group the radio graph of the last frame splits
+        into, two drones joined where they sit within the radio's `range_m`,
+        by the flock's size.
+        """
+        return asarray(
+            [
+                bincount(grouped(cloud, self.composite.radio.range_m)).max()
+                / len(cloud)
+                for cloud in asarray(self.frames.positions)[:, -1]
+            ]
+        )
 
     @property
     def dataset(self) -> Dataset:
@@ -218,12 +249,23 @@ class Flight(Module):
         ).mean(1)
 
     @property
+    def group_speed_m_s(self) -> ndarray:
+        """
+        Averages the flock's mean speed through the air over the settled
+        frames, in meters per second.
+        """
+        return linalg.norm(asarray(self.settled.velocities), axis=-1).mean((1, 2))
+
+    @property
     def groups(self) -> list[ndarray]:
         """
         Labels the group each drone of the last frame flies in, one row
         per seed.
         """
-        return [self.grouped(cloud) for cloud in asarray(self.frames.positions)[:, -1]]
+        return [
+            grouped(cloud, self.reach_m)
+            for cloud in asarray(self.frames.positions)[:, -1]
+        ]
 
     @property
     def last(self) -> Flock:
@@ -231,6 +273,14 @@ class Flight(Module):
         Keeps the last ten frames, which the neighbor statistics read.
         """
         return tree.map(lambda array: array[:, -10:], self.frames)
+
+    @property
+    def middle_aspect_ratio(self) -> ndarray:
+        """
+        Averages the ratio of the flock's middle axis to its thinnest over
+        the settled frames.
+        """
+        return asarray(self.settled.aspect_ratios)[..., 1].mean(1)
 
     @property
     def neighbor_pairs(self) -> tuple[ndarray, ndarray]:
@@ -284,12 +334,55 @@ class Flight(Module):
         return asarray(self.settled.polarization).mean(1)
 
     @property
+    def reach_m(self) -> float:
+        """
+        Triples `spacing_m`, the hop under which two drones fly in one group
+        and the scale of the α-shape whose border `border_density` reads,
+        so a gap narrower than the hop joining two drones is no gap in the
+        flock, in meters.
+        """
+        return 3 * self.plan.spacing_m
+
+    @property
+    def rearrangement_s(self) -> ndarray:
+        """
+        Integrates the share of each drone's neighbors at the first settled
+        frame still among its neighbors, above the share a random reshuffle
+        leaves, over the window `integrated`'s estimator takes, the time
+        over which the neighbors a drone reads rearrange, in seconds.
+        """
+        count  = self.plan.neighbors
+        floor  = count / (self.plan.drones - 1)
+        stayed = asarray(
+            [
+                (
+                    found[..., newaxis] == found[0, :, newaxis, :]
+                ).any(-2).mean((-2, -1))
+                for found in nearest(count, asarray(self.settled.positions))
+            ]
+        )
+        return asarray(
+            [
+                integrated(curve, self.plan.frame_s)
+                for curve in (stayed - floor) / (1 - floor)
+            ]
+        )
+
+    @property
     def settled(self) -> Flock:
         """
         Leaves out the frames before `settled_s`.
         """
         first = self.plan.framed(self.plan.settled_s)
         return tree.map(lambda array: array[:, first:], self.frames)
+
+    @property
+    def shares(self) -> ndarray:
+        """
+        Lays the edges of the distances the speed correlation bins out, as
+        shares of the flock's extent.
+        """
+        return linspace(0.0, 1.0, self.bins.size)
 
     @property
     def spacing_m(self) -> ndarray:
@@ -335,6 +428,51 @@ class Flight(Module):
         )
 
     @property
+    def speed_correlation(self) -> Dataset:
+        """
+        Reads the correlation $C_{sp}(r)$ of the drones' speed fluctuations
+        through the air at each frame `Plan.shape_frames` picks, through
+        `correlated`, over the bins `shares` lays out across the extent.
+
+        Returns:
+            By seed, the curve averaged over the frames by the share of the
+            extent at each bin's center, and over the frames the extent,
+            the largest distance between two drones, in meters, and the
+            first zero of the curve over the extent, `nan` for a seed whose
+            curve stays positive throughout.
+        """
+        picked = self.plan.shape_frames
+        read   = asarray(
+            [
+                [
+                    correlated(cloud, self.shares, linalg.norm(flying, axis=-1))
+                    for cloud, flying in zip(clouds, moving, strict=True)
+                ]
+                for clouds, moving in zip(
+                    asarray(self.frames.positions)[:, picked],
+                    asarray(self.frames.velocities)[:, picked],
+                    strict = True
+                )
+            ],
+            dtype = object
+        )
+        extents = read[..., 1].astype(float)
+        return Dataset(
+            {
+                "extent_m"                : (("seed", "frame"), extents),
+                "speed_correlation"       : (
+                    ("seed", "frame", "share"),
+                    stack(read[..., 0].tolist())
+                ),
+                "speed_correlation_ratio" : (
+                    ("seed", "frame"),
+                    read[..., 2].astype(float) / extents
+                )
+            },
+            coords = {"share": (self.shares[1:] + self.shares[:-1]) / 2}
+        ).mean("frame")
+
+    @property
     def statistics(self) -> Dataset:
         """
         Lays out every statistic the frames give as the table a recorded
@@ -369,6 +507,24 @@ class Flight(Module):
             coords = {
                 "distance" : self.centers / self.plan.spacing_m,
                 "rank"     : arange(1, self.plan.neighbors + 1)
+            }
+        )
+
+    @property
+    def still_statistics(self) -> Dataset:
+        """
+        Lays out the statistics a flight through still air is set beside the
+        starling and drone norms with, by seed, beside the speed correlation
+        by the share of the flock's extent.
+        """
+        return self.speed_correlation.assign(
+            {
+                name: ("seed", getattr(self, name))
+                for name in (
+                    "aspect_ratio", "autocorrelation_s", "border_density", "connected",
+                    "group_speed_m_s", "middle_aspect_ratio", "polarization",
+                    "rearrangement_s", "spacing_m", "wave_speed_m_s"
+                )
             }
         )
 
@@ -426,6 +582,31 @@ class Flight(Module):
                     )
                 ]
             ).T
+        )
+
+    @property
+    def wave_speed_m_s(self) -> ndarray:
+        """
+        Fits the speed at which the flock's fastest spontaneous turn over
+        the settled frames crosses it, through `crossed`, `nan` for a seed
+        whose drones all turn at once, in meters per second.
+        """
+        plan = self.plan
+        return asarray(
+            [
+                crossed(
+                    clouds     = clouds,
+                    frame_s    = plan.frame_s,
+                    reach_m    = self.reach_m,
+                    velocities = flying,
+                    window     = plan.window
+                )
+                for clouds, flying in zip(
+                    asarray(self.settled.positions),
+                    asarray(self.settled.velocities),
+                    strict = True
+                )
+            ]
         )
 
     def drifts(self, air: Air, composite: Composite) -> Array:
@@ -510,25 +691,11 @@ class Flight(Module):
             unturned  = tree.map(lambda leaf: leaf[1], lanes) if plan.turn_deg else None
         )
 
-    def grouped(self, cloud: ndarray) -> ndarray:
-        """
-        Labels the group each drone of `cloud` flies in, two drones sharing
-        a group where a chain of hops under three times `spacing_m` joins
-        them.
-        """
-        return connected_components(
-            (tree := KDTree(cloud)).sparse_distance_matrix(
-                tree,
-                3 * self.plan.spacing_m
-            ),
-            directed = False
-        )[1]
-
     def largest(self, frame: int, seed: int) -> Flock:
         """
         Keeps the largest group one seed's frame splits into.
         """
-        labels = self.grouped(asarray(self.frames.positions)[seed, frame])
+        labels = grouped(asarray(self.frames.positions)[seed, frame], self.reach_m)
         return tree.map(
             lambda frames: frames[seed, frame, labels == bincount(labels).argmax()],
             self.frames
@@ -573,6 +740,176 @@ class Flight(Module):
         )
 
 
+def alpha_shape(cloud: ndarray, reach_m: float) -> tuple[ndarray, ndarray, float]:
+    """
+    Builds the α-shape of `cloud` at `reach_m`, the tetrahedra of its
+    `Delaunay` triangulation whose circumscribed sphere is narrower than
+    `reach_m`, a flat tetrahedron's sphere counting as unbounded.
+
+    Returns:
+        Whether each drone sits on a triangle exactly one kept tetrahedron
+        holds, the shape's border, whether each sits inside the shape, a
+        corner of a kept tetrahedron off the border, so a drone no kept
+        tetrahedron reaches counts as neither, and the shape's volume, in
+        cubic meters.
+    """
+    simplices = Delaunay(cloud).simplices
+    corners   = cloud[simplices]
+    edges     = corners[:, 1:] - corners[:, :1]
+    volumes   = abs(linalg.det(edges)) / 6
+    solid     = volumes > 0
+    squared   = (corners[solid] ** 2).sum(-1)
+    centers   = linalg.solve(
+        2 * edges[solid],
+        (squared[:, 1:] - squared[:, :1])[..., newaxis]
+    )[..., 0]
+    radii        = full(len(simplices), inf)
+    radii[solid] = linalg.norm(centers - corners[solid, 0], axis=-1)
+    held         = radii < reach_m
+    faces        = sort(
+        simplices[held][:, list(combinations(range(4), 3))].reshape(-1, 3),
+        axis = 1
+    )
+    found, counts = unique(faces, axis=0, return_counts=True)
+    border        = isin(arange(len(cloud)), found[counts == 1])
+    return (
+        border,
+        isin(arange(len(cloud)), simplices[held]) & ~border,
+        float(volumes[held].sum())
+    )
+
+
+def correlated(
+    cloud  : ndarray,
+    shares : ndarray,
+    speeds : ndarray
+) -> tuple[ndarray, float, float]:
+    """
+    Reads the correlation of one frame's speed fluctuations by distance,
+    each drone's speed less the flock's mean, summed over the pairs in each
+    bin through a weighted `KDTree.count_neighbors` and divided by the pairs
+    the bin holds and by the fluctuations' variance.
+
+    Args:
+        cloud: The drones' positions, in meters.
+        shares: The edges of the bins, as shares of the flock's extent.
+        speeds: The drones' speeds through the air, in meters per second.
+
+    Returns:
+        The correlation in each bin, `nan` for a bin holding no pair, the
+        extent, the largest distance between two drones, and the distance
+        where the correlation first falls to zero, interpolated between the
+        two bins about it and `nan` where it stays positive, both in meters.
+    """
+    extent = float(pdist(cloud[ConvexHull(cloud).vertices]).max())
+    tree   = KDTree(cloud)
+    swings = speeds - speeds.mean()
+    edges  = shares * extent
+    summed = tree.count_neighbors(
+        tree,
+        edges,
+        cumulative = False,
+        weights    = (swings, swings)
+    )
+    pairs = tree.count_neighbors(tree, edges, cumulative=False)
+    curve = divide(
+        summed[1:],
+        pairs[1:] * (swings**2).mean(),
+        out   = full(len(edges) - 1, nan),
+        where = pairs[1:] > 0
+    )
+    held    = isfinite(curve)
+    centers = ((edges[1:] + edges[:-1]) / 2)[held]
+    found   = curve[held]
+    index   = first_zero(found)
+    zero    = (
+        nan if index == found.size
+        else centers[0] if index == 0
+        else interp(0.0, found[[index, index - 1]], centers[[index, index - 1]])
+    )
+    return curve, extent, float(zero)
+
+
+def crossed(
+    clouds     : ndarray,
+    frame_s    : float,
+    reach_m    : float,
+    velocities : ndarray,
+    window     : int
+) -> float:
+    """
+    Fits the speed at which one flock's fastest turn crosses it, from the
+    radial acceleration of each drone over the turn, the frames where the
+    rotation of the flock's mean heading over `window` frames stays above
+    half its peak, widened by `window` frames on each side, or the peak's
+    frame alone where the peak falls on the first or the last.
+
+    Each pair's delay is the lag maximizing the normalized cross-correlation
+    of their radial accelerations, read for one drone against every other at
+    once from the product of their spectra, zero-padded to twice the frames
+    so no lag wraps around. A drone ranks by how many drones it leads less
+    how many lead it, its turning time is the mean, over each drone ranked
+    ahead, of that drone's time plus the pair's delay, and the distance
+    the turn has crossed by then is the cube root of the drones turned over
+    the flock's density inside its α-shape at `reach_m`, fitted against the
+    times of the first half of the ranks of the drones the shape reaches.
+
+    Args:
+        clouds: The drones' positions at each frame, in meters, `(n_frames,
+                n_drones, 3)`.
+        frame_s: The time between two frames, in seconds.
+        reach_m: The scale of the α-shape the density is read inside.
+        velocities: The drones' velocities through the air at each frame, in
+                    meters per second.
+        window: The frames the rotation of the mean heading is read over.
+
+    Returns:
+        The speed of the turn, in meters per second, `nan` where the shape
+        reaches no drone or every drone it reaches turns at the same time.
+    """
+    headings = asarray(unit(velocities.mean(1)))
+    rotation = arccos(
+        clip(einsum("ti,ti->t", headings[:-window], headings[window:]), -1, 1)
+    )
+    peak       = int(argmax(rotation))
+    start, end = (
+        peak_widths(rotation, [peak])[2:] if 0 < peak < rotation.size - 1
+        else ([peak], [peak])
+    )
+    turning = velocities[max(int(start[0]) - window, 0) : int(end[0]) + 2 * window]
+    pushed  = gradient(turning, frame_s, axis=0)
+    along   = einsum("tni,tni->tn", pushed, asarray(unit(turning)))
+    radial  = sqrt(clip((pushed**2).sum(-1) - along**2, 0, None)).T
+    radial  = radial / clip(
+        linalg.norm(radial, axis=1, keepdims=True),
+        finfo(float).tiny,
+        None
+    )
+    padded  = 2 * radial.shape[1]
+    spectra = fft.rfft(radial, padded, axis=1)
+    lags    = fft.fftfreq(padded, 1 / padded) * frame_s
+    delays  = stack(
+        [
+            lags[argmax(fft.irfft(spectra * own.conj(), padded, axis=1), axis=1)]
+            for own in spectra
+        ]
+    )
+    order = argsort(-sign(delays).sum(1), kind="stable")
+    times = zeros(len(order))
+    for rank, drone in enumerate(order[1:], start=1):
+        ahead        = order[:rank]
+        times[drone] = (times[ahead] + delays[ahead, drone]).mean()
+
+    border, inside, volume = alpha_shape(clouds[peak + window // 2], reach_m)
+    held   = border | inside
+    turned = sort(times[held])[: held.sum() // 2]
+    if volume == 0 or turned.std() == 0:
+        return nan
+
+    reached = (arange(1, turned.size + 1) * volume / held.sum()) ** (1 / 3)
+    return float(linregress(turned, reached).slope)
+
+
 def first_zero(curve: ndarray) -> int:
     """
     Finds the index of the first value at or below zero, or the length of a
@@ -580,6 +917,28 @@ def first_zero(curve: ndarray) -> int:
     """
     crossed = flatnonzero(curve <= 0)
     return crossed[0] if crossed.size else curve.size
+
+
+def grouped(cloud: ndarray, hop_m: float) -> ndarray:
+    """
+    Labels the group each drone of `cloud` flies in, two drones sharing a
+    group where a chain of hops under `hop_m` joins them.
+    """
+    return connected_components(
+        (tree := KDTree(cloud)).sparse_distance_matrix(tree, hop_m),
+        directed = False
+    )[1]
+
+
+def integrated(curve: ndarray, step: float) -> float:
+    """
+    Reads the integrated time of a normalized autocorrelation `curve`
+    sampled every `step` as emcee's `integrated_time` does, one plus twice
+    the sum over the first lags, up to the first lag at least five times
+    that time, past which the noise dominates the sum.
+    """
+    times = 2 * cumsum(curve) - 1
+    return times[auto_window(times, 5)] * step
 
 
 def kept(
@@ -675,15 +1034,19 @@ def kept(
     )[1]
 
 
-def ratio_on_hull(cloud: ndarray, spacings: ndarray) -> float:
+def ratio_on_border(cloud: ndarray, reach_m: float, spacings: ndarray) -> float:
     """
-    Divides the mean density of the drones on the convex hull of `cloud` by
-    that of the rest, each from the cube of its distance in `spacings` to
-    its nearest neighbor.
+    Divides the mean density of the drones on the border of the α-shape of
+    `cloud` at `reach_m` by that of the drones inside it, each from the cube
+    of its distance in `spacings` to its nearest neighbor, `nan` where no
+    drone sits inside it.
     """
-    border  = isin(arange(len(cloud)), ConvexHull(cloud).vertices)
-    density = spacings**-3.0
-    return density[border].mean() / density[~border].mean()
+    border, inside, _ = alpha_shape(cloud, reach_m)
+    density           = spacings**-3.0
+    return (
+        density[border].mean() / density[inside].mean()
+        if inside.any() else nan
+    )
 
 
 def response(

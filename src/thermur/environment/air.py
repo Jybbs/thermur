@@ -1,14 +1,14 @@
 """
 Holds `Air`, the channels of a WRF-SFIRE output laid out on a uniform
 `(time, height, y, x)` grid, which a flight samples at each drone's position
-inside `jit` and `vmap`. `WrfOutput.air` builds it, and the `air` step reads
-it.
+inside `jit` and `vmap`. `WrfOutput.air` builds it, the `air` step reads it,
+and `Air.still` builds the air of a flight through neither fire nor wind.
 """
 
 from equinox           import Module, field
 from functools         import partial
 from jax               import Array, vmap
-from jax.numpy         import asarray, full_like
+from jax.numpy         import asarray, full_like, zeros
 from jax.scipy.ndimage import map_coordinates
 from jax.typing        import ArrayLike
 from numpy             import allclose, diff, finfo
@@ -119,3 +119,17 @@ class Air(Module):
             self.channels
         )
         return dict(zip(self.names, readings, strict=True))
+
+    @classmethod
+    def still(cls) -> Self:
+        """
+        Builds air holding no excess temperature and no wind, one point
+        along each axis, which `mode="nearest"` reads at every position
+        and time.
+        """
+        return cls(
+            channels = zeros((4, 1, 1, 1, 1), dtype="float32"),
+            names    = ("excess", "u", "v", "w"),
+            origin   = (0.0, 0.0, 0.0, 0.0),
+            spacing  = (1.0, 1.0, 1.0, 1.0)
+        )

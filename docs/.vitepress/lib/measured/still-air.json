@@ -1,0 +1,972 @@
+{
+  "norms": {
+    "aspect_ratio": {
+      "doi": "10.1016/j.anbehav.2008.02.004",
+      "figure": 5.6,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 10,
+      "kind": "95% confidence interval",
+      "spread": 1.0
+    },
+    "border_density": {
+      "doi": "10.1016/j.anbehav.2008.02.004",
+      "figure": 1.0,
+      "system": "starlings",
+      "unit": "",
+      "above": true,
+      "flocks": 10,
+      "kind": null,
+      "spread": null
+    },
+    "middle_aspect_ratio": {
+      "doi": "10.1016/j.anbehav.2008.02.004",
+      "figure": 2.8,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 10,
+      "kind": "95% confidence interval",
+      "spread": 0.4
+    },
+    "polarization": {
+      "doi": "10.1073/pnas.1005766107",
+      "figure": 0.96,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 24,
+      "kind": "standard deviation",
+      "spread": 0.03
+    },
+    "spacing_m": {
+      "doi": "10.1126/scirobotics.aat3536",
+      "figure": 21.0,
+      "system": "drones",
+      "unit": "m",
+      "above": false,
+      "flocks": 1,
+      "kind": "half range",
+      "spread": 9.0
+    },
+    "speed_by_size": {
+      "doi": "10.1038/s41467-022-29883-4",
+      "figure": -0.13,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": null,
+      "kind": null,
+      "spread": null
+    },
+    "speed_correlation_ratio": {
+      "doi": "10.1073/pnas.1005766107",
+      "figure": 0.36,
+      "system": "starlings",
+      "unit": "",
+      "above": false,
+      "flocks": 24,
+      "kind": null,
+      "spread": null
+    },
+    "wave_speed_m_s": {
+      "doi": "10.1038/nphys3035",
+      "figure": 30.0,
+      "system": "starlings",
+      "unit": "m/s",
+      "above": false,
+      "flocks": 12,
+      "kind": "half range",
+      "spread": 10.0
+    }
+  },
+  "runs": {
+    "10": {
+      "duration_s": 620.0,
+      "autocorrelation_s": 15.2554,
+      "rearrangement_s": 79.1295
+    },
+    "30": {
+      "duration_s": 574.892,
+      "autocorrelation_s": 48.5917,
+      "rearrangement_s": 55.4892
+    },
+    "100": {
+      "duration_s": 442.0798,
+      "autocorrelation_s": 41.2694,
+      "rearrangement_s": 42.208
+    },
+    "300": {
+      "duration_s": 413.5914,
+      "autocorrelation_s": 39.3591,
+      "rearrangement_s": 36.5114
+    },
+    "1000": {
+      "duration_s": 409.9699,
+      "autocorrelation_s": 38.997,
+      "rearrangement_s": 32.0541
+    },
+    "3000": {
+      "duration_s": 438.6147,
+      "autocorrelation_s": 41.8615,
+      "rearrangement_s": 31.4477
+    }
+  },
+  "sizes": [
+    10,
+    30,
+    100,
+    300,
+    1000,
+    3000
+  ],
+  "slopes": {
+    "extent_m": {
+      "error": 0.0283,
+      "slope": 0.1525
+    },
+    "speed_correlation_ratio": {
+      "error": 0.0226,
+      "slope": -0.0538
+    },
+    "aspect_ratio": {
+      "error": 0.0271,
+      "slope": -0.0516
+    },
+    "autocorrelation_s": {
+      "error": 0.0237,
+      "slope": 0.002
+    },
+    "border_density": {
+      "error": 0.0816,
+      "slope": -0.3986
+    },
+    "connected": {
+      "error": 0.0169,
+      "slope": 0.0662
+    },
+    "group_speed_m_s": {
+      "error": 0.001,
+      "slope": -0.0209
+    },
+    "middle_aspect_ratio": {
+      "error": 0.0314,
+      "slope": 0.0684
+    },
+    "polarization": {
+      "error": 0.0071,
+      "slope": -0.0465
+    },
+    "rearrangement_s": {
+      "error": 0.0268,
+      "slope": -0.2637
+    },
+    "spacing_m": {
+      "error": 0.0285,
+      "slope": -0.3837
+    },
+    "wave_speed_m_s": {
+      "error": 0.0279,
+      "slope": 0.599
+    }
+  },
+  "speed_by_size": {
+    "p": 0.0,
+    "rho": -0.9433
+  },
+  "statistics": {
+    "extent_m": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 107.21,
+          "mean": 801.9571
+        },
+        {
+          "size": 30,
+          "error": 84.4882,
+          "mean": 1101.0043
+        },
+        {
+          "size": 100,
+          "error": 34.1858,
+          "mean": 1276.5402
+        },
+        {
+          "size": 300,
+          "error": 22.4911,
+          "mean": 1398.2252
+        },
+        {
+          "size": 1000,
+          "error": 10.6353,
+          "mean": 1564.2269
+        },
+        {
+          "size": 3000,
+          "error": 8.8207,
+          "mean": 1671.2274
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 110.0426,
+          "mean": 802.863
+        },
+        {
+          "size": 30,
+          "error": 63.234,
+          "mean": 1149.1753
+        },
+        {
+          "size": 100,
+          "error": 16.1018,
+          "mean": 1289.0419
+        },
+        {
+          "size": 300,
+          "error": 18.1988,
+          "mean": 1410.9794
+        },
+        {
+          "size": 1000,
+          "error": 10.632,
+          "mean": 1573.6038
+        },
+        {
+          "size": 3000,
+          "error": 7.8064,
+          "mean": 1692.5125
+        }
+      ]
+    },
+    "speed_correlation_ratio": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0501,
+          "mean": 0.2588
+        },
+        {
+          "size": 30,
+          "error": 0.0129,
+          "mean": 0.1492
+        },
+        {
+          "size": 100,
+          "error": 0.0046,
+          "mean": 0.1083
+        },
+        {
+          "size": 300,
+          "error": 0.0068,
+          "mean": 0.1235
+        },
+        {
+          "size": 1000,
+          "error": 0.0052,
+          "mean": 0.1288
+        },
+        {
+          "size": 3000,
+          "error": 0.0059,
+          "mean": 0.151
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.011,
+          "mean": 0.0556
+        },
+        {
+          "size": 30,
+          "error": 0.0012,
+          "mean": 0.0327
+        },
+        {
+          "size": 100,
+          "error": 0.0012,
+          "mean": 0.0362
+        },
+        {
+          "size": 300,
+          "error": 0.0027,
+          "mean": 0.0537
+        },
+        {
+          "size": 1000,
+          "error": 0.0011,
+          "mean": 0.0938
+        },
+        {
+          "size": 3000,
+          "error": 0.0016,
+          "mean": 0.1319
+        }
+      ]
+    },
+    "aspect_ratio": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 6.0105,
+          "mean": 44.5338
+        },
+        {
+          "size": 30,
+          "error": 3.1567,
+          "mean": 28.7951
+        },
+        {
+          "size": 100,
+          "error": 1.8673,
+          "mean": 33.5494
+        },
+        {
+          "size": 300,
+          "error": 0.4929,
+          "mean": 31.9403
+        },
+        {
+          "size": 1000,
+          "error": 0.1759,
+          "mean": 27.3194
+        },
+        {
+          "size": 3000,
+          "error": 0.0956,
+          "mean": 23.5929
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 8.0328,
+          "mean": 49.9193
+        },
+        {
+          "size": 30,
+          "error": 4.1745,
+          "mean": 38.7963
+        },
+        {
+          "size": 100,
+          "error": 2.6,
+          "mean": 34.6953
+        },
+        {
+          "size": 300,
+          "error": 0.4478,
+          "mean": 33.5563
+        },
+        {
+          "size": 1000,
+          "error": 0.1794,
+          "mean": 28.8859
+        },
+        {
+          "size": 3000,
+          "error": 0.1179,
+          "mean": 26.8505
+        }
+      ]
+    },
+    "autocorrelation_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 5.9431,
+          "mean": 58.1919
+        },
+        {
+          "size": 30,
+          "error": 1.9986,
+          "mean": 62.5573
+        },
+        {
+          "size": 100,
+          "error": 1.8226,
+          "mean": 73.1878
+        },
+        {
+          "size": 300,
+          "error": 0.6298,
+          "mean": 64.3401
+        },
+        {
+          "size": 1000,
+          "error": 0.2641,
+          "mean": 56.7493
+        },
+        {
+          "size": 3000,
+          "error": 0.27,
+          "mean": 54.1075
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 6.9624,
+          "mean": 58.7233
+        },
+        {
+          "size": 30,
+          "error": 2.1649,
+          "mean": 64.0248
+        },
+        {
+          "size": 100,
+          "error": 1.8515,
+          "mean": 78.605
+        },
+        {
+          "size": 300,
+          "error": 0.2777,
+          "mean": 73.5143
+        },
+        {
+          "size": 1000,
+          "error": 0.2161,
+          "mean": 70.1646
+        },
+        {
+          "size": 3000,
+          "error": 0.1399,
+          "mean": 71.1021
+        }
+      ]
+    },
+    "border_density": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.5921,
+          "mean": 1.059
+        },
+        {
+          "size": 30,
+          "error": 1.9264,
+          "mean": 3.8736
+        },
+        {
+          "size": 100,
+          "error": 0.2067,
+          "mean": 0.9178
+        },
+        {
+          "size": 300,
+          "error": 0.4033,
+          "mean": 1.0729
+        },
+        {
+          "size": 1000,
+          "error": 0.0209,
+          "mean": 0.2308
+        },
+        {
+          "size": 3000,
+          "error": 0.0241,
+          "mean": 0.167
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 4.5761,
+          "mean": 6.2092
+        },
+        {
+          "size": 30,
+          "error": 0.4499,
+          "mean": 1.166
+        },
+        {
+          "size": 100,
+          "error": 0.0484,
+          "mean": 0.2849
+        },
+        {
+          "size": 300,
+          "error": 0.1055,
+          "mean": 0.5719
+        },
+        {
+          "size": 1000,
+          "error": 0.082,
+          "mean": 0.4694
+        },
+        {
+          "size": 3000,
+          "error": 0.026,
+          "mean": 0.2272
+        }
+      ]
+    },
+    "connected": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0633,
+          "mean": 0.77
+        },
+        {
+          "size": 30,
+          "error": 0.0503,
+          "mean": 0.7067
+        },
+        {
+          "size": 100,
+          "error": 0.0522,
+          "mean": 0.615
+        },
+        {
+          "size": 300,
+          "error": 0.0427,
+          "mean": 0.7323
+        },
+        {
+          "size": 1000,
+          "error": 0.0118,
+          "mean": 0.9524
+        },
+        {
+          "size": 3000,
+          "error": 0.0024,
+          "mean": 0.9885
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0448,
+          "mean": 0.77
+        },
+        {
+          "size": 30,
+          "error": 0.0452,
+          "mean": 0.7067
+        },
+        {
+          "size": 100,
+          "error": 0.0456,
+          "mean": 0.618
+        },
+        {
+          "size": 300,
+          "error": 0.0349,
+          "mean": 0.5667
+        },
+        {
+          "size": 1000,
+          "error": 0.0201,
+          "mean": 0.5453
+        },
+        {
+          "size": 3000,
+          "error": 0.0148,
+          "mean": 0.576
+        }
+      ]
+    },
+    "group_speed_m_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0272,
+          "mean": 9.4256
+        },
+        {
+          "size": 30,
+          "error": 0.009,
+          "mean": 9.4218
+        },
+        {
+          "size": 100,
+          "error": 0.066,
+          "mean": 9.1045
+        },
+        {
+          "size": 300,
+          "error": 0.0372,
+          "mean": 8.9284
+        },
+        {
+          "size": 1000,
+          "error": 0.0152,
+          "mean": 8.6989
+        },
+        {
+          "size": 3000,
+          "error": 0.0147,
+          "mean": 8.3917
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0001,
+          "mean": 9.9909
+        },
+        {
+          "size": 30,
+          "error": 0.0001,
+          "mean": 9.9911
+        },
+        {
+          "size": 100,
+          "error": 0.0,
+          "mean": 9.991
+        },
+        {
+          "size": 300,
+          "error": 0.0,
+          "mean": 9.9909
+        },
+        {
+          "size": 1000,
+          "error": 0.0001,
+          "mean": 9.9903
+        },
+        {
+          "size": 3000,
+          "error": 0.0,
+          "mean": 9.9894
+        }
+      ]
+    },
+    "middle_aspect_ratio": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 1.5997,
+          "mean": 6.4295
+        },
+        {
+          "size": 30,
+          "error": 1.5146,
+          "mean": 8.4181
+        },
+        {
+          "size": 100,
+          "error": 0.4755,
+          "mean": 7.5393
+        },
+        {
+          "size": 300,
+          "error": 0.2555,
+          "mean": 7.9452
+        },
+        {
+          "size": 1000,
+          "error": 0.1146,
+          "mean": 7.2848
+        },
+        {
+          "size": 3000,
+          "error": 0.117,
+          "mean": 7.6275
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 1.3399,
+          "mean": 5.4924
+        },
+        {
+          "size": 30,
+          "error": 1.1278,
+          "mean": 8.1211
+        },
+        {
+          "size": 100,
+          "error": 0.4195,
+          "mean": 7.4404
+        },
+        {
+          "size": 300,
+          "error": 0.2757,
+          "mean": 8.0697
+        },
+        {
+          "size": 1000,
+          "error": 0.0548,
+          "mean": 7.7733
+        },
+        {
+          "size": 3000,
+          "error": 0.066,
+          "mean": 9.3333
+        }
+      ]
+    },
+    "polarization": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.0405,
+          "mean": 0.8558
+        },
+        {
+          "size": 30,
+          "error": 0.0262,
+          "mean": 0.8791
+        },
+        {
+          "size": 100,
+          "error": 0.0275,
+          "mean": 0.746
+        },
+        {
+          "size": 300,
+          "error": 0.0158,
+          "mean": 0.7007
+        },
+        {
+          "size": 1000,
+          "error": 0.01,
+          "mean": 0.6995
+        },
+        {
+          "size": 3000,
+          "error": 0.0058,
+          "mean": 0.6747
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 0.0338,
+          "mean": 0.8683
+        },
+        {
+          "size": 30,
+          "error": 0.0268,
+          "mean": 0.8208
+        },
+        {
+          "size": 100,
+          "error": 0.0253,
+          "mean": 0.7696
+        },
+        {
+          "size": 300,
+          "error": 0.0123,
+          "mean": 0.6878
+        },
+        {
+          "size": 1000,
+          "error": 0.008,
+          "mean": 0.6509
+        },
+        {
+          "size": 3000,
+          "error": 0.0039,
+          "mean": 0.6409
+        }
+      ]
+    },
+    "rearrangement_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 36.3283,
+          "mean": 183.7854
+        },
+        {
+          "size": 30,
+          "error": 19.1351,
+          "mean": 160.6325
+        },
+        {
+          "size": 100,
+          "error": 4.8324,
+          "mean": 97.9019
+        },
+        {
+          "size": 300,
+          "error": 1.6854,
+          "mean": 65.5472
+        },
+        {
+          "size": 1000,
+          "error": 0.315,
+          "mean": 43.9879
+        },
+        {
+          "size": 3000,
+          "error": 0.2108,
+          "mean": 38.0051
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 39.8785,
+          "mean": 213.6107
+        },
+        {
+          "size": 30,
+          "error": 16.6082,
+          "mean": 168.8917
+        },
+        {
+          "size": 100,
+          "error": 4.9181,
+          "mean": 95.2894
+        },
+        {
+          "size": 300,
+          "error": 1.2236,
+          "mean": 66.0527
+        },
+        {
+          "size": 1000,
+          "error": 0.3142,
+          "mean": 45.1351
+        },
+        {
+          "size": 3000,
+          "error": 0.1813,
+          "mean": 40.3094
+        }
+      ]
+    },
+    "spacing_m": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 17.9502,
+          "mean": 99.2218
+        },
+        {
+          "size": 30,
+          "error": 3.7385,
+          "mean": 41.1874
+        },
+        {
+          "size": 100,
+          "error": 2.2686,
+          "mean": 26.1709
+        },
+        {
+          "size": 300,
+          "error": 0.8925,
+          "mean": 17.0616
+        },
+        {
+          "size": 1000,
+          "error": 0.2475,
+          "mean": 10.7414
+        },
+        {
+          "size": 3000,
+          "error": 0.1052,
+          "mean": 8.1103
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 16.0339,
+          "mean": 79.4041
+        },
+        {
+          "size": 30,
+          "error": 5.1004,
+          "mean": 39.64
+        },
+        {
+          "size": 100,
+          "error": 2.1231,
+          "mean": 21.4824
+        },
+        {
+          "size": 300,
+          "error": 0.6227,
+          "mean": 17.5781
+        },
+        {
+          "size": 1000,
+          "error": 0.3243,
+          "mean": 12.9542
+        },
+        {
+          "size": 3000,
+          "error": 0.0612,
+          "mean": 9.5239
+        }
+      ]
+    },
+    "wave_speed_m_s": {
+      "flocking": [
+        {
+          "size": 10,
+          "error": 0.7565,
+          "mean": 3.6837
+        },
+        {
+          "size": 30,
+          "error": 0.9223,
+          "mean": 5.8506
+        },
+        {
+          "size": 100,
+          "error": 1.7259,
+          "mean": 14.2039
+        },
+        {
+          "size": 300,
+          "error": 2.7955,
+          "mean": 33.6262
+        },
+        {
+          "size": 1000,
+          "error": 3.2736,
+          "mean": 54.4342
+        },
+        {
+          "size": 3000,
+          "error": 2.8531,
+          "mean": 79.1555
+        }
+      ],
+      "fixed": [
+        {
+          "size": 10,
+          "error": 1.7125,
+          "mean": 3.872
+        },
+        {
+          "size": 30,
+          "error": 0.8841,
+          "mean": 6.0405
+        },
+        {
+          "size": 100,
+          "error": 2.5531,
+          "mean": 16.497
+        },
+        {
+          "size": 300,
+          "error": 3.9915,
+          "mean": 32.1541
+        },
+        {
+          "size": 1000,
+          "error": 4.3616,
+          "mean": 53.4697
+        },
+        {
+          "size": 3000,
+          "error": 2.9641,
+          "mean": 59.4005
+        }
+      ]
+    }
+  }
+}
