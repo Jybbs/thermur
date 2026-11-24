@@ -4,11 +4,12 @@ it fails where no `main` resolves.
 """
 
 from collections.abc  import Callable
+from common.children  import nested
 from common.edits     import committed, git
 from common.stand_ins import StandIn
 from os               import environ, pathsep
 from pathlib          import Path
-from pytest           import Config, fixture, mark, param
+from pytest           import Config, TempPathFactory, fixture, mark, param
 from subprocess       import run
 from sys              import executable
 
@@ -129,26 +130,29 @@ def test_the_affected_tests_select_unless_a_shared_input_changed(
     assert (branch.root / ".cache/testmon").is_dir()
 
 
-def affected(pytestconfig: Config, repository: Checkout) -> list[str]:
+def affected(
+    pytestconfig     : Config,
+    repository       : Checkout,
+    tmp_path_factory : TempPathFactory
+) -> list[str]:
     """
-    Runs `py:affected` in `repository` on the environment's own pytest, with
-    the suite's `common` helpers on the import path and the collection order
-    fixed.
+    Runs `py:affected` in `repository` on the environment's own pytest
+    through `nested`, with the suite's `common` helpers on the import path
+    and the collection order fixed.
 
     Returns:
         The id of each test that passed, in the order pytest ran them.
     """
-    ran = run(
+    ran = nested(
         [pytestconfig.rootpath / ".mise/tasks/py/affected", "-p", "no:randomly", "-rA"],
-        capture_output = True,
-        check          = True,
-        cwd            = repository.root,
-        env            = {
+        tmp_path_factory,
+        check = True,
+        cwd   = repository.root,
+        env   = {
             **environ,
             "PATH"       : f"{Path(executable).parent}{pathsep}{environ['PATH']}",
             "PYTHONPATH" : str(pytestconfig.rootpath / "tests")
-        },
-        text = True
+        }
     ).stdout
 
     return [
@@ -159,7 +163,11 @@ def affected(pytestconfig: Config, repository: Checkout) -> list[str]:
 
 
 @fixture
-def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
+def suite(
+    branch           : Checkout,
+    pytestconfig     : Config,
+    tmp_path_factory : TempPathFactory
+) -> Checkout:
     """
     Commits to the `branch` repository a `README.md`, a `guide.md`, a
     `notes.md`, a `NOTICE`, a `mark.png` holding bytes UTF-8 cannot decode,
@@ -226,7 +234,7 @@ def suite(branch: Checkout, pytestconfig: Config) -> Checkout:
     git(branch, "add", "--all")
     git(branch, "commit", "--message=Suite", "--quiet")
     git(branch, "update-ref", "refs/heads/main", "HEAD")
-    affected(pytestconfig, branch)
+    affected(pytestconfig, branch, tmp_path_factory)
 
     return branch
 
@@ -294,10 +302,11 @@ def test_the_affected_tests_fail_where_no_main_resolves(
     ]
 )
 def test_the_affected_tests_are_those_opening_a_changed_file(
-    passed       : list[str],
-    path         : str,
-    pytestconfig : Config,
-    suite        : Checkout
+    passed           : list[str],
+    path             : str,
+    pytestconfig     : Config,
+    suite            : Checkout,
+    tmp_path_factory : TempPathFactory
 ):
     """
     Asserts that `py:affected` runs only the tests that opened a changed
@@ -310,4 +319,4 @@ def test_the_affected_tests_are_those_opening_a_changed_file(
     """
     (suite.root / path).write_text("Changed.\n", encoding="utf-8")
 
-    assert sorted(affected(pytestconfig, suite)) == passed
+    assert sorted(affected(pytestconfig, suite, tmp_path_factory)) == passed

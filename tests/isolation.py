@@ -7,14 +7,16 @@ pool reaches its server over, the mark that lets a `network` test open a
 connection, the files a `reads` mark leaves in a case's checkout, the shared
 copy the read-only cases read apart from the worktree, build once, and read
 through a `Checkout` holding no value an earlier case cached, the one JAX
-compilation cache every worker shares, and the test modules a folder of the
-same name would hide from collection.
+compilation cache every worker shares, the test modules a folder of the same
+name would hide from collection, and the bytecode and base temporary folder
+of a pytest run a case starts.
 """
 
 from collections.abc  import Iterator
-from common.children  import runs
+from common.children  import nested, runs
 from common.edits     import committed
 from common.isolation import CLEARED, copied_once, pytest_collection_modifyitems
+from importlib.util   import cache_from_source
 from jax              import config
 from os               import environ
 from pathlib          import Path
@@ -23,7 +25,6 @@ from pytest           import (
 )
 from pytest_socket import SocketBlockedError
 from socket        import create_connection, socketpair
-from subprocess    import run
 from sys           import executable
 
 from thermur.pipeline.settings import Settings
@@ -47,6 +48,34 @@ def name(request: FixtureRequest) -> Iterator[str]:
     with MonkeyPatch.context() as patched:
         patched.setenv(request.param, "1")
         yield request.param
+
+
+def test_a_nested_run_writes_no_bytecode_and_keeps_its_base_folder_apart(
+    tmp_path         : Path,
+    tmp_path_factory : TempPathFactory
+):
+    """
+    Asserts that a pytest `nested` starts over a suite under the temporary
+    root leaves the folder the bytecode cache holds for that suite empty,
+    and hands the suite's case a `tmp_path` in a fresh folder of this case's
+    `tmp_path_factory` rather than in a numbered folder of the machine-wide
+    root.
+    """
+    module = tmp_path / "test_nested.py"
+    module.write_text(
+        "def test_prints(tmp_path):\n    print(tmp_path)\n",
+        encoding = "utf-8"
+    )
+    ran = nested(
+        [executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "-s", str(module)],
+        tmp_path_factory,
+        check = True
+    )
+
+    assert list(Path(cache_from_source(str(module))).parent.glob("*")) == []
+    assert Path(ran.stdout.splitlines()[0]).parent.parent == (
+        tmp_path_factory.getbasetemp()
+    )
 
 
 def test_a_network_test_gets_the_mark_that_opens_the_socket(request: FixtureRequest):
@@ -203,20 +232,11 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
         (tmp_path / path).write_text(text, encoding="utf-8")
     committed(Checkout(root=tmp_path))
     runs("thermur.repo.checkout", "thermur.repo.schemas")
-    ran = run(
-        [
-            executable, "-m", "pytest", "--basetemp",
-            tmp_path_factory.mktemp("inner"),
-            "-p", "no:randomly", "-q", "tests"
-        ],
-        capture_output = True,
-        cwd            = tmp_path,
-        env            = {
-            **environ,
-            "PYTHONDONTWRITEBYTECODE" : "1",
-            "PYTHONPATH"              : str(root / "tests")
-        },
-        text = True
+    ran = nested(
+        [executable, "-m", "pytest", "-p", "no:randomly", "-q", "tests"],
+        tmp_path_factory,
+        cwd = tmp_path,
+        env = {**environ, "PYTHONPATH": str(root / "tests")}
     )
 
     assert ran.returncode == 0, ran.stdout
