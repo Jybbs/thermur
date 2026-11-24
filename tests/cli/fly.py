@@ -11,22 +11,24 @@ from thermur.pipeline.graph import Graph
 
 
 @fixture
-def computed(monkeypatch: MonkeyPatch) -> list[tuple[bool, int, tuple[str, ...]]]:
+def computed(monkeypatch: MonkeyPatch) -> list[tuple[bool, int, int, tuple[str, ...]]]:
     """
     Stands in for computing the graph, recording whether each graph records
-    its run, the flock size its settings hold, and the steps named, and
-    returning each step's name as its result.
+    its run, the flock size and the radio's table its settings hold, and the
+    steps named, and returning each step's name as its result.
 
     Returns:
         The record of each call, in order.
     """
-    calls: list[tuple[bool, int, tuple[str, ...]]] = []
+    calls: list[tuple[bool, int, int, tuple[str, ...]]] = []
 
     def compute(self: Graph, *steps: str) -> dict[str, object]:
         """
         Records the call and names each step as its result.
         """
-        calls.append((self.recorded, self.settings.plan.drones, steps))
+        calls.append(
+            (self.recorded, self.settings.plan.drones, self.settings.radio.slots, steps)
+        )
         return {step: f"<{step}>" for step in steps}
 
     monkeypatch.setattr(Graph, "compute", compute)
@@ -42,7 +44,7 @@ def computed(monkeypatch: MonkeyPatch) -> list[tuple[bool, int, tuple[str, ...]]
 )
 def test_a_flight_computes_its_steps_in_a_recorded_run_and_prints_them(
     capsys   : CaptureFixture[str],
-    computed : list[tuple[bool, int, tuple[str, ...]]],
+    computed : list[tuple[bool, int, int, tuple[str, ...]]],
     printed  : str,
     steps    : tuple[str, ...],
     tokens   : tuple[str, ...]
@@ -52,21 +54,33 @@ def test_a_flight_computes_its_steps_in_a_recorded_run_and_prints_them(
     a recorded run and prints the statistics, and that given step names it
     computes and prints each one, under the settings its flags set.
     """
-    app(["fly", *tokens, "--plan.drones", "30"], result_action="return_value")
+    app(
+        ["fly", *tokens, "--plan.drones", "30", "--radio.slots", "24"],
+        result_action = "return_value"
+    )
 
-    assert computed == [(True, 30, steps)]
+    assert computed == [(True, 30, 24, steps)]
     assert capsys.readouterr().out == printed
 
 
+@mark.parametrize(
+    "tokens",
+    [
+        param(("--plan.drones", "0"), id="field"),
+        param(("--radio.slots", "6"), id="neighbors")
+    ]
+)
 def test_a_flag_past_its_bound_exits_with_status_two_computing_nothing(
-    computed: list[tuple[bool, int, tuple[str, ...]]]
+    computed : list[tuple[bool, int, int, tuple[str, ...]]],
+    tokens   : tuple[str, ...]
 ):
     """
-    Asserts that a flag whose value fails its bound exits with status 2
-    before any step is computed.
+    Asserts that a flag whose value fails its own bound, or the bound the
+    settings set across fields, exits with status 2 before any step is
+    computed.
     """
     with raises(SystemExit) as exited:
-        app(["fly", "--plan.drones", "0"], result_action="return_value")
+        app(["fly", *tokens], result_action="return_value")
 
     assert exited.value.code == 2
     assert computed == []

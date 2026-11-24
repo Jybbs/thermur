@@ -452,7 +452,7 @@ class Flight(Module):
                 count  = self.plan.neighbors,
                 cruise = self.plan.cruise_m_s,
                 flock  = flock,
-                inbox  = Inbox.from_broadcast(earlier, composite.radio.range_m, sent),
+                inbox  = Inbox.from_broadcast(earlier, composite.radio, sent),
                 t      = t
             )
             return across(vmap(composite)(sensed)[0], flock.commands)
