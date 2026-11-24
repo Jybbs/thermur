@@ -32,6 +32,7 @@ from tomllib          import loads
 from thermur.repo.checkout import Checkout
 
 CONFIG     = ".mise/config.toml"
+FROZEN     = "error: lockfile had changes, but lockfile is frozen"
 LOCK       = ".mise/mise.lock"
 LYCHEE     = '[tools."aqua:lycheeverse/lychee"."platforms.macos-x64"]'
 MICROMATCH = "GHSA-952p-6rrq-rcjv"
@@ -40,6 +41,7 @@ PICOMATCH   = "GHSA-fc5q-39xc-vjpf"
 PIN         = "uv  0.13.8 (missing)  .mise/config.toml  0.13.8"
 STALE       = "zizmor@0.0.1 is not in the lockfile"
 UNREACHABLE = "mise ERROR unable to fetch versions for uv: error sending request"
+UNREADABLE  = "mise ERROR failed to parse .mise/config.toml"
 
 
 def executed(copy: Path, task: str = "check") -> CompletedProcess:
@@ -62,39 +64,6 @@ def pinning(copy: Path) -> dict[str, str]:
     each file's path under the copy's root.
     """
     return {name: (copy / name).read_text() for name in (CONFIG, LOCK)}
-
-
-@fixture
-def copy(
-    monkeypatch  : MonkeyPatch,
-    pytestconfig : Config,
-    stand_in     : Callable[[str, str], StandIn],
-    tmp_path     : Path
-) -> Path:
-    """
-    Copies the `lock` tasks, the library they source, `.mise/config.toml`,
-    `.mise/mise.lock`, and `pyproject.toml` into `tmp_path`, keeping
-    each file's mode, names the copy as the root a task sources its
-    library from, clears the `AUDIT_IGNORE` list `mise test` sets from
-    `.mise/config.toml`, and puts a stand-in `uv` that reports `uv.lock`
-    current, a stand-in `bun` that reports `docs/bun.lock` current, and a
-    stand-in `gh` that lists no patched release ahead on the path.
-
-    Returns:
-        The copy's root.
-    """
-    (tmp_path / ".mise/tasks").mkdir(parents=True)
-    for path in (
-        CONFIG, ".mise/lib", LOCK, ".mise/tasks/lock", "pyproject.toml"
-    ):
-        (pytestconfig.rootpath / path).copy(tmp_path / path, preserve_metadata=True)
-
-    monkeypatch.delenv("AUDIT_IGNORE", raising=False)
-    monkeypatch.setenv("MISE_PROJECT_ROOT", str(tmp_path))
-    stand_in("bun", "exit 0")
-    stand_in("gh", "exit 0")
-    stand_in("uv", "exit 0")
-    return tmp_path
 
 
 def test_a_current_lock_passes(
@@ -133,6 +102,39 @@ def test_a_current_lock_passes(
     )
 
 
+@fixture
+def copy(
+    monkeypatch  : MonkeyPatch,
+    pytestconfig : Config,
+    stand_in     : Callable[[str, str], StandIn],
+    tmp_path     : Path
+) -> Path:
+    """
+    Copies the `lock` tasks, the library they source, `.mise/config.toml`,
+    `.mise/mise.lock`, and `pyproject.toml` into `tmp_path`, keeping
+    each file's mode, names the copy as the root a task sources its
+    library from, clears the `AUDIT_IGNORE` list `mise test` sets from
+    `.mise/config.toml`, and puts a stand-in `uv` that reports `uv.lock`
+    current, a stand-in `bun` that reports `docs/bun.lock` current, and a
+    stand-in `gh` that lists no patched release ahead on the path.
+
+    Returns:
+        The copy's root.
+    """
+    (tmp_path / ".mise/tasks").mkdir(parents=True)
+    for path in (
+        CONFIG, ".mise/lib", LOCK, ".mise/tasks/lock", "pyproject.toml"
+    ):
+        (pytestconfig.rootpath / path).copy(tmp_path / path, preserve_metadata=True)
+
+    monkeypatch.delenv("AUDIT_IGNORE", raising=False)
+    monkeypatch.setenv("MISE_PROJECT_ROOT", str(tmp_path))
+    stand_in("bun", "exit 0")
+    stand_in("gh", "exit 0")
+    stand_in("uv", "exit 0")
+    return tmp_path
+
+
 def test_a_failing_uv_check_stops_before_mise_runs(
     copy     : Path,
     stand_in : Callable[[str, str], StandIn]
@@ -147,42 +149,30 @@ def test_a_failing_uv_check_stops_before_mise_runs(
     assert (executed(copy).returncode, (copy / "ran").exists()) == (1, False)
 
 
-def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
-    copy     : Path,
-    stand_in : Callable[[str, str], StandIn]
-):
-    """
-    Asserts that a `docs/bun.lock` lagging `docs/package.json`, which a
-    frozen dry run of `bun install` reports by exiting `1`, fails the task
-    once `uv.lock` and `.mise/mise.lock` both pass.
-    """
-    stand_in(
-        "bun",
-        'echo "error: lockfile had changes, but lockfile is frozen" >&2\nexit 1'
-    )
-    stand_in("mise", "exit 0")
-
-    result = executed(copy)
-
-    assert (result.returncode, result.stderr.strip()) == (
-        1, "error: lockfile had changes, but lockfile is frozen"
-    )
-
-
+@mark.usefixtures("mise")
 @mark.parametrize(
-    ("mise", "reported"),
+    ("program", "script", "reported"),
     [
         param(
+            "mise",
             f'[ "$1" = lock ] && echo "{STALE}" >&2 && exit 1\nexit 0',
             STALE,
             id = "failed-check"
         ),
         param(
+            "mise",
+            f'[ "$1" = ls ] && echo "{UNREADABLE}" >&2 && exit 1\nexit 0',
+            UNREADABLE,
+            id = "failed-listing"
+        ),
+        param(
+            "mise",
             f'[ "$1" = install ] && echo "{MISSING}" >&2 && exit 1\nexit 0',
             MISSING,
             id = "missing-entry"
         ),
         param(
+            "mise",
             f'[ "$1" = ls ] && echo "{PIN}"\n'
             f'[ "$1" = ls-remote ] && echo "{UNREACHABLE}" >&2 && exit 1\n'
             "exit 0",
@@ -190,25 +180,32 @@ def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
             id = "unreachable-host"
         ),
         param(
+            "mise",
             f'[ "$1" = ls ] && echo "{PIN}"\nexit 0',
             "mise ls-remote lists no version of uv, as when mise runs offline",
             id = "no-version-list"
-        )
-    ],
-    indirect = ["mise"]
+        ),
+        param("bun", f'echo "{FROZEN}" >&2\nexit 1', FROZEN, id="site-lockfile")
+    ]
 )
-def test_the_check_fails_printing_what_mise_reports(
+def test_the_check_fails_printing_what_each_program_reports(
     copy     : Path,
-    mise     : StandIn,
-    reported : str
+    program  : str,
+    reported : str,
+    script   : str,
+    stand_in : Callable[[str, str], StandIn]
 ):
     """
     Asserts that a `mise lock --check` exiting nonzero, a dry run finding
-    no lockfile entry for a pinned tool on the running platform, and a `mise
-    ls-remote` reaching no host each fail the task, which prints what mise
-    reported, and that a `mise ls-remote` listing no version at all, as it
-    does offline before it caches a list, fails the task naming the tool.
+    no lockfile entry for a pinned tool on the running platform, a `mise
+    ls` failing to list the pins, a `mise ls-remote` reaching no host, and
+    a frozen dry run of `bun install` finding `docs/bun.lock` lagging its
+    manifest each fail the task, which prints what the program reported, and
+    that a `mise ls-remote` listing no version at all, as it does offline
+    before it caches a list, fails the task naming the tool.
     """
+    stand_in(program, script)
+
     result = executed(copy)
 
     assert (result.returncode, result.stderr.strip()) == (1, reported)
@@ -244,6 +241,35 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
         "mise ls-remote aqua:lycheeverse/lychee", "mise ls-remote bun",
         "mise ls-remote zizmor"
     ]
+
+
+def test_the_sync_fails_on_a_window_bun_cannot_be_given_before_locking(
+    copy     : Path,
+    stand_in : Callable[[str, str], StandIn]
+):
+    """
+    Asserts that `lock:sync` fails on an `exclude-newer` uv accepts but
+    written other than as whole days, naming the value and the form it
+    reads, before `mise` or `uv` locks anything.
+    """
+    manifest = copy / "pyproject.toml"
+    manifest.write_text(
+        sub(r'(?m)^(exclude-newer\s*=\s*)".*"$', r'\1"P1W"', manifest.read_text())
+    )
+    ran = [stand_in(program, "exit 0") for program in ("mise", "uv")]
+
+    result = executed(copy, "sync")
+
+    assert (
+        result.returncode,
+        result.stderr.strip(),
+        [*ran[0].commands, *ran[1].commands]
+    ) == (
+        1,
+        "[tool.uv] sets exclude-newer to 'P1W', which lock:sync passes Bun only when "
+        "written as whole days, P<days>D",
+        []
+    )
 
 
 @mark.parametrize(
@@ -300,11 +326,10 @@ def test_the_real_mise_fails_offline_on_what_a_locked_install_rejects(
     `MISE_HTTP_RETRIES` set to `0` makes each refused request fail at once
     rather than after mise's retries.
     """
-    held       = pinning(copy)
-    pinned     = loads(held[CONFIG])["tools"]
-    held[path] = sub(pattern, replacement, held[path], count=1)
-    for name, text in held.items():
-        (copy / name).write_text(text)
+    found       = pinning(copy)
+    pinned      = loads(found[CONFIG])["tools"]
+    found[path] = sub(pattern, replacement, found[path], count=1)
+    written(copy, found)
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("MISE_HTTP_RETRIES", "0")
@@ -312,7 +337,7 @@ def test_the_real_mise_fails_offline_on_what_a_locked_install_rejects(
 
     result = executed(copy)
 
-    assert (result.returncode, pinning(copy)) == (1, held)
+    assert (result.returncode, pinning(copy)) == (1, found)
     assert reported.format(
         lychee = pinned["aqua:lycheeverse/lychee"],
         zizmor = pinned["zizmor"]
@@ -338,13 +363,15 @@ def test_a_pin_moved_with_its_lock_entry_to_no_release_fails(
     version `.mise/config.toml` pins before the move and runs the real
     `mise` for the rest, while the online case reads each real version list.
     """
-    pinned = loads((copy / CONFIG).read_text())["tools"]
-    held   = {
-        name: text.replace(pinned["aqua:lycheeverse/lychee"], "0.99.9")
-        for name, text in pinning(copy).items()
-    }
-    for name, text in held.items():
-        (copy / name).write_text(text)
+    found  = pinning(copy)
+    pinned = loads(found[CONFIG])["tools"]
+    held   = written(
+        copy  = copy,
+        texts = {
+            name: text.replace(pinned["aqua:lycheeverse/lychee"], "0.99.9")
+            for name, text in found.items()
+        }
+    )
     if not online:
         listed = quote("\n".join(pinned.values()))
         real   = quote(which("mise"))
@@ -380,6 +407,7 @@ def test_the_committed_lock_passes_the_check_online(
     assert (result.returncode, result.stderr) == (0, "")
 
 
+@mark.usefixtures("mise")
 @mark.parametrize(
     ("task", "ran", "bun_command"),
     [
@@ -427,7 +455,6 @@ def test_each_lock_task_reaches_every_lockfile(
     (copy / script).write_text('# /// script\n# dependencies = ["minijinja"]\n# ///\n')
     (copy / ".mise/tasks/gha/plain.py").write_text('"""\nDeclares nothing.\n"""\n')
     programs = {program: stand_in(program, "exit 0") for program in ("bun", "uv")}
-    stand_in("mise", "exit 0")
 
     assert executed(copy, task).returncode == 0
     assert programs["uv"].commands == [
@@ -560,30 +587,11 @@ def test_the_sync_leaves_a_release_newer_than_the_window_out_of_uv_lock(
     assert 'name = "aged"\nversion = "1.0.0"' in (copy / "uv.lock").read_text()
 
 
-def test_the_sync_fails_on_a_window_bun_cannot_be_given_before_locking(
-    copy     : Path,
-    stand_in : Callable[[str, str], StandIn]
-):
+def written(copy: Path, texts: dict[str, str]) -> dict[str, str]:
     """
-    Asserts that `lock:sync` fails on an `exclude-newer` uv accepts but
-    written other than as whole days, naming the value and the form it
-    reads, before `mise` or `uv` locks anything.
+    Writes each text over the file its path names under the copy's root,
+    returning the texts.
     """
-    manifest = copy / "pyproject.toml"
-    manifest.write_text(
-        sub(r'(?m)^(exclude-newer\s*=\s*)".*"$', r'\1"P1W"', manifest.read_text())
-    )
-    ran = [stand_in(program, "exit 0") for program in ("mise", "uv")]
-
-    result = executed(copy, "sync")
-
-    assert (
-        result.returncode,
-        result.stderr.strip(),
-        [*ran[0].commands, *ran[1].commands]
-    ) == (
-        1,
-        "[tool.uv] sets exclude-newer to 'P1W', which lock:sync passes Bun only when "
-        "written as whole days, P<days>D",
-        []
-    )
+    for name, text in texts.items():
+        (copy / name).write_text(text)
+    return texts
