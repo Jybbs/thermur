@@ -18,7 +18,10 @@ def runs(*modules: str):
     block. The entry `sys.modules` holds under each name stays as it was,
     whereas each parent package `find_spec` imports and each module a block
     imports as it runs stay loaded. A change inside a function only the
-    child calls still selects no test.
+    child calls selects no test unless the next statement in the same body
+    carries a decorator. A function's block in pytest-testmon ends on the
+    line before that statement's `def` or `class` line, leaving inside it
+    the decorator lines the top-level block runs.
     """
     for module in modules:
         run_path(find_spec(module).origin, run_name=module)
