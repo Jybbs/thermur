@@ -101,7 +101,8 @@ def environment(
     name the branch and the commit `gha:brief` prefers over the ones a case
     sets. `CI`, which a GitHub Actions runner sets, and `MISE_YES` each
     turn on mise's `yes` setting, which answers a task's `confirm` prompt
-    without asking. The rest name the folders where a tool keeps its cache,
+    without asking. `UV_OFFLINE` and `MISE_OFFLINE` keep uv and mise off
+    the network. The rest name the folders where a tool keeps its cache,
     configuration, data, and state, which the XDG convention defines. It
     also clears every variable opening on the `env_prefix` of `Settings`,
     which pydantic-settings matches to the field it names whatever its case,
@@ -114,8 +115,9 @@ def environment(
     it runs in, as well as the file at `HOME`. Moving `HOME` leaves the
     developer's own configuration above the checkout as an ordinary ancestor
     rather than as the global file, and mise stops on it as one it was never
-    told to trust. The two `MISE_` variables name that file as one to skip
-    and this checkout as one to trust, so a test can run mise over it.
+    told to trust. `MISE_IGNORED_CONFIG_PATHS` names that file as one to
+    skip and `MISE_TRUSTED_CONFIG_PATHS` this checkout as one to trust, so a
+    test can run mise over it.
     """
     prefixes = (Settings.model_config["env_prefix"].lower(), "usage_")
     for name in [

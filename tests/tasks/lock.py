@@ -448,6 +448,9 @@ def test_the_sync_leaves_a_release_newer_than_the_window_out_of_uv_lock(
     `uv` against a registry publishing `1.0.0` twice the window `[tool.uv]`
     declares ago and `2.0.0` half of it ago, locks `1.0.0` in `uv.lock`,
     reading the window the worktree's `pyproject.toml` declares.
+
+    The manifest the case writes sets `offline` to `false`, which outranks
+    the same key in a system `uv.toml` such as `/etc/uv/uv.toml`.
     """
     window   = Checkout(root=copy).manifest.window
     now      = datetime.now(UTC)
@@ -460,7 +463,8 @@ def test_the_sync_leaves_a_release_newer_than_the_window_out_of_uv_lock(
                 "[project]", 'dependencies = ["aged"]', 'name = "probe"',
                 'requires-python = ">=3.15"', 'version = "0"',
                 "", "[tool.uv]",
-                f'exclude-newer = "{declared}"\n'
+                f'exclude-newer = "{declared}"',
+                "offline = false\n"
             ]
         )
     )
