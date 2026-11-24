@@ -19,18 +19,24 @@ export interface Rect {
  */
 const DASH = [5, 4]
 /**
- * The opacity of a strip's sample counting none.
+ * The opacity of each strip's sample counting none in each scheme, the least
+ * in steps of 0.05 holding every count at the 3:1 WCAG 2.2 sets for a graphic
+ * against the panel.
  */
-const FAINT = 0.15
+const FLOOR: Record<Geometry['scheme'], { ranged: number, seven: number }> = {
+  dark  : { ranged: 0.8, seven: 0.6 },
+  light : { ranged: 0.8, seven: 0.9 }
+}
+/**
+ * The opacity of the ink the time axis is labeled in, the least in steps of
+ * 0.05 holding the 4.5:1 WCAG 2.2 sets for text against the halo in both
+ * schemes.
+ */
+const INK = 0.65
 /**
  * The unbroken line the ring returns to from `DASH`.
  */
 const LINE: readonly number[] = []
-/**
- * The opacity of the by-rank strip's sample counting none in each scheme,
- * which in the dark holds every count at 3:1 or more against the panel.
- */
-const FLOOR: Record<Geometry['scheme'], number> = { dark: 0.6, light: FAINT }
 
 /**
  * Draws the bird at `index` of `birds` centered on where the flock places it
@@ -163,7 +169,7 @@ export class Strips {
   /**
    * Draws the strip of `trace` from `left` to `right`, `tall` pixels from
    * `top`, shaded by each sample's count against the seven from the opacity
-   * `floor` up to 0.85.
+   * `floor` up to full.
    */
   #strip(
     ctx   : CanvasRenderingContext2D,
@@ -180,7 +186,7 @@ export class Strips {
     ctx.fillStyle = color
     for (let k = 0; k < count; k++) {
       const value     = trace[(this.#traced + k) % count]!
-      ctx.globalAlpha = floor + (0.85 - floor) * common.clamp(value / common.NEIGHBORS)
+      ctx.globalAlpha = floor + (1 - floor) * common.clamp(value / common.NEIGHBORS)
       ctx.fillRect(left + k * width, top, width + 0.5, tall)
     }
     ctx.globalAlpha = 1
@@ -202,7 +208,8 @@ export class Strips {
   paint(ctx: CanvasRenderingContext2D, g: Geometry, ranged: string, seven: string): void {
     const { panel } = this
     const words     = this.#words
-    const faint     = this.#tones.ink(g.scheme, 0.55)
+    const faint     = this.#tones.ink(g.scheme, INK)
+    const floor     = FLOOR[g.scheme]
     const left      = panel.x0 + 12
     const counted   = this.#last(this.#trace)
     const ranked    = this.#last(this.#ranks)
@@ -229,8 +236,8 @@ export class Strips {
     const foot      = panel.y1 - (stacked ? 5 : 6)
     this.#label(ctx, 'left', faint, g, words.ago, left, foot)
     this.#label(ctx, 'right', faint, g, 'now', end, foot)
-    this.#strip(ctx, seven, FLOOR[g.scheme], left, end, tall, stacked ? panel.y0 + 19 : top, this.#ranks)
-    this.#strip(ctx, ranged, FAINT, left, end, tall, next, this.#trace)
+    this.#strip(ctx, seven, floor.seven, left, end, tall, stacked ? panel.y0 + 19 : top, this.#ranks)
+    this.#strip(ctx, ranged, floor.ranged, left, end, tall, next, this.#trace)
     if (stacked) {
       this.#label(ctx, 'left', seven, g, words.seven, left, panel.y0 + 15)
       this.#label(ctx, 'left', ranged, g, words.range, left, panel.y0 + 45)

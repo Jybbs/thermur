@@ -1,61 +1,137 @@
-import { describe, expect, it, vi } from 'vitest'
+import { formatHex, rgb, wcagContrast } from 'culori'
+import { describe, expect, it }         from 'vitest'
 
 import type { Scheme } from '../../../lib/identity.ts'
 
-import { Tones }     from '../../../lib/canvas/tones.ts'
-import { NEIGHBORS } from '../../../lib/common.ts'
-import { Strips }    from '../../../lib/rules/paint.ts'
-import { geometry }  from '../../common/front.ts'
+import { Tones }         from '../../../lib/canvas/tones.ts'
+import { NEIGHBORS }     from '../../../lib/common.ts'
+import { seriesOf }      from '../../../lib/identity.ts'
+import { ALONG, RANGED } from '../../../lib/rules/falcon.ts'
+import { Strips }        from '../../../lib/rules/paint.ts'
+import { FLOORS, laid }  from '../../common/contrast.ts'
+import { geometry }      from '../../common/front.ts'
 
 /**
- * Paints strips of four samples whose newest counts `within` inside the range
- * and `ranked` by rank in `scheme`, over a context that writes down each word
- * it fills and the opacity each rectangle in the color `seven` or `ranged` is
- * filled at.
+ * One fill a paint lays down: its color and the opacity it is laid at, and for
+ * a word, its text and the halo stroked under it.
  */
-function painted(
-  ranked : number,
-  scheme : Scheme,
-  within : number
-): { alphas: number[], ranges: number[], words: string[] } {
-  const alphas: number[] = []
-  const ranges: number[] = []
-  const words: string[]  = []
-  const pen              = {
+interface Laid {
+  alpha : number
+  halo  : string
+  style : string
+  text  : string
+}
+
+/**
+ * What one paint of the strips lays down: every rectangle and every word.
+ */
+interface Painted {
+  rects : Laid[]
+  words : Laid[]
+}
+
+/**
+ * The two schemes every contrast holds under.
+ */
+const SCHEMES = ['dark', 'light'] as const
+
+/**
+ * Builds strips of four samples over the foot of a canvas 1200 pixels wide,
+ * every sample but the newest counting five inside the range and seven by rank.
+ */
+function strips(tones: Tones): Strips {
+  const built = new Strips('11px mono', 4, 4, tones)
+  built.panel = { x0: 0, x1: 1200, y0: 720, y1: 800 }
+  built.fill(5, NEIGHBORS)
+  return built
+}
+
+/**
+ * Paints `built` in `scheme` with the strips' colors `ranged` and `seven`, over
+ * a context that writes down each rectangle and word it lays.
+ */
+function painted(built: Strips, scheme: Scheme, ranged: string, seven: string): Painted {
+  const laidDown: Painted = { rects: [], words: [] }
+  const pen               = {
     fillStyle   : '',
     globalAlpha : 1,
+    strokeStyle : '',
     fillRect    : (): void => {
-      if (pen.fillStyle === 'seven') alphas.push(pen.globalAlpha)
-      if (pen.fillStyle === 'ranged') ranges.push(pen.globalAlpha)
+      laidDown.rects.push({ alpha: pen.globalAlpha, halo: '', style: pen.fillStyle, text: '' })
     },
-    fillText    : (text: string): number => words.push(text),
+    fillText    : (text: string): void => {
+      laidDown.words.push({ alpha: pen.globalAlpha, halo: pen.strokeStyle, style: pen.fillStyle, text })
+    },
     measureText : (): Partial<TextMetrics> => ({ width: 60 }),
-    strokeText  : vi.fn<() => void>()
+    strokeText  : (): void => undefined
   }
-  const ctx    = pen as unknown as CanvasRenderingContext2D
-  const strips = new Strips('11px mono', 4, 4, new Tones())
-  strips.panel = { x0: 0, x1: 1200, y0: 720, y1: 800 }
-  strips.fill(5, NEIGHBORS)
-  strips.sample(within, ranked)
-  strips.paint(ctx, geometry({ scheme }), 'ranged', 'seven')
-  return { alphas, ranges, words }
+  built.paint(pen as unknown as CanvasRenderingContext2D, geometry({ scheme }), ranged, seven)
+  return laidDown
+}
+
+/**
+ * Reads the color `fill` paints over `under`, its own opacity and the
+ * context's taken together.
+ */
+function over(under: string, { alpha, style }: Laid): string {
+  const color = rgb(style)!
+  return laid(under, formatHex(color), alpha * (color.alpha ?? 1))
 }
 
 describe('Strips', () => {
   it.each([
-    ['dark', 3, 0.6 + 0.25 * 3 / NEIGHBORS],
+    ['dark', 3, 0.6 + 0.4 * 3 / NEIGHBORS],
     ['dark', 0, 0.6],
-    ['light', 3, 0.15 + 0.7 * 3 / NEIGHBORS],
-    ['light', 0, 0.15]
-  ] as const)('labels the senders ranked in %s by their newest count, %i, shading it from the floor and the range from 0.15', (
+    ['light', 3, 0.9 + 0.1 * 3 / NEIGHBORS],
+    ['light', 0, 0.9]
+  ] as const)('labels the senders ranked in %s by their newest count, %i, shading it from the floor and the range from 0.8', (
     scheme,
     ranked,
     newest
   ) => {
-    const { alphas, ranges, words } = painted(ranked, scheme, 4)
-    expect(words).toContain(`by rank, ${ranked}`)
-    expect(words).toContain('within range, 4')
-    expect(alphas.slice(-4)).toEqual([0.85, 0.85, 0.85, newest].map(alpha => expect.closeTo(alpha, 6)))
-    expect(ranges.slice(-4)).toEqual([5, 5, 5, 4].map(count => expect.closeTo(0.15 + 0.7 * count / NEIGHBORS, 6)))
+    const built = strips(new Tones())
+    built.sample(4, ranked)
+    const { rects, words } = painted(built, scheme, 'ranged', 'seven')
+    const shades           = (style: string): number[] => rects.filter(rect => rect.style === style).map(rect => rect.alpha)
+    expect(words.map(word => word.text)).toEqual(expect.arrayContaining([`by rank, ${ranked}`, 'within range, 4']))
+    expect(shades('seven')).toEqual([1, 1, 1, newest].map(alpha => expect.closeTo(alpha, 6)))
+    expect(shades('ranged')).toEqual([5, 5, 5, 4].map(count => expect.closeTo(0.8 + 0.2 * count / NEIGHBORS, 6)))
+  })
+
+  it('reuses each count’s word on a repeated paint at an unchanged count, writing a new one once a count changes', () => {
+    const built = strips(new Tones())
+    built.sample(4, 3)
+    const texts = (): string[] => painted(built, 'dark', 'ranged', 'seven').words.map(word => word.text)
+    const first = texts()
+    expect(first).toEqual(['4 s ago', 'now', 'by rank, 3', 'within range, 4'])
+    expect(texts()).toEqual(first)
+    built.sample(4, 6)
+    expect(texts()).toEqual(['4 s ago', 'now', 'by rank, 6', 'within range, 4'])
+  })
+})
+
+describe.for(SCHEMES)('the strips under the %s scheme', scheme => {
+  const tones  = new Tones()
+  const sky    = tones.sky(scheme)
+  const ranged = seriesOf(RANGED, scheme)
+  const seven  = tones.flock(scheme, ALONG.seven, 1)
+
+  it.for([...Array.from({ length: NEIGHBORS + 1 }).keys()])('hold a count of %i at a graphic’s contrast against the panel', count => {
+    const built = strips(tones)
+    built.sample(count, count)
+    const [panel, ...rects] = painted(built, scheme, ranged, seven).rects
+    const under             = over(sky.bands.at(-1)!, panel!)
+    for (const style of [ranged, seven]) {
+      const newest = rects.findLast(rect => rect.style === style)!
+      expect(wcagContrast(over(under, newest), under)).toBeGreaterThanOrEqual(FLOORS.mark)
+    }
+  })
+
+  it('write the time axis and the range’s count at a text’s contrast against their halo', () => {
+    const built = strips(tones)
+    built.sample(4, 3)
+    const words = painted(built, scheme, ranged, seven).words.filter(word => !word.text.startsWith('by rank'))
+    expect(words.map(word => word.text)).toEqual(['4 s ago', 'now', 'within range, 4'])
+    for (const word of words) expect(wcagContrast(over(word.halo, word), word.halo)).toBeGreaterThanOrEqual(FLOORS.text)
   })
 })
