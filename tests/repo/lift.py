@@ -17,20 +17,21 @@ then prints, writes, and tries:
   beside the major lift whose hold lets the rest pass
 """
 
-from collections.abc  import Callable
-from common.edits     import edit, hold
-from common.lags      import BREAKING, uv_lag
-from common.stand_ins import StandIn
-from contextlib       import nullcontext
-from datetime         import UTC, datetime
-from json             import dumps, loads
-from pathlib          import Path
-from pytest           import MonkeyPatch, fixture, mark, param, raises
-from re               import fullmatch
-from shlex            import quote
-from shutil           import which
-from subprocess       import CalledProcessError
-from tomllib          import loads as from_toml
+from collections.abc     import Callable
+from common.declarations import DECLARED
+from common.edits        import edit, hold
+from common.lags         import BREAKING, uv_lag
+from common.stand_ins    import StandIn
+from contextlib          import nullcontext
+from datetime            import UTC, datetime
+from json                import dumps, loads
+from pathlib             import Path
+from pytest              import MonkeyPatch, fixture, mark, param, raises
+from re         import fullmatch
+from shlex      import quote
+from shutil     import which
+from subprocess import CalledProcessError
+from tomllib    import loads as from_toml
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import ImageCheck, ParityCheck
@@ -55,6 +56,8 @@ KIT     = Path("docs/kit/package.json")
 NOW     = datetime(2026, 10, 16, tzinfo=UTC)
 PACKAGE = Path("docs/package.json")
 PAGES   = Path(".github/workflows/pages.yml")
+
+pytestmark = mark.reads(*DECLARED)
 
 
 @fixture

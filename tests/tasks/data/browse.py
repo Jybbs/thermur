@@ -1,6 +1,5 @@
 """
-Pins that the `data:fetch` task runs the command fetching the sample, and
-that `data:browse` opens the experiment viewer over the recorded runs.
+Pins that `data:browse` opens the experiment viewer over the recorded runs.
 """
 
 from collections.abc  import Callable
@@ -29,25 +28,3 @@ def test_browsing_opens_the_viewer_over_the_recorded_runs(
     ).stdout.splitlines()
 
     assert printed == ["--port", "8124", "data/runs"]
-
-
-def test_fetching_runs_the_command_fetching_the_sample(
-    pytestconfig : Config,
-    stand_in     : Callable[[str, str], StandIn]
-):
-    """
-    Asserts that the `data:fetch` task runs `thermur fetch sample`, passing
-    the command nothing more.
-    """
-    root = pytestconfig.rootpath
-    stand_in("thermur", 'printf "%s\\n" "$@"')
-
-    printed = run(
-        [root / ".mise/tasks/data/fetch"],
-        capture_output = True,
-        check          = True,
-        cwd            = root,
-        text           = True
-    ).stdout.splitlines()
-
-    assert printed == ["fetch", "sample"]

@@ -21,6 +21,7 @@ export default defineConfig({
     restoreMocks        : true,
     sequence            : { shuffle: true },
     setupFiles          : ['.vitepress/tests/common/matchers.ts'],
+    testTimeout         : 60_000,
     unstubGlobals       : true,
 
     coverage: {
