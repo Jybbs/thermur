@@ -1,13 +1,22 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "links"
 #MISE depends     = ["site:press"]
-#MISE description = "Check every link, asset, and heading fragment in the built site, the README, and the contributor guide offline through lychee"
+#MISE description = "Check every link, asset, and heading fragment in the built site, the README, and the contributor guide offline, each guide's fragments as GitHub writes them"
 #MISE dir         = "{{config_root}}/docs"
 
 dist="$PWD/.vitepress/dist"
 homepage=$(node --eval "import { projectFacts } from './.vitepress/lib/manifest.ts'; console.log(projectFacts(import.meta.url).homepage)" --input-type=module)
+status=0
+
+node --eval "
+import { strayFragments } from './.vitepress/lib/fragments.ts'
+const stray = await strayFragments(import.meta.url, process.argv.slice(1))
+for (const line of stray) console.error(line)
+process.exitCode = Number(stray.length > 0)
+" --input-type=module .github/README.md .github/CONTRIBUTING.md || status=$?
 
 lychee \
+  --exclude '^file://.*\.md#' \
   --fallback-extensions html \
   --include-fragments \
   --index-files index.html \
@@ -19,3 +28,5 @@ lychee \
   "$dist" \
   ../.github/README.md \
   ../.github/CONTRIBUTING.md
+
+exit "$status"
