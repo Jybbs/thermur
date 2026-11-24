@@ -146,13 +146,10 @@ def affected(
     ran = nested(
         [pytestconfig.rootpath / ".mise/tasks/py/affected", "-p", "no:randomly", "-rA"],
         tmp_path_factory,
-        check = True,
-        cwd   = repository.root,
-        env   = {
-            **environ,
-            "PATH"       : f"{Path(executable).parent}{pathsep}{environ['PATH']}",
-            "PYTHONPATH" : str(pytestconfig.rootpath / "tests")
-        }
+        check      = True,
+        cwd        = repository.root,
+        PATH       = f"{Path(executable).parent}{pathsep}{environ['PATH']}",
+        PYTHONPATH = str(pytestconfig.rootpath / "tests")
     ).stdout
 
     return [

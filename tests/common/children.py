@@ -5,7 +5,7 @@ it, `spawned` runs a script in a child and calls `runs` on each `thermur`
 module that child loaded, and `nested` runs a second pytest in a child.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from importlib.util  import find_spec
 from os              import environ
 from pathlib         import Path
@@ -19,16 +19,16 @@ def nested(
     command          : Sequence[str | Path],
     tmp_path_factory : TempPathFactory,
     *,
-    check            : bool              = False,
-    cwd              : Path | None       = None,
-    env              : Mapping[str, str] = environ
+    check            : bool        = False,
+    cwd              : Path | None = None,
+    **variables      : str
 ) -> CompletedProcess[str]:
     """
-    Runs `command`, which starts pytest, in a child under `env` with
-    `PYTHONDONTWRITEBYTECODE` set, so no module of a suite under the
-    temporary root reaches the bytecode cache `PYTHONPYCACHEPREFIX` names,
-    and with a `--basetemp` in a fresh folder of `tmp_path_factory`, so the
-    child opens no numbered folder of its own in the machine-wide root.
+    Runs `command`, which starts pytest, in a child with `variables` and
+    `PYTHONDONTWRITEBYTECODE` set over this process's environment and a
+    `--basetemp` in a fresh folder of `tmp_path_factory`, so the child
+    writes no bytecode for its suite and opens no folder in the machine-wide
+    root.
 
     Returns:
         The finished run, its output captured as text.
@@ -38,7 +38,7 @@ def nested(
         capture_output = True,
         check          = check,
         cwd            = cwd,
-        env            = {**env, "PYTHONDONTWRITEBYTECODE": "1"},
+        env            = {**environ, **variables, "PYTHONDONTWRITEBYTECODE": "1"},
         text           = True
     )
 

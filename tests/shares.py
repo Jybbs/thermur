@@ -68,7 +68,7 @@ def ran(
             executable, "-m", "pytest", "--numprocesses=0",
             "-p", "no:cacheprovider", "-v",
             *options,
-            str(folder)
+            folder
         ],
         tmp_path_factory,
         check = check

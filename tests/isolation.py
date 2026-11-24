@@ -56,10 +56,9 @@ def test_a_nested_run_writes_no_bytecode_and_keeps_its_base_folder_apart(
 ):
     """
     Asserts that a pytest `nested` starts over a suite under the temporary
-    root leaves the folder the bytecode cache holds for that suite empty,
-    and hands the suite's case a `tmp_path` in a fresh folder of this case's
-    `tmp_path_factory` rather than in a numbered folder of the machine-wide
-    root.
+    root leaves the bytecode cache's folder for that suite empty, and
+    hands the suite's case a `tmp_path` in a fresh folder of this case's
+    `tmp_path_factory` rather than in the machine-wide root.
     """
     module = tmp_path / "test_nested.py"
     module.write_text(
@@ -67,12 +66,12 @@ def test_a_nested_run_writes_no_bytecode_and_keeps_its_base_folder_apart(
         encoding = "utf-8"
     )
     ran = nested(
-        [executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "-s", str(module)],
+        [executable, "-m", "pytest", "-p", "no:cacheprovider", "-q", "-s", module],
         tmp_path_factory,
         check = True
     )
 
-    assert list(Path(cache_from_source(str(module))).parent.glob("*")) == []
+    assert list(Path(cache_from_source(module)).parent.glob("*")) == []
     assert Path(ran.stdout.splitlines()[0]).parent.parent == (
         tmp_path_factory.getbasetemp()
     )
@@ -235,8 +234,8 @@ def test_the_shared_copy_holds_no_value_an_earlier_case_cached(
     ran = nested(
         [executable, "-m", "pytest", "-p", "no:randomly", "-q", "tests"],
         tmp_path_factory,
-        cwd = tmp_path,
-        env = {**environ, "PYTHONPATH": str(root / "tests")}
+        cwd        = tmp_path,
+        PYTHONPATH = str(root / "tests")
     )
 
     assert ran.returncode == 0, ran.stdout
