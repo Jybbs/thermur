@@ -197,12 +197,29 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
 
     @property
+    def cutoff(self) -> datetime:
+        """
+        Reads the instant the window `[tool.uv]` declares opens on, so a
+        release published after it is inside the window.
+        """
+        return datetime.now(UTC) - self.checkout.manifest.window
+
+    @property
     def lags(self) -> list[Lag]:
         """
         Lists each pin the manager reports lagging, which a manager reading
         nothing of its own leaves empty.
         """
         return []
+
+    @property
+    def seconds(self) -> int:
+        """
+        Reads the window `[tool.uv]` declares in whole seconds, the unit
+        Bun's `--minimum-release-age` takes and mise's `minimum_release_age`
+        reads under an `s`.
+        """
+        return int(self.checkout.manifest.window.total_seconds())
 
     def audit(self, *arguments: str | Path) -> Audit:
         """
@@ -258,14 +275,20 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         """
         return loads(self.info(name, "time", "--json")).get(version)
 
-    def read(self, *command: str | Path, folder: Path = Path()) -> str:
+    def read(
+        self,
+        *command : str | Path,
+        env      : frozendict[str, str] = frozendict(),
+        folder   : Path                 = Path()
+    ) -> str:
         """
-        Runs `command` in `folder` under the root and reads what it prints.
+        Runs `command` in `folder` under the root, with the variables `env`
+        sets, and reads what it prints.
 
         Raises:
             CalledProcessError: Where the command exits nonzero.
         """
-        return self.checkout.run(*command, capture=True, folder=folder).stdout
+        return self.checkout.run(*command, capture=True, env=env, folder=folder).stdout
 
     def resolve(self, *requirements: str) -> Tree:
         """
@@ -313,16 +336,18 @@ class Manager(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
 class Actions(Manager):
     """
     GitHub, reporting each action a workflow or a composite action pins by
-    commit, against the commit the tag of its latest release names.
+    commit, against the commit the tag of its newest release older than the
+    window `[tool.uv]` declares names.
     """
 
     @property
     def lags(self) -> list[Lag]:
         """
-        Lists each pinned action whose latest release tags a commit other
-        than its pin, naming the current release by the most specific tag
-        naming the pinned commit, or by the commit's opening where no tag
-        names it.
+        Lists each pinned action whose newest release older than the window
+        tags a commit other than its pin, naming the current release by
+        the most specific tag naming the pinned commit, or by the commit's
+        opening where no tag names it. A pin a tag names past that release,
+        as a lift inside the window leaves it, makes no row.
         """
         steps = self.checkout.steps
         return [
@@ -352,44 +377,61 @@ class Actions(Manager):
             )
             for release, tags in self.releases(action)
             if tags[release["tagName"]] != commit
+            and read_release(release["tagName"])
+            >= max(
+                (read_release(tag) for tag, tagged in tags.items() if tagged == commit),
+                default = ()
+            )
         ]
 
     def releases(self, action: str) -> list[tuple[dict, dict[str, str]]]:
         """
-        Reads the latest release of the repository holding `action`, named
-        by its owner and name, through `gh release view`, and the commit
-        each of its tags names through `git ls-remote`. A tag annotating
-        a commit reads as that commit, which `git ls-remote` lists as
-        `<tag>^{}` right after the tag.
+        Reads the newest release of the repository holding `action`, named
+        by its owner and name, that `gh release list` dates before the
+        window `[tool.uv]` declares, short of a draft and a prerelease,
+        and the commit each of its tags names through `git ls-remote`. The
+        newest is the release whose tag reads as the highest version, since
+        a repository can publish a fix to an older major after its newest
+        release. A tag annotating a commit reads as that commit, which `git
+        ls-remote` lists as `<tag>^{}` right after the tag.
 
         Returns:
             The release's `tagName` and `publishedAt` beside the commit each
             tag names, by the tag, as the one pair the list holds, or no
-            pair where `gh` finds no release.
+            pair where `gh` lists no release before the window.
 
         Raises:
-            CalledProcessError: Where `gh` fails for any other reason, or
-                                `git` fails.
+            CalledProcessError: Where `gh` or `git` fails.
         """
         repository = "/".join(action.split("/")[:2])
-        released   = self.checkout.run(
-            "gh",
-            "release",
-            "view",
-            "--json",
-            "publishedAt,tagName",
-            "--repo",
-            repository,
-            capture = True,
-            check   = False
+        cutoff     = self.cutoff
+        newest     = max(
+            (
+                release
+                for release in loads(
+                    self.read(
+                        "gh",
+                        "release",
+                        "list",
+                        "--exclude-drafts",
+                        "--exclude-pre-releases",
+                        "--json",
+                        "publishedAt,tagName",
+                        "--repo",
+                        repository
+                    )
+                )
+                if datetime.fromisoformat(release["publishedAt"]) <= cutoff
+            ),
+            default = None,
+            key     = lambda release: read_release(release["tagName"])
         )
-        if "release not found" in released.stderr:
+        if newest is None:
             return []
 
-        released.check_returncode()
         return [
             (
-                loads(released.stdout),
+                newest,
                 {
                     tag.removesuffix("^{}"): commit
                     for commit, tag in findall(
@@ -621,8 +663,7 @@ class Site(Manager):
         holds a Bun resolve to releases older than the window `[tool.uv]`
         declares.
         """
-        seconds = int(self.checkout.manifest.window.total_seconds())
-        return f"--minimum-release-age={seconds}"
+        return f"--minimum-release-age={self.seconds}"
 
     @property
     def lags(self) -> list[Lag]:
@@ -760,7 +801,7 @@ class Site(Manager):
         prerelease, that `bun info` dates at least the window `[tool.uv]`
         declares ago, the release `bun outdated` reports under the window.
         """
-        cutoff = datetime.now(UTC) - self.checkout.manifest.window
+        cutoff = self.cutoff
         return max(
             (
                 version
@@ -780,9 +821,11 @@ class Tools(Manager):
     """
     mise, reporting each tool `.mise/config.toml` pins and the `min_version`
     floor it sets on mise itself, read as the release the aqua registry
-    names `aqua:jdx/mise`. The `required-version` in `[tool.uv]` restates
-    the `uv` pin, so a lift of `uv` writes both, and a lift of `python` to
-    another minor moves each floor and restatement `repo:audit` holds to it.
+    names `aqua:jdx/mise`, against its newest release older than the window
+    `[tool.uv]` declares, which mise's `minimum_release_age` holds it to.
+    The `required-version` in `[tool.uv]` restates the `uv` pin, so a lift
+    of `uv` writes both, and a lift of `python` to another minor moves each
+    floor and restatement `repo:audit` holds to it.
     """
 
     mise: ClassVar[str] = "aqua:jdx/mise"
@@ -816,8 +859,9 @@ class Tools(Manager):
     @property
     def lags(self) -> list[Lag]:
         """
-        Lists each tool `mise outdated --bump` reports a newer release of,
-        then the floor where mise has released past it.
+        Lists each tool `mise outdated --bump` reports a newer release of
+        under the window, then the floor where mise has released past it
+        under the window.
         """
         config = self.checkout.config
         return [
@@ -869,10 +913,27 @@ class Tools(Manager):
 
     def outdated(self, *arguments: str) -> dict[str, dict]:
         """
-        Reads what `mise outdated --bump --json` reports for `arguments`,
-        each tool it finds a newer release of by its name.
+        Reads what `mise outdated --bump --json` reports for `arguments`
+        under `minimum_release_age` set to the window, each tool by its name
+        where the newest release it reports is ahead of the release it is
+        asked about. mise also lists a tool it finds no installed release
+        of, as the floor always is, at a release that can be the one asked
+        about or one behind it.
         """
-        return loads(self.read("mise", "outdated", "--bump", "--json", *arguments))
+        return {
+            name: tool
+            for name, tool in loads(
+                self.read(
+                    "mise",
+                    "outdated",
+                    "--bump",
+                    "--json",
+                    *arguments,
+                    env = frozendict(MISE_MINIMUM_RELEASE_AGE=f"{self.seconds}s")
+                )
+            ).items()
+            if read_release(tool["latest"]) > read_release(tool["requested"])
+        }
 
     def places(self, tool: str) -> dict[Path, str]:
         """
