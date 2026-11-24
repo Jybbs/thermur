@@ -52,10 +52,8 @@ describe('murmuration', () => {
   it('turns a bird at the edge of the parting away from it and lifts it', () => {
     const open = birds(scene.murmuration(FLOCK))
     const edge = birds(scene.murmuration({ ...FLOCK, gap: () => 0.5 }))
-    for (const [index, bird] of edge.entries()) {
-      expect(bird.turn - open[index]!.turn).toBeCloseTo(-0.4 * 180 / Math.PI, 0)
-      expect(bird.y - open[index]!.y).toBeCloseTo(-3, 0)
-    }
+    expect(edge.map((bird, index) => [bird.turn - open[index]!.turn, bird.y - open[index]!.y]))
+      .toStrictEqual(edge.map(() => [expect.closeTo(-0.4 * 180 / Math.PI, 0), expect.closeTo(-3, 0)]))
   })
 
   it('colors each bird by how near the parting it sits, turning none short of the edge', () => {

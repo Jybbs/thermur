@@ -11,7 +11,8 @@ from pydantic        import ValidationError
 from pytest          import Config, fixture, mark, param, raises
 from re              import fullmatch, sub
 
-from thermur.docs.schemas import Article, Bibliography, Preprint, Report, Study
+from thermur.docs.schemas  import Article, Bibliography, Preprint, Report, Study
+from thermur.repo.checkout import Checkout
 
 ARTICLE = """@article{{{key},
     author   = {{{author}}},
@@ -372,14 +373,30 @@ def test_citing_keys_joins_their_definitions_in_the_order_given(
 def test_the_shipped_bibliography_lists_each_study_in_key_order(pytestconfig: Config):
     """
     Asserts that every entry in the repository's `docs/pages/references.bib`
-    validates, sits in the order of its key, carries a key in the form
-    `Study.form` sets, and reads as a definition holding no run of spaces,
-    the mark of a LaTeX special left unescaped.
+    validates and sits in the order of its key.
     """
     studies = Bibliography.read(pytestconfig.rootpath).studies
 
     assert list(studies) == sorted(studies)
-    for key, study in studies.items():
-        assert fullmatch(Study.form, key)
-        assert "  " not in study.definition
-        assert "\xa0" not in study.annote + study.definition
+
+
+@mark.parametrize(
+    ("key", "study"),
+    [
+        param(key, study, id=key)
+        for key, study in Bibliography.read(Checkout.installed().root).studies.items()
+    ]
+)
+def test_each_shipped_study_carries_a_formed_key_and_a_plain_definition(
+    key   : str,
+    study : Study
+):
+    """
+    Asserts that each entry in the repository's `docs/pages/references.bib`
+    carries a key in the form `Study.form` sets and reads as a definition
+    holding no run of spaces, the mark of a LaTeX special left unescaped,
+    and no nonbreaking space.
+    """
+    assert fullmatch(Study.form, key)
+    assert "  " not in study.definition
+    assert "\xa0" not in study.annote + study.definition
