@@ -402,8 +402,8 @@ def test_tracked_leaves_out_the_file_mise_lock_writes_and_keeps_the_lock(
     """
     Asserts that the files a checkout tracks take in `.mise/mise.lock` and
     leave out the temporary file `mise lock` writes beside it, so a reader
-    listing them while `lock:check` runs names no file `mise lock` may
-    remove before the reader opens it.
+    listing them while `mise lock` runs names no file it may remove before
+    the reader opens it.
     """
     written = Path(".mise/.mise.lock.jQXMo2")
     (checkout.root / written).touch()

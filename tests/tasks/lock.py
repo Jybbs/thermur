@@ -3,10 +3,10 @@ Pins the path `lock:check` takes for each answer `uv`, `mise`, and `bun`
 give it, each case running a copy of the task beside a lockfile of its
 own, the lockfile beside each task script declaring its own dependencies
 that every `lock` task checks, audits, or writes, and what the real mise
-answers for the committed lockfile online and for one missing a platform
-entry offline, where `lock:check` fails on a `mise lock` exiting nonzero
-or counting a skipped platform and on a lockfile in which a tool holds no
-entry for a platform another tool carries. It also pins which `AUDIT_IGNORE`
+answers for the committed lockfile online, for one missing a platform entry,
+a checksum, or a pin's entry offline, and for a pin moved with its entry
+to a release that does not exist, where `lock:check` fails on each pinned
+version `mise ls-remote` does not list. It also pins which `AUDIT_IGNORE`
 ids `lock:scan` passes to `bun audit --ignore`, and how it fails before the
 audit on an id a release fixes, naming the entry and the patched version, or
 on an id `gh` cannot read, each against a stand-in `gh`. Last, it pins that
@@ -31,13 +31,15 @@ from tomllib          import loads
 
 from thermur.repo.checkout import Checkout
 
-CHECKED    = "mise lock    ✓ 72 targets checked"
-FAILED     = "mise ERROR error sending request"
-LYCHEE     = '[tools."aqua:lycheeverse/lychee"."platforms.linux-x64"]'
+CONFIG     = ".mise/config.toml"
+LOCK       = ".mise/mise.lock"
+LYCHEE     = '[tools."aqua:lycheeverse/lychee"."platforms.macos-x64"]'
 MICROMATCH = "GHSA-952p-6rrq-rcjv"
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
-PICOMATCH = "GHSA-fc5q-39xc-vjpf"
-SUMMARY   = "✓ Updated 14 platform entries ({skipped} skipped)"
+PICOMATCH   = "GHSA-fc5q-39xc-vjpf"
+PIN         = "uv  0.13.8 (missing)  .mise/config.toml  0.13.8"
+STALE       = "zizmor@0.0.1 is not in the lockfile"
+UNREACHABLE = "mise ERROR unable to fetch versions for uv: error sending request"
 
 
 def executed(copy: Path, task: str = "check") -> CompletedProcess:
@@ -52,6 +54,14 @@ def executed(copy: Path, task: str = "check") -> CompletedProcess:
         cwd            = copy,
         text           = True
     )
+
+
+def pinning(copy: Path) -> dict[str, str]:
+    """
+    Reads `.mise/config.toml` and `.mise/mise.lock` in the copy, keyed by
+    each file's path under the copy's root.
+    """
+    return {name: (copy / name).read_text() for name in (CONFIG, LOCK)}
 
 
 @fixture
@@ -75,8 +85,7 @@ def copy(
     """
     (tmp_path / ".mise/tasks").mkdir(parents=True)
     for path in (
-        ".mise/config.toml", ".mise/lib", ".mise/mise.lock",
-        ".mise/tasks/lock", "pyproject.toml"
+        CONFIG, ".mise/lib", LOCK, ".mise/tasks/lock", "pyproject.toml"
     ):
         (pytestconfig.rootpath / path).copy(tmp_path / path, preserve_metadata=True)
 
@@ -88,40 +97,39 @@ def copy(
     return tmp_path
 
 
-@mark.parametrize(
-    "summary",
-    [
-        param(SUMMARY.format(skipped=0), id="no-skipped-platform"),
-        param(CHECKED, id="the-targets-checked")
-    ]
-)
 def test_a_current_lock_passes(
-    copy     : Path,
-    stand_in : Callable[[str, str], StandIn],
-    summary  : str
+    copy        : Path,
+    monkeypatch : MonkeyPatch,
+    stand_in    : Callable[[str, str], StandIn]
 ):
     """
-    Asserts that the task exits `0` where `uv.lock` is current, `mise lock`
-    writes every platform and changes nothing, reporting no skipped platform
-    or only the targets it checked, and the dry run installs every tool the
-    project pins under the project's lock scope alone, while the task prints
-    nothing and leaves `.mise/mise.lock` the file it found.
+    Asserts that the task exits `0` where `uv.lock` is current, `mise lock
+    --check` passes, the dry run installs every tool the project pins under
+    the project's lock scope alone, whatever scope the environment names,
+    and `mise ls-remote` lists the version each pin names, while the task
+    prints nothing and leaves `.mise/mise.lock` the file it found.
     """
-    lock = copy / ".mise/mise.lock"
+    monkeypatch.setenv("MISE_LOCKED_SCOPES", "global")
+    lock = copy / LOCK
     held = (lock.read_bytes(), lock.stat().st_ino)
-    stand_in(
+    mise = stand_in(
         "mise",
-        f'[ "$1" = lock ] && echo "{summary}"\n'
-        'echo "$MISE_LOCKED_SCOPES $*" >> install\n'
-        'echo "mise uv@0.12.22 would install"'
+        '[ "$1" = install ] && echo "$MISE_LOCKED_SCOPES" > scopes\n'
+        f'[ "$1" = ls ] && echo "{PIN}"\n'
+        '[ "$1" = ls-remote ] && printf "0.13.7\\n0.13.8\\n"\n'
+        "exit 0"
     )
 
     result = executed(copy)
 
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
     assert (lock.read_bytes(), lock.stat().st_ino) == held
-    assert (copy / "install").read_text().splitlines()[-1] == (
-        "project install --dry-run --force --locked"
+    assert ((copy / "scopes").read_text(), mise.commands) == (
+        "project\n",
+        [
+            "mise lock --check", "mise install --dry-run --force --locked",
+            "mise ls --no-header --project", "mise ls-remote uv"
+        ]
     )
 
 
@@ -139,30 +147,6 @@ def test_a_failing_uv_check_stops_before_mise_runs(
     assert (executed(copy).returncode, (copy / "ran").exists()) == (1, False)
 
 
-def test_a_rewritten_lock_fails_and_is_restored(
-    copy     : Path,
-    stand_in : Callable[[str, str], StandIn]
-):
-    """
-    Asserts that a `mise lock` rewriting `.mise/mise.lock` fails the task,
-    which prints the difference and leaves the file as it found it, byte for
-    byte and mode for mode.
-    """
-    lock = copy / ".mise/mise.lock"
-    held = (lock.read_bytes(), lock.stat().st_mode)
-    stand_in(
-        "mise",
-        'echo "drifted = true" >> .mise/mise.lock\n'
-        "chmod 600 .mise/mise.lock\n"
-        f'echo "{SUMMARY.format(skipped=0)}"'
-    )
-
-    result = executed(copy)
-
-    assert (result.returncode, "+drifted = true" in result.stderr) == (1, True)
-    assert (lock.read_bytes(), lock.stat().st_mode) == held
-
-
 def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
     copy     : Path,
     stand_in : Callable[[str, str], StandIn]
@@ -176,7 +160,7 @@ def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
         "bun",
         'echo "error: lockfile had changes, but lockfile is frozen" >&2\nexit 1'
     )
-    stand_in("mise", f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}"\nexit 0')
+    stand_in("mise", "exit 0")
 
     result = executed(copy)
 
@@ -189,26 +173,26 @@ def test_a_site_lockfile_lagging_its_manifest_fails_the_check(
     ("mise", "reported"),
     [
         param(
-            f'echo "{SUMMARY.format(skipped=3)}"',
-            SUMMARY.format(skipped=3),
-            id = "skipped-platform"
+            f'[ "$1" = lock ] && echo "{STALE}" >&2 && exit 1\nexit 0',
+            STALE,
+            id = "failed-check"
         ),
         param(
-            f'echo "{SUMMARY.format(skipped=10)}"',
-            SUMMARY.format(skipped=10),
-            id = "ten-skipped-platforms"
-        ),
-        param(
-            f'[ "$1" = lock ] && echo "{FAILED}" >&2 && exit 1\nexit 0',
-            FAILED,
-            id = "failed-lock"
-        ),
-        param(
-            f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}" && exit 0\n'
-            f'echo "{MISSING}" >&2\n'
-            "exit 1",
+            f'[ "$1" = install ] && echo "{MISSING}" >&2 && exit 1\nexit 0',
             MISSING,
             id = "missing-entry"
+        ),
+        param(
+            f'[ "$1" = ls ] && echo "{PIN}"\n'
+            f'[ "$1" = ls-remote ] && echo "{UNREACHABLE}" >&2 && exit 1\n'
+            "exit 0",
+            UNREACHABLE,
+            id = "unreachable-host"
+        ),
+        param(
+            f'[ "$1" = ls ] && echo "{PIN}"\nexit 0',
+            "mise ls-remote lists no version of uv, as when mise runs offline",
+            id = "no-version-list"
         )
     ],
     indirect = ["mise"]
@@ -219,67 +203,163 @@ def test_the_check_fails_printing_what_mise_reports(
     reported : str
 ):
     """
-    Asserts that a `mise lock` counting a skipped platform, which exits `0`,
-    a `mise lock` exiting nonzero, and a dry run finding no lockfile entry
-    for a pinned tool on the running platform each fail the task, which
-    prints what mise reported.
+    Asserts that a `mise lock --check` exiting nonzero, a dry run finding
+    no lockfile entry for a pinned tool on the running platform, and a `mise
+    ls-remote` reaching no host each fail the task, which prints what mise
+    reported, and that a `mise ls-remote` listing no version at all, as it
+    does offline before it caches a list, fails the task naming the tool.
     """
     result = executed(copy)
 
     assert (result.returncode, result.stderr.strip()) == (1, reported)
 
 
-def test_a_tool_missing_a_platform_another_carries_fails_naming_both(
+def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
     copy     : Path,
     stand_in : Callable[[str, str], StandIn]
 ):
     """
-    Asserts that a lockfile in which one tool holds no entry for a platform
-    another tool's entries carry fails the task, which names the tool
-    and the platform, even where `mise lock` exits `0`, counts no skipped
-    platform, and leaves the file as it found it.
+    Asserts that the task fails on every pin whose version `mise ls-remote`
+    lists no line of its own, naming each tool and its version, rather than
+    stopping at the first or passing a version that only opens a listed one.
     """
-    lock = copy / ".mise/mise.lock"
-    lock.write_text(sub(rf"{escape(LYCHEE)}\n(?:.+\n)+\n?", "", lock.read_text()))
-    stand_in("mise", f'echo "{CHECKED}"')
+    mise = stand_in(
+        "mise",
+        '[ "$1" = ls ] && printf "%s\\n" "aqua:lycheeverse/lychee  0.99.9"'
+        ' "bun  1.4.4" "zizmor  1.32"\n'
+        '[ "$1" = ls-remote ] && printf "0.99.90\\n1.4.4\\n1.32.0\\n"\n'
+        "exit 0"
+    )
 
     result = executed(copy)
 
-    assert (result.returncode, result.stderr.strip()) == (
-        1, "aqua:lycheeverse/lychee has no linux-x64 entry in .mise/mise.lock"
+    assert (result.returncode, result.stderr.splitlines()) == (
+        1,
+        [
+            "aqua:lycheeverse/lychee pins 0.99.9, which mise ls-remote does not list",
+            "zizmor pins 1.32, which mise ls-remote does not list"
+        ]
     )
+    assert [command for command in mise.commands if "ls-remote" in command] == [
+        "mise ls-remote aqua:lycheeverse/lychee", "mise ls-remote bun",
+        "mise ls-remote zizmor"
+    ]
 
 
 @mark.parametrize(
-    "table",
+    ("path", "pattern", "replacement", "reported"),
     [
-        param(LYCHEE, id="lychee"),
-        param('[tools.zizmor."platforms.windows-x64-baseline"]', id="zizmor")
+        param(
+            LOCK,
+            rf"{escape(LYCHEE)}\n(?:.+\n)+\n?",
+            "",
+            "No lockfile URL found for aqua:lycheeverse/lychee@{lychee} on platform"
+            " macos-x64 (--locked mode)",
+            id = "lychee-entry"
+        ),
+        param(
+            LOCK,
+            r'\[tools\.zizmor\."platforms\.windows-x64-baseline"\]\n(?:.+\n)+\n?',
+            "",
+            "No lockfile URL found for zizmor@{zizmor} on platform"
+            " windows-x64-baseline (--locked mode)",
+            id = "zizmor-entry"
+        ),
+        param(
+            LOCK,
+            rf"({escape(LYCHEE)}\n)checksum = .+\n",
+            r"\1",
+            "No lockfile checksum found for aqua:lycheeverse/lychee@{lychee} on"
+            " platform macos-x64",
+            id = "checksum"
+        ),
+        param(
+            CONFIG,
+            r'(?m)^(zizmor\s*=\s*)".+"$',
+            r'\1"0.0.1"',
+            "zizmor@0.0.1 is not in the lockfile",
+            id = "pin"
+        )
     ]
 )
-def test_an_offline_lock_fails_the_check(
+def test_the_real_mise_fails_offline_on_what_a_locked_install_rejects(
     copy        : Path,
     monkeypatch : MonkeyPatch,
-    table       : str
+    path        : str,
+    pattern     : str,
+    replacement : str,
+    reported    : str
 ):
     """
-    Asserts that the real `mise lock`, reaching no release host through
+    Asserts that the real `mise lock --check`, reaching no host through
     a proxy that refuses every connection, fails the task on a lockfile
-    missing one platform entry, which it cannot fetch, and that the task
-    leaves the lockfile as it found it.
+    missing one platform entry or one entry's checksum, and on a pin the
+    lockfile holds no entry for, naming the tool, its version, and the
+    platform, and that the task leaves both files as it found them.
 
     `MISE_HTTP_RETRIES` set to `0` makes each refused request fail at once
     rather than after mise's retries.
     """
-    lock    = copy / ".mise/mise.lock"
-    trimmed = sub(rf"{escape(table)}\n(?:.+\n)+\n?", "", lock.read_text())
-    lock.write_text(trimmed)
+    held       = pinning(copy)
+    pinned     = loads(held[CONFIG])["tools"]
+    held[path] = sub(pattern, replacement, held[path], count=1)
+    for name, text in held.items():
+        (copy / name).write_text(text)
     monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("HTTP_PROXY", "http://127.0.0.1:9")
     monkeypatch.setenv("MISE_HTTP_RETRIES", "0")
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(copy))
 
-    assert (executed(copy).returncode, lock.read_text()) == (1, trimmed)
+    result = executed(copy)
+
+    assert (result.returncode, pinning(copy)) == (1, held)
+    assert reported.format(
+        lychee = pinned["aqua:lycheeverse/lychee"],
+        zizmor = pinned["zizmor"]
+    ) in result.stderr
+
+
+@mark.parametrize(
+    "online",
+    [param(False, id="stood-in"), param(True, id="online", marks=mark.network)]
+)
+def test_a_pin_moved_with_its_lock_entry_to_no_release_fails(
+    copy        : Path,
+    monkeypatch : MonkeyPatch,
+    online      : bool,
+    stand_in    : Callable[[str, str], StandIn]
+):
+    """
+    Asserts that the lychee pin moved, with every version and URL its lock
+    entry holds, to `0.99.9`, a release lychee never published, which the
+    real `mise lock --check` and the `--locked` dry run both pass, fails
+    the task, which names the tool and the version and leaves both files
+    as it moved them. The stood-in case answers `mise ls-remote` with every
+    version `.mise/config.toml` pins before the move and runs the real
+    `mise` for the rest, while the online case reads each real version list.
+    """
+    pinned = loads((copy / CONFIG).read_text())["tools"]
+    held   = {
+        name: text.replace(pinned["aqua:lycheeverse/lychee"], "0.99.9")
+        for name, text in pinning(copy).items()
+    }
+    for name, text in held.items():
+        (copy / name).write_text(text)
+    if not online:
+        listed = quote("\n".join(pinned.values()))
+        real   = quote(which("mise"))
+        stand_in(
+            "mise",
+            f'[ "$1" = ls-remote ] && echo {listed} && exit 0\nexec {real} "$@"'
+        )
+    monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(copy))
+
+    result = executed(copy)
+
+    assert (result.returncode, result.stderr) == (
+        1, "aqua:lycheeverse/lychee pins 0.99.9, which mise ls-remote does not list\n"
+    )
+    assert pinning(copy) == held
 
 
 @mark.network
@@ -288,10 +368,10 @@ def test_the_committed_lock_passes_the_check_online(
     monkeypatch : MonkeyPatch
 ):
     """
-    Asserts that the real `mise`, locking every platform `.mise/mise.lock`
-    holds and running the dry run, passes the task on the committed
-    lockfile, printing nothing. The release `min_version` names fetches each
-    platform entry over the network to lock it.
+    Asserts that the real `mise`, checking every platform `.mise/mise.lock`
+    holds, running the dry run, and reading each pinned tool's version list
+    over the network, passes the task on the committed lockfile, printing
+    nothing.
     """
     monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(copy))
 
@@ -347,7 +427,7 @@ def test_each_lock_task_reaches_every_lockfile(
     (copy / script).write_text('# /// script\n# dependencies = ["minijinja"]\n# ///\n')
     (copy / ".mise/tasks/gha/plain.py").write_text('"""\nDeclares nothing.\n"""\n')
     programs = {program: stand_in(program, "exit 0") for program in ("bun", "uv")}
-    stand_in("mise", f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}"\nexit 0')
+    stand_in("mise", "exit 0")
 
     assert executed(copy, task).returncode == 0
     assert programs["uv"].commands == [
