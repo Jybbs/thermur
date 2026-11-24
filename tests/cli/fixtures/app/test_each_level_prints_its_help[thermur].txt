@@ -7,6 +7,7 @@ way it breaks around a falcon.
 │ cut          Cuts the data a run reads out of a full output.                 │
 │ fetch        Fetches the data a run reads into the clone's data/ folder.     │
 │ fly          Flies the flock, or computes the steps of the graph named.      │
+│ watch        Serves the Lookout on flights the graph flies.                  │
 │ --help (-h)  Display this message and exit.                                  │
 │ --version    Display application version.                                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯

@@ -1,0 +1,55 @@
+.lookout-bar {
+  align-items    : center;
+  display        : flex;
+  flex-wrap      : wrap;
+  gap            : 0.625rem 1rem;
+  padding-bottom : 2px;
+}
+
+.lookout-size {
+  align-items : center;
+  display     : inline-flex;
+  flex        : 1 1 100%;
+  gap         : 0.625rem;
+  min-width   : 0;
+}
+
+.lookout-track {
+  flex      : 1 1 auto;
+  min-width : 0;
+  position  : relative;
+}
+
+.lookout-track .kit-slider { width: 100%; }
+
+.lookout-default {
+  background : var(--vp-c-text-2);
+  bottom     : -6px;
+  height     : 6px;
+  position   : absolute;
+  translate  : -50% 0;
+  width      : 1px;
+}
+
+.lookout-stage {
+  aspect-ratio  : 2 / 1;
+  border-radius : 8px;
+  max-height    : 21rem;
+  min-height    : 18rem;
+  overflow      : hidden;
+  position      : relative;
+  width         : 100%;
+}
+
+.lookout-stage canvas {
+  display : block;
+  height  : 100%;
+  width   : 100%;
+}
+
+.lookout-chips {
+  display   : flex;
+  flex-wrap : wrap;
+  gap       : 0.5rem 1rem;
+  padding   : 0.5rem 0 0;
+}

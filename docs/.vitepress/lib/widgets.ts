@@ -23,6 +23,7 @@ const MARKERS: Readonly<Record<string, string>> = {
   'faces'        : `<IdentityFaces />\n${FOLD}`,
   'heat'         : `<IdentityHeat />\n${FOLD}`,
   'kept'         : '<CropKept />\n',
+  'lookout'      : '<LookoutFlight />\n',
   'marks'        : `<IdentityMarks />\n${FOLD}`,
   'neighbors'    : '<RulesNeighbors />\n',
   'palette'      : `<IdentityPalette />\n${FOLD}`,

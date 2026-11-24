@@ -108,7 +108,8 @@ def test_running_the_fetch_imports_neither_jax_nor_xarray():
         param(("cut", "sample", "--help"), id="cut-sample"),
         param(("fetch", "--help"), id="fetch"),
         param(("fetch", "sample", "--help"), id="fetch-sample"),
-        param(("fly", "--help"), id="fly")
+        param(("fly", "--help"), id="fly"),
+        param(("watch", "--help"), id="watch")
     ]
 )
 def test_each_level_prints_its_help(
@@ -146,7 +147,7 @@ def test_a_level_given_no_command_prints_its_help(
 @mark.parametrize(
     ("tokens", "offered"),
     [
-        param(("bogus",), "cut, fetch, fly", id="thermur"),
+        param(("bogus",), "cut, fetch, fly, watch", id="thermur"),
         param(("cut", "bogus"), "sample", id="cut"),
         param(("fetch", "bogus"), "sample", id="fetch")
     ]

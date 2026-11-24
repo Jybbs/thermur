@@ -81,8 +81,10 @@
     "clearance_sd": 4.0,
     "course_deg": 180.0,
     "cruise_m_s": 10.0,
+    "drones": 1000,
     "neighbors": 7,
     "scatter_deg": 10.0,
+    "seed": 0,
     "spacing_m": 15.0,
     "step_s": 0.02
   }

@@ -1,7 +1,7 @@
 import { ranked }                      from '../common.ts'
 import source                          from '../rendered/composite.json' with { type: 'json' }
 import { launched }                    from './launch.ts'
-import { type Broadcast, Radio, SENT } from './radio.ts'
+import { type Broadcast, type Draw, Radio, SENT } from './radio.ts'
 import { type Model, type Place, TINY, capped, excited, home, zigging } from './slots.ts'
 
 /**
@@ -41,9 +41,8 @@ export class Composite {
   readonly model      : Model
   readonly positions  : Float64Array
   /**
-   * The senders each drone ranked at the last step, nearest first by the
-   * positions it heard and `-1` past the last heard, the plan's `neighbors` of
-   * them for each drone in turn.
+   * The senders each drone ranked at the last step by the positions it heard,
+   * nearest first and `-1` past the last, the plan's `neighbors` to a drone.
    */
   readonly ranks      : Int32Array
   /**
@@ -55,6 +54,7 @@ export class Composite {
   readonly #before    : Float64Array
   readonly #best      : Float64Array
   readonly #broadcast : Broadcast
+  readonly #places    : Int32Array
   readonly #radio     : Radio
   readonly #rates     : Float64Array
   readonly #sides     : Float64Array
@@ -88,6 +88,7 @@ export class Composite {
     this.#sums      = new Float64Array(11)
     this.#best      = new Float64Array(neighbors)
     this.ranks      = new Int32Array(count * neighbors).fill(-1)
+    this.#places    = new Int32Array(count * neighbors).fill(-1)
     this.#radio     = new Radio(count, model)
     this.#broadcast = (index, into, at): void => {
       const from = index * 3
@@ -106,18 +107,18 @@ export class Composite {
    * the length of the mean bearing to every sender it heard.
    */
   #rank(index: number): number {
-    const { count, positions } = this
-    const best  = this.#best
-    const inbox = this.#radio.inbox
-    const at    = index * 3
-    const base  = index * best.length
+    const { positions }      = this
+    const { inbox, senders } = this.#radio
+    const best               = this.#best
+    const slots              = this.model.radio.slots
+    const at                 = index * 3
+    const base               = index * best.length
     let cx = 0, cy = 0, cz = 0, held = 0
     best.fill(Infinity)
-    this.ranks.fill(-1, base, base + best.length)
-    for (let sender = 0; sender < count; sender++) {
-      const pair = index * count + sender
-      if (sender === index || !this.#radio.heard[pair]) continue
-      const o        = pair * SENT
+    this.#places.fill(-1, base, base + best.length)
+    for (let slot = index * slots; slot < (index + 1) * slots; slot++) {
+      if (senders[slot]! < 0) continue
+      const o        = slot * SENT
       const dx       = inbox[o]! - positions[at]!
       const dy       = inbox[o + 1]! - positions[at + 1]!
       const dz       = inbox[o + 2]! - positions[at + 2]!
@@ -127,8 +128,9 @@ export class Composite {
       cy += dy / apart
       cz += dz / apart
       held++
-      ranked(best, distance, this.ranks, sender, base)
+      ranked(best, distance, this.#places, slot, base)
     }
+    for (let k = base; k < base + best.length; k++) this.ranks[k] = senders[this.#places[k]!] ?? -1
     return Math.hypot(cx, cy, cz) / Math.max(held, 1)
   }
 
@@ -142,7 +144,7 @@ export class Composite {
    */
   #gather(index: number): void {
     const { cohesion, contact, noise }   = this.model
-    const { commands, count, positions } = this
+    const { commands, positions }        = this
     const inbox                          = this.#radio.inbox
     const sums                           = this.#sums
     const at                             = index * 3
@@ -156,9 +158,9 @@ export class Composite {
     this.#zigs[index]  = 0
     this.#sides[index] = 0
     for (let k = 0; k < this.#best.length; k++) {
-      const sender = this.ranks[base + k]!
-      if (sender < 0) break
-      const o        = (index * count + sender) * SENT
+      const place = this.#places[base + k]!
+      if (place < 0) break
+      const o        = place * SENT
       const distance = this.#best[k]!
       const dx       = inbox[o]! - positions[at]!
       const dy       = inbox[o + 1]! - positions[at + 1]!
@@ -270,10 +272,10 @@ export class Composite {
 
   /**
    * Carries every drone's broadcast over the radio for this step, each packet
-   * lost where `random` falls under the link's loss.
+   * lost where `draw` for its pair reaches the link's chance of keeping it.
    */
-  hear(random: () => number): void {
-    this.#radio.hear(this.#broadcast, random)
+  hear(draw: Draw): void {
+    this.#radio.hear(this.#broadcast, draw)
   }
 
   /**

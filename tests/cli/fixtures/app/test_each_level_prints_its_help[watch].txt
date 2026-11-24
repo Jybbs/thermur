@@ -1,0 +1,286 @@
+Usage: thermur watch [OPTIONS]
+
+Serves the Lookout on flights the graph flies.
+
+╭─ Parameters ─────────────────────────────────────────────────────────────────╮
+│ --port INT                    The port to serve on, any free one by default. │
+│                               [default: 0]                                   │
+│ --cohesion.blind-deg FLOAT    The angle behind the drone within which a      │
+│                               neighbor is left out, in degrees, by default   │
+│                               the model's 45 degrees to either side.         │
+│                               [default: 90.0]                                │
+│ --cohesion.sphere-m FLOAT     The radius of the hard sphere within which a   │
+│                               neighbor pulls nothing, in meters, at a        │
+│                               starling's scale, by default half a starling's │
+│                               wingspan. [default: 0.2]                       │
+│ --cohesion.weight-m-s2 FLOAT  The pull of a drone at a centrality of one, in │
+│                               meters per second squared, at a starling's     │
+│                               scale, by default the model's cohesion weight  │
+│                               of 1 newton over its bird's mass of 80 grams.  │
+│                               [default: 12.5]                                │
+│ --contact.sphere-m FLOAT      The radius of the hard sphere, in meters, at a │
+│                               starling's scale, by default half a starling's │
+│                               wingspan. [default: 0.2]                       │
+│ --contact.spread-m FLOAT      The standard deviation of the Gaussian past    │
+│                               the hard sphere, in meters, at a starling's    │
+│                               scale, by default the one leaving the push at  │
+│                               a hundredth of its strength at the separation  │
+│                               radius of 1.6 meters the model sets for its    │
+│                               flock of 781 birds, (1.6 - 0.2) / sqrt(2 * ln  │
+│                               100). [default: 0.461]                         │
+│ --contact.weight-m-s2 FLOAT   The push at full strength, in meters per       │
+│                               second squared, at a starling's scale, by      │
+│                               default the model's separation weight of 1     │
+│                               newton over its bird's mass of 80 grams.       │
+│                               [default: 12.5]                                │
+│ --coupling.coupling-per-s     The rate at which a drone aligns with each     │
+│   FLOAT                       neighbor, in reciprocal seconds, at a          │
+│                               starling's scale, by default the relaxation    │
+│                               rate inferred from the dynamics of starling    │
+│                               flocks spread over 7 neighbors, 1 / (7 *       │
+│                               0.158), where 0.158 seconds is the geometric   │
+│                               mean of the flocks' relaxation times.          │
+│                               [default: 0.904]                               │
+│ --crop.floor-m FLOAT          The lowest fixed height above the ground, in   │
+│                               meters. [default: 20.0]                        │
+│ --crop.levels INT             The number of fixed heights, which reach 500 m │
+│                               above the ground at the default floor and      │
+│                               spacing. [default: 25]                         │
+│ --crop.spacing-m FLOAT        The distance between neighboring fixed         │
+│                               heights, in meters. [default: 20.0]            │
+│ --crop.window-s FLOAT FLOAT   The first and the last time kept, in seconds   │
+│   --crop.empty-window-s       since the simulation started, or None to keep  │
+│                               every snapshot.                                │
+│ --crop.x-m FLOAT FLOAT        The westernmost and the easternmost mass point │
+│   --crop.empty-x-m            kept, in meters from the domain's western      │
+│                               edge, or None to keep every column.            │
+│ --crop.y-m FLOAT FLOAT        The southernmost and the northernmost mass     │
+│   --crop.empty-y-m            point kept, in meters from the domain's        │
+│                               southern edge, or None to keep every row.      │
+│ --heading.centering FLOAT     The rate at which a drone's velocity relaxes   │
+│                               toward its neighbors' mean, as a share of the  │
+│                               coupling's mean rate per neighbor, by default  │
+│                               the source's aggregation strength of 0.01 over │
+│                               its alignment strength of 50 per neighbor, so  │
+│                               it carries to any scale the coupling does.     │
+│                               [default: 0.0002]                              │
+│ --noise.amplitude FLOAT       The amplitude, in meters per second per root   │
+│                               second, at a starling's scale, by default 10 * │
+│                               sqrt(2 * T) at 10 meters per second, the       │
+│                               temperature T of 0.0301 being the relaxation   │
+│                               rate 1 / 0.158 over the product of 12.13 and   │
+│                               17.31, the medians of the interaction range    │
+│                               and of the coupling over the temperature       │
+│                               inferred from starling flocks. [default:       │
+│                               2.455]                                         │
+│ --noise.accel-m-s2 FLOAT      The push across the heading, in meters per     │
+│                               second squared, at a starling's scale, by      │
+│                               default the model's zig force of 1 newton over │
+│                               its bird's mass of 80 grams. [default: 12.5]   │
+│ --noise.back-s FLOAT          The time the drone pushes back toward its      │
+│                               first heading, in seconds, at a starling's     │
+│                               scale. [default: 0.3]                          │
+│ --noise.branching FLOAT       The mean number of drones each zig sets off    │
+│                               among the neighbors hearing it, by default the │
+│                               critical branching ratio of an excitable       │
+│                               network. [default: 1.0]                        │
+│ --noise.cue-s FLOAT           The time a drone takes to recognize a          │
+│                               neighbor's zig, in seconds, at a starling's    │
+│                               scale. [default: 0.05]                         │
+│ --noise.reaction-s FLOAT      The time between a cue and the start of the    │
+│                               zig, in seconds, at a starling's scale, by     │
+│                               default the reaction time of a starling.       │
+│                               [default: 0.076]                               │
+│ --noise.refractory-s FLOAT    The time after a zig during which the drone    │
+│                               starts none, in seconds, at a starling's       │
+│                               scale. [default: 1.0]                          │
+│ --noise.side-s FLOAT          The time the drone pushes to its side, in      │
+│                               seconds, at a starling's scale. [default:      │
+│                               0.25]                                          │
+│ --plan.airspeeds-m-s FLOAT    The slowest and the fastest speed at which a   │
+│   FLOAT                       drone's speed stays stable under one step of   │
+│   --plan.empty-airspeeds-m-s  the integrator, in meters per second, the      │
+│                               range the centers of starling flocks fly at.   │
+│                               [default: (6.9, 15.2)]                         │
+│ --plan.axes FLOAT FLOAT       The launch cloud's length, width, and depth,   │
+│   FLOAT --plan.empty-axes     in proportion, the thin horizontal shape       │
+│                               measured on starling flocks, whose long axis   │
+│                               holds no fixed bearing to their motion,        │
+│                               launched with its long axis along the course   │
+│                               and its thin axis vertical. [default: (5.6,    │
+│                               2.8, 1.0)]                                     │
+│ --plan.center-m FLOAT FLOAT   The center of the launch cloud, east, north,   │
+│   FLOAT                       and above the ground, in meters, by default on │
+│   --plan.empty-center-m       the parametric threat's course to the front it │
+│                               crosses within two minutes, its height the     │
+│                               lowest the launch's center takes, which        │
+│                               clearance_sd raises for a deeper cloud.        │
+│                               [default: (1000.0, 1000.0, 100.0)]             │
+│ --plan.clearance-sd FLOAT     The vertical standard deviations of the launch │
+│                               cloud its center sits at least above the       │
+│                               ground, by default 4, past which a Gaussian    │
+│                               draw falls for 0.003% of drones, so about one  │
+│                               flock of 1,000 in 32 sets a drone on the       │
+│                               ground. [default: 4.0]                         │
+│ --plan.course-deg FLOAT       The launch heading in degrees counterclockwise │
+│                               from east, by default west. [default: 180.0]   │
+│ --plan.cruise-m-s FLOAT       The speed each drone launches and cruises at,  │
+│                               in meters per second. [default: 10.0]          │
+│ --plan.drones INT             The size of the flock, by default near the     │
+│                               median of the ten starling flocks of 448 to    │
+│                               2,631 birds the topological interaction was    │
+│                               measured on. [default: 1000]                   │
+│ --plan.duration-s FLOAT       The length of the flight, in seconds.          │
+│                               [default: 120.0]                               │
+│ --plan.frame-every INT        The number of steps between two kept frames.   │
+│                               [default: 25]                                  │
+│ --plan.neighbors INT          The number of topological neighbors each drone │
+│                               senses. [default: 7]                           │
+│ --plan.resolution-s FLOAT     The time resolution of the Brownian path, in   │
+│                               seconds, which a flight at a smaller step_s    │
+│                               replays unchanged. [default: 0.005]            │
+│ --plan.scatter-deg FLOAT      The spread of the launch headings about the    │
+│                               course, in degrees. [default: 10.0]            │
+│ --plan.seed INT               The value every draw of a flight derives from. │
+│                               [default: 0]                                   │
+│ --plan.seeds INT              The number of launches flown together under    │
+│                               vmap. [default: 4]                             │
+│ --plan.settled-s FLOAT        The start of the flight a statistic leaves     │
+│                               out, in seconds. [default: 20.0]               │
+│ --plan.shape-every-s FLOAT    The time between the frames a flight's shape   │
+│                               is averaged over, in seconds, by default the   │
+│                               second between the measurements a study of the │
+│                               starling model averages a flock's shape over.  │
+│                               [default: 1.0]                                 │
+│ --plan.spacing-m FLOAT        The launch cloud's cube root of the volume per │
+│                               drone, in meters. [default: 15.0]              │
+│ --plan.starling-m FLOAT       The nearest-neighbor distance of the starling  │
+│                               flock the controller's values are taken at, in │
+│                               meters, by default that of the starling        │
+│                               model's flock of 781 birds. [default: 0.69]    │
+│ --plan.step-s FLOAT           The step of the integrator, in seconds.        │
+│                               [default: 0.02]                                │
+│ --plan.turn-at-s FLOAT        The moment the first drone starts the turn, in │
+│                               seconds. [default: 25.0]                       │
+│ --plan.turn-deg FLOAT         The angle the first drone turns through and    │
+│                               then holds, in degrees counterclockwise, none  │
+│                               by default. [default: 0.0]                     │
+│ --plan.turning-deg-s FLOAT    The rotation of the flock's mean heading, over │
+│                               turning_window_s, past which a spontaneous     │
+│                               turn counts as started, in degrees per second. │
+│                               [default: 2.0]                                 │
+│ --plan.turning-window-s       The time over which the flock's mean heading   │
+│   FLOAT                       or a drone's heading is read for a turn, in    │
+│                               seconds, longer than a step's noise on either. │
+│                               [default: 5.0]                                 │
+│ --plant.climb-m-s FLOAT       The fastest climb a command holds, in meters   │
+│                               per second, PX4's MPC_Z_VEL_MAX_UP. [default:  │
+│                               3.0]                                           │
+│ --plant.climbing-m-s2 FLOAT   The largest upward acceleration, in meters per │
+│                               second squared, PX4's MPC_ACC_UP_MAX.          │
+│                               [default: 4.0]                                 │
+│ --plant.descending-m-s2       The largest downward acceleration, in meters   │
+│   FLOAT                       per second squared, PX4's MPC_ACC_DOWN_MAX,    │
+│                               raised from its default of 3 within the 2 to   │
+│                               15 PX4 allows to match climbing_m_s2.          │
+│                               [default: 4.0]                                 │
+│ --plant.descent-m-s FLOAT     The fastest descent a command holds, in meters │
+│                               per second, PX4's MPC_Z_VEL_MAX_DN, raised     │
+│                               from its default of 1.5 within the 0.5 to 4    │
+│                               PX4 allows to match climb_m_s. [default: 3.0]  │
+│ --plant.lag-s FLOAT           The time constant over which a drone's         │
+│                               velocity relaxes toward its command, in        │
+│                               seconds. [default: 1.0]                        │
+│ --plant.level-m-s FLOAT       The fastest horizontal speed a command holds,  │
+│                               in meters per second, within the 0 to 20 PX4   │
+│                               allows its MPC_XY_VEL_MAX. [default: 15.2]     │
+│ --plant.level-m-s2 FLOAT      The largest horizontal acceleration, in meters │
+│                               per second squared, the ceiling PX4's          │
+│                               MPC_ACC_HOR_MAX sets in its direct-velocity    │
+│                               mode. [default: 5.0]                           │
+│ --radio.delay-s FLOAT         The age of a broadcast as it arrives, in       │
+│                               seconds. [default: 1.0]                        │
+│ --radio.hold-periods INT      The number of packet periods after its last    │
+│                               packet for which a receiver keeps hearing a    │
+│                               sender, by default the three refresh intervals │
+│                               the mobile ad hoc routing protocols OLSR and   │
+│                               NHDP set as the neighbor hold time. [default:  │
+│                               3]                                             │
+│ --radio.loss FLOAT            The share of the packets between two drones    │
+│                               the link loses, each loss drawn apart from     │
+│                               every other. [default: 0.4]                    │
+│ --radio.range-m FLOAT         The distance between two drones, as a packet   │
+│                               is sent, past which the packet never arrives,  │
+│                               in meters, by default the distance past which  │
+│                               the outdoor drone flock's radios began to      │
+│                               fail. [default: 50.0]                          │
+│ --radio.rate-hz FLOAT         The number of packets each drone sends each    │
+│                               second. [default: 5.0]                         │
+│ --roost.bound-m-s2 FLOAT      The largest turning acceleration, in meters    │
+│                               per second squared, by default the plant's     │
+│                               bound on a horizontal acceleration. [default:  │
+│                               5.0]                                           │
+│ --roost.center-m FLOAT FLOAT  The disk's center east and north, in meters,   │
+│   --roost.empty-center-m      by default the launch's. [default: (1000.0,    │
+│                               1000.0)]                                       │
+│ --roost.height-m FLOAT        The height the drone is pulled toward, in      │
+│                               meters above the ground, by default that of    │
+│                               the launch's center, which a flock of more     │
+│                               than 304 drones launches above. [default:      │
+│                               100.0]                                         │
+│ --roost.radius-m FLOAT        The disk's radius, in meters. [default:        │
+│                               1000.0]                                        │
+│ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
+│   FLOAT                       away from it, in reciprocal square seconds, at │
+│                               a starling's scale, by default the starling    │
+│                               model's vertical weight of 0.2 newtons per     │
+│                               meter over its bird's mass of 80 grams, read   │
+│                               per meter since the model multiplies it by the │
+│                               height away, although its table of parameters  │
+│                               lists it in newtons. [default: 2.5]            │
+│ --roost.turn FLOAT            The turn rate times the time to reach the rim, │
+│                               in radians, by default the strength fitted to  │
+│                               fish turning from the wall of their tank.      │
+│                               [default: 0.94]                                │
+│ --simulation PATH             The WRF-SFIRE output the graph reads, relative │
+│                               to the clone, such as the                      │
+│                               data/samples/wrf_sample.nc the thermur fetch   │
+│                               sample command writes, or None to read the     │
+│                               dataset threat builds.                         │
+│ --speed.fixed                 Whether a flight holds each drone at the       │
+│   --speed.no-fixed            cruise speed, leaving no speed to fluctuate.   │
+│                               [default: False]                               │
+│ --speed.cruise-m-s FLOAT      The speed the drone relaxes toward, in meters  │
+│                               per second, by default the model's cruise      │
+│                               speed of 10 meters per second, which the plan  │
+│                               launches the flock at. [default: 10.0]         │
+│ --speed.relaxation-s FLOAT    The time over which the drone's speed relaxes  │
+│                               toward cruise_m_s, in seconds, at a starling's │
+│                               scale, by default the model's speed control of │
+│                               1 second. [default: 1.0]                       │
+│ --threat.anomaly-k FLOAT      The potential temperature behind the front in  │
+│                               excess of the air ahead of it, in kelvin.      │
+│                               [default: 20.0]                                │
+│ --threat.edge-m FLOAT         The scale of the hyperbolic tangent carrying   │
+│                               the anomaly to zero ahead of the front, in     │
+│                               meters, one grid spacing by default, so 76% of │
+│                               the anomaly falls within this distance on      │
+│                               either side of the front. [default: 40.0]      │
+│ --threat.grid.columns INT     The number of mass points from west to east.   │
+│                               [default: 100]                                 │
+│ --threat.grid.interval-s      The time between neighboring snapshots, in     │
+│   FLOAT                       seconds, the interval each output of the plume │
+│                               dataset is written at. [default: 15.0]         │
+│ --threat.grid.level-m FLOAT   The depth of each model level, in meters.      │
+│                               [default: 20.0]                                │
+│ --threat.grid.levels INT      The number of model levels. [default: 30]      │
+│ --threat.grid.rows INT        The number of mass points from south to north. │
+│                               [default: 50]                                  │
+│ --threat.grid.snapshots INT   The number of snapshots, which span two        │
+│                               minutes at the default interval. [default: 9]  │
+│ --threat.grid.spacing-m       The distance between neighboring mass points,  │
+│   FLOAT                       in meters, the horizontal spacing of the plume │
+│                               dataset. [default: 40.0]                       │
+│ --threat.speed-m-s FLOAT      The speed at which the front advances east, in │
+│                               meters per second. [default: 1.0]              │
+╰──────────────────────────────────────────────────────────────────────────────╯

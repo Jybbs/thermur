@@ -230,9 +230,9 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 | {
                     "plan": settings.plan.model_dump(
                         include = {
-                            "axes", "center_m", "clearance_sd",
-                            "course_deg", "cruise_m_s", "neighbors",
-                            "scatter_deg", "spacing_m", "step_s"
+                            "axes", "center_m", "clearance_sd", "course_deg",
+                            "cruise_m_s", "drones", "neighbors", "scatter_deg",
+                            "seed", "spacing_m", "step_s"
                         }
                     )
                 },
