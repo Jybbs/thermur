@@ -201,7 +201,6 @@ class Inbox(Module):
         The search compares every pair of drones once, and a flight runs it
         only as it opens or replays a frame.
         """
-        slots    = radio.slots
         drones   = sent.positions.shape[-2]
         apart    = linalg.norm(sent.positions[:, newaxis] - sent.positions, axis=-1)
         distance = where(
@@ -210,9 +209,9 @@ class Inbox(Module):
             inf
         )
         indices, heard = closest(
-            count     = slots,
+            count     = radio.slots,
             distances = concatenate(
-                [distance, full((drones, max(slots - drones, 0)), inf)],
+                [distance, full((drones, max(radio.slots - drones, 0)), inf)],
                 1
             )
         )

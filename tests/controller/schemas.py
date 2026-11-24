@@ -63,6 +63,12 @@ EASTWARD = flock_of(zeros((8, 3)), array([10.0, 0.0, 0.0]) * ones((8, 3)))
 Eight drones stacked at the origin, each flying east at 10 m/s.
 """
 
+UNBOUNDED = Radio(range_m=inf)
+"""
+The default radio with no range, so a packet the link keeps arrives from any
+distance.
+"""
+
 
 def composite(**slots: Component) -> Composite:
     """
@@ -331,7 +337,7 @@ def test_diffusion_drives_the_command_and_the_force_and_never_a_position():
         7,
         10.0,
         EASTWARD,
-        Inbox.from_broadcast(EASTWARD, Radio(range_m=inf), EASTWARD),
+        Inbox.from_broadcast(EASTWARD, UNBOUNDED, EASTWARD),
         0.0
     )
     increment = tree.map(ones_like, EASTWARD)
@@ -381,7 +387,7 @@ def test_diffusion_under_a_spin_drives_the_spin_rather_than_the_heading():
             7,
             10.0,
             EASTWARD,
-            Inbox.from_broadcast(EASTWARD, Radio(range_m=inf), EASTWARD),
+            Inbox.from_broadcast(EASTWARD, UNBOUNDED, EASTWARD),
             0.0
         )
     ).mv(
@@ -409,7 +415,7 @@ def test_drift_moves_each_position_by_its_velocity_and_the_wind():
         7,
         12.0,
         flock,
-        Inbox.from_broadcast(flock, Radio(range_m=inf), flock),
+        Inbox.from_broadcast(flock, UNBOUNDED, flock),
         0.0
     )
     slots = composite(noise=Persistent(persistence_s=2.0))
@@ -642,7 +648,7 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
         flock,
         Inbox.from_broadcast(
             earlier = flock_of(positions, 2 * velocities),
-            radio   = Radio(range_m=inf),
+            radio   = UNBOUNDED,
             sent    = flock_of(positions - array([0.5, 0.0, 0.0]), 3 * velocities)
         ),
         0.0
@@ -709,7 +715,7 @@ def test_sensing_ranks_neighbors_by_the_positions_the_drone_heard():
         2,
         10.0,
         flock,
-        Inbox.from_broadcast(flock, Radio(range_m=inf), sent),
+        Inbox.from_broadcast(flock, UNBOUNDED, sent),
         0.0
     )
 
@@ -897,19 +903,28 @@ def test_the_radio_hears_at_launch_only_the_drones_within_its_range():
     )
 
 
-@mark.parametrize("drones", [param(20, id="twenty"), param(200, id="two-hundred")])
+@mark.parametrize(
+    ("drones", "slots"),
+    [
+        param(20, 16, id="twenty"),
+        param(200, 16, id="two-hundred"),
+        param(200, 8, id="a-table-of-eight")
+    ]
+)
 def test_the_radio_opens_on_a_table_of_the_nearest_senders_whatever_the_flock_s_size(
-    drones: int
+    drones : int,
+    slots  : int
 ):
     """
     Asserts that each drone's table holds the radio's `slots` senders, the
-    nearest drones to it at launch, at any flock size.
+    nearest drones to it at launch, at any flock size and table size.
     """
     positions = uniform(key(drones), (drones, 3)) * 30.0
-    inbox, _ = Radio(range_m=inf).opened(flock_of(positions, ones((drones, 3))), 0, 0.1)
-    held     = min(Radio.slots, drones - 1)
+    radio     = replace(UNBOUNDED, slots=slots)
+    inbox, _  = radio.opened(flock_of(positions, ones((drones, 3))), 0, 0.1)
+    held      = min(slots, drones - 1)
 
-    assert inbox.senders.shape == inbox.heard.shape == (drones, Radio.slots)
+    assert inbox.senders.shape == inbox.heard.shape == (drones, slots)
     assert inbox.heard.sum(1).tolist() == [held] * drones
     assert_array_equal(
         sort(where(inbox.heard, inbox.senders, drones), axis=1)[:, :held],
