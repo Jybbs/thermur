@@ -5,12 +5,15 @@ pull-request rows run, and the status it exits with when the doctor or a
 row fails.
 """
 
-from collections.abc  import Callable
-from common.stand_ins import StandIn
-from pytest           import MonkeyPatch, mark, param, raises
-from types            import ModuleType
+from collections.abc     import Callable
+from common.declarations import RENDERED
+from common.stand_ins    import StandIn
+from pytest              import MonkeyPatch, mark, param, raises
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
+
+pytestmark = mark.reads(*RENDERED)
 
 
 @mark.parametrize(

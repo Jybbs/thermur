@@ -62,7 +62,7 @@ describe('Links reaching out and drawing back', () => {
     run(links, birds, 1)
     run(links, birds, 0.25, false)
     expect(strokes(links, birds)).toBe(0)
-    expect(warmth(links).every(value => value === 0)).toBe(true)
+    expect(warmth(links).filter(value => value !== 0)).toStrictEqual([])
   })
 
   it('draws a link back before it reaches for the bird that took its fallen bird’s place', () => {
