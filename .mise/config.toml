@@ -1,5 +1,9 @@
 min_version = "2026.11.9"
 
+[deps.bun]
+dir = "docs"
+run = "bun install --frozen-lockfile && bun prune"
+
 [doctor.checks.gh]
 description = "`gh` is installed and signed in to GitHub"
 hint        = "Run `gh auth login`, which signs `gh` in to GitHub for the `gh api` calls `mise scan` makes."
@@ -29,6 +33,7 @@ _.path                         = ".mise/bin"
 
 [settings]
 auto_install = false
+experimental = true
 
 [tool_config]
 locked = true
