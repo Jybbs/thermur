@@ -14,7 +14,7 @@ jobs:
     steps:
       - name : Provision the tools the site's tasks run
         uses : $/.github/actions/provision
-        with : { tools: aqua:lycheeverse/lychee bun node }
+        with : { tools: bun lychee node }
 
       - name : Run the row's task
         env  : { TASK: "${{ matrix.task }}" }

@@ -20,7 +20,7 @@ from tomllib          import loads
 CONFIG  = ".mise/config.toml"
 FROZEN  = "error: lockfile had changes, but lockfile is frozen"
 LOCK    = ".mise/mise.lock"
-LYCHEE  = '[tools."aqua:lycheeverse/lychee"."platforms.macos-x64"]'
+LYCHEE  = '[tools.lychee."platforms.macos-x64"]'
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
 PIN     = "uv  0.13.8 (missing)  .mise/config.toml  0.13.8"
 STALE   = "zizmor@0.0.1 is not in the lockfile"
@@ -159,7 +159,7 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
     """
     mise = stand_in(
         "mise",
-        '[ "$1" = ls ] && printf "%s\\n" "aqua:lycheeverse/lychee  0.99.9"'
+        '[ "$1" = ls ] && printf "%s\\n" "lychee  0.99.9"'
         ' "bun  1.4.4" "zizmor  1.32"\n'
         '[ "$1" = ls-remote ] && printf "0.99.90\\n1.4.4\\n1.32.0\\n"\n'
         "exit 0"
@@ -170,13 +170,12 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
     assert (result.returncode, result.stderr.splitlines()) == (
         1,
         [
-            "aqua:lycheeverse/lychee pins 0.99.9, which mise ls-remote does not list",
+            "lychee pins 0.99.9, which mise ls-remote does not list",
             "zizmor pins 1.32, which mise ls-remote does not list"
         ]
     )
     assert [command for command in mise.commands if "ls-remote" in command] == [
-        "mise ls-remote -q aqua:lycheeverse/lychee", "mise ls-remote -q bun",
-        "mise ls-remote -q zizmor"
+        "mise ls-remote -q lychee", "mise ls-remote -q bun", "mise ls-remote -q zizmor"
     ]
 
 
@@ -187,7 +186,7 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
             LOCK,
             rf"{escape(LYCHEE)}\n(?:.+\n)+\n?",
             "",
-            "No lockfile URL found for aqua:lycheeverse/lychee@{lychee} on platform"
+            "No lockfile URL found for lychee@{lychee} on platform"
             " macos-x64 (--locked mode)",
             id = "lychee-entry"
         ),
@@ -203,7 +202,7 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
             LOCK,
             rf"({escape(LYCHEE)}\n)checksum = .+\n",
             r"\1",
-            "No lockfile checksum found for aqua:lycheeverse/lychee@{lychee} on"
+            "No lockfile checksum found for lychee@{lychee} on"
             " platform macos-x64",
             id = "checksum"
         ),
@@ -247,7 +246,7 @@ def test_the_real_mise_fails_offline_on_what_a_locked_install_rejects(
 
     assert (result.returncode, pinning(lock_copy)) == (1, found)
     assert reported.format(
-        lychee = pinned["aqua:lycheeverse/lychee"],
+        lychee = pinned["lychee"],
         zizmor = pinned["zizmor"]
     ) in result.stderr
 
@@ -276,7 +275,7 @@ def test_a_pin_moved_with_its_lock_entry_to_no_release_fails(
     held   = written(
         copy  = lock_copy,
         texts = {
-            name: text.replace(pinned["aqua:lycheeverse/lychee"], "0.99.9")
+            name: text.replace(pinned["lychee"], "0.99.9")
             for name, text in found.items()
         }
     )
@@ -292,7 +291,7 @@ def test_a_pin_moved_with_its_lock_entry_to_no_release_fails(
     result = run_lock(lock_copy)
 
     assert (result.returncode, result.stderr) == (
-        1, "aqua:lycheeverse/lychee pins 0.99.9, which mise ls-remote does not list\n"
+        1, "lychee pins 0.99.9, which mise ls-remote does not list\n"
     )
     assert pinning(lock_copy) == held
 

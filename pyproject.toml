@@ -147,4 +147,4 @@ build-constraint-dependencies = [
 exclude-newer                 = "P7D"
 python-downloads              = "never"
 python-preference             = "only-system"
-required-version              = "==0.13.8"
+required-version              = "==0.13.9"
