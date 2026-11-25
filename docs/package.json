@@ -25,10 +25,16 @@
         "vue"                 : "3.5.45"
     },
     "knip"            : {
-        "ignoreDependencies" : ["oxlint"],
-        "rules"              : { "cycles": "error" },
-        "typescript"         : { "config": [".vitepress/tsconfig.json"] },
-        "vitest"             : { "config": [".vitepress/config/vitest.config.ts"] }
+        "rules"      : { "cycles": "error" },
+        "workspaces" : {
+            "."             : {
+                "ignoreDependencies" : ["oxlint"],
+                "typescript"         : { "config": [".vitepress/tsconfig.json"] },
+                "vitest"             : { "config": [".vitepress/config/vitest.config.ts"] }
+            },
+            "../tests/kit"  : {},
+            "../tests/site" : {}
+        }
     },
     "overrides"       : {
         "fflate"    : "0.8.3",

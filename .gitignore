@@ -15,4 +15,4 @@ notes/
 .DS_Store
 
 docs/.vitepress/.temp/
-node_modules/
+node_modules

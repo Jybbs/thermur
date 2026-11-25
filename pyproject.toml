@@ -127,9 +127,9 @@ markers                  = [
 ]
 norecursedirs            = ["common", "fixtures"]
 python_files             = ["*.py"]
-pythonpath               = ["tests"]
+pythonpath               = ["tests/py"]
 strict                   = true
-testpaths                = ["tests"]
+testpaths                = ["tests/py"]
 
 [tool.thermur.holds]
 satori = "0.63 widens the gap around the middle dot in the preview cards' mono lines by about 7 px"

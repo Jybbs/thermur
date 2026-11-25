@@ -500,7 +500,7 @@ thermur/
 │   └── runs/                       # The record of each recorded run and the tables it saved
 │
 ├── docs/
-│   ├── .vitepress/                 # The docs site's configuration, theme, and Vitest suite
+│   ├── .vitepress/                 # The docs site's configuration and theme
 │   ├── pages/                      # Every page the docs site at https://thermur.fyi/ builds
 │   │   ├── public/                 # The logo's files and the headers Cloudflare Pages serves the site with
 │   │   └── references.bib          # Every study a page can cite, each with its annotation and priority
@@ -517,7 +517,11 @@ thermur/
 │   ├── pipeline/                   # The settings, the Hamilton graph and its cache, and each run's record
 │   ├── repo/                       # The checks `mise audit` runs, the records `mise rulesets` sends, the lift `mise lift` reports, and the clone the `repo` tasks and the pipeline read
 │   └── startup/                    # The entry point `site` calls in every interpreter the environment starts, loading each top-level import lazily
-├── tests/                          # The pytest suite, mirroring src/thermur, with tests/tasks covering the tasks and .mise/bin
+│
+├── tests/
+│   ├── kit/                        # The Vitest suite of the site's component kit under docs/kit
+│   ├── py/                         # The pytest suite, mirroring src/thermur, with tests/py/tasks covering the tasks and .mise/bin
+│   └── site/                       # The docs site's Vitest suite
 │
 ├── CITATION.cff                    # The citation GitHub's "Cite this repository" link reads
 ├── pyproject.toml                  # Package configuration, its dependencies, and each tool's table
