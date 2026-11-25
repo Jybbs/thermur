@@ -53,22 +53,22 @@ class Alarm(IntEnum):
 
     ALARMED = 1
     """
-    Flying with the flock, its alertness below the alarm.
+    Flying with the flock, its alertness at or above the alarm.
     """
 
     FIRING = 2
     """
-    Flying with the flock, its alertness at or above the alarm.
+    Turning or climbing away, the maneuver its neighbors copy.
     """
 
     REFRACTORY = 3
     """
-    Turning or climbing away, the maneuver its neighbors copy.
+    Flying with the flock after firing, starting no maneuver.
     """
 
     RESTING = 0
     """
-    Flying with the flock after firing, starting no maneuver.
+    Flying with the flock, its alertness below the alarm.
     """
 
 
@@ -81,10 +81,14 @@ class Flock(Module):
 
     alarms: Array
     """
-    The state the escape slot holds on each drone, meaning its `Alarm`, its
-    alertness, the seconds left in its state, and the side its maneuver
-    turns toward, one to the left of the heading, minus one to the right,
-    and zero for a climb, all zero under a slot holding none.
+    The state the escape slot holds on each drone, all zero under a slot
+    holding none, in four columns:
+
+    - Its `Alarm`
+    - Its alertness
+    - The seconds left in its state
+    - The side its maneuver turns toward, one to the left of the heading,
+      minus one to the right, and zero for a climb
     """
 
     commands: Array

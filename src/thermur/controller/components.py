@@ -373,8 +373,8 @@ class Excitable(Escape):
     firing_s: Positive = 3.5 / 2.88 / 2
     """
     The time a drone fires its maneuver, in seconds, at a starling's scale,
-    by default half the time between the pulses of a starling agitation
-    wave, 3.5 s across 2.88 pulses.
+    by default half the time a starling agitation wave lasts per pulse,
+    3.5 s across 2.88 pulses.
     """
 
     refractory_s: Positive = 3.5 / 2.88 / 2
@@ -408,15 +408,19 @@ class Excitable(Escape):
 
     def excited(self, draws: Array, observation: Observation, step_s: float) -> Array:
         """
-        Relaxes the alertness toward the stimulus over `step_s`, fires a
-        resting or alarmed drone where the first of `draws` falls below
-        the chance its neighbors or its own alertness set it off within
-        the step, copying the side most of its firing neighbors take, or on
-        its own climbing where the second of `draws` falls below `climbing`
-        and otherwise turning to a side it splits evenly, and otherwise
-        counts the time left in its state down, moving a firing drone on
-        to the refractory time and a refractory drone back to the alarm its
-        alertness sets.
+        Steps one drone's escape state by `step_s`, relaxing its alertness
+        toward the stimulus and moving it through the `Alarm` states:
+
+        - A resting or alarmed drone fires where the first of `draws` falls
+          below the chance its firing neighbors and its own alertness set
+          it off within the step, copying the side most of those neighbors
+          take, climbing where their sides cancel, or, firing on its own,
+          climbing where the second of `draws` falls below `climbing` and
+          otherwise turning to either side alike
+        - A firing drone counts its time down, then moves on to
+          `refractory_s`
+        - A refractory drone counts its time down, then returns to the
+          alarm its alertness sets
         """
         alarm, alertness, left_s, side = observation.alarm
         stimulus = exp(-sqrt(observation.air.get("front", inf) / self.alarm_m))
@@ -425,16 +429,19 @@ class Excitable(Escape):
         firing   = (observation.distances > 0) & (
             observation.alarms[:, 0] == Alarm.FIRING
         )
-        copied = -log1p(-self.branching / observation.distances.size) * firing.sum()
+        copied = branched(self.branching, observation) * firing.sum()
         own    = where(alarmed == Alarm.ALARMED, alert, 0.0) * self.firing_s / (
             self.firing_s + self.refractory_s
         )
         ready   = alarm <= Alarm.ALARMED
-        climbs  = draws[1] < self.climbing
-        heading = where(
-            firing.any(),
-            sign(observation.alarms[:, 3] @ firing),
-            where(climbs, 0.0, where(draws[1] < (1 + self.climbing) / 2, 1.0, -1.0))
+        heading = select(
+            [
+                firing.any(),
+                draws[1] < self.climbing,
+                draws[1] < (1 + self.climbing) / 2
+            ],
+            [sign(observation.alarms[:, 3] @ firing), 0.0, 1.0],
+            -1.0
         )
         counted = left_s - step_s
         ended   = counted <= 0
@@ -442,7 +449,7 @@ class Excitable(Escape):
             [
                 ready & (draws[0] < -expm1(-(copied + own) * step_s / self.firing_s)),
                 (alarm == Alarm.FIRING) & ended,
-                (alarm == Alarm.REFRACTORY) & ~ended | (alarm == Alarm.FIRING)
+                (alarm >= Alarm.FIRING) & ~ended
             ],
             [
                 asarray([Alarm.FIRING, alert, self.firing_s, heading]),
@@ -1260,7 +1267,7 @@ class Zig(White):
         zigging            = (observation.distances > 0) & self.zigging(
             observation.forces[:, 0]
         )
-        hazard  = -log1p(-self.branching / observation.distances.size) / self.zig_s
+        hazard  = branched(self.branching, observation) / self.zig_s
         resting = countdown <= 0
         walled  = resting & (linalg.norm(turn[:2]) >= self.accel_m_s2)
         copied  = resting & ~walled & (
@@ -1318,6 +1325,15 @@ class Zig(White):
         return (countdown > self.refractory_s) & (
             countdown <= self.refractory_s + self.zig_s
         )
+
+
+def branched(branching: float, observation: Observation) -> Array:
+    """
+    Computes the hazard, integrated over one firing, at which one firing
+    neighbor sets a drone off with the chance `branching` over the size of
+    the drone's table.
+    """
+    return -log1p(-branching / observation.distances.size)
 
 
 def left(velocity: Array) -> Array:

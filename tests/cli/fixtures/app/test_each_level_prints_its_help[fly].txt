@@ -73,9 +73,9 @@ Flies the flock, or computes the steps of the graph named.
 │                               for its dive. [default: 0.5]                   │
 │ --escape.firing-s FLOAT       The time a drone fires its maneuver, in        │
 │                               seconds, at a starling's scale, by default     │
-│                               half the time between the pulses of a starling │
-│                               agitation wave, 3.5 s across 2.88 pulses.      │
-│                               [default: 0.607638888888889]                   │
+│                               half the time a starling agitation wave lasts  │
+│                               per pulse, 3.5 s across 2.88 pulses. [default: │
+│                               0.607638888888889]                             │
 │ --escape.refractory-s FLOAT   The time after firing during which the drone   │
 │                               fires no maneuver, in seconds, at a starling's │
 │                               scale, by default the other half of that time, │

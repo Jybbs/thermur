@@ -6,7 +6,6 @@ flight.
 """
 
 from jax.numpy import array, asarray, full, linalg, ones, zeros
-from math      import inf
 from xarray    import Dataset
 
 from thermur.controller.schemas  import Flock, Observation, unit
@@ -16,18 +15,26 @@ from thermur.metrics.schemas     import Plan
 from thermur.pipeline.settings   import Settings
 
 
-def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
+def flock_of(
+    positions  : object,
+    velocities : object,
+    commands   : object = None,
+    *,
+    alarms     : object = None
+) -> Flock:
     """
     Builds a flock at `positions` and `velocities`, holding no force and
     no spin, each drone commanding `commands`, or its own velocity where
-    `commands` is `None`.
+    `commands` is `None`, and holding the escape state `alarms`, or resting
+    where `alarms` is `None`.
     """
+    shape = asarray(positions).shape
     return Flock(
-        alarms     = zeros((*asarray(positions).shape[:-1], 4)),
+        alarms     = zeros((*shape[:-1], 4)) if alarms is None else asarray(alarms),
         commands   = asarray(velocities if commands is None else commands),
-        forces     = zeros(asarray(positions).shape),
+        forces     = zeros(shape),
         positions  = asarray(positions),
-        spins      = zeros(asarray(positions).shape),
+        spins      = zeros(shape),
         velocities = asarray(velocities)
     )
 
@@ -73,12 +80,11 @@ def small() -> Settings:
 
 def still_air(
     excess : float = 0.0,
-    front  : float = inf,
     wind   : tuple[float, float, float] = (0.0, 0.0, 0.0)
 ) -> Air:
     """
-    Builds air holding one `excess`, one distance to the burning front, and
-    one `wind`, east, north, and up, at every point of a small grid.
+    Builds air holding one `excess` and one `wind`, east, north, and up, at
+    every point of a small grid.
     """
     return Air.from_dataset(
         Dataset(
@@ -88,8 +94,8 @@ def still_air(
                     full((2, 2, 2, 2), value)
                 )
                 for name, value in zip(
-                    ("excess", "front", "u", "v", "w"),
-                    (excess, front, *wind),
+                    ("excess", "u", "v", "w"),
+                    (excess, *wind),
                     strict = True
                 )
             },

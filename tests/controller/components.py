@@ -7,7 +7,8 @@ the second drone's action as it stands.
 from common.drones import flock_of, still_air, viewed
 from equinox       import filter_jit, tree_at
 from jax           import Array, lax, tree, vmap
-from jax.numpy     import argsort, array, concatenate, exp, flatnonzero, linalg, linspace, newaxis, pi, sqrt, zeros
+from jax.numpy     import argsort, array, concatenate, exp, expm1, flatnonzero, linalg, linspace, newaxis, pi, sqrt
+from jax.numpy     import zeros
 from jax.random    import key, normal, split
 from math          import inf
 from numpy.testing import assert_allclose
@@ -422,21 +423,22 @@ def test_each_noise_scales_its_increments_by_its_source_s_form(
 
 
 def alarmed(
-    alarm  : tuple[float, float, float, float],
-    alarms : list[list[float]] | None = None,
-    draws  : tuple[float, float]      = (1.0, 1.0),
-    front  : float = inf,
-    step_s : float = 0.1
+    alarm   : tuple[float, float, float, float],
+    alarms  : list[list[float]] | None = None,
+    draws   : tuple[float, float]      = (1.0, 1.0),
+    front   : float = inf,
+    offsets : list[list[float]] | None = None,
+    step_s  : float = 0.1
 ) -> Array:
     """
-    Steps the escape state of a drone holding `alarm` among `SEVEN`, each
-    neighbor holding a row of `alarms` or resting, `front` meters from the
-    burning front.
+    Steps the escape state of a drone holding `alarm` among the neighbors
+    at `offsets`, or `SEVEN`, each neighbor holding a row of `alarms` or
+    resting, `front` meters from the burning front.
     """
     return EXCITABLE.excited(
         array(draws),
         viewed(
-            SEVEN,
+            offsets or SEVEN,
             air = {"excess": array(0.0), "front": array(front)}
             | dict.fromkeys("uvw", array(0.0)),
             alarm  = array(alarm),
@@ -571,34 +573,86 @@ def test_a_zig_s_chance_of_spreading_grows_with_each_zigging_neighbor():
     )
 
 
-def test_an_excitable_escape_copies_no_neighbor_through_its_refractory_time():
+@mark.parametrize(
+    "alarm",
+    [
+        param((2.0, 0.0, 0.5, -1.0), id="firing"),
+        param((3.0, 0.0, 0.5, -1.0), id="refractory")
+    ]
+)
+def test_an_excitable_escape_copies_no_neighbor_while_firing_or_refractory(
+    alarm: tuple[float, float, float, float]
+):
     """
-    Asserts that a refractory drone counts down rather than copying seven
-    firing neighbors under a draw that would set it off.
+    Asserts that a firing or refractory drone counts down rather than
+    copying seven firing neighbors under a draw that would set it off.
     """
     assert_allclose(
-        alarmed(
-            alarm  = (3.0, 0.0, 0.5, 1.0),
-            alarms = [[2.0, 1.0, 0.3, 1.0]] * 7,
-            draws  = (0.0, 0.0)
-        ),
-        (3.0, 0.0, 0.4, 1.0),
+        alarmed(alarm=alarm, alarms=[[2.0, 1.0, 0.3, 1.0]] * 7, draws=(0.0, 0.0)),
+        (alarm[0], 0.0, 0.4, -1.0),
         atol = 1e-6
     )
 
 
-def test_an_excitable_escape_relaxes_the_alertness_toward_the_stimulus():
+def test_an_excitable_escape_hears_no_firing_from_a_slot_holding_no_sender():
+    """
+    Asserts that a resting drone copies nothing from a table slot at no
+    distance, the slot holding no sender, whatever state it reads.
+    """
+    assert_allclose(
+        alarmed(
+            alarm   = (0.0, 0.0, 0.0, 0.0),
+            alarms  = [[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6,
+            draws   = (0.0, 0.0),
+            offsets = [[0.0, 0.0, 0.0]] + SEVEN[1:]
+        ),
+        (0.0, 0.0, 0.0, 0.0),
+        atol = 1e-6
+    )
+
+
+@mark.parametrize(("margin", "fired"), [(-1e-4, True), (1e-4, False)])
+def test_an_alarmed_drone_fires_on_its_own_at_its_alertness_over_its_cycle(
+    fired  : bool,
+    margin : float
+):
+    """
+    Asserts that a drone alarmed at full alertness, hearing no firing
+    neighbor, fires on its own within a step of `step_s` with the chance
+    `1 - exp(-step_s / (firing_s + refractory_s))`.
+    """
+    assert_allclose(
+        alarmed(
+            alarm  = (1.0, 1.0, 0.0, 0.0),
+            draws  = (float(-expm1(-0.1 / 1.5)) + margin, 1.0),
+            front  = 0.0,
+            step_s = 0.1
+        ),
+        (2.0, 1.0, EXCITABLE.firing_s, -1.0) if fired else (1.0, 1.0, 0.0, 0.0),
+        atol = 1e-6
+    )
+
+
+@mark.parametrize(
+    ("alertness", "front", "expected"),
+    [
+        param(0.0, 0.0, 1 - exp(-0.25), id="rising-at-the-front"),
+        param(0.8, inf, 0.8 * exp(-0.25), id="falling-with-no-front")
+    ]
+)
+def test_an_excitable_escape_relaxes_the_alertness_toward_the_stimulus(
+    alertness : float,
+    expected  : float,
+    front     : float
+):
     """
     Asserts that the alertness closes `1 - exp(-step_s / relaxation_s)`
     of its gap to the stimulus within one step, rising near the front and
     falling to nothing where the air holds no front.
     """
     assert_allclose(
-        (
-            alarmed((0.0, 0.0, 0.0, 0.0), front=0.0, step_s=0.5)[1],
-            alarmed((1.0, 0.8, 0.0, 0.0), step_s=0.5)[1]
-        ),
-        (1 - exp(-0.25), 0.8 * exp(-0.25)),
+        alarmed((1.0, alertness, 0.0, 0.0), front=front, step_s=0.5)[1],
+        expected,
         rtol = 1e-6
     )
 
@@ -1113,6 +1167,22 @@ def test_one_firing_neighbor_sets_a_drone_off_at_the_branching_ratio_over_the_co
     assert_allclose(
         stepped,
         (2.0, 0.0, EXCITABLE.firing_s, -1.0) if fired else (0.0, 0.0, 0.0, 0.0),
+        atol = 1e-6
+    )
+
+
+def test_firing_neighbors_on_opposite_sides_set_a_drone_off_into_a_climb():
+    """
+    Asserts that a drone set off by two firing neighbors turning to opposite
+    sides climbs, their sides canceling.
+    """
+    assert_allclose(
+        alarmed(
+            alarm  = (0.0, 0.0, 0.0, 0.0),
+            alarms = [[2.0, 1.0, 0.3, 1.0], [2.0, 1.0, 0.3, -1.0]] + [[0.0] * 4] * 5,
+            draws  = (0.0, 1.0)
+        ),
+        (2.0, 0.0, EXCITABLE.firing_s, 0.0),
         atol = 1e-6
     )
 

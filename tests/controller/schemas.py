@@ -100,28 +100,37 @@ def test_a_bare_component_declares_no_action(act: Callable[[Observation], object
         act(viewed([[1.0, 0.0, 0.0]]))
 
 
-def test_a_bare_escape_and_thermal_response_leave_the_flock_as_it_stands():
+@mark.parametrize(
+    ("act", "expected"),
+    [
+        param(lambda view: Escape()(view), [0.0] * 3, id="escape"),
+        param(
+            lambda view: Escape().excited(array([0.0, 0.0]), view, 0.1),
+            [2.0, 1.0, 0.3, 1.0],
+            id = "escape-state"
+        ),
+        param(lambda view: Thermal()(view), [0.0] * 3, id="thermal"),
+        param(lambda view: Thermal().aligning(view), [1.0] * 2, id="thermal-aligning")
+    ]
+)
+def test_a_bare_escape_and_thermal_response_leave_the_flock_as_it_stands(
+    act      : Callable[[Observation], Array],
+    expected : list[float]
+):
     """
     Asserts that the abstract escape fires nothing and keeps the state the
     drone holds, and the abstract thermal response adds nothing and leaves
     each neighbor's rate as the coupling sets it, in air of any excess.
     """
-    observation = viewed(
-        [[1.0, 0.0, 0.0]] * 2,
-        excess = 30.0,
-        alarm  = array([2.0, 1.0, 0.3, 1.0])
-    )
-
     assert_allclose(
-        concatenate(
-            [
-                Escape()(observation),
-                Escape().excited(array([0.0, 0.0]), observation, 0.1),
-                Thermal()(observation),
-                Thermal().aligning(observation)
-            ]
+        act(
+            viewed(
+                [[1.0, 0.0, 0.0]] * 2,
+                excess = 30.0,
+                alarm  = array([2.0, 1.0, 0.3, 1.0])
+            )
         ),
-        [0.0] * 3 + [2.0, 1.0, 0.3, 1.0] + [0.0] * 3 + [1.0] * 2
+        expected
     )
 
 
@@ -562,12 +571,10 @@ def test_exciting_the_flock_sets_off_a_drone_hearing_a_firing_neighbor():
     slot's state holds.
     """
     built = composite(escape=Excitable(branching=1.0, firing_s=0.5, refractory_s=1.0))
-    flock = replace(
-        flock_of(
-            array([[1000.0, 1000.0, 100.0], [1000.0, 1005.0, 100.0]]),
-            array([[10.0, 0.0, 0.0]] * 2)
-        ),
-        alarms = array([[0.0] * 4, [2.0, 1.0, 0.3, -1.0]])
+    flock = flock_of(
+        array([[1000.0, 1000.0, 100.0], [1000.0, 1005.0, 100.0]]),
+        array([[10.0, 0.0, 0.0]] * 2),
+        alarms = [[0.0] * 4, [2.0, 1.0, 0.3, -1.0]]
     )
 
     excited = built.excited(
@@ -884,6 +891,28 @@ def test_the_composite_adds_the_escape_and_the_thermal_response_to_its_sum():
     )
 
 
+def test_the_composite_scales_the_coupling_by_the_thermal_response_s_alignment():
+    """
+    Asserts that a thermal response doubling the alignment rate at 20 K of
+    excess commands what a composite with twice the coupling's rate and no
+    thermal response does, for neighbors flying off the drone's heading.
+    """
+    view = viewed(
+        [[20.0, 0.0, 0.0]] * 7,
+        excess    = 20.0,
+        neighbors = array([[8.0, 4.0, 1.0]] * 7)
+    )
+
+    assert_allclose(
+        composite(
+            coupling = Constant(coupling_per_s=1.0),
+            thermal  = Kinetic(aligning_per_k=0.05, speeding_m_s2_k=0.0)
+        )(view)[0],
+        composite(coupling=Constant(coupling_per_s=2.0), thermal=Thermal())(view)[0],
+        rtol = 1e-6
+    )
+
+
 def test_the_curve_order_follows_the_drones_along_a_line():
     """
     Asserts that drones spread along one axis take their order along it on
@@ -937,12 +966,10 @@ def test_the_radio_carries_each_sender_s_alarm_to_the_drones_hearing_it():
     Asserts that a receiver senses each neighbor's escape state as the
     broadcast it heard carried it, and its own beside them.
     """
-    flock = replace(
-        flock_of(
-            array([[0.0, 0.0, 100.0], [5.0, 0.0, 100.0], [10.0, 0.0, 100.0]]),
-            array([[10.0, 0.0, 0.0]] * 3)
-        ),
-        alarms = array([[0.0] * 4, [2.0, 1.0, 0.3, -1.0], [3.0, 0.5, 0.2, 1.0]])
+    flock = flock_of(
+        array([[0.0, 0.0, 100.0], [5.0, 0.0, 100.0], [10.0, 0.0, 100.0]]),
+        array([[10.0, 0.0, 0.0]] * 3),
+        alarms = [[0.0] * 4, [2.0, 1.0, 0.3, -1.0], [3.0, 0.5, 0.2, 1.0]]
     )
     sensed = Observation.sensed(
         still_air(),
@@ -968,8 +995,9 @@ def test_the_radio_delivers_each_broadcast_its_delay_late_at_each_packet():
     """
     radio  = Radio(delay_s=0.3, loss=0.0, rate_hz=5.0)
     flocks = [
-        replace(
-            flock_of(full((3, 3), step), full((3, 3), 10.0 * step)),
+        flock_of(
+            full((3, 3), step),
+            full((3, 3), 10.0 * step),
             alarms = full((3, 4), step)
         )
         for step in range(8)
