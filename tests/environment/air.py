@@ -8,7 +8,7 @@ from equinox       import filter_jit
 from jax           import numpy
 from numpy         import arange, finfo, inf
 from numpy.testing import assert_allclose
-from pytest        import fixture, mark, param, raises
+from pytest        import Subtests, fixture, mark, param, raises
 from xarray        import DataArray, Dataset
 
 from thermur.environment.air import Air
@@ -118,7 +118,7 @@ def test_air_spreads_a_variable_along_an_axis_it_lacks():
     assert_allclose(air.channels[1, 0, :, 0, 0], [ground.item()] * 2)
 
 
-def test_sampling_holds_every_reading_over_clipped_values_finite():
+def test_sampling_holds_every_reading_over_clipped_values_finite(subtests: Subtests):
     """
     Asserts that each reading over a grid holding only clipped values, or
     clipped values beside finite ones, stays finite, along a diagonal whose
@@ -139,7 +139,9 @@ def test_sampling_holds_every_reading_over_clipped_values_finite():
 
     readings = air.sampled(numpy.stack([along, along, along / 2 + 10], axis=1), 7.3)
 
-    assert all(numpy.isfinite(reading).all() for reading in readings.values())
+    for name, reading in readings.items():
+        with subtests.test(name=name):
+            assert numpy.isfinite(reading).all()
 
 
 def test_sampling_holds_the_edge_value_beyond_the_grid(air: Air):

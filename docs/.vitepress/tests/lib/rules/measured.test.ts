@@ -64,12 +64,13 @@ describe('the rules out of a trial', () => {
     ])
   })
 
-  it('carries every rule the page names out of the trials `mise measure` wrote', () => {
-    for (const written of Object.values(measured.TRIALS)) {
+  it.each(Object.entries(measured.TRIALS))(
+    'carries every rule the page names out of the %s trial `mise measure` wrote',
+    (_, written) => {
       expect(Object.keys(written.measured)).toContain('reference')
       expect(Object.keys(written.given).length).toBeGreaterThan(1)
     }
-  })
+  )
 
   it('places the coupling by launch spacing and the heading by turn, as `mise render` wrote them', () => {
     expect(measured.TRIALS.coupling.given).toStrictEqual({ dense: 10, middle: 15, sparse: 25 })

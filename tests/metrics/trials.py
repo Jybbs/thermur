@@ -99,8 +99,9 @@ def measure_of(slot: str, statistic: str) -> Measure:
 def test_a_flown_trial_tables_every_flight_beside_its_ranks():
     """
     Asserts that flying a trial returns its statistics by candidate,
-    condition, and seed, whether each candidate is favored, and the rank of
-    each model on each candidate's replayed flight.
+    condition, and seed, whether each candidate is favored, and the rank
+    of each model on each candidate's replayed flight, a replay as short as
+    the flights.
     """
     flown = Trial(
         candidates = {"elastic": Elastic()},
@@ -108,6 +109,7 @@ def test_a_flown_trial_tables_every_flight_beside_its_ranks():
         drones     = 10,
         duration_s = 2.0,
         measures   = (Measure(statistic="spacing_m"),),
+        replay_s   = 2.0,
         slot       = "cohesion"
     ).flown(still_air(), Composite.from_settings(Settings()), short())
 
@@ -307,6 +309,14 @@ def test_every_listed_trial_flies_the_sizes_its_tables_were_measured_at():
         for trial in Trial.listed()
         for changes in trial.conditions.values()
     } <= {size["drones"] for size in SIZES.values()}
+
+
+def test_every_listed_trial_replays_each_composite_for_ten_seconds():
+    """
+    Asserts that every trial the package runs flies each composite for 10 s
+    for the models to rank.
+    """
+    assert {trial.replay_s for trial in Trial.listed()} == {10.0}
 
 
 def test_the_coupling_trial_favors_a_flat_polarization_only_near_a_starling_flock():
