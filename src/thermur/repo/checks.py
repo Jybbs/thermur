@@ -188,8 +188,8 @@ class DraftCheck(Check):
                 yield Finding(
                     file    = path,
                     message = f"`{path}` cancels a ready run from a draft or fails a "
-                    f"dispatched run, since its concurrency group leaves out "
-                    f"`{Workflow.drafted}`"
+                    "run no pull request started, since its concurrency group "
+                    f"leaves out `{Workflow.drafted}`"
                 )
 
             for key, job in workflow.jobs.items():

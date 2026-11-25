@@ -964,7 +964,7 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
             f"`{CI}` cancels a ready run from a draft or fails a "
-            "dispatched run, since its concurrency group leaves out "
+            "run no pull request started, since its concurrency group leaves out "
             "`github.event.pull_request.draft == true`",
             id = "ci-group"
         ),
@@ -973,7 +973,7 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
             f"`{SITE}` cancels a ready run from a draft or fails a "
-            "dispatched run, since its concurrency group leaves out "
+            "run no pull request started, since its concurrency group leaves out "
             "`github.event.pull_request.draft == true`",
             id = "site-group"
         ),
@@ -982,7 +982,7 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             "draft == true, '-draft'",
             "draft, '-draft'",
             f"`{CI}` cancels a ready run from a draft or fails a "
-            "dispatched run, since its concurrency group leaves out "
+            "run no pull request started, since its concurrency group leaves out "
             "`github.event.pull_request.draft == true`",
             id = "ci-group-null"
         ),
