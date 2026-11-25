@@ -14,8 +14,8 @@ over HTTP, served here from the loopback address by `Served`:
   the range or leaves a range out of its multipart answer
 - The record `Served` keeps of each range, written before the client can
   read the range
-- The traceback `Served` prints for a failure in its handler, beside the
-  silence of a connection the client closed or reset
+- The traceback `Served` prints for a failure in its handler, where a
+  connection the client closed or reset prints none
 """
 
 from collections.abc import Iterable, Iterator
@@ -162,7 +162,7 @@ def test_a_connection_the_client_resets_ends_with_nothing_printed(
         connection.sock.setsockopt(SOL_SOCKET, SO_LINGER, pack("ii", 1, 0))
         connection.close()
 
-    assert capsys.readouterr().err == ""
+    assert capsys.readouterr() == ("", "")
 
 
 def test_a_crop_across_columns_requests_each_row_in_one_multipart_request(
@@ -370,16 +370,16 @@ def test_a_server_ignoring_the_range_is_refused(
     served : Served
 ):
     """
-    Asserts that a server answering a range request with the whole file and
-    a status of 200 is refused, naming the status, and prints nothing once
-    the client resets the connection it refused the answer on.
+    Asserts that a server answering a range request with the whole file
+    and a status of 200 is refused, naming the status, and that the server
+    prints nothing once the client closes or resets the connection.
     """
     served.faults[:] = ["whole"]
     with served.serving() as address, closing(Remote.from_url(address)) as remote:
         with raises(ValueError, match="status 200 rather than 206"):
             remote.fetch([(0, 4)])
 
-    assert capsys.readouterr().err == ""
+    assert capsys.readouterr() == ("", "")
 
 
 def test_a_stalled_read_is_requested_again_over_a_new_connection(threat: Path):

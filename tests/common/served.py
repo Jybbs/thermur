@@ -1,9 +1,10 @@
 """
 Holds `Served`, one file a test serves over HTTP on the loopback address,
 answering range requests as the Apache server the WRF-SFIRE dataset
-publishes through does, behind a redirect from another path, failing the
-requests a case lines up, and printing the traceback of any other failure in
-a handler before the case ends.
+publishes through does, behind a redirect from another path, failing
+the requests a case lines up, and printing the traceback of a failure
+in a handler before the case ends unless the client closed or reset the
+connection.
 """
 
 from collections.abc import Iterator
