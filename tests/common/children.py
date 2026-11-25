@@ -14,12 +14,13 @@ from sys            import executable
 def runs(*modules: str):
     """
     Runs the top-level block of each of `modules` in this process, in a
-    namespace of its own, so pytest-testmon records the test as reading that
-    block. The entry `sys.modules` holds under each name stays as it was,
-    whereas each parent package `find_spec` imports and each module a block
-    imports as it runs stay loaded. A change inside a function only the
-    child calls selects no test unless the next statement in the same body
-    carries a decorator. A function's block in pytest-testmon ends on the
+    namespace of its own, so pytest-testmon records the test as reading
+    that block. The entry `sys.modules` holds under each name stays as it
+    was, whereas each parent package `find_spec` imports and each module a
+    block imports as it runs stay loaded. A change inside a function only
+    the child calls selects no test unless the statement after it carries a
+    decorator, where a method ending its class's body takes the class's next
+    statement as its own. A function's block in pytest-testmon ends on the
     line before that statement's `def` or `class` line, leaving inside it
     the decorator lines the top-level block runs.
     """
