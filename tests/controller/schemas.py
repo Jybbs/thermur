@@ -198,6 +198,27 @@ def test_a_drone_learns_only_the_list_a_member_broadcast_its_delay_earlier():
     assert not holds(heard, 0, 2)
 
 
+def test_a_drone_senses_a_neighbor_s_alarm_only_as_its_radio_last_heard_it():
+    """
+    Asserts that a receiver senses a neighbor's escape state from the
+    broadcast its radio last heard, a neighbor firing since then still
+    reading as resting.
+    """
+    positions  = array([[0.0, 0.0, 100.0], [5.0, 0.0, 100.0]])
+    velocities = array([[10.0, 0.0, 0.0]] * 2)
+    heard      = flock_of(positions, velocities)
+    sensed     = Observation.sensed(
+        still_air(),
+        1,
+        10.0,
+        flock_of(positions, velocities, alarms=[[0.0] * 4, [2.0, 1.0, 0.3, -1.0]]),
+        Inbox.from_broadcast(heard, 50.0, heard),
+        0.0
+    )
+
+    assert_allclose(sensed.alarms[0, 0], [0.0] * 4)
+
+
 def test_a_fixed_speed_leaves_no_acceleration_along_the_velocity():
     """
     Asserts that a speed slot holding the speed fixed takes out the part
@@ -563,41 +584,6 @@ def test_exciting_the_flock_counts_down_and_starts_a_zig_at_the_rim():
     )
 
 
-def test_exciting_the_flock_sets_off_a_drone_hearing_a_firing_neighbor():
-    """
-    Asserts that a resting drone hearing a firing neighbor over the radio,
-    under a branching that sets it off for certain, fires the neighbor's
-    side, while the firing neighbor counts down by the step and the noise
-    slot's state holds.
-    """
-    built = composite(escape=Excitable(branching=1.0, firing_s=0.5, refractory_s=1.0))
-    flock = flock_of(
-        array([[1000.0, 1000.0, 100.0], [1000.0, 1005.0, 100.0]]),
-        array([[10.0, 0.0, 0.0]] * 2),
-        alarms = [[0.0] * 4, [2.0, 1.0, 0.3, -1.0]]
-    )
-
-    excited = built.excited(
-        flock,
-        key(0),
-        Observation.sensed(
-            still_air(),
-            1,
-            10.0,
-            flock,
-            Inbox.from_broadcast(flock, built.radio.range_m, flock),
-            0.0
-        ),
-        0.1
-    )
-
-    assert_allclose(
-        (excited.alarms[:, [0, 2, 3]], excited.forces),
-        ([[2.0, 0.5, -1.0], [2.0, 0.2, -1.0]], flock.forces),
-        rtol = 1e-6
-    )
-
-
 @mark.parametrize("rate", [0.0, 1.0, 2.0])
 def test_the_heading_turns_a_drone_at_the_rate_its_coupling_sets(rate: float):
     """
@@ -658,6 +644,41 @@ def test_unit_divides_by_length_and_holds_a_zero_vector(
     assert_allclose(unit(array(vectors)), expected)
 
 
+def test_exciting_the_flock_sets_off_a_drone_hearing_a_firing_neighbor():
+    """
+    Asserts that a resting drone hearing a firing neighbor over the radio,
+    under a branching that sets it off for certain, fires the neighbor's
+    side, while the firing neighbor counts down by the step and the noise
+    slot's state holds.
+    """
+    built = composite(escape=Excitable(branching=1.0, firing_s=0.5, refractory_s=1.0))
+    flock = flock_of(
+        array([[1000.0, 1000.0, 100.0], [1000.0, 1005.0, 100.0]]),
+        array([[10.0, 0.0, 0.0]] * 2),
+        alarms = [[0.0] * 4, [2.0, 1.0, 0.3, -1.0]]
+    )
+
+    excited = built.excited(
+        flock,
+        key(0),
+        Observation.sensed(
+            still_air(),
+            1,
+            10.0,
+            flock,
+            Inbox.from_broadcast(flock, built.radio.range_m, flock),
+            0.0
+        ),
+        0.1
+    )
+
+    assert_allclose(
+        (excited.alarms[:, [0, 2, 3]], excited.forces),
+        ([[2.0, 0.5, -1.0], [2.0, 0.2, -1.0]], flock.forces),
+        rtol = 1e-6
+    )
+
+
 def test_from_settings_reads_each_slot_by_name_scaled_to_the_launch():
     """
     Asserts that each slot of the composite is the settings field naming it,
@@ -671,18 +692,6 @@ def test_from_settings_reads_each_slot_by_name_scaled_to_the_launch():
         slot.name: getattr(settings, slot.name).scaled(settings.plan.similarity)
         for slot in fields(Composite)
     }
-
-
-def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position(
-    subtests: Subtests
-):
-    """
-    Asserts that drones stacked at one point each list every other drone,
-    which `KDTree.query` may order ahead of the drone itself.
-    """
-    for own, row in enumerate(nearest(3, zeros((4, 3)))):
-        with subtests.test(own=own):
-            assert sorted(row) == sorted({0, 1, 2, 3} - {own})
 
 
 @mark.parametrize(
@@ -715,6 +724,18 @@ def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(
         getattr(settings, slot).scaled(settings.plan.similarity)(view),
         atol = 1e-5
     )
+
+
+def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position(
+    subtests: Subtests
+):
+    """
+    Asserts that drones stacked at one point each list every other drone,
+    which `KDTree.query` may order ahead of the drone itself.
+    """
+    for own, row in enumerate(nearest(3, zeros((4, 3)))):
+        with subtests.test(own=own):
+            assert sorted(row) == sorted({0, 1, 2, 3} - {own})
 
 
 def test_nearest_orders_neighbors_by_distance_over_a_batch():
@@ -925,22 +946,6 @@ def test_the_curve_order_follows_the_drones_along_a_line():
     ).tolist() == [1, 3, 4, 2, 0]
 
 
-def test_the_radio_carried_to_a_larger_flock_stays_a_drone_radio():
-    """
-    Asserts that the radio carried to a flock four times a starling flock's
-    size keeps the delay, the rate, the loss, and the range a drone's radio
-    sets.
-    """
-    radio = Radio(
-        delay_s = 0.5,
-        loss    = 0.2,
-        range_m = 100.0,
-        rate_hz = 10.0
-    )
-
-    assert radio.scaled(4.0) == radio
-
-
 @mark.parametrize("drones", [param(20, id="twenty"), param(200, id="two-hundred")])
 def test_the_radio_opens_on_a_table_of_the_nearest_senders_whatever_the_flock_s_size(
     drones: int
@@ -959,6 +964,22 @@ def test_the_radio_opens_on_a_table_of_the_nearest_senders_whatever_the_flock_s_
         sort(where(inbox.heard, inbox.senders, drones), axis=1)[:, :held],
         sort(nearest(held, positions), axis=1)
     )
+
+
+def test_the_radio_carried_to_a_larger_flock_stays_a_drone_radio():
+    """
+    Asserts that the radio carried to a flock four times a starling flock's
+    size keeps the delay, the rate, the loss, and the range a drone's radio
+    sets.
+    """
+    radio = Radio(
+        delay_s = 0.5,
+        loss    = 0.2,
+        range_m = 100.0,
+        rate_hz = 10.0
+    )
+
+    assert radio.scaled(4.0) == radio
 
 
 def test_the_radio_carries_each_sender_s_alarm_to_the_drones_hearing_it():

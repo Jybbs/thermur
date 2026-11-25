@@ -79,8 +79,9 @@ Flies the flock, or computes the steps of the graph named.
 │ --escape.refractory-s FLOAT   The time after firing during which the drone   │
 │                               fires no maneuver, in seconds, at a starling's │
 │                               scale, by default the other half of that time, │
-│                               so a drone the fire holds alarmed fires once   │
-│                               per pulse. [default: 0.607638888888889]        │
+│                               so a drone the fire holds alarmed fires at     │
+│                               most once per pulse. [default:                 │
+│                               0.607638888888889]                             │
 │ --escape.relaxation-s FLOAT   The time over which the alertness relaxes      │
 │                               toward the stimulus, in seconds, by default    │
 │                               the reciprocal of the starling model's decay   │

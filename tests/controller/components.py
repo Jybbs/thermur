@@ -1171,6 +1171,22 @@ def test_one_firing_neighbor_sets_a_drone_off_at_the_branching_ratio_over_the_co
     )
 
 
+def test_firing_neighbors_on_one_side_set_a_drone_off_toward_that_side():
+    """
+    Asserts that a drone set off by two firing neighbors turning left turns
+    left, holding the side one firing neighbor would set.
+    """
+    assert_allclose(
+        alarmed(
+            alarm  = (0.0, 0.0, 0.0, 0.0),
+            alarms = [[2.0, 1.0, 0.3, 1.0]] * 2 + [[0.0] * 4] * 5,
+            draws  = (0.0, 1.0)
+        ),
+        (2.0, 0.0, EXCITABLE.firing_s, 1.0),
+        atol = 1e-6
+    )
+
+
 def test_firing_neighbors_on_opposite_sides_set_a_drone_off_into_a_climb():
     """
     Asserts that a drone set off by two firing neighbors turning to opposite
@@ -1183,6 +1199,30 @@ def test_firing_neighbors_on_opposite_sides_set_a_drone_off_into_a_climb():
             draws  = (0.0, 1.0)
         ),
         (2.0, 0.0, EXCITABLE.firing_s, 0.0),
+        atol = 1e-6
+    )
+
+
+@mark.parametrize(("margin", "fired"), [(-1e-4, True), (1e-4, False)])
+def test_two_firing_neighbors_set_a_drone_off_as_two_chances_of_one(
+    fired  : bool,
+    margin : float
+):
+    """
+    Asserts that two firing neighbors among seven set a resting drone off
+    within one whole firing with the chance one minus the square of the
+    chance that one leaves it resting.
+    """
+    stepped = alarmed(
+        alarm  = (0.0, 0.0, 0.0, 0.0),
+        alarms = [[2.0, 1.0, 0.3, -1.0]] * 2 + [[0.0] * 4] * 5,
+        draws  = (1 - (6 / 7) ** 2 + margin, 0.0),
+        step_s = EXCITABLE.firing_s
+    )
+
+    assert_allclose(
+        stepped,
+        (2.0, 0.0, EXCITABLE.firing_s, -1.0) if fired else (0.0, 0.0, 0.0, 0.0),
         atol = 1e-6
     )
 
@@ -1258,6 +1298,8 @@ def test_an_excitable_escape_fires_then_rests_then_returns_to_its_alarm(
     [
         param(0.25, 0.0, id="climbing"),
         param(0.6, 1.0, id="turning-left"),
+        param(0.75 - 1e-4, 1.0, id="turning-left-at-the-split"),
+        param(0.75 + 1e-4, -1.0, id="turning-right-at-the-split"),
         param(0.9, -1.0, id="turning-right")
     ]
 )

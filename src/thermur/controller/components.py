@@ -381,7 +381,7 @@ class Excitable(Escape):
     """
     The time after firing during which the drone fires no maneuver, in
     seconds, at a starling's scale, by default the other half of that time,
-    so a drone the fire holds alarmed fires once per pulse.
+    so a drone the fire holds alarmed fires at most once per pulse.
     """
 
     relaxation_s: Positive = 1.0
