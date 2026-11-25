@@ -14,7 +14,7 @@ describe('plan', () => {
 
   it('lands each of the eight on the ridge at the page’s foot', () => {
     const run = plan(page, 604, FIRE)
-    for (const ys of run.ys) expect(ys.at(-1)).toBeGreaterThan(page.page - 120)
+    expect(run.ys.map(ys => ys.at(-1)!).filter(y => y <= page.page - 120)).toStrictEqual([])
     expect(Math.abs(run.ridge(600) - (page.page - 70))).toBeLessThanOrEqual(12)
   })
 
