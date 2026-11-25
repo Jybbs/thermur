@@ -67,7 +67,7 @@ def test_a_current_lock_passes(
         "project\n",
         [
             "mise lock --check", "mise install --dry-run --force --locked",
-            "mise ls --no-header --project", "mise ls-remote uv"
+            "mise ls --no-header --project", "mise ls-remote -q uv"
         ]
     )
 
@@ -175,8 +175,8 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
         ]
     )
     assert [command for command in mise.commands if "ls-remote" in command] == [
-        "mise ls-remote aqua:lycheeverse/lychee", "mise ls-remote bun",
-        "mise ls-remote zizmor"
+        "mise ls-remote -q aqua:lycheeverse/lychee", "mise ls-remote -q bun",
+        "mise ls-remote -q zizmor"
     ]
 
 

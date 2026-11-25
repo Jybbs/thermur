@@ -16,7 +16,7 @@ unlisted=0
 for pin in $pins; do
   tool=${pin%@*}
   version=${pin##*@}
-  releases=$(mise ls-remote "$tool")
+  releases=$(mise ls-remote -q "$tool")
   [[ -n "$releases" ]] || {
     echo "mise ls-remote lists no version of $tool, as when mise runs offline" >&2
     exit 1
