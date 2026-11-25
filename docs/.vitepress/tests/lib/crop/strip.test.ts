@@ -128,10 +128,10 @@ describe('the gathering of a strip’s birds', () => {
     const [first, ...rest] = crop.draws(strip)
     const reach            = tight * crop.scaleAt(top)
     expect(rest.length).toBeGreaterThan(0)
-    for (const { index, x, y } of rest) {
-      expect(x - first!.x).toBeCloseTo((strip.birds.x[index]! - strip.birds.x[first!.index]!) * reach, 2)
-      expect(y - first!.y).toBeCloseTo((strip.birds.y[index]! - strip.birds.y[first!.index]!) * reach, 2)
-    }
+    expect(rest.map(({ x, y }) => [x - first!.x, y - first!.y])).toStrictEqual(rest.map(({ index }) => [
+      expect.closeTo((strip.birds.x[index]! - strip.birds.x[first!.index]!) * reach, 2),
+      expect.closeTo((strip.birds.y[index]! - strip.birds.y[first!.index]!) * reach, 2)
+    ]))
   })
 
   it('leaves the middle of the birds showing where it stands', () => {
@@ -141,9 +141,10 @@ describe('the gathering of a strip’s birds', () => {
     const weight  = shown.reduce((total, share) => total + share)
     const middle  = shown.reduce((total, share, bird) => total + share * strip.birds.x[bird]!, 0) / weight
     const tight   = Math.sqrt(crop.LATE / 2)
-    for (const { index, x } of crop.draws(strip)) {
-      expect(x / crop.scaleAt(200)).toBeCloseTo(middle + (strip.birds.x[index]! - middle) * tight, 2)
-    }
+    const drawn   = crop.draws(strip)
+    expect(drawn.map(({ x }) => x / crop.scaleAt(200)))
+      .toStrictEqual(drawn.map(({ index }) =>
+        expect.closeTo(middle + (strip.birds.x[index]! - middle) * tight, 2)))
   })
 
   it.each([
@@ -180,15 +181,15 @@ describe('a strip’s birds at the part', () => {
     expect(Math.min(...rooms.map(({ room }) => room))).toBeGreaterThan(0)
     expect(Math.max(...rooms.map(({ alpha }) => alpha))).toBeLessThanOrEqual(0.82)
     expect(nearing.length).toBeGreaterThan(0)
-    for (const { alpha, room } of nearing) expect(alpha).toBeCloseTo(0.82 * room / fade)
+    expect(nearing.map(({ alpha }) => alpha))
+      .toStrictEqual(nearing.map(({ room }) => expect.closeTo(0.82 * room / fade)))
   })
 
   it('shrink by the root of the sky’s scale, no shorter than a bird still reads', () => {
     const strip  = crop.painted(crop.CROWD, [1, 1, 1])
     const placed = crop.draws(strip)
-    for (const { index, length } of placed) {
-      expect(length).toBeCloseTo(Math.max(strip.birds.size[index]! * 0.8 * Math.sqrt(crop.scaleAt(200)), 2.2))
-    }
+    expect(placed.map(({ length }) => length)).toStrictEqual(placed.map(({ index }) =>
+      expect.closeTo(Math.max(strip.birds.size[index]! * 0.8 * Math.sqrt(crop.scaleAt(200)), 2.2))))
     expect(Math.min(...placed.map(({ length }) => length))).toBeCloseTo(2.2)
   })
 })
@@ -202,10 +203,10 @@ describe('the pointer over a strip', () => {
     const falcon = heat.mock.contexts.at(-1) as PointerHeat
     const reach  = Math.sqrt(crop.LATE / 2) * crop.scaleAt(200)
     expect(falcon.on).toBe(true)
-    for (const { index, x, y } of placed) {
-      expect(x - 100).toBeCloseTo((strip.birds.x[index]! - falcon.x) * reach, 2)
-      expect(y - 60).toBeCloseTo((strip.birds.y[index]! - falcon.y) * reach, 2)
-    }
+    expect(placed.map(({ x, y }) => [x - 100, y - 60])).toStrictEqual(placed.map(({ index }) => [
+      expect.closeTo((strip.birds.x[index]! - falcon.x) * reach, 2),
+      expect.closeTo((strip.birds.y[index]! - falcon.y) * reach, 2)
+    ]))
   })
 
   it('parts the birds around it, and leaves their flight alone off the strip', () => {
