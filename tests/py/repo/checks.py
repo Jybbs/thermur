@@ -2179,3 +2179,18 @@ def test_an_undeclared_input_to_a_composite_action_is_named(checkout: Checkout):
             f"which `{ACTION}` does not declare"
         )
     ]
+
+
+@mark.parametrize(
+    "file",
+    ["tests/kit/motion/gate.test.ts", "tests/site/lib/math.test.ts"]
+)
+def test_a_change_to_a_vitest_suite_runs_the_site_workflow(
+    checked : Checkout,
+    file    : str
+):
+    """
+    Asserts that a pull request changing a file under `tests/kit` or
+    `tests/site` runs `🐦‍⬛ Site`, whose filter names both suites.
+    """
+    assert checked.workflows[Path(SITE)].events["pull_request"].matches(file)
