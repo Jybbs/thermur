@@ -379,9 +379,10 @@ def test_images_reports_no_row_for_a_label_holding_more_than_a_family_and_a_vers
 ):
     """
     Asserts that `Images` reports no row where every job runs on a label
-    carrying a suffix past its version, such as one ending on `-arm`, even
-    where the README gives that label's family a newer version, and fails
-    where the copy holds no workflow.
+    carrying a suffix past its version, such as one ending on `-arm`,
+    even where the README gives that label's family a newer version. The
+    case fails where the copy holds no workflow, so it cannot pass without
+    reading a label.
     """
     assert checkout.workflows
 
@@ -1179,8 +1180,8 @@ def test_an_action_whose_repository_publishes_no_release_makes_no_row(
     Asserts that an action whose repository `gh` finds no release for makes
     no row without reading its tags, which a stand-in `git` failing every
     call stops, whereas any other failure of `gh` raises rather than leaving
-    the action out of the table unreported, and fails where the copy holds
-    no workflow.
+    the action out of the table unreported. The case fails where the copy
+    holds no workflow.
     """
     assert checkout.workflows
 
