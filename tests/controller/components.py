@@ -7,8 +7,9 @@ the second drone's action as it stands.
 from common.drones import flock_of, still_air, viewed
 from equinox       import filter_jit, tree_at
 from jax           import Array, lax, tree, vmap
-from jax.numpy     import argsort, array, concatenate, exp, flatnonzero, linalg, linspace, newaxis, sqrt, zeros
+from jax.numpy     import argsort, array, concatenate, exp, flatnonzero, linalg, linspace, newaxis, pi, sqrt, zeros
 from jax.random    import key, normal, split
+from math          import inf
 from numpy.testing import assert_allclose
 from pytest        import mark, param
 
@@ -21,11 +22,13 @@ from thermur.controller.components import (
     Cruise,
     Delayed,
     Elastic,
+    Excitable,
     Fitted,
     HardSphere,
     Home,
     InertialSpin,
     Intrinsic,
+    Kinetic,
     Marginal,
     Metric,
     Nonmutual,
@@ -61,12 +64,9 @@ COMPOSITES = {
         Plan().similarity
     ).items()
 }
-
-AIR = still_air()
-
+AIR       = still_air()
 NEIGHBORS = Plan().neighbors
-
-DRONES = 2 * NEIGHBORS + 2
+DRONES    = 2 * NEIGHBORS + 2
 
 
 @filter_jit
@@ -421,6 +421,31 @@ def test_each_noise_scales_its_increments_by_its_source_s_form(
     assert_allclose(noise.amplitudes(observation), expected, rtol=1e-6)
 
 
+def alarmed(
+    alarm  : tuple[float, float, float, float],
+    alarms : list[list[float]] | None = None,
+    draws  : tuple[float, float]      = (1.0, 1.0),
+    front  : float = inf,
+    step_s : float = 0.1
+) -> Array:
+    """
+    Steps the escape state of a drone holding `alarm` among `SEVEN`, each
+    neighbor holding a row of `alarms` or resting, `front` meters from the
+    burning front.
+    """
+    return EXCITABLE.excited(
+        array(draws),
+        viewed(
+            SEVEN,
+            air = {"excess": array(0.0), "front": array(front)}
+            | dict.fromkeys("uvw", array(0.0)),
+            alarm  = array(alarm),
+            alarms = array(alarms or [[0.0] * 4] * 7)
+        ),
+        step_s
+    )
+
+
 def test_a_copied_zig_starts_at_once_where_the_radio_s_delay_outlasts_the_cue():
     """
     Asserts that a drone copying a zig the radio delivers later than its
@@ -546,51 +571,36 @@ def test_a_zig_s_chance_of_spreading_grows_with_each_zigging_neighbor():
     )
 
 
-def test_an_inertial_spin_carries_its_spin_along_the_turn_a_force_makes():
+def test_an_excitable_escape_copies_no_neighbor_through_its_refractory_time():
     """
-    Asserts that a force across the velocity turns the spin a drone holds at
-    the rate `turning x spin`, `turning` being the force's torque `v x force
-    / |v|^2`, beside the friction's relaxation.
+    Asserts that a refractory drone counts down rather than copying seven
+    firing neighbors under a draw that would set it off.
     """
-    turned, spun = InertialSpin(friction=0.5, inertia_s=2.0).steered(
-        array([0.0, 0.0, 1.0]),
-        viewed([[10.0, 0.0, 0.0]], spin=array([0.0, 0.0, 0.2]))
+    assert_allclose(
+        alarmed(
+            alarm  = (3.0, 0.0, 0.5, 1.0),
+            alarms = [[2.0, 1.0, 0.3, 1.0]] * 7,
+            draws  = (0.0, 0.0)
+        ),
+        (3.0, 0.0, 0.4, 1.0),
+        atol = 1e-6
     )
 
-    assert_allclose(turned, [0.0, 2.0, 1.0], atol=1e-6)
-    assert_allclose(spun, [-0.02, 0.0, -0.05], atol=1e-6)
 
-
-def test_an_inertial_spin_holds_at_the_spin_its_pull_sets():
+def test_an_excitable_escape_relaxes_the_alertness_toward_the_stimulus():
     """
-    Asserts that a drone spinning at the torque of its pull, `v x pull /
-    |v|^2`, keeps that spin at a friction of one and turns its velocity as
-    the overdamped heading does.
+    Asserts that the alertness closes `1 - exp(-step_s / relaxation_s)`
+    of its gap to the stimulus within one step, rising near the front and
+    falling to nothing where the air holds no front.
     """
-    neighbors = array([[10.0, 3.0, 1.0]])
-    pull      = Overdamped()(viewed([[10.0, 0.0, 0.0]], neighbors=neighbors))
-    view      = viewed(
-        [[10.0, 0.0, 0.0]],
-        neighbors = neighbors,
-        spin      = array([0.0, -pull[2], pull[1]]) / 10.0
+    assert_allclose(
+        (
+            alarmed((0.0, 0.0, 0.0, 0.0), front=0.0, step_s=0.5)[1],
+            alarmed((1.0, 0.8, 0.0, 0.0), step_s=0.5)[1]
+        ),
+        (1 - exp(-0.25), 0.8 * exp(-0.25)),
+        rtol = 1e-6
     )
-
-    turned, spun = InertialSpin(friction=1.0, inertia_s=4.0).steered(zeros(3), view)
-
-    assert_allclose(spun, 0.0, atol=1e-6)
-    assert_allclose(turned, across(pull, view.velocity), atol=1e-6)
-
-
-def test_an_inertial_spin_relaxes_its_spin_at_the_friction_over_the_inertia():
-    """
-    Asserts that a spin with no pull and no force decays at `friction /
-    inertia_s` and turns the velocity at that spin.
-    """
-    view         = viewed([[10.0, 0.0, 0.0]], spin=array([0.0, 0.0, 0.2]))
-    turned, spun = InertialSpin(friction=0.5, inertia_s=2.0).steered(zeros(3), view)
-
-    assert_allclose(spun, [0.0, 0.0, -0.05], atol=1e-6)
-    assert_allclose(turned, [0.0, 2.0, 0.0], atol=1e-6)
 
 
 ZIG = Zig(
@@ -723,16 +733,19 @@ def test_a_zig_starts_at_the_rim_or_from_a_zigging_neighbor(
     )
 
 
-def test_an_inertial_spin_turns_the_velocity_by_the_other_slots_directly():
+def test_an_inertial_spin_carries_its_spin_along_the_turn_a_force_makes():
     """
-    Asserts that the other slots' force turns a drone holding no spin and no
-    pull by the part of the force across its velocity, and drives no spin.
+    Asserts that a force across the velocity turns the spin a drone holds at
+    the rate `turning x spin`, `turning` being the force's torque `v x force
+    / |v|^2`, beside the friction's relaxation.
     """
-    force        = array([2.0, 0.5, -0.2])
-    turned, spun = InertialSpin().steered(force, viewed([[10.0, 0.0, 0.0]]))
+    turned, spun = InertialSpin(friction=0.5, inertia_s=2.0).steered(
+        array([0.0, 0.0, 1.0]),
+        viewed([[10.0, 0.0, 0.0]], spin=array([0.0, 0.0, 0.2]))
+    )
 
-    assert_allclose(turned, [0.0, 0.5, -0.2], atol=1e-6)
-    assert_allclose(spun, 0.0, atol=1e-6)
+    assert_allclose(turned, [0.0, 2.0, 1.0], atol=1e-6)
+    assert_allclose(spun, [-0.02, 0.0, -0.05], atol=1e-6)
 
 
 @mark.parametrize(("margin", "copied"), [(-1e-4, True), (1e-4, False)])
@@ -895,43 +908,24 @@ def test_home_damps_a_drone_s_height_critically(
     )
 
 
-def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
+def test_an_inertial_spin_holds_at_the_spin_its_pull_sets():
     """
-    Asserts that a drone the roost alone moves, lifted 30 m above the
-    roost's height at the drone scale, settles back to within a meter of
-    it in ten minutes without ever falling below it, the pull setting the
-    rate of the command and the velocity following the command through the
-    plant's lag, as a flight steps them.
+    Asserts that a drone spinning at the torque of its pull, `v x pull /
+    |v|^2`, keeps that spin at a friction of one and turns its velocity as
+    the overdamped heading does.
     """
-    plant = Plant()
-    roost = Settings().roost.scaled(Plan().similarity)
-    alone = viewed([[1.0, 0.0, 0.0]])
-
-    def step(state: Array, *_: None) -> tuple[Array, Array]:
-        """
-        Advances the height, the commanded climb, and the climb by a tenth
-        of a second under the roost's vertical pull.
-        """
-        height, command, climb = state
-        pull = roost.vertical(
-            tree_at(
-                lambda seen: (seen.position, seen.velocity),
-                alone,
-                (array([1000.0, 1000.0, height]), array([10.0, 0.0, climb]))
-            )
-        )
-        rate = plant.tracked(array([10.0, 0.0, command]), array([10.0, 0.0, climb]))
-        return (
-            array([height + climb * 0.1, command + pull * 0.1, climb + rate[2] * 0.1]),
-            height
-        )
-
-    _, heights = lax.scan(
-        step, array([roost.height_m + 30.0, 0.0, 0.0]), length=6000
+    neighbors = array([[10.0, 3.0, 1.0]])
+    pull      = Overdamped()(viewed([[10.0, 0.0, 0.0]], neighbors=neighbors))
+    view      = viewed(
+        [[10.0, 0.0, 0.0]],
+        neighbors = neighbors,
+        spin      = array([0.0, -pull[2], pull[1]]) / 10.0
     )
 
-    assert heights.min() >= roost.height_m - 1e-3
-    assert_allclose(heights[-1], roost.height_m, atol=1.0)
+    turned, spun = InertialSpin(friction=1.0, inertia_s=4.0).steered(zeros(3), view)
+
+    assert_allclose(spun, 0.0, atol=1e-6)
+    assert_allclose(turned, across(pull, view.velocity), atol=1e-6)
 
 
 @mark.parametrize(
@@ -984,7 +978,23 @@ def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
         ),
         param(Marginal(), Marginal(), id="marginal"),
         param(Overdamped(), Overdamped(), id="overdamped"),
-        param(Centroid(), Centroid(), id="centroid")
+        param(Centroid(), Centroid(), id="centroid"),
+        param(
+            Excitable(
+                alarm_m      = 50.0,
+                firing_s     = 0.5,
+                refractory_s = 1.0,
+                relaxation_s = 1.0
+            ),
+            Excitable(
+                alarm_m      = 50.0,
+                firing_s     = 2.0,
+                refractory_s = 4.0,
+                relaxation_s = 1.0
+            ),
+            id = "excitable"
+        ),
+        param(Kinetic(), Kinetic(), id="kinetic")
     ]
 )
 def test_each_slot_carried_to_a_flock_four_times_the_size_scales_its_values(
@@ -998,3 +1008,228 @@ def test_each_slot_carried_to_a_flock_four_times_the_size_scales_its_values(
     slot holding a drone flock's own values.
     """
     assert_allclose(tree.leaves(component.scaled(4.0)), tree.leaves(expected))
+
+
+EXCITABLE = Excitable(
+    alarm_m      = 25.0,
+    branching    = 1.0,
+    climbing     = 0.5,
+    firing_s     = 0.5,
+    refractory_s = 1.0,
+    relaxation_s = 2.0
+)
+SEVEN = [[10.0, float(rank), 0.0] for rank in range(7)]
+"""
+Seven neighbors 10 m east of the drone, a meter apart.
+"""
+
+
+def test_an_inertial_spin_relaxes_its_spin_at_the_friction_over_the_inertia():
+    """
+    Asserts that a spin with no pull and no force decays at `friction /
+    inertia_s` and turns the velocity at that spin.
+    """
+    view         = viewed([[10.0, 0.0, 0.0]], spin=array([0.0, 0.0, 0.2]))
+    turned, spun = InertialSpin(friction=0.5, inertia_s=2.0).steered(zeros(3), view)
+
+    assert_allclose(spun, [0.0, 0.0, -0.05], atol=1e-6)
+    assert_allclose(turned, [0.0, 2.0, 0.0], atol=1e-6)
+
+
+@mark.parametrize(
+    ("alarm", "expected"),
+    [
+        param((2.0, 1.0, 0.3, 1.0), (0.0, pi * 10.0 / 0.5, 0.0), id="turning-left"),
+        param((2.0, 1.0, 0.3, -1.0), (0.0, -pi * 10.0 / 0.5, 0.0), id="turning-right"),
+        param((2.0, 1.0, 0.3, 0.0), (0.0, 0.0, pi * 10.0 / 0.5), id="climbing"),
+        param((1.0, 1.0, 0.0, 1.0), (0.0, 0.0, 0.0), id="alarmed"),
+        param((3.0, 1.0, 0.5, 1.0), (0.0, 0.0, 0.0), id="refractory"),
+        param((0.0, 0.0, 0.0, 0.0), (0.0, 0.0, 0.0), id="resting")
+    ]
+)
+def test_an_excitable_escape_turns_or_climbs_only_while_firing(
+    alarm    : tuple[float, float, float, float],
+    expected : tuple[float, float, float]
+):
+    """
+    Asserts that a firing drone flying east at 10 m/s turns toward its side
+    at the acceleration carrying it through half a turn within `firing_s`,
+    or climbs at that acceleration, and adds nothing in any other state.
+    """
+    assert_allclose(
+        EXCITABLE(viewed([[10.0, 0.0, 0.0]], alarm=array(alarm))),
+        expected,
+        atol = 1e-5
+    )
+
+
+@mark.parametrize(
+    ("front", "state"),
+    [param(25.0 * 0.999, 1.0, id="inside"), param(25.0 * 1.001, 0.0, id="outside")]
+)
+def test_an_excitable_escape_alarms_a_settled_drone_within_its_alarm_distance(
+    front : float,
+    state : float
+):
+    """
+    Asserts that a drone whose alertness has settled at the stimulus is
+    alarmed just inside `alarm_m` of the front and rests just outside it.
+    """
+    stimulus = float(exp(-sqrt(front / 25.0)))
+    stepped  = alarmed((0.0, stimulus, 0.0, 0.0), front=front)
+
+    assert_allclose(stepped[:2], (state, stimulus), rtol=1e-5)
+
+
+def test_an_inertial_spin_turns_the_velocity_by_the_other_slots_directly():
+    """
+    Asserts that the other slots' force turns a drone holding no spin and no
+    pull by the part of the force across its velocity, and drives no spin.
+    """
+    force        = array([2.0, 0.5, -0.2])
+    turned, spun = InertialSpin().steered(force, viewed([[10.0, 0.0, 0.0]]))
+
+    assert_allclose(turned, [0.0, 0.5, -0.2], atol=1e-6)
+    assert_allclose(spun, 0.0, atol=1e-6)
+
+
+@mark.parametrize(("margin", "fired"), [(-1e-4, True), (1e-4, False)])
+def test_one_firing_neighbor_sets_a_drone_off_at_the_branching_ratio_over_the_count(
+    fired  : bool,
+    margin : float
+):
+    """
+    Asserts that one firing neighbor among seven sets a resting drone off
+    within one whole firing with the chance `branching` over seven, copying
+    its side.
+    """
+    stepped = alarmed(
+        alarm  = (0.0, 0.0, 0.0, 0.0),
+        alarms = [[2.0, 1.0, 0.3, -1.0]] + [[0.0] * 4] * 6,
+        draws  = (1.0 / 7 + margin, 0.0),
+        step_s = EXCITABLE.firing_s
+    )
+
+    assert_allclose(
+        stepped,
+        (2.0, 0.0, EXCITABLE.firing_s, -1.0) if fired else (0.0, 0.0, 0.0, 0.0),
+        atol = 1e-6
+    )
+
+
+def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
+    """
+    Asserts that a drone the roost alone moves, lifted 30 m above the
+    roost's height at the drone scale, settles back to within a meter of
+    it in ten minutes without ever falling below it, the pull setting the
+    rate of the command and the velocity following the command through the
+    plant's lag, as a flight steps them.
+    """
+    plant = Plant()
+    roost = Settings().roost.scaled(Plan().similarity)
+    alone = viewed([[1.0, 0.0, 0.0]])
+
+    def step(state: Array, *_: None) -> tuple[Array, Array]:
+        """
+        Advances the height, the commanded climb, and the climb by a tenth
+        of a second under the roost's vertical pull.
+        """
+        height, command, climb = state
+        pull = roost.vertical(
+            tree_at(
+                lambda seen: (seen.position, seen.velocity),
+                alone,
+                (array([1000.0, 1000.0, height]), array([10.0, 0.0, climb]))
+            )
+        )
+        rate = plant.tracked(array([10.0, 0.0, command]), array([10.0, 0.0, climb]))
+        return (
+            array([height + climb * 0.1, command + pull * 0.1, climb + rate[2] * 0.1]),
+            height
+        )
+
+    _, heights = lax.scan(
+        step, array([roost.height_m + 30.0, 0.0, 0.0]), length=6000
+    )
+
+    assert heights.min() >= roost.height_m - 1e-3
+    assert_allclose(heights[-1], roost.height_m, atol=1.0)
+
+
+@mark.parametrize(
+    ("alarm", "front", "expected"),
+    [
+        param((2.0, 1.0, 0.05, 1.0), 0.0, (3.0, 1.0, 1.0, 1.0), id="firing-ends"),
+        param((2.0, 1.0, 0.3, 1.0), 0.0, (2.0, 1.0, 0.2, 1.0), id="firing-counts"),
+        param(
+            (3.0, 1.0, 0.05, 1.0),
+            0.0,
+            (1.0, 1.0, 0.0, 1.0),
+            id = "refractory-alarmed"
+        ),
+        param((3.0, 0.0, 0.05, 1.0), inf, (0.0, 0.0, 0.0, 1.0), id="refractory-rests")
+    ]
+)
+def test_an_excitable_escape_fires_then_rests_then_returns_to_its_alarm(
+    alarm    : tuple[float, float, float, float],
+    expected : tuple[float, float, float, float],
+    front    : float
+):
+    """
+    Asserts that a firing drone moves on to `refractory_s` as its firing
+    ends, and a refractory drone returns to the alarm its alertness sets as
+    its refractory time ends, each counting down by the step before.
+    """
+    assert_allclose(alarmed(alarm, draws=(1.0, 1.0), front=front), expected, atol=1e-6)
+
+
+@mark.parametrize(
+    ("second", "side"),
+    [
+        param(0.25, 0.0, id="climbing"),
+        param(0.6, 1.0, id="turning-left"),
+        param(0.9, -1.0, id="turning-right")
+    ]
+)
+def test_an_alarmed_drone_fires_on_its_own_and_picks_its_maneuver(
+    second : float,
+    side   : float
+):
+    """
+    Asserts that an alarmed drone at the front, hearing no firing neighbor,
+    fires on its own under a low first draw, climbing where the second falls
+    below `climbing` and otherwise turning to the side the rest splits.
+    """
+    assert_allclose(
+        alarmed((1.0, 1.0, 0.0, 0.0), draws=(0.0, second), front=0.0),
+        (2.0, 1.0, EXCITABLE.firing_s, side),
+        atol = 1e-6
+    )
+
+
+@mark.parametrize(
+    ("excess", "speeding", "aligning"),
+    [
+        param(8.0, (2.0, 0.0, 0.0), 1.4, id="hot"),
+        param(-3.0, (0.0, 0.0, 0.0), 1.0, id="cool"),
+        param(0.0, (0.0, 0.0, 0.0), 1.0, id="ambient")
+    ]
+)
+def test_a_kinetic_thermal_response_speeds_and_aligns_by_the_excess(
+    aligning : float,
+    excess   : float,
+    speeding : tuple[float, float, float]
+):
+    """
+    Asserts that a drone flying east speeds up along its command and aligns
+    faster with every neighbor in proportion to the excess, reading air
+    cooler than the ambient profile as no excess.
+    """
+    thermal = Kinetic(aligning_per_k=0.05, speeding_m_s2_k=0.25)
+    view    = viewed([[10.0, 0.0, 0.0]] * 3, excess=excess)
+
+    assert_allclose(
+        (thermal(view), thermal.aligning(view)),
+        (speeding, [aligning] * 3),
+        rtol = 1e-6
+    )

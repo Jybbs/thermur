@@ -17,8 +17,10 @@ from thermur.controller.components import (
     Consensus,
     Constant,
     Cruise,
+    Excitable,
     HardSphere,
     Home,
+    Kinetic,
     Zig
 )
 from thermur.controller.schemas  import Radio
@@ -69,6 +71,12 @@ class Settings(
     to, and the fixed heights its fields are regridded onto.
     """
 
+    escape: Excitable = Excitable()
+    """
+    The turn or climb a drone fires away from the fire, or copies from its
+    neighbors.
+    """
+
     heading: Consensus = Consensus()
     """
     The acceleration turning a drone toward its neighbors.
@@ -111,6 +119,12 @@ class Settings(
     speed: Cruise = Cruise()
     """
     The acceleration relaxing a drone's speed toward the cruise speed.
+    """
+
+    thermal: Kinetic = Kinetic()
+    """
+    The speed and the alignment a drone takes up in air hotter than the
+    ambient profile.
     """
 
     threat: ParametricThreat = ParametricThreat()

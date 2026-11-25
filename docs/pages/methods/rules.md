@@ -1,12 +1,12 @@
 # The Interaction Rules
 
-Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, the roost holding the flock over one place, and the speed it flies at. Each slot holds a rule borrowed from another physical system, a starling flock, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it. In the flights below only the overdamped limit for the heading passes that test, and every slot still holds its default.
+Each drone in *Thermur* steers by the sum of a few rules, and each rule reads only what that one drone senses. The controller has a slot for each part of the motion, meaning the heading a drone turns toward, the rate it aligns with each neighbor at, the random increments driving it, the force holding it at a spacing, the contact keeping two drones apart, the roost holding the flock over one place, the speed it flies at, the response to air hotter than the ambient profile, and the escape from the fire. Each slot holds a rule borrowed from another physical system, a starling flock, a school of fish, or a swarm of active particles. An open slot starts from a default and flies each candidate rule against it, keeping a candidate only where the measurements favor it. In the flights below only the overdamped limit for the heading passes that test, and every slot still holds its default.
 
 ## The Neighbors a Drone Senses
 
 A drone senses its seven nearest neighbors by rank rather than within a fixed range, the topological interaction measured in starling flocks[^ballerini2008a]. For each neighbor it reads the offset, the distance, and the velocity as its radio last heard them, together with the velocity a neighbor held half a second before that for the rule that reads a delay, and it reads its own position, its own command, and the excess temperature and the wind of the air at its position. A rule receives that view and nothing else.
 
-By rank a drone senses the seven nearest of the senders its radio holds, fewer only where it holds fewer than seven, whereas the number within a fixed range swings as a flock gathers and splits. The drawing below flies the front page's flock under a TypeScript copy of the default composite, whose step and radio the site's suite checks against the package's own from the same states and draws. The pointer acts as a falcon through a push the drawing adds beside the composite, whose default slots read no air. The marked bird's lines run to the nearest seven of the senders its radio holds, ranked by where the radio last heard them, and the upper strip counts them, whereas the ring counts the birds within the fixed range by the distance between the drones the drawing flies.
+By rank a drone senses the seven nearest of the senders its radio holds, fewer only where it holds fewer than seven, whereas the number within a fixed range swings as a flock gathers and splits. The drawing below flies the front page's flock under a TypeScript copy of the default composite, whose step and radio the site's suite checks against the package's own from the same states and draws. The pointer acts as a falcon through a push the drawing adds beside the composite, and the drawing flies through air holding no fire, where the thermal response and the escape add nothing, so the copy leaves both out. The marked bird's lines run to the nearest seven of the senders its radio holds, ranked by where the radio last heard them, and the upper strip counts them, whereas the ring counts the birds within the fixed range by the distance between the drones the drawing flies.
 
 <!-- neighbors -->
 
@@ -240,6 +240,36 @@ The default cohesion is the starling model's[^hildenbrandt2010], a pull along th
 
 <!-- /cohesion -->
 
+## The Thermal Response
+
+The thermal response borrows the way a school of fish tracks a field of light no single fish resolves[^berdahl2013]. Each fish slows in the dark it seeks and follows its neighbors far more than the light, so the school turns toward its slower side, and agents adjusting their speed alone reproduce the result. A drone reads only the excess of the air over the ambient profile at its own position, so it cannot tell where the heat lies. It speeds up along its command by 0.25 m/s² per kelvin of excess and aligns with each neighbor faster by a twentieth of the coupling's rate per kelvin, so a flock reading different values across it turns toward its slower, cooler side, the drones in hot air catching up with those already turned. At the parametric threat's anomaly of 20 K the push reaches the plant's level bound of 5 m/s² and the alignment doubles. Air cooler than the ambient profile reads as no excess, and both values are set at the drones' scale, so the starling scale leaves them as they are. The table is written from the slot's record, set under `[tool.thermur.thermal]` or through a `--thermal.` flag of `thermur fly`, and `mise render` rewrites it.
+
+<!-- thermal -->
+
+| **Field** | **Default** | **Bound** | **Holds** |
+|---|---|---|---|
+| `aligning_per_k` | `0.05` | at least 0 | The rise of the rate at which a drone aligns with each neighbor, as a share of the coupling's rate per kelvin of excess, by default the value doubling the rate at the parametric threat's anomaly of 20 K |
+| `speeding_m_s2_k` | `0.25` | at least 0 | The acceleration along a drone's command per kelvin of excess, in meters per second squared, by default the value reaching the plant's level bound of 5 m/s² at the parametric threat's anomaly of 20 K |
+
+<!-- /thermal -->
+
+## The Escape
+
+The escape is an excitable medium on the neighbor graph, each drone a cell of a Greenberg-Hastings medium[^greenberg1978] that rests, fires, and then turns refractory, the structure that carries a stadium's Mexican wave from one person to the next[^farkas2002]. A drone moves through four states, resting, alarmed, firing, and refractory, as the birds of a starling escape model do[^papadopoulou2026]. Its alertness relaxes over 1 s toward a stimulus only the fire produces, $`e^{-\sqrt{d / d_a}}`$ of the distance $`d`$ to the burning front, the model's falloff $`e^{-\sqrt{d} / \sigma}`$ with $`\sigma = \sqrt{d_a}`$, and the drone is alarmed while that alertness holds at or above $`e^{-1}`$, so within $`d_a`$ of the front once it settles. The distance $`d_a`$ defaults to the radio's 50 m range, and air holding no front reads as no stimulus. A resting or alarmed drone fires as the firing neighbors it hears set it off, each with the chance one over the neighbor count within one firing, the critical branching ratio the zig takes, and an alarmed drone also fires on its own at its alertness once per firing and refractory time. A drone hears a neighbor's state only through the radio, so the radio's delay sets part of the wave's speed. A firing drone turns through half a turn across its heading, as the model's birds turn about 180° away from the predator, or climbs at the same acceleration in place of the model's dive, copying the side most of its firing neighbors take or, firing on its own, climbing half the time and otherwise turning to either side alike. A starling agitation wave lasts $`3.5 \pm 0.23`$ s across $`2.88 \pm 0.19`$ pulses, each a mean and its standard error[^storms2019], so the firing and the refractory time default to half each of the 1.22 s per pulse, at a starling's scale, which a drone the fire holds alarmed fires once per pulse across. The table is written from the slot's record, set under `[tool.thermur.escape]` or through a `--escape.` flag of `thermur fly`, and `mise render` rewrites it.
+
+<!-- escape -->
+
+| **Field** | **Default** | **Bound** | **Holds** |
+|---|---|---|---|
+| `alarm_m` | `50.0` | above 0 | The distance to the burning front within which a drone's alertness settles at or above the alarm, in meters at a drone's own scale, by default the radio's range |
+| `branching` | `1.0` | at least 0 | The mean number of drones each firing sets off among the neighbors hearing it, by default the critical branching ratio of an excitable network |
+| `climbing` | `0.5` | at least 0 and at most 1 | The share of the maneuvers a drone fires on its own that climb rather than turn, by default an even split between the starling model's level turn and the climb that stands for its dive |
+| `firing_s` | `0.607638888888889` | above 0 | The time a drone fires its maneuver, in seconds, at a starling's scale, by default half the time between the pulses of a starling agitation wave, 3.5 s across 2.88 pulses |
+| `refractory_s` | `0.607638888888889` | above 0 | The time after firing during which the drone fires no maneuver, in seconds, at a starling's scale, by default the other half of that time, so a drone the fire holds alarmed fires once per pulse |
+| `relaxation_s` | `1.0` | above 0 | The time over which the alertness relaxes toward the stimulus, in seconds, by default the reciprocal of the starling model's decay rate of 1 per second |
+
+<!-- /escape -->
+
 ## Choosing Among Candidates
 
 A trial flies the default and each candidate for 60 s under each of three conditions over four seeds, and keeps a candidate only where no measurement leaves it worse than the default by more than the standard error of the two means across seeds and at least one leaves it better by more than that error. Beside the measurements, each composite's flight is replayed for 10 s through the drift of every composite in the trial, which gives a one-step likelihood for likelihood ranking[^torney2018] and the coefficient of each drift in a regression of the replayed accelerations on all of them, the force inference that builds a model from trajectories[^ferretti2020][^gerardos2025]. Each trial's table also carries how alignment between two drones falls with their distance, the time over which a drone's departure from the flock's heading stays correlated with itself, and the polarization of every seed, whose spread shows how far one launch strays from another. A trial reports these and chooses with none of them, since no goal for any of them has yet been set from a starling measurement.
@@ -358,6 +388,16 @@ On every replayed flight the composite that flew it ranks first by one-step log-
 [^calovi2018]: Calovi et al. 2018. "Disentangling and modeling interactions in fish with burst-and-coast swimming reveal distinct alignment and attraction behaviors." *PLOS Computational Biology* 14(1): e1005933. <https://doi.org/10.1371/journal.pcbi.1005933>
 
 [^caprini2023]: Caprini and Löwen 2023. "Flocking without Alignment Interactions in Attractive Active Brownian Particles." *Physical Review Letters* 130(14): 148202. <https://doi.org/10.1103/PhysRevLett.130.148202>
+
+[^berdahl2013]: Berdahl et al. 2013. "Emergent Sensing of Complex Environments by Mobile Animal Groups." *Science* 339(6119): 574–576. <https://doi.org/10.1126/science.1225883>
+
+[^greenberg1978]: Greenberg and Hastings 1978. "Spatial Patterns for Discrete Models of Diffusion in Excitable Media." *SIAM Journal on Applied Mathematics* 34(3): 515–523. <https://doi.org/10.1137/0134040>
+
+[^farkas2002]: Farkas et al. 2002. "Mexican waves in an excitable medium." *Nature* 419(6903): 131–132. <https://doi.org/10.1038/419131a>
+
+[^papadopoulou2026]: Papadopoulou et al. 2026. "A mechanistic understanding of collective escape in starling flocks." *Communications Biology* 9(1): 1055. <https://doi.org/10.1038/s42003-026-10173-4>
+
+[^storms2019]: Storms et al. 2019. "Complex patterns of collective escape in starling flocks under predation." *Behavioral Ecology and Sociobiology* 73(1): 10. <https://doi.org/10.1007/s00265-018-2609-0>
 
 [^torney2018]: Torney et al. 2018. "Inferring the rules of social interaction in migrating caribou." *Philosophical Transactions of the Royal Society B: Biological Sciences* 373(1746): 20170385. <https://doi.org/10.1098/rstb.2017.0385>
 

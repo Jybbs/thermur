@@ -4,7 +4,7 @@ the seeds of one flight, which the settings nest as `plan`.
 """
 
 from jax        import Array
-from jax.numpy  import array, cbrt, cos, deg2rad, pi, sin, stack, where, zeros_like
+from jax.numpy  import array, cbrt, cos, deg2rad, pi, sin, stack, where, zeros, zeros_like
 from jax.random import normal, split
 from math       import gamma, prod, radians
 from numpy      import arange, ndarray
@@ -312,6 +312,7 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
             where(positions[:, 2] < 0, abs(velocities[:, 2]), velocities[:, 2])
         )
         return Flock(
+            alarms     = zeros((self.drones, 4)),
             commands   = velocities,
             forces     = zeros_like(offsets),
             positions  = positions.at[:, 2].max(0.0),

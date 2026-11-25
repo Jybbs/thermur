@@ -12,6 +12,7 @@ from jax.numpy       import (
     arange,
     array,
     broadcast_to,
+    concatenate,
     eye,
     full,
     isfinite,
@@ -35,8 +36,10 @@ from thermur.controller.components import (
     Consensus,
     Constant,
     Cruise,
+    Excitable,
     HardSphere,
     InertialSpin,
+    Kinetic,
     Marginal,
     Overdamped,
     Persistent,
@@ -44,12 +47,15 @@ from thermur.controller.components import (
     Zig
 )
 from thermur.controller.schemas import (
+    Alarm,
     Component,
     Composite,
+    Escape,
     Inbox,
     Noise,
     Observation,
     Radio,
+    Thermal,
     across,
     nearest,
     torque,
@@ -92,6 +98,31 @@ def test_a_bare_component_declares_no_action(act: Callable[[Observation], object
     """
     with raises(NotImplementedError):
         act(viewed([[1.0, 0.0, 0.0]]))
+
+
+def test_a_bare_escape_and_thermal_response_leave_the_flock_as_it_stands():
+    """
+    Asserts that the abstract escape fires nothing and keeps the state the
+    drone holds, and the abstract thermal response adds nothing and leaves
+    each neighbor's rate as the coupling sets it, in air of any excess.
+    """
+    observation = viewed(
+        [[1.0, 0.0, 0.0]] * 2,
+        excess = 30.0,
+        alarm  = array([2.0, 1.0, 0.3, 1.0])
+    )
+
+    assert_allclose(
+        concatenate(
+            [
+                Escape()(observation),
+                Escape().excited(array([0.0, 0.0]), observation, 0.1),
+                Thermal()(observation),
+                Thermal().aligning(observation)
+            ]
+        ),
+        [0.0] * 3 + [2.0, 1.0, 0.3, 1.0] + [0.0] * 3 + [1.0] * 2
+    )
 
 
 def test_a_drone_learns_a_sender_beyond_its_table_from_a_member_s_list():
@@ -523,31 +554,41 @@ def test_exciting_the_flock_counts_down_and_starts_a_zig_at_the_rim():
     )
 
 
-def test_from_settings_reads_each_slot_by_name_scaled_to_the_launch():
+def test_exciting_the_flock_sets_off_a_drone_hearing_a_firing_neighbor():
     """
-    Asserts that each slot of the composite is the settings field naming it,
-    carried from a starling flock to the launch by the plan's similarity.
+    Asserts that a resting drone hearing a firing neighbor over the radio,
+    under a branching that sets it off for certain, fires the neighbor's
+    side, while the firing neighbor counts down by the step and the noise
+    slot's state holds.
     """
-    settings = Settings(coupling=Constant(coupling_per_s=2.0))
+    built = composite(escape=Excitable(branching=1.0, firing_s=0.5, refractory_s=1.0))
+    flock = replace(
+        flock_of(
+            array([[1000.0, 1000.0, 100.0], [1000.0, 1005.0, 100.0]]),
+            array([[10.0, 0.0, 0.0]] * 2)
+        ),
+        alarms = array([[0.0] * 4, [2.0, 1.0, 0.3, -1.0]])
+    )
 
-    built = Composite.from_settings(settings)
+    excited = built.excited(
+        flock,
+        key(0),
+        Observation.sensed(
+            still_air(),
+            1,
+            10.0,
+            flock,
+            Inbox.from_broadcast(flock, built.radio.range_m, flock),
+            0.0
+        ),
+        0.1
+    )
 
-    assert {slot.name: getattr(built, slot.name) for slot in fields(Composite)} == {
-        slot.name: getattr(settings, slot.name).scaled(settings.plan.similarity)
-        for slot in fields(Composite)
-    }
-
-
-def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position(
-    subtests: Subtests
-):
-    """
-    Asserts that drones stacked at one point each list every other drone,
-    which `KDTree.query` may order ahead of the drone itself.
-    """
-    for own, row in enumerate(nearest(3, zeros((4, 3)))):
-        with subtests.test(own=own):
-            assert sorted(row) == sorted({0, 1, 2, 3} - {own})
+    assert_allclose(
+        (excited.alarms[:, [0, 2, 3]], excited.forces),
+        ([[2.0, 0.5, -1.0], [2.0, 0.2, -1.0]], flock.forces),
+        rtol = 1e-6
+    )
 
 
 @mark.parametrize("rate", [0.0, 1.0, 2.0])
@@ -610,6 +651,65 @@ def test_unit_divides_by_length_and_holds_a_zero_vector(
     assert_allclose(unit(array(vectors)), expected)
 
 
+def test_from_settings_reads_each_slot_by_name_scaled_to_the_launch():
+    """
+    Asserts that each slot of the composite is the settings field naming it,
+    carried from a starling flock to the launch by the plan's similarity.
+    """
+    settings = Settings(coupling=Constant(coupling_per_s=2.0))
+
+    built = Composite.from_settings(settings)
+
+    assert {slot.name: getattr(built, slot.name) for slot in fields(Composite)} == {
+        slot.name: getattr(settings, slot.name).scaled(settings.plan.similarity)
+        for slot in fields(Composite)
+    }
+
+
+def test_nearest_leaves_a_drone_out_of_its_own_row_at_a_shared_position(
+    subtests: Subtests
+):
+    """
+    Asserts that drones stacked at one point each list every other drone,
+    which `KDTree.query` may order ahead of the drone itself.
+    """
+    for own, row in enumerate(nearest(3, zeros((4, 3)))):
+        with subtests.test(own=own):
+            assert sorted(row) == sorted({0, 1, 2, 3} - {own})
+
+
+@mark.parametrize(
+    ("slot", "idle"),
+    [
+        param("roost", Centroid(stiffness_per_s2=0.0), id="roost"),
+        param("speed", Cruise(cruise_m_s=8.0), id="speed")
+    ]
+)
+def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(
+    slot : str,
+    idle : Component
+):
+    """
+    Asserts that the composite's command rate carries the roost's turn and
+    pull and the speed slot's acceleration beside every other slot, against
+    a composite holding that slot idle, for a drone slower than the cruise
+    speed, high, and past the rim of the roost.
+    """
+    view = viewed(
+        [[20.0, 0.0, 0.0]] * 7,
+        velocity = (8.0, 0.0, 0.0),
+        cruise   = array(10.0),
+        position = array([-10.0, 1700.0, 130.0])
+    )
+    settings = Settings()
+
+    assert_allclose(
+        composite()(view)[0] - composite(**{slot: idle})(view)[0],
+        getattr(settings, slot).scaled(settings.plan.similarity)(view),
+        atol = 1e-5
+    )
+
+
 def test_nearest_orders_neighbors_by_distance_over_a_batch():
     """
     Asserts that a batch of flocks keeps its leading axis, with each drone's
@@ -655,38 +755,6 @@ def test_sensing_holds_each_neighbor_s_heard_state_by_rank():
     assert_array_equal(sensed.spin, flock.spins)
     assert_allclose(sensed.air["excess"], 5.0)
     assert_allclose(sensed.cruise, [10.0, 10.0, 10.0])
-
-
-@mark.parametrize(
-    ("slot", "idle"),
-    [
-        param("roost", Centroid(stiffness_per_s2=0.0), id="roost"),
-        param("speed", Cruise(cruise_m_s=8.0), id="speed")
-    ]
-)
-def test_the_composite_adds_each_slot_holding_the_flock_to_its_sum(
-    slot : str,
-    idle : Component
-):
-    """
-    Asserts that the composite's command rate carries the roost's turn and
-    pull and the speed slot's acceleration beside every other slot, against
-    a composite holding that slot idle, for a drone slower than the cruise
-    speed, high, and past the rim of the roost.
-    """
-    view = viewed(
-        [[20.0, 0.0, 0.0]] * 7,
-        velocity = (8.0, 0.0, 0.0),
-        cruise   = array(10.0),
-        position = array([-10.0, 1700.0, 130.0])
-    )
-    settings = Settings()
-
-    assert_allclose(
-        composite()(view)[0] - composite(**{slot: idle})(view)[0],
-        getattr(settings, slot).scaled(settings.plan.similarity)(view),
-        atol = 1e-5
-    )
 
 
 def test_sensing_ranks_neighbors_by_the_positions_the_drone_heard():
@@ -783,6 +851,39 @@ def test_summing_a_neighbor_on_the_drone_stays_finite():
     assert_allclose(viewed([[0.0, 0.0, 0.0], [1.0, 0.0, 0.0]]).bearings[0], 0.0)
 
 
+def test_the_alarm_states_run_from_resting_through_firing_to_refractory():
+    """
+    Asserts that the alarm's states number the cycle of an excitable medium
+    in order, so `Alarm.ALARMED` bounds the states that may fire.
+    """
+    assert [state.name for state in sorted(Alarm)] == [
+        "RESTING", "ALARMED", "FIRING", "REFRACTORY"
+    ]
+
+
+def test_the_composite_adds_the_escape_and_the_thermal_response_to_its_sum():
+    """
+    Asserts that a firing drone in hot air commands the escape's turn across
+    its heading and the thermal response's push along it beside every other
+    slot, against a composite holding both idle.
+    """
+    view = viewed(
+        [[20.0, 0.0, 0.0]] * 7,
+        excess   = 8.0,
+        alarm    = array([2.0, 1.0, 0.3, 1.0]),
+        position = array([-10.0, 1700.0, 130.0])
+    )
+    escape  = Excitable(firing_s=0.5)
+    thermal = Kinetic(speeding_m_s2_k=0.25)
+
+    assert_allclose(
+        composite(escape=escape, thermal=thermal)(view)[0]
+        - composite(escape=Escape(), thermal=Thermal())(view)[0],
+        escape(view) + thermal(view),
+        atol = 1e-5
+    )
+
+
 def test_the_curve_order_follows_the_drones_along_a_line():
     """
     Asserts that drones spread along one axis take their order along it on
@@ -811,90 +912,6 @@ def test_the_radio_carried_to_a_larger_flock_stays_a_drone_radio():
     assert radio.scaled(4.0) == radio
 
 
-def test_the_radio_delivers_each_broadcast_its_delay_late_at_each_packet():
-    """
-    Asserts that the radio delivers, at each packet, the broadcast sent
-    `delay_s` earlier and the velocity the lag before it, holds what each
-    drone heard between packets, and opens with the launch heard by every
-    drone and kept as every broadcast.
-    """
-    radio  = Radio(delay_s=0.3, loss=0.0, rate_hz=5.0)
-    flocks = [
-        flock_of(full((3, 3), step), full((3, 3), 10.0 * step))
-        for step in range(8)
-    ]
-    inbox, sent = radio.opened(flocks[0], 1, 0.1)
-    heard       = {}
-    for step in range(1, 8):
-        inbox, sent = radio.heard(flocks[step], inbox, key(0), 1, sent, step, 0.1)
-        heard[step] = inbox
-
-    assert sent.positions.shape == (5, 3, 3)
-    assert_allclose(heard[2].positions[heard[2].heard], 0.0)
-    assert_allclose(heard[4].positions[heard[4].heard], 1.0)
-    assert_allclose(heard[5].positions[heard[5].heard], 1.0)
-    assert_allclose(heard[6].positions[heard[6].heard], 3.0)
-    assert_allclose(heard[6].velocities[heard[6].heard], 30.0)
-    assert_allclose(heard[6].delayed[heard[6].heard], 20.0)
-    assert_allclose(heard[7].positions[heard[7].heard], 3.0)
-
-
-def test_the_radio_draws_each_packet_s_loss_apart_at_each_step():
-    """
-    Asserts that each step draws its own losses, so a packet lost at two
-    steps in a row falls at the square of the loss rather than at the loss.
-    """
-    radio = Radio(loss=0.4)
-    lost  = [
-        radio.draws(key(0), arange(200)[:, newaxis], arange(200), step) >= 0.6
-        for step in (1, 2)
-    ]
-
-    assert_allclose(float((lost[0] & lost[1]).mean()), 0.16, atol=0.01)
-
-
-def test_the_radio_forgets_a_sender_once_its_hold_passes_with_no_packet():
-    """
-    Asserts that a drone keeps hearing a sender whose packets stop until
-    `hold_periods` packet periods pass from its last packet, then forgets
-    it, and hears it again at its next packet.
-    """
-    radio = Radio(
-        delay_s      = 0.0,
-        hold_periods = 3,
-        loss         = 0.0,
-        range_m      = 10.0,
-        rate_hz      = 5.0
-    )
-    near        = flock_of(array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]]), zeros((2, 3)))
-    far         = flock_of(array([[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]]), zeros((2, 3)))
-    inbox, sent = radio.opened(near, 0, 0.1)
-    heard       = []
-    for step, flock in enumerate([far] * 7 + [near], start=1):
-        inbox, sent = radio.heard(flock, inbox, key(0), 0, sent, step, 0.1)
-        heard.append(holds(inbox, 0, 1))
-
-    assert heard == [True] * 5 + [False] * 2 + [True]
-
-
-def test_the_radio_hears_at_launch_only_the_drones_within_its_range():
-    """
-    Asserts that the inbox a flight opens on holds each drone within the
-    range and none past it, so sensing pads a rank no heard sender fills.
-    """
-    flock = flock_of(
-        array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [50.0, 0.0, 0.0]]),
-        ones((3, 3))
-    )
-    inbox, _ = Radio(range_m=10.0).opened(flock, 0, 0.1)
-
-    assert_array_equal(inbox.senders[0][inbox.heard[0]], [1])
-    assert_allclose(
-        Observation.sensed(still_air(), 2, 10.0, flock, inbox, 0.0).offsets[0],
-        [[5.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
-    )
-
-
 @mark.parametrize("drones", [param(20, id="twenty"), param(200, id="two-hundred")])
 def test_the_radio_opens_on_a_table_of_the_nearest_senders_whatever_the_flock_s_size(
     drones: int
@@ -915,58 +932,63 @@ def test_the_radio_opens_on_a_table_of_the_nearest_senders_whatever_the_flock_s_
     )
 
 
-def test_the_radio_loses_its_share_of_the_packets_between_two_drones():
+def test_the_radio_carries_each_sender_s_alarm_to_the_drones_hearing_it():
     """
-    Asserts that each drone hears each other drone's packet with the chance
-    the loss leaves, each pair drawn apart, and that a packet lost leaves
-    what the drone heard before.
+    Asserts that a receiver senses each neighbor's escape state as the
+    broadcast it heard carried it, and its own beside them.
     """
-    radio = Radio(delay_s=0.0, loss=0.4, rate_hz=10.0)
-    draws = radio.draws(key(0), arange(200)[:, newaxis], arange(200), 1)
-    lost  = next(
-        step
-        for step in range(1, 50)
-        if radio.draws(key(0), array([[0]]), array([[1]]), step)[0, 0] >= 0.6
+    flock = replace(
+        flock_of(
+            array([[0.0, 0.0, 100.0], [5.0, 0.0, 100.0], [10.0, 0.0, 100.0]]),
+            array([[10.0, 0.0, 0.0]] * 3)
+        ),
+        alarms = array([[0.0] * 4, [2.0, 1.0, 0.3, -1.0], [3.0, 0.5, 0.2, 1.0]])
     )
-    inbox, sent = radio.opened(flock_of(zeros((2, 3)), zeros((2, 3))), 0, 0.1)
-
-    inbox, _ = radio.heard(
-        flock_of(ones((2, 3)), ones((2, 3))),
-        inbox,
-        key(0),
-        0,
-        sent,
-        lost,
-        0.1
+    sensed = Observation.sensed(
+        still_air(),
+        2,
+        10.0,
+        flock,
+        Inbox.from_broadcast(flock, 50.0, flock),
+        0.0
     )
 
-    assert_allclose(float((draws >= 0.6).mean()), 0.4, atol=0.01)
-    assert holds(inbox, 0, 1)
-    assert_allclose(inbox.positions[0, 0], 0.0)
-
-
-def test_the_radio_s_range_acts_on_the_distance_as_each_packet_is_sent():
-    """
-    Asserts that a packet sent from past the range never arrives, leaving
-    what the drone heard before, while one sent from inside it arrives even
-    where the sender has since flown past the range.
-    """
-    radio = Radio(
-        delay_s = 0.1,
-        loss    = 0.0,
-        range_m = 10.0,
-        rate_hz = 10.0
+    assert_allclose(
+        concatenate([sensed.alarm[:1], sensed.alarms[0]]),
+        [[0.0] * 4, [2.0, 1.0, 0.3, -1.0], [3.0, 0.5, 0.2, 1.0]]
     )
-    near        = flock_of(array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]]), zeros((2, 3)))
-    far         = flock_of(array([[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]]), zeros((2, 3)))
-    inbox, sent = radio.opened(near, 0, 0.1)
 
-    inbox, sent = radio.heard(far, inbox, key(0), 0, sent, 1, 0.1)
-    assert_allclose(inbox.positions[0, 0], [5.0, 0.0, 0.0])
 
-    inbox, sent = radio.heard(far, inbox, key(0), 0, sent, 2, 0.1)
-    assert_allclose(inbox.positions[0, 0], [5.0, 0.0, 0.0])
-    assert holds(inbox, 0, 1)
+def test_the_radio_delivers_each_broadcast_its_delay_late_at_each_packet():
+    """
+    Asserts that the radio delivers, at each packet, the broadcast sent
+    `delay_s` earlier with its escape state and the velocity the lag before
+    it, holds what each drone heard between packets, and opens with the
+    launch heard by every drone and kept as every broadcast.
+    """
+    radio  = Radio(delay_s=0.3, loss=0.0, rate_hz=5.0)
+    flocks = [
+        replace(
+            flock_of(full((3, 3), step), full((3, 3), 10.0 * step)),
+            alarms = full((3, 4), step)
+        )
+        for step in range(8)
+    ]
+    inbox, sent = radio.opened(flocks[0], 1, 0.1)
+    heard       = {}
+    for step in range(1, 8):
+        inbox, sent = radio.heard(flocks[step], inbox, key(0), 1, sent, step, 0.1)
+        heard[step] = inbox
+
+    assert sent.positions.shape == (5, 3, 3)
+    assert_allclose(heard[2].positions[heard[2].heard], 0.0)
+    assert_allclose(heard[4].positions[heard[4].heard], 1.0)
+    assert_allclose(heard[5].positions[heard[5].heard], 1.0)
+    assert_allclose(heard[6].positions[heard[6].heard], 3.0)
+    assert_allclose(heard[6].alarms[heard[6].heard], 3.0)
+    assert_allclose(heard[6].velocities[heard[6].heard], 30.0)
+    assert_allclose(heard[6].delayed[heard[6].heard], 20.0)
+    assert_allclose(heard[7].positions[heard[7].heard], 3.0)
 
 
 @mark.parametrize(
@@ -1057,3 +1079,113 @@ def test_the_neighbors_agree_with_an_exact_search_over_the_same_broadcasts(drone
     ).any(-1)
 
     assert float(matched.sum() / isfinite(searched_m).sum()) >= 0.99
+
+
+def test_the_radio_draws_each_packet_s_loss_apart_at_each_step():
+    """
+    Asserts that each step draws its own losses, so a packet lost at two
+    steps in a row falls at the square of the loss rather than at the loss.
+    """
+    radio = Radio(loss=0.4)
+    lost  = [
+        radio.draws(key(0), arange(200)[:, newaxis], arange(200), step) >= 0.6
+        for step in (1, 2)
+    ]
+
+    assert_allclose(float((lost[0] & lost[1]).mean()), 0.16, atol=0.01)
+
+
+def test_the_radio_forgets_a_sender_once_its_hold_passes_with_no_packet():
+    """
+    Asserts that a drone keeps hearing a sender whose packets stop until
+    `hold_periods` packet periods pass from its last packet, then forgets
+    it, and hears it again at its next packet.
+    """
+    radio = Radio(
+        delay_s      = 0.0,
+        hold_periods = 3,
+        loss         = 0.0,
+        range_m      = 10.0,
+        rate_hz      = 5.0
+    )
+    near        = flock_of(array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]]), zeros((2, 3)))
+    far         = flock_of(array([[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]]), zeros((2, 3)))
+    inbox, sent = radio.opened(near, 0, 0.1)
+    heard       = []
+    for step, flock in enumerate([far] * 7 + [near], start=1):
+        inbox, sent = radio.heard(flock, inbox, key(0), 0, sent, step, 0.1)
+        heard.append(holds(inbox, 0, 1))
+
+    assert heard == [True] * 5 + [False] * 2 + [True]
+
+
+def test_the_radio_hears_at_launch_only_the_drones_within_its_range():
+    """
+    Asserts that the inbox a flight opens on holds each drone within the
+    range and none past it, so sensing pads a rank no heard sender fills.
+    """
+    flock = flock_of(
+        array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0], [50.0, 0.0, 0.0]]),
+        ones((3, 3))
+    )
+    inbox, _ = Radio(range_m=10.0).opened(flock, 0, 0.1)
+
+    assert_array_equal(inbox.senders[0][inbox.heard[0]], [1])
+    assert_allclose(
+        Observation.sensed(still_air(), 2, 10.0, flock, inbox, 0.0).offsets[0],
+        [[5.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    )
+
+
+def test_the_radio_loses_its_share_of_the_packets_between_two_drones():
+    """
+    Asserts that each drone hears each other drone's packet with the chance
+    the loss leaves, each pair drawn apart, and that a packet lost leaves
+    what the drone heard before.
+    """
+    radio = Radio(delay_s=0.0, loss=0.4, rate_hz=10.0)
+    draws = radio.draws(key(0), arange(200)[:, newaxis], arange(200), 1)
+    lost  = next(
+        step
+        for step in range(1, 50)
+        if radio.draws(key(0), array([[0]]), array([[1]]), step)[0, 0] >= 0.6
+    )
+    inbox, sent = radio.opened(flock_of(zeros((2, 3)), zeros((2, 3))), 0, 0.1)
+
+    inbox, _ = radio.heard(
+        flock_of(ones((2, 3)), ones((2, 3))),
+        inbox,
+        key(0),
+        0,
+        sent,
+        lost,
+        0.1
+    )
+
+    assert_allclose(float((draws >= 0.6).mean()), 0.4, atol=0.01)
+    assert holds(inbox, 0, 1)
+    assert_allclose(inbox.positions[0, 0], 0.0)
+
+
+def test_the_radio_s_range_acts_on_the_distance_as_each_packet_is_sent():
+    """
+    Asserts that a packet sent from past the range never arrives, leaving
+    what the drone heard before, while one sent from inside it arrives even
+    where the sender has since flown past the range.
+    """
+    radio = Radio(
+        delay_s = 0.1,
+        loss    = 0.0,
+        range_m = 10.0,
+        rate_hz = 10.0
+    )
+    near        = flock_of(array([[0.0, 0.0, 0.0], [5.0, 0.0, 0.0]]), zeros((2, 3)))
+    far         = flock_of(array([[0.0, 0.0, 0.0], [50.0, 0.0, 0.0]]), zeros((2, 3)))
+    inbox, sent = radio.opened(near, 0, 0.1)
+
+    inbox, sent = radio.heard(far, inbox, key(0), 0, sent, 1, 0.1)
+    assert_allclose(inbox.positions[0, 0], [5.0, 0.0, 0.0])
+
+    inbox, sent = radio.heard(far, inbox, key(0), 0, sent, 2, 0.1)
+    assert_allclose(inbox.positions[0, 0], [5.0, 0.0, 0.0])
+    assert holds(inbox, 0, 1)

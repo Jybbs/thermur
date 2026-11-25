@@ -377,6 +377,7 @@ def flown(
         inbox     = inbox,
         key       = key,
         path      = lambda *_: Flock(
+            alarms     = jnp.zeros_like(flock.alarms),
             commands   = jnp.asarray(increments, dtype="float32"),
             forces     = still,
             positions  = still,
@@ -526,6 +527,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         flock = tree.map(
             lambda leaf: jnp.asarray(leaf, dtype="float32"),
             Flock(
+                alarms     = zeros((120, 4)),
                 commands   = velocities,
                 forces     = zeros((120, 3)),
                 positions  = crossing,
@@ -643,6 +645,7 @@ def posed(
             dtype = "float32"
         ),
         Flock(
+            alarms    = zeros((len(forces), 4)),
             commands  = commands,
             forces    = forces,
             positions = positions,

@@ -6,6 +6,7 @@ flight.
 """
 
 from jax.numpy import array, asarray, full, linalg, ones, zeros
+from math      import inf
 from xarray    import Dataset
 
 from thermur.controller.schemas  import Flock, Observation, unit
@@ -22,6 +23,7 @@ def flock_of(positions: object, velocities: object, commands: object = None) -> 
     `commands` is `None`.
     """
     return Flock(
+        alarms     = zeros((*asarray(positions).shape[:-1], 4)),
         commands   = asarray(velocities if commands is None else commands),
         forces     = zeros(asarray(positions).shape),
         positions  = asarray(positions),
@@ -71,11 +73,12 @@ def small() -> Settings:
 
 def still_air(
     excess : float = 0.0,
+    front  : float = inf,
     wind   : tuple[float, float, float] = (0.0, 0.0, 0.0)
 ) -> Air:
     """
-    Builds air holding one `excess` and one `wind`, east, north, and up, at
-    every point of a small grid.
+    Builds air holding one `excess`, one distance to the burning front, and
+    one `wind`, east, north, and up, at every point of a small grid.
     """
     return Air.from_dataset(
         Dataset(
@@ -85,8 +88,8 @@ def still_air(
                     full((2, 2, 2, 2), value)
                 )
                 for name, value in zip(
-                    ("excess", "u", "v", "w"),
-                    (excess, *wind),
+                    ("excess", "front", "u", "v", "w"),
+                    (excess, front, *wind),
                     strict = True
                 )
             },
@@ -117,7 +120,9 @@ def viewed(
     distances = linalg.norm(spots, axis=-1)
     return Observation(
         **{
-            "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
+            "air"    : {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
+            "alarm"  : zeros(4),
+            "alarms" : zeros((len(offsets), 4)),
             "centrality" : linalg.norm(unit(spots).sum(0))
             / max(int((distances > 0).sum()), 1),
             "cruise"     : linalg.norm(own),

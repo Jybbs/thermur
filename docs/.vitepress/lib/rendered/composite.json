@@ -15,6 +15,15 @@
     "kind": "Constant",
     "coupling_per_s": 0.026277478192083335
   },
+  "escape": {
+    "kind": "Excitable",
+    "alarm_m": 50.0,
+    "branching": 1.0,
+    "climbing": 0.5,
+    "firing_s": 20.904043818064928,
+    "refractory_s": 20.904043818064928,
+    "relaxation_s": 1.0
+  },
   "heading": {
     "kind": "Consensus",
     "centering": 0.0002
@@ -66,6 +75,11 @@
     "fixed": false,
     "cruise_m_s": 10.0,
     "relaxation_s": 34.40208354058685
+  },
+  "thermal": {
+    "kind": "Kinetic",
+    "aligning_per_k": 0.05,
+    "speeding_m_s2_k": 0.25
   },
   "plan": {
     "axes": [

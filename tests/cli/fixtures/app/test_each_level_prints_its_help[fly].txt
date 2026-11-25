@@ -58,6 +58,33 @@ Flies the flock, or computes the steps of the graph named.
 │ --crop.y-m FLOAT FLOAT        The southernmost and the northernmost mass     │
 │   --crop.empty-y-m            point kept, in meters from the domain's        │
 │                               southern edge, or None to keep every row.      │
+│ --escape.alarm-m FLOAT        The distance to the burning front within which │
+│                               a drone's alertness settles at or above the    │
+│                               alarm, in meters at a drone's own scale, by    │
+│                               default the radio's range. [default: 50.0]     │
+│ --escape.branching FLOAT      The mean number of drones each firing sets off │
+│                               among the neighbors hearing it, by default the │
+│                               critical branching ratio of an excitable       │
+│                               network. [default: 1.0]                        │
+│ --escape.climbing FLOAT       The share of the maneuvers a drone fires on    │
+│                               its own that climb rather than turn, by        │
+│                               default an even split between the starling     │
+│                               model's level turn and the climb that stands   │
+│                               for its dive. [default: 0.5]                   │
+│ --escape.firing-s FLOAT       The time a drone fires its maneuver, in        │
+│                               seconds, at a starling's scale, by default     │
+│                               half the time between the pulses of a starling │
+│                               agitation wave, 3.5 s across 2.88 pulses.      │
+│                               [default: 0.607638888888889]                   │
+│ --escape.refractory-s FLOAT   The time after firing during which the drone   │
+│                               fires no maneuver, in seconds, at a starling's │
+│                               scale, by default the other half of that time, │
+│                               so a drone the fire holds alarmed fires once   │
+│                               per pulse. [default: 0.607638888888889]        │
+│ --escape.relaxation-s FLOAT   The time over which the alertness relaxes      │
+│                               toward the stimulus, in seconds, by default    │
+│                               the reciprocal of the starling model's decay   │
+│                               rate of 1 per second. [default: 1.0]           │
 │ --heading.centering FLOAT     The rate at which a drone's velocity relaxes   │
 │                               toward its neighbors' mean, as a share of the  │
 │                               coupling's mean rate per neighbor, by default  │
@@ -259,6 +286,18 @@ Flies the flock, or computes the steps of the graph named.
 │                               toward cruise_m_s, in seconds, at a starling's │
 │                               scale, by default the model's speed control of │
 │                               1 second. [default: 1.0]                       │
+│ --thermal.aligning-per-k      The rise of the rate at which a drone aligns   │
+│   FLOAT                       with each neighbor, as a share of the          │
+│                               coupling's rate per kelvin of excess, by       │
+│                               default the value doubling the rate at the     │
+│                               parametric threat's anomaly of 20 K. [default: │
+│                               0.05]                                          │
+│ --thermal.speeding-m-s2-k     The acceleration along a drone's command per   │
+│   FLOAT                       kelvin of excess, in meters per second         │
+│                               squared, by default the value reaching the     │
+│                               plant's level bound of 5 m/s² at the           │
+│                               parametric threat's anomaly of 20 K. [default: │
+│                               0.25]                                          │
 │ --threat.anomaly-k FLOAT      The potential temperature behind the front in  │
 │                               excess of the air ahead of it, in kelvin.      │
 │                               [default: 20.0]                                │
