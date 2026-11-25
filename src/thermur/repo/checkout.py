@@ -310,13 +310,19 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         """
         Reads every command and alias `mise --help` lists under `Commands`,
         each of which `mise <word>` runs ahead of a task aliased the same,
-        joining an alias list the help wraps across lines.
+        joining an alias list the help wraps across lines. The help prints
+        without color at 100 columns, since forced color or a wider terminal
+        moves the heading the read starts from.
         """
-        listing = (
-            self.run("mise", "--help", capture=True)
-            .stdout.partition("\nCommands:\n")[2]
-            .partition("\n\n")[0]
+        printed = self.run(
+            "env",
+            "NO_COLOR=1",
+            "COLUMNS=100",
+            "mise",
+            "--help",
+            capture = True
         )
+        listing = printed.stdout.partition("\nCommands:\n")[2].partition("\n\n")[0]
         return {
             *findall(r"(?m)^  ([\w-]+)", listing),
             *findall(r"[\w-]+", " ".join(findall(r"\[aliases: ([^\]]+)\]", listing)))

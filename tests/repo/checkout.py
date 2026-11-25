@@ -267,6 +267,8 @@ def test_subcommands_reads_each_command_and_alias_the_help_lists(
     """
     printed = (
         "Usage: mise [OPTIONS] [TASK] [COMMAND]\n\nCommands:\n"
+        "  activate      Print the script to activate mise in an\n"
+        "                interactive shell\n"
         "  audit         Check tool versions\n"
         "  backends      Manage backends [aliases: b, backend,\n"
         "                backend-list]\n"
@@ -279,13 +281,35 @@ def test_subcommands_reads_each_command_and_alias_the_help_lists(
         lambda checkout, *command, capture: CompletedProcess(
             command,
             0,
-            {("mise", "--help"): printed}[command]
+            {("env", "NO_COLOR=1", "COLUMNS=100", "mise", "--help"): printed}[command]
         )
     )
 
     assert checkout.subcommands == {
-        "audit", "b", "backend", "backend-list", "backends", "self-update"
+        "activate", "audit", "b", "backend", "backend-list", "backends", "self-update"
     }
+
+
+@mark.parametrize(
+    ("variable", "value"),
+    [
+        param("CLICOLOR_FORCE", "1", id = "forced-color"),
+        param("COLUMNS", "300", id = "wide-terminal")
+    ]
+)
+def test_subcommands_reads_the_help_whatever_the_terminal(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch,
+    value       : str,
+    variable    : str
+):
+    """
+    Asserts that the commands `mise --help` lists are read under forced
+    color and a wide terminal, either of which moves the `Commands` heading.
+    """
+    monkeypatch.setenv(variable, value)
+
+    assert "use" in checkout.subcommands
 
 
 def test_tasks_carries_the_lines_a_toml_task_runs(checkout: Checkout):
