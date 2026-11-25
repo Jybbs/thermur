@@ -1031,8 +1031,8 @@ class Workflow(Document):
     drafted: ClassVar[str] = "github.event.pull_request.draft == true"
     """
     The term of a concurrency group naming a run on a draft pull request,
-    compared to `true` since the field is null on a run no pull request
-    started.
+    compared to `true` since the field reads as an empty string on a run
+    no pull request started.
     """
 
     jobs: frozendict[str, Job]

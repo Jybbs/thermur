@@ -963,24 +963,27 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
             CI,
             "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
-            f"`{CI}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft == true`",
+            f"`{CI}` cancels a ready run from a draft or fails a "
+            "dispatched run, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "ci-group"
         ),
         param(
             SITE,
             "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
-            f"`{SITE}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft == true`",
+            f"`{SITE}` cancels a ready run from a draft or fails a "
+            "dispatched run, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "site-group"
         ),
         param(
             CI,
             "draft == true, '-draft'",
             "draft, '-draft'",
-            f"`{CI}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft == true`",
+            f"`{CI}` cancels a ready run from a draft or fails a "
+            "dispatched run, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "ci-group-null"
         ),
         param(
