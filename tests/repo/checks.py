@@ -961,19 +961,27 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
         ),
         param(
             CI,
-            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
             f"`{CI}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft`",
+            "group leaves out `github.event.pull_request.draft == true`",
             id = "ci-group"
         ),
         param(
             SITE,
-            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
             f"`{SITE}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft`",
+            "group leaves out `github.event.pull_request.draft == true`",
             id = "site-group"
+        ),
+        param(
+            CI,
+            "draft == true, '-draft'",
+            "draft, '-draft'",
+            f"`{CI}` cancels a ready run from a draft, since its concurrency "
+            "group leaves out `github.event.pull_request.draft == true`",
+            id = "ci-group-null"
         ),
         param(
             CI,
@@ -1010,8 +1018,8 @@ def test_a_workflow_running_on_a_draft_is_named(
 ):
     """
     Asserts that a pull-request workflow whose activity types leave out
-    `ready_for_review` or whose concurrency group leaves out the draft
-    state is named, as is each of its jobs whose condition carries no guard
+    `ready_for_review` or whose concurrency group compares no draft state to
+    `true` is named, as is each of its jobs whose condition carries no guard
     skipping a draft.
     """
     edit(checkout, path, new=new, old=old)
@@ -2065,7 +2073,7 @@ def test_a_workflow_sharing_no_concurrency_group_passes(checkout: Checkout):
         "  cancel-in-progress : ${{ github.event_name == 'pull_request' }}\n"
         "  group              : ${{ github.workflow }}-"
         "${{ github.head_ref || github.ref }}"
-        "${{ case(github.event.pull_request.draft, '-draft', '') }}\n"
+        "${{ case(github.event.pull_request.draft == true, '-draft', '') }}\n"
     )
 
     assert DraftCheck(checkout=checkout).findings == []

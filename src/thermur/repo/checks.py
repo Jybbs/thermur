@@ -19,7 +19,7 @@ from yaml            import NodeEvent, parse
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
-from thermur.repo.schemas  import Finding, Job, Parity, read_pin
+from thermur.repo.schemas  import Finding, Parity, Workflow, read_pin
 
 
 class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -187,7 +187,7 @@ class DraftCheck(Check):
                 yield Finding(
                     file    = path,
                     message = f"`{path}` cancels a ready run from a draft, since its "
-                    f"concurrency group leaves out `{Job.draft.removeprefix('!')}`"
+                    f"concurrency group leaves out `{Workflow.drafted}`"
                 )
 
             for key, job in workflow.jobs.items():
