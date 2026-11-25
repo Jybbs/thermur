@@ -22,14 +22,16 @@ def runs(*modules: str):
     in the span pytest-testmon checksums as that function's block. The span
     starts on the line of the function's first statement and ends on the
     line before the next statement in the body holding the function. Where
-    the function ends that body, the span ends before whatever statement,
-    `except` clause, or `case` clause follows the statement or clause
-    holding the body, stepping outward through each enclosing one that
-    nothing follows. Each line of the span the top-level block runs is a
-    `def` line the function's body shares, a decorator of the statement
-    after the span, since `ast` starts a decorated statement on its `def`
-    or `class` line, or a line of a later branch of an enclosing statement,
-    such as an `elif`, an `else`, an `except`, or a `finally`.
+    the function ends that body, the span ends before whatever statement
+    or `except` clause follows the statement or clause holding the body,
+    stepping outward through each enclosing one that nothing follows, and
+    ends on the function's last line once that stepping reaches a `case`
+    clause another follows. Each line of the span the top-level block runs
+    is a line of the `def` statement the function's body shares, a decorator
+    of the statement after the span, since `ast` starts a decorated
+    statement on its `def` or `class` line, or a line of a later branch of
+    an enclosing statement, such as an `elif`, an `else`, an `except`, or
+    a `finally`.
     """
     for module in modules:
         run_path(find_spec(module).origin, run_name=module)
