@@ -908,7 +908,8 @@ def test_the_radio_hears_at_launch_only_the_drones_within_its_range():
     [
         param(20, 16, id="twenty"),
         param(200, 16, id="two-hundred"),
-        param(200, 8, id="a-table-of-eight")
+        param(200, 8, id="a-table-of-eight"),
+        param(10, 24, id="a-table-past-the-flock")
     ]
 )
 def test_the_radio_opens_on_a_table_of_the_nearest_senders_whatever_the_flock_s_size(

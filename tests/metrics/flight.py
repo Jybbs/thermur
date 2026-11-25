@@ -42,6 +42,7 @@ from numpy.testing import assert_allclose, assert_array_equal
 from pytest        import FixtureRequest, fixture, mark, param
 
 from thermur.controller.components import (
+    Centered,
     Centroid,
     Consensus,
     Constant,
@@ -955,6 +956,26 @@ def test_the_radio_s_range_reaches_the_replay_and_the_flight():
             short()
         ).frames.positions
     )
+
+
+def test_the_radio_s_table_reaches_the_replay():
+    """
+    Asserts that a string of drones a meter apart across their heading
+    replays otherwise under a table of eight senders than under one of
+    twenty-four, since the cohesion's centrality reads every sender the
+    table holds.
+    """
+    flight = laid(stack([zeros(30), arange(30.0), zeros(30)], -1), [10.0, 0.0, 0.0])
+    table  = {
+        slots: replace(
+            STILL,
+            cohesion = Centered(),
+            radio    = Radio(delay_s=0.0, loss=0.0, slots=slots)
+        )
+        for slots in (8, 24)
+    }
+
+    assert not allclose(flight.drifts(AIR, table[8]), flight.drifts(AIR, table[24]))
 
 
 def test_the_statistics_table_holds_each_statistic_by_seed(flight: Flight):

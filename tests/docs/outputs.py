@@ -29,7 +29,7 @@ from typing       import Annotated
 from thermur.controller.components import HardSphere, Home
 from thermur.controller.schemas    import Composite, Flock, Radio
 from thermur.docs.kit              import Piece
-from thermur.docs.outputs          import Outputs, flown, markdown_table, pieces, specimens, tabled
+from thermur.docs.outputs          import Outputs, flown, markdown_table, paired, pieces, specimens, tabled
 from thermur.environment.plant     import Plant
 from thermur.environment.schemas import (
     BASE_K,
@@ -350,6 +350,17 @@ def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkou
     assert "| Slider | `Slider` | `slider` | " in table
     assert "| The Gate | `onMotion`, `pause`, `paused`, `still` | None | " in table
     assert any(" | None | " in row for row in rows)
+
+
+def test_the_parity_file_s_radio_flock_outnumbers_the_composite_s_table():
+    """
+    Asserts that the radio run of the parity file flies eight more drones
+    than the composite's table holds, at a table other than the default.
+    """
+    settings = Settings(radio=Radio(slots=8))
+    radio    = paired(Composite.from_settings(settings), settings.plan)["radio"]
+
+    assert len(radio["flock"]["positions"]) == 16
 
 
 def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
