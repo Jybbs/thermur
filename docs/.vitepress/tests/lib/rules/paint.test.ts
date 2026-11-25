@@ -41,8 +41,19 @@ interface Painted {
 const SCHEMES = ['dark', 'light'] as const
 
 /**
+ * The labels each scheme holds to a text's contrast, after four samples
+ * counting four inside the range and three by rank; the light by-rank count
+ * waits on a pick of its color.
+ */
+const HELD: Record<Scheme, string[]> = {
+  dark  : ['4 s ago', 'now', 'by rank, 3', 'within range, 4'],
+  light : ['4 s ago', 'now', 'within range, 4']
+}
+
+/**
  * Builds strips of four samples over the foot of a canvas 1200 pixels wide,
- * every sample but the newest counting five inside the range and seven by rank.
+ * every sample counting five inside the range and seven by rank until a case
+ * samples a newest.
  */
 function strips(tones: Tones): Strips {
   const built = new Strips('11px mono', 4, 4, tones)
@@ -139,11 +150,11 @@ describe.for(SCHEMES)('the strips under the %s scheme', scheme => {
     }
   })
 
-  it('write the time axis and the range’s count at a text’s contrast against their halo', () => {
+  it('write every label but the light scheme’s by-rank count at a text’s contrast against their halo', () => {
     const built = strips(tones)
     built.sample(4, 3)
-    const words = painted(built, scheme, ranged, seven).words.filter(word => !word.text.startsWith('by rank'))
-    expect(words.map(word => word.text)).toEqual(['4 s ago', 'now', 'within range, 4'])
+    const words = painted(built, scheme, ranged, seven).words.filter(word => HELD[scheme].includes(word.text))
+    expect(words.map(word => word.text)).toEqual(HELD[scheme])
     for (const word of words) expect(wcagContrast(over(word.halo, word), word.halo)).toBeGreaterThanOrEqual(FLOORS.text)
   })
 })
