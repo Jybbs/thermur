@@ -72,7 +72,7 @@ jobs:
 
 on:
   pull_request:
-    paths : ['**', '!docs/.vitepress/**', docs/.vitepress/lib/rendered/**]
+    paths : ['**', '!docs/.vitepress/**', '!tests/kit/**', '!tests/site/**', docs/.vitepress/lib/rendered/**]
     types : [opened, synchronize, reopened, ready_for_review]
 
   workflow_dispatch:

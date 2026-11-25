@@ -66,7 +66,7 @@ jobs:
 
 on:
   pull_request:
-    paths : [.github/CONTRIBUTING.md, .github/README.md, .github/actions/provision/**, .github/workflows/site.yml, .gitignore, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, docs/**, pyproject.toml, src/thermur/identity/fonts/**]
+    paths : [.github/CONTRIBUTING.md, .github/README.md, .github/actions/provision/**, .github/workflows/site.yml, .gitignore, .mise/config.toml, .mise/mise.lock, .mise/tasks/site/**, docs/**, pyproject.toml, src/thermur/identity/fonts/**, tests/kit/**, tests/site/**]
     types : [opened, synchronize, reopened, ready_for_review]
 
   workflow_dispatch:

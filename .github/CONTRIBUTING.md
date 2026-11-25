@@ -33,7 +33,7 @@ A page cites published work through a footnote whose label is the study's key in
 
 ## Checks
 
-Every pull request runs `🐦‍⬛ CI` except one touching only the site's own code under `docs/.vitepress/`, and one touching what the site reads runs `🐦‍⬛ Site`, whose rows each run one task, so the command beside each check below runs the same task on a laptop:
+Every pull request runs `🐦‍⬛ CI` except one touching only the site's own code under `docs/.vitepress/` or the site's and the kit's tests under `tests/site/` and `tests/kit/`, and one touching what the site reads runs `🐦‍⬛ Site`, whose rows each run one task, so the command beside each check below runs the same task on a laptop:
 
 | **Check** | **Runs Locally** | **Fails When** |
 |---|---|---|

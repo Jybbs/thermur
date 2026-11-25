@@ -1,11 +1,12 @@
 import { configDefaults, defineConfig } from 'vitest/config'
 
-import { cacheDir } from '../lib/paths.ts'
-import { shared }   from '../lib/vite.ts'
+import { cacheDir, repoRoot } from '../lib/paths.ts'
+import { shared }             from '../lib/vite.ts'
 
 export default defineConfig({
   ...shared(),
   cacheDir : cacheDir(import.meta.url, 'vitest'),
+  server   : { fs: { allow: [repoRoot(import.meta.url)] } },
 
   test: {
     css                 : { include: [/\.css\?raw$/u] },
@@ -15,12 +16,12 @@ export default defineConfig({
       '**/*.lock',
       '**/.mise/**'
     ],
-    include             : ['.vitepress/tests/**/*.test.ts', 'kit/tests/**/*.test.{ts,tsx}'],
+    include             : ['../tests/kit/**/*.test.{ts,tsx}', '../tests/site/**/*.test.ts'],
     pool                : 'threads',
     resolveSnapshotPath : (testPath, extension) => testPath + extension,
     restoreMocks        : true,
     sequence            : { shuffle: true },
-    setupFiles          : ['.vitepress/tests/common/matchers.ts'],
+    setupFiles          : ['../tests/site/common/matchers.ts'],
     testTimeout         : 60_000,
     unstubGlobals       : true,
 
