@@ -221,8 +221,8 @@ Flies the flock, or computes the steps of the graph named.
 │                               that no pull acts in, in meters, at a          │
 │                               starling's scale, by default the thickness     │
 │                               measured on the starling flock of 781 birds,   │
-│                               which the model's flock setting that scale is  │
-│                               matched to. [default: 5.33]                    │
+│                               whose counterpart in the starling model sets   │
+│                               that scale. [default: 5.33]                    │
 │ --roost.bound-m-s2 FLOAT      The largest turning acceleration, in meters    │
 │                               per second squared, by default the plant's     │
 │                               bound on a horizontal acceleration. [default:  │

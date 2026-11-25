@@ -860,6 +860,16 @@ def test_the_time_to_reach_the_rim_follows_the_course_to_the_circle(
     assert_allclose(Home().rim_s(array(ground), array(outward)), expected, rtol=1e-6)
 
 
+def test_home_defaults_to_the_launch_s_center():
+    """
+    Asserts that the roost's disk and band sit by default on the launch's
+    center, east, north, and above the ground.
+    """
+    home = Home()
+
+    assert (*home.center_m, home.height_m) == Plan().center_m
+
+
 @mark.parametrize(
     ("height", "climb", "updraft", "expected"),
     [
@@ -890,6 +900,34 @@ def test_home_pulls_a_drone_back_to_its_band_and_damps_its_climb(
                 velocity = (10.0, 0.0, climb),
                 air      = {"excess": array(0.0), "u": array(0.0), "v": array(0.0)}
                 | {"w": array(updraft)},
+                position = array([1000.0, 1000.0, height])
+            )
+        )[2],
+        expected,
+        atol = 1e-6
+    )
+
+
+@mark.parametrize(
+    ("height", "expected"),
+    [param(100.0, 0.0, id="at-the-height"), param(104.0, -1.0, id="above")]
+)
+def test_home_without_a_band_pulls_by_the_full_height_away(
+    expected : float,
+    height   : float
+):
+    """
+    Asserts that a roost whose band has no depth pulls a level drone toward
+    its height by the stiffness times the whole height away, as the starling
+    model's roost term does.
+    """
+    assert_allclose(
+        Home(band_m=0.0, height_m=100.0, stiffness_per_s2=0.25)(
+            viewed(
+                [[1.0, 0.0, 0.0]],
+                velocity = (10.0, 0.0, 0.0),
+                air      = {"excess": array(0.0), "u": array(0.0), "v": array(0.0)}
+                | {"w": array(0.0)},
                 position = array([1000.0, 1000.0, height])
             )
         )[2],

@@ -436,15 +436,16 @@ class Home(Component):
     rising as its time to reach that rim falls.
 
     The pull also opposes the drone's climb over the ground at twice the
-    square root of the stiffness, which damps the height critically.
+    square root of the stiffness, which damps the height critically outside
+    the band.
     """
 
     band_m: NonNegative = 5.33
     """
     The depth of the band centered on `height_m` that no pull acts in, in
     meters, at a starling's scale, by default the thickness measured on the
-    starling flock of 781 birds, which the model's flock setting that scale
-    is matched to.
+    starling flock of 781 birds, whose counterpart in the starling model
+    sets that scale.
     """
 
     bound_m_s2: Positive = Plant().level_m_s2

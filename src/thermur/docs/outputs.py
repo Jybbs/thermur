@@ -434,17 +434,17 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     Moves three flocks of twelve drones from `plan` through one step of
     `composite`, each with five zigs under way at its side, at its push
     back, and in its refractory time. The first sits astride the rim of
-    the roost's disk on the side its course heads toward and the top of its
-    band, its zigs read from the key the step derives, and the other two
-    sit on the roost's center, half their drones drawing zero and the rest
-    drawing across the chances a few zigging neighbors give, the last under
-    a radio whose delay outlasts the zig's reaction and cue. Beside them,
-    the radio carries a flock of eight more drones than a table holds on
-    the roost's center, launched at half the spacing of the other three, so
-    a drone hears more senders than its table keeps, its last drone flying
-    back at the cruise speed from 5 m past the radio's range ahead of the
-    drone leading along the flock's mean velocity, so no drone holds it
-    as the radio opens and it flies into the flock's range. A second run
+    the roost's disk on the side its course heads toward, at the top of the
+    roost's band, its zigs read from the key the step derives, and the other
+    two sit on the roost's center, half their drones drawing zero and the
+    rest drawing across the chances a few zigging neighbors give, the last
+    under a radio whose delay outlasts the zig's reaction and cue. Beside
+    them, the radio carries a flock of eight more drones than a table holds
+    on the roost's center, launched at half the spacing of the other three,
+    so a drone hears more senders than its table keeps, its last drone
+    flying back at the cruise speed from 5 m past the radio's range ahead
+    of the drone leading along the flock's mean velocity, so no drone holds
+    it as the radio opens and it flies into the flock's range. A second run
     carries 120 drones scattered 25 m about the roost's center over a radio
     losing no packet, the even drones flying east at the cruise speed and
     the odd ones west, each velocity scattered 1.5 m/s on every axis and

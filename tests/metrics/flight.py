@@ -124,12 +124,7 @@ def hundred(composite: Composite, request: FixtureRequest) -> Flight:
     the parametric threat's air, for the plan's two minutes and for the five
     the rules page reads.
     """
-    settings = Settings()
-    return Flight.flown(
-        WrfOutput.from_settings(settings).air,
-        composite,
-        settings.plan.changed(drones=100, duration_s=request.param)
-    )
+    return threatened(composite, 100, request.param)
 
 
 @fixture(scope="module")
@@ -194,6 +189,19 @@ def laid(
             None if commands is None else broadcast_to(commands, shape)
         ),
         plan = plan
+    )
+
+
+def threatened(composite: Composite, drones: int, duration_s: float) -> Flight:
+    """
+    Flies the default plan at `drones` for `duration_s` under `composite`
+    through the parametric threat's air.
+    """
+    settings = Settings()
+    return Flight.flown(
+        WrfOutput.from_settings(settings).air,
+        composite,
+        settings.plan.changed(drones=drones, duration_s=duration_s)
     )
 
 
@@ -310,21 +318,11 @@ def test_a_larger_flight_keeps_a_starling_flock_s_shape(
     duration_s : float
 ):
     """
-    Asserts that a flight of 448 drones, the smallest of the starling
-    flocks the span is read from, and one of 1000 hold the largest group's
-    longest axis within 4.02 to 6.94 times its thinnest, averaged as at 100
-    drones, whereas a roost pulling toward one height with no band about it
-    stretches 448 past the span.
-
-    The flight of 1000 runs two minutes rather than five, which keeps the
-    suite inside its CI job's limit.
+    Asserts that a flight of 448 drones, the smallest of the starling flocks
+    the span is read from, and one of 1000 hold the largest group's longest
+    axis within 4.02 to 6.94 times its thinnest, averaged as at 100 drones.
     """
-    settings = Settings()
-    flight   = Flight.flown(
-        WrfOutput.from_settings(settings).air,
-        composite,
-        settings.plan.changed(drones=drones, duration_s=duration_s)
-    )
+    flight = threatened(composite, drones, duration_s)
 
     assert 4.02 <= flight.group_aspect_ratios.mean(0)[2] <= 6.94
 
