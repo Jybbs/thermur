@@ -1048,7 +1048,11 @@ def test_an_inertial_spin_holds_at_the_spin_its_pull_sets():
             ),
             id = "excitable"
         ),
-        param(Kinetic(), Kinetic(), id="kinetic")
+        param(
+            Kinetic(aligning_per_k=0.05, speeding_m_s2_k=0.2),
+            Kinetic(aligning_per_k=0.05, speeding_m_s2_k=0.05),
+            id = "kinetic"
+        )
     ]
 )
 def test_each_slot_carried_to_a_flock_four_times_the_size_scales_its_values(
@@ -1344,4 +1348,20 @@ def test_a_kinetic_thermal_response_speeds_and_aligns_by_the_excess(
         (thermal(view), thermal.aligning(view)),
         (speeding, [aligning] * 3),
         rtol = 1e-6
+    )
+
+
+@mark.parametrize("factor", [param(1.0, id="starling"), param(Plan().similarity, id="drone")])
+def test_the_default_thermal_push_holds_a_drone_at_the_level_bound_at_20_k(factor: float):
+    """
+    Asserts that the default push at the parametric threat's anomaly of
+    20 K balances the cruise's pull on a drone at the plant's level bound,
+    at a starling's scale and at the default launch's.
+    """
+    view = viewed([[10.0, 0.0, 0.0]], excess=20.0, velocity=(Plant().level_m_s, 0.0, 0.0))
+
+    assert_allclose(
+        Cruise().scaled(factor)(view) + Kinetic().scaled(factor)(view),
+        zeros(3),
+        atol = 1e-6
     )

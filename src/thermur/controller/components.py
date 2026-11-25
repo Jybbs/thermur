@@ -743,11 +743,14 @@ class Kinetic(Thermal):
     doubling the rate at the parametric threat's anomaly of 20 K.
     """
 
-    speeding_m_s2_k: NonNegative = 0.25
+    speeding_m_s2_k: NonNegative = 0.26
     """
     The acceleration along a drone's command per kelvin of excess, in meters
-    per second squared, by default the value reaching the plant's level
-    bound of 5 m/s² at the parametric threat's anomaly of 20 K.
+    per second squared, at a starling's scale, by default the value holding
+    the cruise's steady speed at the plant's level bound at the parametric
+    threat's anomaly of 20 K, the 5.2 m/s from the cruise's 10 m/s to the
+    bound's 15.2 m/s over 20 K and the cruise's relaxation of 1 s, or about
+    0.0076 at a drone flock's scale.
     """
 
     def __call__(self, observation: Observation) -> Array:
@@ -769,6 +772,19 @@ class Kinetic(Thermal):
         return full(
             observation.distances.shape,
             1 + self.aligning_per_k * maximum(observation.air["excess"], 0.0)
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Divides the push by `factor`, as the cruise's relaxation time
+        multiplies by it, so an excess holds the same steady speed at every
+        scale, leaving the alignment, a share of the coupling's rate, as it
+        stands.
+        """
+        return tree_at(
+            lambda kinetic: kinetic.speeding_m_s2_k,
+            self,
+            self.speeding_m_s2_k / factor
         )
 
 

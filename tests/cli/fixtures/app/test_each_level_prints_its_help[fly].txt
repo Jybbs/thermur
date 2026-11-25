@@ -295,10 +295,14 @@ Flies the flock, or computes the steps of the graph named.
 │                               0.05]                                          │
 │ --thermal.speeding-m-s2-k     The acceleration along a drone's command per   │
 │   FLOAT                       kelvin of excess, in meters per second         │
-│                               squared, by default the value reaching the     │
-│                               plant's level bound of 5 m/s² at the           │
-│                               parametric threat's anomaly of 20 K. [default: │
-│                               0.25]                                          │
+│                               squared, at a starling's scale, by default the │
+│                               value holding the cruise's steady speed at the │
+│                               plant's level bound at the parametric threat's │
+│                               anomaly of 20 K, the 5.2 m/s from the cruise's │
+│                               10 m/s to the bound's 15.2 m/s over 20 K and   │
+│                               the cruise's relaxation of 1 s, or about       │
+│                               0.0076 at a drone flock's scale. [default:     │
+│                               0.26]                                          │
 │ --threat.anomaly-k FLOAT      The potential temperature behind the front in  │
 │                               excess of the air ahead of it, in kelvin.      │
 │                               [default: 20.0]                                │

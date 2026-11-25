@@ -79,7 +79,7 @@
   "thermal": {
     "kind": "Kinetic",
     "aligning_per_k": 0.05,
-    "speeding_m_s2_k": 0.25
+    "speeding_m_s2_k": 0.007557681780908924
   },
   "plan": {
     "axes": [
