@@ -23,15 +23,18 @@ def runs(*modules: str):
     starts on the line of the function's first statement and ends on the
     line before the next statement in the body holding the function. Where
     the function ends that body, the span ends before whatever statement
-    or `except` clause follows the statement or clause holding the body,
-    stepping outward through each enclosing one that nothing follows, and
-    ends on the function's last line once that stepping reaches a `case`
-    clause another follows. Each line of the span the top-level block runs
-    is a line of the `def` statement the function's body shares, a decorator
-    of the statement after the span, since `ast` starts a decorated
-    statement on its `def` or `class` line, or a line of a later branch of
-    an enclosing statement, such as an `elif`, an `else`, an `except`, or
-    a `finally`.
+    or `except` clause follows the statement, `except` clause, or `case`
+    clause holding the body, stepping outward through each enclosing one
+    that nothing follows, and ends on the function's last line once that
+    stepping reaches a `case` clause another follows. Each line of the span
+    the top-level block runs is a line of the `def` statement the function's
+    body shares, a decorator of the statement after the span, since `ast`
+    starts a decorated statement on its `def` or `class` line, or a line of
+    a later branch of an enclosing statement, such as an `elif`, an `else`,
+    an `except`, or a `finally`. Adding or removing a `def` or `async def`
+    inside the function selects the test regardless, since pytest-testmon
+    checksums each span with its number in the order it finishes them, and
+    finishes the span of the whole module, which the test reads, last.
     """
     for module in modules:
         run_path(find_spec(module).origin, run_name=module)
