@@ -321,7 +321,7 @@ def colored(name: str, palette: Palette) -> str:
 
 def credited(sample: Sample) -> str:
     """
-    Lays out the credit CC BY 4.0 asks of a modified work as the list
+    Lays out the credit CC BY 4.0 requires of a modified work as the list
     closing the Data page: the dataset `sample` is cut from, its creators,
     its publisher and year, its license, and what the cut keeps and the
     format it is written in, the `snapshots` marker standing where the site

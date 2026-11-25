@@ -60,7 +60,6 @@ it('walks through a module exporting from another', () => {
 
 it.each(figures)('ends the caption of %s on the link to the credits, with no script run', async (file) => {
   const html = await renderToString(createSSRApp((await WIDGETS[file]!()).default))
-  expect(html).toContain(
-    `<a class="credits-link" href="/base/data/#credits" title="${credit.title}">Credits ↓</a></figcaption></figure>`
-  )
+  const link = `<a class="credits-link" href="/base/data/#credits" title="${credit.title}">Credits ↓</a>`
+  expect(html).toContain(`${link}</figcaption></figure>`)
 })

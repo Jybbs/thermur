@@ -56,7 +56,7 @@
 .credits-flame,
 .credits-flame-ember {
   fill           : none;
-  stroke         : light-dark(var(--th-heat-3), var(--th-heat-1));
+  stroke         : var(--credits-hot);
   stroke-linecap : round;
   stroke-width   : 2;
 }

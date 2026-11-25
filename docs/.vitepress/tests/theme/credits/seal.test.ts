@@ -35,7 +35,8 @@ describe('CreditsSeal', () => {
   })
 
   it('names its gradient and arcs apart from another seal’s on the page', () => {
-    const ids = mount({ render: () => [h(CreditsSeal), h(CreditsSeal)] }).findAll('[id]').map(node => node.attributes('id'))
+    const page = mount({ render: () => [h(CreditsSeal), h(CreditsSeal)] })
+    const ids  = page.findAll('[id]').map(node => node.attributes('id'))
     expect(new Set(ids).size).toBe(ids.length)
   })
 })

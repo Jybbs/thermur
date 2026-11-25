@@ -4,8 +4,8 @@
   vertical-align : baseline;
 }
 
-.credits-cool { stop-color: light-dark(var(--th-heat-5), var(--th-heat-3)); }
+.credits-cool { stop-color: var(--credits-cool); }
 
-.credits-hot { stop-color: light-dark(var(--th-heat-3), var(--th-heat-1)); }
+.credits-hot { stop-color: var(--credits-hot); }
 
-.credits-mid { stop-color: light-dark(var(--th-heat-4), var(--th-heat-2)); }
+.credits-mid { stop-color: var(--credits-mid); }

@@ -9,8 +9,9 @@ import { GROUND, SEAL, rimOf, rimPath } from '../../lib/credits/seal.ts'
 function flame(glow: string): VNode[] {
   const { center, flame: { glow: reach, half, rise, y } } = SEAL
   const crest = `M${center - half} ${y}Q${center} ${y - 2 * rise} ${center + half} ${y}`
+  const dome  = `M${center - reach} ${y}a${reach} ${reach} 0 0 1 ${2 * reach} 0z`
   return [
-    h('path', { d: `M${center - reach} ${y}a${reach} ${reach} 0 0 1 ${2 * reach} 0z`, fill: `url(#${glow})` }),
+    h('path', { d: dome, fill: `url(#${glow})` }),
     h('path', { class: 'credits-ground', d: `M${center - GROUND} ${y}h${2 * GROUND}` }),
     h('path', { class: 'credits-flame-ember', d: crest }),
     h('path', { class: 'credits-flame', d: crest })
@@ -25,10 +26,10 @@ function flame(glow: string): VNode[] {
 export default defineComponent({
   name: 'CreditsSeal',
   setup() {
-    const id                                        = useId()
+    const id            = useId()
     const { center, flame: { glow, y }, rim, size } = SEAL
-    const { foot, top }                             = rimOf()
-    const arc  = (name: 'foot' | 'top', words: string): VNode[] => [
+    const { foot, top } = rimOf()
+    const arc           = (name: 'foot' | 'top', words: string): VNode[] => [
       h('path', { d: rimPath(rim[name], name === 'top'), fill: 'none', id: `${id}-${name}` }),
       h('text', { class: 'credits-rim' }, [
         h('textPath', { href: `#${id}-${name}`, startOffset: '50%' }, words)
@@ -56,7 +57,8 @@ export default defineComponent({
       ...flame(`${id}-glow`),
       ...arc('top', top),
       ...arc('foot', foot),
-      ...[-1, 1].map(side => h('circle', { class: 'credits-dot', cx: center + side * rim.side, cy: center, r: rim.dot }))
+      ...[-1, 1].map(side =>
+        h('circle', { class: 'credits-dot', cx: center + side * rim.side, cy: center, r: rim.dot }))
     ])
   }
 })

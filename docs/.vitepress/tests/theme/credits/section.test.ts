@@ -9,7 +9,8 @@ enableAutoUnmount(afterEach)
 
 it('sets the page’s own lines beside the seal', () => {
   const section = mount(CreditsSection, { slots: { default: () => h('ul', [h('li', 'a line')]) } })
-  expect([...section.element.children].map(child => child.getAttribute('class'))).toEqual(['credits-seal', 'credits-lines'])
+  expect([...section.element.children].map(child => child.getAttribute('class')))
+    .toEqual(['credits-seal', 'credits-lines'])
   expect(section.get('.credits-lines li').text()).toBe('a line')
 })
 

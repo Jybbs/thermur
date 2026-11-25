@@ -1,8 +1,11 @@
 .credits-section {
+  --credits-cool        : light-dark(var(--th-heat-5), var(--th-heat-3));
+  --credits-hot         : light-dark(var(--th-heat-3), var(--th-heat-1));
+  --credits-mid         : light-dark(var(--th-heat-4), var(--th-heat-2));
   align-items           : center;
   display               : grid;
   gap                   : 1rem 1.75rem;
-  grid-template-columns : 9rem minmax(0, 1fr);
+  grid-template-columns : auto minmax(0, 1fr);
   margin                : 1.5rem 0;
 }
 

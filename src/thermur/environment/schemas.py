@@ -98,7 +98,7 @@ class Crop(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
 class Deposit(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The WRF-SFIRE LES Synthetic Wildfire Plume Dataset as its DataCite
-    record gives it, which CC BY 4.0 asks a copy to credit.
+    record gives it, which CC BY 4.0 requires a copy to credit.
     """
 
     creators: tuple[str, ...] = ("Nadya Moisseeva", "Roland Stull")

@@ -348,6 +348,30 @@ def test_a_sample_refuses_snapshots_at_no_one_gap(
         _ = Sample(times_s=times_s).interval_s
 
 
+@mark.parametrize(
+    ("creators", "surnames"),
+    [
+        param(
+            ("Nadya Moisseeva", "Roland Stull"),
+            ("Moisseeva", "Stull"),
+            id = "the-record-s"
+        ),
+        param(("Plato",), ("Plato",), id="a-lone-name"),
+        param(("Bo de Brie",), ("Brie",), id="a-particle-left-off")
+    ]
+)
+def test_a_deposit_reads_the_last_word_of_each_creator_s_name(
+    creators : tuple[str, ...],
+    surnames : tuple[str, ...]
+):
+    """
+    Asserts that a deposit's surnames are the last word of each creator's
+    name, a lone name kept whole and a particle before the last word left
+    off.
+    """
+    assert Deposit(creators=creators).surnames == surnames
+
+
 def test_a_sample_measures_its_length_across_its_rectangle():
     """
     Asserts that a sample's length is the east edge of its rectangle less

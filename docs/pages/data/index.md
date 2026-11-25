@@ -129,7 +129,7 @@ The drawing below runs the threat's own formula at ten times its pace, so the ho
 
 ## Credits
 
-The sample is a modified copy of the dataset, so it carries the attribution CC BY 4.0 asks of one. The lines below are written from the record the package pins the sample in, and `mise render` rewrites them.
+The sample is a modified copy of the dataset, so it carries the attribution CC BY 4.0 requires of one. The lines below are written from the record the package pins the sample in, and `mise render` rewrites them.
 
 <!-- credits -->
 

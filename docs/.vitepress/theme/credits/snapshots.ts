@@ -25,7 +25,8 @@ export default defineComponent({
     }, [
       h('defs', [
         h('linearGradient', { gradientUnits: 'userSpaceOnUse', id: fill, x1: 0, x2: width },
-          ['cool', 'mid', 'hot'].map((tone, place) => h('stop', { class: `credits-${tone}`, offset: place / 2 })))
+          ['cool', 'mid', 'hot'].map((tone, place) =>
+            h('stop', { class: `credits-${tone}`, offset: place / 2 })))
       ]),
       ...Array.from({ length: credit.snapshots }, (_, place) =>
         h('circle', { cx: (place + 0.5) * BAND.step, cy: BAND.step / 2, fill: `url(#${fill})`, r: BAND.dot }))

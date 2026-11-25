@@ -37,7 +37,7 @@ export const GROUND = Math.sqrt(SEAL.core ** 2 - (SEAL.flame.y - SEAL.center) **
 export function rimPath(radius: number, up: boolean): string {
   const { center }      = SEAL
   const [start, across] = up ? [center + radius, -2 * radius] : [center - radius, 2 * radius]
-  const arc = (down: number): string => `a${radius} ${radius} 0 0 ${up ? 1 : 0} 0 ${down}`
+  const arc             = (down: number): string => `a${radius} ${radius} 0 0 ${up ? 1 : 0} 0 ${down}`
   return `M${center} ${start}${arc(across)}${arc(-across)}`
 }
 

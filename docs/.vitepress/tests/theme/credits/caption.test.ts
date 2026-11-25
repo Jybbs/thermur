@@ -8,7 +8,8 @@ import { creditCaption } from '../../../theme/credits/caption.ts'
 import caption           from '../../../theme/styles/credits/caption.css?raw'
 import { declared }      from '../../common/sheets.ts'
 
-vi.mock(import('vitepress'), async original => ({ ...await original(), withBase: (to: string) => `/base${to}` }))
+vi.mock(import('vitepress'), async original =>
+  ({ ...await original(), withBase: (to: string) => `/base${to}` }))
 
 /**
  * The selector of the link closing a caption.
@@ -20,7 +21,7 @@ afterAll(() => {
 })
 
 it('closes the caption’s own words on a link to the Data page’s credits, named for the record’s dataset', () => {
-  const [words, link] = creditCaption('What the figure shows.').children as [string, { props: Record<string, string> }]
+  const [words, link] = creditCaption('What the figure shows.').children as [string, { props: object }]
   expect(words).toBe('What the figure shows. ')
   expect(link.props).toMatchObject({ href: '/base/data/#credits', title: credit.title })
 })
@@ -42,6 +43,7 @@ describe('the link’s sheet', () => {
   it('sets it in the mono and the faintest text until it is reached', () => {
     expect(caption).toMatch(/\.vp-doc \.credits-link \{[^}]*var\(--vp-font-family-mono\)/u)
     expect(declared('color', LINK, caption)).toBe('var(--vp-c-text-3)')
-    expect(declared('color', `${LINK}:is(:hover, :focus-visible, :active)`, caption)).toBe('var(--vp-c-text-1)')
+    const reached = `${LINK}:is(:hover, :focus-visible, :active)`
+    expect(declared('color', reached, caption)).toBe('var(--vp-c-text-1)')
   })
 })
