@@ -16,7 +16,7 @@ export default defineConfig({
       '**/*.lock',
       '**/.mise/**'
     ],
-    include             : ['../tests/kit/**/*.test.{ts,tsx}', '../tests/site/**/*.test.ts'],
+    include             : ['../tests/{kit,site}/**/*.test.{ts,tsx}'],
     pool                : 'threads',
     resolveSnapshotPath : (testPath, extension) => testPath + extension,
     restoreMocks        : true,

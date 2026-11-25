@@ -75,16 +75,19 @@ def lock_copy(
 def site(tmp_path: Path) -> Path:
     """
     Writes a `docs/` folder holding an empty `.vitepress`, an empty `kit`,
-    a front page, and a `node_modules/.bin` holding a stand-in for each tool
-    a `site` task runs, each printing its own name and every argument it
-    receives, beside a module under `src`, and commits the folder and the
-    module to `main` in a git repository of their own.
+    a front page, and a `node_modules/.bin` holding a stand-in for each
+    tool a `site` task runs, each printing its own name and every argument
+    it receives, beside an empty `tests/kit` and `tests/site` and a module
+    under `src`, and commits the folders and the module to `main` in a git
+    repository of their own.
 
     Returns:
         The `docs/` folder, which every `site` task runs from.
     """
-    for folder in (".vitepress", "kit", "pages"):
-        (tmp_path / "docs" / folder).mkdir(parents=True)
+    for folder in (
+        "docs/.vitepress", "docs/kit", "docs/pages", "tests/kit", "tests/site"
+    ):
+        (tmp_path / folder).mkdir(parents=True)
     for tool in ("knip", "oxlint", "tsc", "vitepress", "vitest"):
         executable(
             tmp_path / "docs/node_modules/.bin" / tool,

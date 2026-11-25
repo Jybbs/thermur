@@ -22,7 +22,6 @@ def test_the_install_installs_from_the_lockfile_and_prunes(
     resolves the site's packages in any clone.
     """
     bun = stand_in("bun", "exit 0")
-    (site.parent / "tests").mkdir()
     run_site(site, pytestconfig, "install")
 
     assert bun.commands == ["bun install --frozen-lockfile", "bun prune"]
