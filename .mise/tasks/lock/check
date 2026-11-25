@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bash -euo pipefail
 #MISE alias       = "lockfile"
-#MISE description = "Verify `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, that the lock holds every pinned tool for this platform and every platform it records, and that `mise ls-remote` lists each version `.mise/config.toml` pins"
+#MISE description = "Verify `uv.lock`, the lockfile beside each task script declaring its own dependencies, `.mise/mise.lock`, and `docs/bun.lock` against their manifests, that the lock holds every pinned tool for this platform and every platform it records, and that `mise ls-remote` lists each version `.mise/config.toml` pins as a release older than the `minimum_release_age` window"
 
 source "$MISE_PROJECT_ROOT/.mise/lib/lockfiles.sh"
 
@@ -22,7 +22,8 @@ for pin in $pins; do
     exit 1
   }
   grep -qxF "$version" <<< "$releases" || {
-    echo "$tool pins $version, which mise ls-remote does not list" >&2
+    echo "$tool pins $version, which mise ls-remote does not list as a release older" \
+      "than the minimum_release_age window" >&2
     unlisted=1
   }
 done

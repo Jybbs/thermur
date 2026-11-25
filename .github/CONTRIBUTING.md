@@ -37,7 +37,7 @@ Every pull request runs `🐦‍⬛ CI` except one touching only the site's own 
 
 | **Check** | **Runs Locally** | **Fails When** |
 |---|---|---|
-| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, `docs/bun.lock`, or the lockfile beside a task script drifts from its manifest, `.mise/mise.lock` lacks a pinned tool, a platform entry, or a checksum, or `.mise/config.toml` pins a version `mise ls-remote` does not list for its tool |
+| `🪵 Lockfiles` | `mise lockfile` | `uv.lock`, `.mise/mise.lock`, `docs/bun.lock`, or the lockfile beside a task script drifts from its manifest, `.mise/mise.lock` lacks a pinned tool, a platform entry, or a checksum, or `.mise/config.toml` pins a version `mise ls-remote` does not list for its tool as a release older than the `minimum_release_age` window |
 | `⛈️ Advisories` | `mise scan` | A package `uv.lock`, `docs/bun.lock`, or a task script's lockfile resolves carries a published advisory the project has not set aside, an `AUDIT_IGNORE` entry in `.mise/config.toml` names an advisory a release now fixes, or the advisory service cannot be reached |
 | `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the line it concerns |
 | `☂️ Coverage` | `mise coverage` | A test fails under coverage, the suite fails to collect, or the package's coverage falls below 95% |

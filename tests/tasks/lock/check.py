@@ -1,10 +1,11 @@
 """
 Pins the path `lock:check` takes for each answer `uv`, `mise`, and `bun`
-give it, each case running a copy of the task beside a lockfile of its
-own, and what the real mise answers for the committed lockfile online,
-for one missing a platform entry, a checksum, or a pin's entry offline,
-and for a pin moved with its entry to a release that does not exist, where
-`lock:check` fails on each pinned version `mise ls-remote` does not list.
+give it, each case running a copy of the task beside a lockfile of its own,
+and what the real mise answers for the committed lockfile online, for one
+missing a platform entry, a checksum, or a pin's entry offline, for a pin
+moved with its entry to a release that does not exist, and for pins inside
+mise's `minimum_release_age` window, where `lock:check` fails on each pinned
+version `mise ls-remote` does not list.
 """
 
 from collections.abc  import Callable
@@ -24,6 +25,10 @@ LYCHEE  = '[tools.lychee."platforms.macos-x64"]'
 MISSING = "No lockfile URL found for uv@0.12.22 on platform macos-arm64 (--locked mode)"
 PIN     = "uv  0.13.8 (missing)  .mise/config.toml  0.13.8"
 STALE   = "zizmor@0.0.1 is not in the lockfile"
+UNLISTED = (
+    "which mise ls-remote does not list as a release older than the"
+    " minimum_release_age window"
+)
 UNREACHABLE = "mise ERROR unable to fetch versions for uv: error sending request"
 UNREADABLE  = "mise ERROR failed to parse .mise/config.toml"
 
@@ -170,8 +175,8 @@ def test_each_pin_mise_ls_remote_does_not_list_fails_naming_it(
     assert (result.returncode, result.stderr.splitlines()) == (
         1,
         [
-            "lychee pins 0.99.9, which mise ls-remote does not list",
-            "zizmor pins 1.32, which mise ls-remote does not list"
+            f"lychee pins 0.99.9, {UNLISTED}",
+            f"zizmor pins 1.32, {UNLISTED}"
         ]
     )
     assert [command for command in mise.commands if "ls-remote" in command] == [
@@ -291,7 +296,8 @@ def test_a_pin_moved_with_its_lock_entry_to_no_release_fails(
     result = run_lock(lock_copy)
 
     assert (result.returncode, result.stderr) == (
-        1, "lychee pins 0.99.9, which mise ls-remote does not list\n"
+        1,
+        f"lychee pins 0.99.9, {UNLISTED}\n"
     )
     assert pinning(lock_copy) == held
 
@@ -312,6 +318,32 @@ def test_the_committed_lock_passes_the_check_online(
     result = run_lock(lock_copy)
 
     assert (result.returncode, result.stderr) == (0, "")
+
+
+@mark.network
+def test_each_pin_inside_the_release_age_window_fails_naming_it(
+    lock_copy   : Path,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that the real `mise`, with a `minimum_release_age` window
+    holding back every release since 2026-01-01, which each pinned version
+    follows, fails the task on the committed lockfile, naming each pin.
+    """
+    monkeypatch.setenv("MISE_MINIMUM_RELEASE_AGE", "2026-01-01")
+    monkeypatch.setenv("MISE_TRUSTED_CONFIG_PATHS", str(lock_copy))
+
+    result = run_lock(lock_copy)
+
+    assert (result.returncode, result.stderr.splitlines()) == (
+        1,
+        [
+            f"{tool} pins {version}, {UNLISTED}"
+            for tool, version in sorted(
+                loads((lock_copy / CONFIG).read_text())["tools"].items()
+            )
+        ]
+    )
 
 
 def written(copy: Path, texts: dict[str, str]) -> dict[str, str]:
