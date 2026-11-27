@@ -421,9 +421,10 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
     def run(
         self,
         *command : str | Path,
-        capture  : bool = False,
-        check    : bool = True,
-        folder   : Path = Path()
+        capture  : bool                 = False,
+        check    : bool                 = True,
+        env      : frozendict[str, str] = frozendict(),
+        folder   : Path                 = Path()
     ) -> CompletedProcess[str]:
         """
         Runs `command` in `folder` under the root, with mise trusting the
@@ -434,6 +435,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Args:
             capture: Whether the output is captured rather than printed.
             check: Whether a nonzero exit raises.
+            env: The variables set for the command over the environment.
             folder: The folder to run in, relative to the root.
 
         Raises:
@@ -451,7 +453,8 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             env            = {
                 name: value for name, value in environ.items() if name != "VIRTUAL_ENV"
             }
-            | {"MISE_TRUSTED_CONFIG_PATHS": trusted},
+            | {"MISE_TRUSTED_CONFIG_PATHS": trusted}
+            | env,
             text = True
         )
 
