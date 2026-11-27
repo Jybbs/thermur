@@ -411,18 +411,18 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
 ):
     """
     Asserts that the parity file holds a flock of twelve astride the rim
-    of the roost's disk and two on its center, each commanding off its
-    velocity and off the cruise speed with one pair inside the cohesion's
-    hard sphere, the center's resting drones starting a zig toward their
-    zigging neighbors' side where their draw is zero and the last flock's
-    radio delay outlasting the zig's reaction and cue, beside a run of the
-    radio in which each drone's table holds `Radio.slots` of the senders in
-    range as it opens, or every one where fewer are, some drone hearing more
-    senders than its table holds, and the last drone, which no drone holds
-    as it opens, held by a drone by the last packet, a run over a crossing
-    flock whose tables turn over and whose third drone sits on its second,
-    a curve over drones with one coincident pair, and that the copy the
-    repository holds has not drifted.
+    of the roost's disk and the top of its band and two on its center,
+    each commanding off its velocity and off the cruise speed with one
+    pair inside the cohesion's hard sphere, the center's resting drones
+    starting a zig toward their zigging neighbors' side where their draw
+    is zero and the last flock's radio delay outlasting the zig's reaction
+    and cue, beside a run of the radio in which each drone's table holds
+    `Radio.slots` of the senders in range as it opens, or every one where
+    fewer are, some drone hearing more senders than its table holds, and
+    the last drone, which no drone holds as it opens, held by a drone by
+    the last packet, a run over a crossing flock whose tables turn over
+    and whose third drone sits on its second, a curve over drones with one
+    coincident pair, and that the copy the repository holds has not drifted.
     """
     outputs   = Outputs(checkout=checked)
     settings  = Settings()
@@ -440,6 +440,7 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     rim      = flocks["rim"]
     roost    = flocks["roost"]
     outward  = linalg.norm(rim["positions"][:, :2] - composite.roost.center_m, axis=-1)
+    over     = rim["positions"][:, 2] - composite.roost.height_m
     apart    = linalg.norm(rim["positions"][:, None] - rim["positions"], axis=-1)
     resting  = (roost["forces"][:, 0] == 0) & (roost["draws"] == 0)
     radio    = paired["radio"]
@@ -451,6 +452,7 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     ).sum(1) - 1
 
     assert outward.min() < composite.roost.radius_m < outward.max()
+    assert over.min() < composite.roost.band_m / 2 < over.max()
     assert (rim["commands"] != rim["velocities"]).all()
     assert (
         abs(linalg.norm(rim["commands"], axis=-1) - settings.plan.cruise_m_s) > 1

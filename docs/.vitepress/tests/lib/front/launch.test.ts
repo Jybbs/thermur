@@ -39,8 +39,8 @@ describe('launched', () => {
     }
   )
 
-  it('raises a cloud of 1000 drones off the ground by its depth and leaves one of 100 at the plan’s height', () => {
-    const raised = Array.from({ length: 64 }, (_, seed) => heights(1000, seed)).flat()
+  it('raises a cloud of 2000 drones off the ground by its depth and leaves one of 100 at the plan’s height', () => {
+    const raised = Array.from({ length: 64 }, (_, seed) => heights(2000, seed)).flat()
     const plain  = Array.from({ length: 64 }, (_, seed) => heights(100, seed)).flat()
     expect(Math.min(...raised)).toBe(0)
     expect(standardized(raised)).toBeCloseTo(model.plan.clearance_sd, 1)
