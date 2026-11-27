@@ -1193,14 +1193,14 @@ def test_tools_reads_each_tool_mise_reports_newer_and_the_floor(
     Asserts that `Tools` reports each tool `mise outdated --bump` names
     beside the date `mise ls-remote` gives its newest release, or none,
     then the floor under the name `mise`, and that writing its edits lifts
-    each pin, one under a quoted key and the `required-version` restating
-    the `uv` pin among them. A `python` lift to another minor moves the
-    `requires-python` floor, each restatement `repo:audit` holds to it, and
-    each task script's own floor with it, leaving the audit clean.
+    each pin, the `required-version` restating the `uv` pin among them. A
+    `python` lift to another minor moves the `requires-python` floor, each
+    restatement `repo:audit` holds to it, and each task script's own floor
+    with it, leaving the audit clean.
     """
     config = checkout.config
     pinned = from_toml(checkout.read(CONFIG))["tools"]
-    lychee = "aqua:lycheeverse/lychee"
+    lychee = "lychee"
     tools  = {
         "python" : {"latest": "3.99.0", "requested": pinned["python"]},
         "uv"     : {"latest": "9.0.0", "requested": config.uv},

@@ -5,13 +5,14 @@ declaring its own dependencies, beside `uv.lock` and `docs/bun.lock`.
 
 from collections.abc  import Callable
 from common.stand_ins import StandIn
-from common.tasks     import SUMMARY, run_lock
+from common.tasks     import run_lock
 from pathlib          import Path
 from pytest           import mark, param
 
 from thermur.repo.checkout import Checkout
 
 
+@mark.usefixtures("mise")
 @mark.parametrize(
     ("task", "ran", "bun_command"),
     [
@@ -61,7 +62,6 @@ def test_each_lock_task_reaches_every_lockfile(
     ).write_text('# /// script\n# dependencies = ["minijinja"]\n# ///\n')
     (lock_copy / ".mise/tasks/gha/plain.py").write_text('"""\nDeclares nothing.\n"""\n')
     programs = {program: stand_in(program, "exit 0") for program in ("bun", "uv")}
-    stand_in("mise", f'[ "$1" = lock ] && echo "{SUMMARY.format(skipped=0)}"\nexit 0')
 
     assert run_lock(lock_copy, task).returncode == 0
     assert programs["uv"].commands == [

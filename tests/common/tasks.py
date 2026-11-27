@@ -1,14 +1,11 @@
 """
-Runs a copy of a `lock` task or a `site` task the way mise runs it, and
-holds the summary a stand-in `mise lock` prints, which the `lock` tests in
-each script's module and the group's own share.
+Runs a copy of a `lock` task or a `site` task the way mise runs it, which
+the `lock` tests in each script's module and the `site` tests share.
 """
 
 from pathlib    import Path
 from pytest     import Config
 from subprocess import CompletedProcess, run
-
-SUMMARY = "✓ Updated 14 platform entries ({skipped} skipped)"
 
 
 def run_lock(copy: Path, task: str = "check") -> CompletedProcess:

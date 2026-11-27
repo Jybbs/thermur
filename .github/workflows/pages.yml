@@ -12,7 +12,7 @@ jobs:
     steps:
       - name : Provision the tools the site is pressed with
         uses : $/.github/actions/provision
-        with : { tools: aqua:lycheeverse/lychee bun node }
+        with : { tools: bun lychee node }
 
       - name : Press the site and check every link in it
         run  : mise run site:links

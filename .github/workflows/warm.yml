@@ -24,7 +24,7 @@ jobs:
           - name  : 🎒 Kit · Package
             tools : &package python uv
           - name  : 🎒 Kit · Site
-            tools : aqua:lycheeverse/lychee bun node
+            tools : bun lychee node
           - name  : 🎒 Kit · Workflows
             tools : zizmor
 
