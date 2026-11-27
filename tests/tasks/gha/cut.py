@@ -7,7 +7,7 @@ the gate, and the commands it sends GitHub on each path.
 
 from collections.abc  import Callable
 from common.stand_ins import StandIn
-from json             import dumps
+from json             import dumps, loads as from_json
 from pathlib          import Path
 from pytest           import (
     CaptureFixture, Config, MonkeyPatch, fixture, mark, param, raises
@@ -45,16 +45,18 @@ def cut(
 @fixture
 def gh(stand_in: Callable[[str, str], StandIn]) -> StandIn:
     """
-    Puts a stand-in `gh` on the path that prints generated notes for
-    the generate-notes call, writes the body a `PATCH` receives on stdin
-    to `patched.json` and prints the updated URL, prints the releases
-    `RELEASES` holds for any other `api` call and a URL for a `release` one,
-    and exits with the status `GH_STATUS` names.
+    Puts a stand-in `gh` on the path that writes the input the
+    generate-notes call receives on stdin to `generated.json` and prints
+    generated notes, writes the input a `PATCH` receives to `patched.json`
+    and prints the updated URL, prints the releases `RELEASES` holds for
+    any other `api` call and a URL for a `release` one, and exits with the
+    status `GH_STATUS` names.
     """
     return stand_in(
         "gh",
         'case "$*" in\n'
-        '  *releases/generate-notes*) echo \'{"body":"notes"}\' ;;\n'
+        "  *releases/generate-notes*) cat > generated.json;"
+        ' echo \'{"body":"notes"}\' ;;\n'
         f"  *PATCH*) cat > patched.json; echo {UPDATED} ;;\n"
         '  api*) printf "%s" "$RELEASES" ;;\n'
         f"  release*) echo {DRAFTED} ;;\n"
@@ -159,20 +161,26 @@ def test_a_release_listing_that_fails_fails_the_cut(
     assert len(gh.commands) == 1
 
 
-def test_an_updated_draft_takes_the_notes_github_generates_now(
+def test_an_updated_draft_keeps_its_tag_beside_the_notes_github_generates_now(
     cut         : ModuleType,
     monkeypatch : MonkeyPatch,
     tmp_path    : Path
 ):
     """
-    Asserts that the `PATCH` updating a draft sends only the body the
-    generate-notes endpoint returned, leaving the draft's title as it was.
+    Asserts that the generate-notes call and the `PATCH` updating a draft
+    both send the version as the tag and `main` as the target, which keep
+    the draft tagged, the `PATCH` sending them beside the body the endpoint
+    returned and leaving the draft's title as it was.
     """
     monkeypatch.setenv("RELEASES", release(draft=True, url="https://u/draft"))
 
     cut.Draft(version="0.2.0").cut()
 
-    assert (tmp_path / "patched.json").read_text() == '{"body":"notes"}'
+    tag = {"tag_name": "0.2.0", "target_commitish": "main"}
+    assert (
+        from_json((tmp_path / "generated.json").read_text()),
+        from_json((tmp_path / "patched.json").read_text())
+    ) == (tag, {"body": "notes"} | tag)
 
 
 def test_the_draft_runs_on_every_push_to_main_and_on_dispatch(pytestconfig: Config):
