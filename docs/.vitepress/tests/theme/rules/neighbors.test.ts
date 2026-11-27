@@ -82,22 +82,26 @@ function short(count: number): void {
 }
 
 /**
- * Mounts the drawing and reads the scale each bird of its last frame is drawn
- * at, its length over the size its flock gives it, in the order the frame
- * draws them, the marked bird last.
+ * Mounts the drawing and reads the length of its marked bird, the lengths of
+ * the others in a frame's drawing order, the scale each of those others is
+ * drawn at over the zoom, and the zoom, which the least scaled bird's length
+ * over its flock size gives.
  */
-function scaled(): number[] {
-  const marked = { chosen: -1, flock: undefined as Flock | undefined }
-  const heard  = Flock.prototype.heard
-  vi.spyOn(Flock.prototype, 'heard').mockImplementation(function seen(this: Flock, index, into) {
-    marked.chosen = index
-    marked.flock  = this
+function lengths(): { marked: number, others: number[], scales: number[], zoom: number } {
+  const seen  = { chosen: -1, flock: undefined as Flock | undefined }
+  const heard = Flock.prototype.heard
+  vi.spyOn(Flock.prototype, 'heard').mockImplementation(function heardBy(this: Flock, index, into) {
+    seen.chosen = index
+    seen.flock  = this
     return heard.call(this, index, into)
   })
   const last              = frame(drawn().birds)
-  const { chosen, flock } = marked
-  const order             = [...last.keys()].filter(index => index !== chosen).concat(chosen)
-  return last.map((bird, at) => bird.length / flock!.size[order[at]!]!)
+  const { chosen, flock } = seen
+  const order             = [...last.keys()].filter(index => index !== chosen)
+  const others            = last.slice(0, -1).map(bird => bird.length)
+  const scales            = order.map((index, at) => others[at]! / flock!.size[index]!)
+  const zoom              = Math.min(...scales)
+  return { marked: last.at(-1)!.length, others, scales: scales.map(scale => scale / zoom), zoom }
 }
 
 enableAutoUnmount(afterEach)
@@ -140,9 +144,11 @@ describe('the header', () => {
 })
 
 describe('the marked bird', () => {
-  it('draws the marked bird last and at the largest scale of its size', () => {
-    const scales = scaled()
-    expect(scales.at(-1)! - Math.max(...scales.slice(0, -1))).toBeGreaterThan(1e-9)
+  it('draws the marked bird last at 1.6 times the largest flock size, above every other bird', () => {
+    const { marked, others, scales, zoom } = lengths()
+    expect(marked).toBeCloseTo(1.6 * FLIGHT.size[1] * zoom, 6)
+    expect(marked).toBeGreaterThan(Math.max(...others))
+    expect(new Set(scales.map(scale => scale.toFixed(6)))).toEqual(new Set(['1.000000', '1.150000']))
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {

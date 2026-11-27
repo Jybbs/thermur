@@ -190,7 +190,7 @@ export class Falcon implements Part {
       const color  = inside ? ranged : this.#tones.flock(g.scheme, seven ? ALONG.seven : 0, seven ? 1 : REST)
       paint.bird(ctx, birds, color, dpr, index, this.#marks, seven ? 1.15 : 1, zoom)
     }
-    paint.bird(ctx, birds, this.#tones.flock(g.scheme, ALONG.marked, 1), dpr, chosen, this.#marks, 1.6, zoom)
+    paint.bird(ctx, birds, this.#tones.flock(g.scheme, ALONG.marked, 1), dpr, chosen, this.#marks, 1.6 * flock.FLIGHT.size[1] / birds.size[chosen]!, zoom)
   }
 
   /**
