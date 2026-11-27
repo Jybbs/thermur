@@ -83,7 +83,7 @@ export const NAMES = {
 /**
  * The heading rule drawn in the ink, the palette holding no hue for it.
  */
-export const INKED = 'overdamped'
+export const INKED = 'overdamped' satisfies keyof typeof NAMES
 /**
  * The opacity a ring and its band take past the first drone's turn.
  */

@@ -2,7 +2,7 @@ import { Radios, markup }                      from '@thermur/kit'
 import { defineComponent, h, ref, shallowRef } from 'vue'
 
 import { useStage }        from '../../lib/canvas/mount.ts'
-import { INKED, NAMES }   from '../../lib/rules/dial.ts'
+import { INKED, NAMES }    from '../../lib/rules/dial.ts'
 import { TRIALS, rulesOf } from '../../lib/rules/measured.ts'
 import { Reach }           from '../../lib/rules/reach.ts'
 
