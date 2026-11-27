@@ -477,27 +477,28 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     """
     Moves three flocks of twelve drones from `plan` through one step of
     `composite`, each with five zigs under way at its side, at its push
-    back, and in its refractory time. The first sits astride the rim of the
-    roost's disk on the side its course heads toward, its zigs read from
-    the key the step derives, and the other two sit on the roost's center,
-    half their drones drawing zero and the rest drawing across the chances a
-    few zigging neighbors give, the last under a radio whose delay outlasts
-    the zig's reaction and cue. Beside them, the radio carries a flock of
-    eight more drones than a table holds on the roost's center, launched at
-    half the spacing of the other three, so a drone hears more senders than
-    its table keeps, its last drone flying back at the cruise speed from 5
-    m past the radio's range ahead of the drone leading along the flock's
-    mean velocity, so no drone holds it as the radio opens and it flies into
-    the flock's range. A second run carries 120 drones scattered 25 m about
-    the roost's center over a radio losing no packet, the even drones flying
-    east at the cruise speed and the odd ones west, each velocity scattered
-    1.5 m/s on every axis and its third drone flying on its second, and
-    the curve orders 340 drones scattered the same way, its third drone on
-    its second, each value drawn in double precision and rounded to four
-    decimals. A launch of 24 drones at a spacing of 120 m and a clearance
-    of 1.5 deviations raises its center past `center_m` and sets two drones
-    on the ground, one of them drawn heading down, the launch run in double
-    precision and the draws it reads written to eight decimals.
+    back, and in its refractory time. The first sits astride the rim of
+    the roost's disk on the side its course heads toward, at the top of the
+    roost's band, its zigs read from the key the step derives, and the other
+    two sit on the roost's center, half their drones drawing zero and the
+    rest drawing across the chances a few zigging neighbors give, the last
+    under a radio whose delay outlasts the zig's reaction and cue. Beside
+    them, the radio carries a flock of eight more drones than a table holds
+    on the roost's center, launched at half the spacing of the other three,
+    so a drone hears more senders than its table keeps, its last drone
+    flying back at the cruise speed from 5 m past the radio's range ahead
+    of the drone leading along the flock's mean velocity, so no drone holds
+    it as the radio opens and it flies into the flock's range. A second run
+    carries 120 drones scattered 25 m about the roost's center over a radio
+    losing no packet, the even drones flying east at the cruise speed and
+    the odd ones west, each velocity scattered 1.5 m/s on every axis and
+    its third drone flying on its second, and the curve orders 340 drones
+    scattered the same way, its third drone on its second, each value drawn
+    in double precision and rounded to four decimals. A launch of 24 drones
+    at a spacing of 140 m and a clearance of 1.5 deviations raises its
+    center past `center_m` and sets two drones on the ground, one of them
+    drawn heading down, the launch run in double precision and the draws it
+    reads written to eight decimals.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
@@ -508,6 +509,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     """
     zig            = composite.noise
     roost          = composite.roost
+    center         = (*roost.center_m, roost.height_m)
     rest           = zig.refractory_s
     forces         = zeros((12, 3))
     forces[:5, :2] = [
@@ -520,19 +522,23 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     draws       = zeros(len(forces))
     draws[1::2] = around(geomspace(1e-4, 4e-3, len(forces) // 2), 4)
     rim         = posed(
-        center_m  = (roost.center_m[0] - roost.radius_m, roost.center_m[1]),
+        center_m = (
+            roost.center_m[0] - roost.radius_m,
+            roost.center_m[1],
+            round(roost.height_m + roost.band_m / 2)
+        ),
         composite = composite,
         forces    = forces,
         plan      = plan
     )
     middle = posed(
-        center_m  = roost.center_m,
+        center_m  = center,
         composite = composite,
         forces    = forces,
         plan      = plan
     )
     radio = posed(
-        center_m  = roost.center_m,
+        center_m  = center,
         composite = composite,
         forces    = zeros((Radio.slots + 8, 3)),
         plan      = plan,
@@ -545,7 +551,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         composite,
         replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
     )
-    raised = plan.changed(clearance_sd=1.5, drones=24, spacing_m=120.0)
+    raised = plan.changed(clearance_sd=1.5, drones=24, spacing_m=140.0)
     with enable_x64():
         where_key, heading_key = split(seeded(raised.seed))
         launch                 = raised.launched(seeded(raised.seed))
@@ -557,7 +563,6 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
             8
         )
     cloud             = default_rng(plan.seed)
-    center            = (*roost.center_m, roost.height_m)
     points            = around(cloud.normal(center, 25.0, (340, 3)), 4)
     points[2]         = points[1]
     crossing          = around(cloud.normal(center, 25.0, (120, 3)), 4)
@@ -672,7 +677,7 @@ def posed(
     a copy of the step reads the same flock the package moves.
     """
     launch = plan.changed(
-        center_m  = (*center_m, composite.roost.height_m),
+        center_m  = center_m,
         drones    = len(forces),
         spacing_m = spacing_m
     ).launched(seeded(plan.seed))
