@@ -167,4 +167,16 @@ describe('the drawing scene', () => {
     widget.unmount()
     expect(stand.held()).toEqual(RELEASED)
   })
+
+  it('captions the ramp in the muted tone and the class the kit’s label rule sets', () => {
+    const { stand, widget } = staged('drawing')
+    stand.reflow(undefined, 480)
+    stand.frames.run(1)
+    const caption = widget.get('.kit-catalog-width text').element as SVGElement
+    expect(caption.getAttribute('class')).toBe('kit-caption')
+    expect(caption.style.getPropertyValue('fill')).toBe('var(--vp-c-text-2)')
+    expect(caption.hasAttribute('letter-spacing')).toBe(false)
+    widget.unmount()
+    expect(stand.held()).toEqual(RELEASED)
+  })
 })

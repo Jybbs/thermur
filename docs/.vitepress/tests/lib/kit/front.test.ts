@@ -23,6 +23,13 @@ describe('Front', () => {
     expect(labels).toEqual(['0 m', '50 m', '100 m', '150 m', '200 m', '250 m', '300 m', 'MADE-UP SPREAD RATES'])
   })
 
+  it('captions itself in the faint tone and the class the kit’s label rule sets', () => {
+    const caption = [...new Front().node.querySelectorAll('text')].at(-1)!
+    expect(caption.getAttribute('class')).toBe('kit-caption')
+    expect(caption.style.getPropertyValue('fill')).toBe('var(--vp-c-text-3)')
+    expect(caption.hasAttribute('letter-spacing')).toBe(false)
+  })
+
   it('moves the burn, the edge, and the flock to the reach it draws, the flock stopping short of the end', () => {
     const front = new Front()
     front.draw(150)
