@@ -81,6 +81,30 @@ function short(count: number): void {
   })
 }
 
+/**
+ * Mounts the drawing and reads the length of its marked bird, the lengths of
+ * the others in a frame's drawing order, and the zoom, which the least scaled
+ * bird's length over its flock size gives.
+ */
+function lengths(): { marked: number, others: number[], zoom: number } {
+  const seen  = { chosen: -1, flock: undefined as Flock | undefined }
+  const heard = Flock.prototype.heard
+  vi.spyOn(Flock.prototype, 'heard').mockImplementation(function heardBy(this: Flock, index, into) {
+    seen.chosen = index
+    seen.flock  = this
+    return heard.call(this, index, into)
+  })
+  const last              = frame(drawn().birds)
+  const { chosen, flock } = seen
+  const order             = [...last.keys()].filter(index => index !== chosen)
+  const others            = last.slice(0, -1).map(bird => bird.length)
+  return {
+    marked: last.at(-1)!.length,
+    others,
+    zoom  : Math.min(...order.map((index, at) => others[at]! / flock!.size[index]!))
+  }
+}
+
 enableAutoUnmount(afterEach)
 
 afterEach(() => {
@@ -122,20 +146,9 @@ describe('the header', () => {
 
 describe('the marked bird', () => {
   it('draws the marked bird last at 1.6 times the largest flock size, above every other bird', () => {
-    const marked = { chosen: -1, flock: undefined as Flock | undefined }
-    const heard  = Flock.prototype.heard
-    vi.spyOn(Flock.prototype, 'heard').mockImplementation(function seen(this: Flock, index, into) {
-      marked.chosen = index
-      marked.flock  = this
-      return heard.call(this, index, into)
-    })
-    const last              = frame(drawn().birds)
-    const { chosen, flock } = marked
-    const order             = [...last.keys()].filter(index => index !== chosen)
-    const zoom              = Math.min(...order.map((index, at) => last[at]!.length / flock!.size[index]!))
-    const others            = last.slice(0, -1).map(bird => bird.length)
-    expect(last.at(-1)!.length).toBeCloseTo(1.6 * FLIGHT.size[1] * zoom, 6)
-    expect(last.at(-1)!.length).toBeGreaterThan(Math.max(...others))
+    const { marked, others, zoom } = lengths()
+    expect(marked).toBeCloseTo(1.6 * FLIGHT.size[1] * zoom, 6)
+    expect(marked).toBeGreaterThan(Math.max(...others))
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {
