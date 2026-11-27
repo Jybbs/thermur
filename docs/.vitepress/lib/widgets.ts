@@ -9,9 +9,14 @@ const FOLD = '<details class="every-value"><summary>Every value as a table</summ
  */
 const SHUT = '</details>\n'
 /**
- * What each marker writes on the site, by the marker's name.
+ * What each marker inside a line writes on the site, by the marker's name.
+ */
+const INLINE: Readonly<Record<string, string>> = { snapshots: '<CreditsSnapshots />' }
+/**
+ * What each marker standing alone writes on the site, by the marker's name.
  */
 const MARKERS: Readonly<Record<string, string>> = {
+  '/credits'     : '</CreditsSection>\n',
   '/crop'        : SHUT,
   '/faces'       : SHUT,
   '/heat'        : SHUT,
@@ -19,6 +24,7 @@ const MARKERS: Readonly<Record<string, string>> = {
   '/palette'     : SHUT,
   '/pieces'      : SHUT,
   '/threat'      : SHUT,
+  'credits'      : '<CreditsSection>\n',
   'crop'         : FOLD,
   'faces'        : `<IdentityFaces />\n${FOLD}`,
   'heat'         : `<IdentityHeat />\n${FOLD}`,
@@ -35,12 +41,15 @@ const MARKERS: Readonly<Record<string, string>> = {
 /**
  * Sets each widget and each fold a page's markers name, on the site alone, so
  * the page stays bare Markdown and its tables read on GitHub, for a reader
- * without scripts, and in the site's search.
+ * without scripts, and in the site's search. A marker standing alone in its
+ * block takes what `MARKERS` writes, and one inside a line what `INLINE` does.
  */
 export function widgetRules(md: MarkdownRenderer): void {
-  const written = md.renderer.rules.html_block!
-  md.renderer.rules.html_block = (tokens, index, options, env, self) => {
-    const [, name] = /^<!-- (\/?\w+) -->$/u.exec(tokens[index]!.content.trim()) ?? []
-    return MARKERS[name ?? ''] ?? written(tokens, index, options, env, self)
+  for (const [rule, markers] of [['html_block', MARKERS], ['html_inline', INLINE]] as const) {
+    const written = md.renderer.rules[rule]!
+    md.renderer.rules[rule] = (tokens, index, options, env, self) => {
+      const [, name] = /^<!-- (\/?\w+) -->$/u.exec(tokens[index]!.content.trim()) ?? []
+      return markers[name ?? ''] ?? written(tokens, index, options, env, self)
+    }
   }
 }

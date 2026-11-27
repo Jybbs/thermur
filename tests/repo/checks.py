@@ -16,6 +16,7 @@ from shutil              import copystat
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
 from thermur.repo.checks   import (
+    AliasCheck,
     AnchorCheck,
     BinCheck,
     Check,
@@ -961,19 +962,30 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
         ),
         param(
             CI,
-            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
-            f"`{CI}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft`",
+            f"`{CI}` cancels a ready run from a draft or fails a "
+            "run no pull request started, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "ci-group"
         ),
         param(
             SITE,
-            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
-            f"`{SITE}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft`",
+            f"`{SITE}` cancels a ready run from a draft or fails a "
+            "run no pull request started, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "site-group"
+        ),
+        param(
+            CI,
+            "draft == true, '-draft'",
+            "draft, '-draft'",
+            f"`{CI}` cancels a ready run from a draft or fails a "
+            "run no pull request started, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
+            id = "ci-group-null"
         ),
         param(
             CI,
@@ -1010,8 +1022,8 @@ def test_a_workflow_running_on_a_draft_is_named(
 ):
     """
     Asserts that a pull-request workflow whose activity types leave out
-    `ready_for_review` or whose concurrency group leaves out the draft
-    state is named, as is each of its jobs whose condition carries no guard
+    `ready_for_review` or whose concurrency group compares no draft state to
+    `true` is named, as is each of its jobs whose condition carries no guard
     skipping a draft.
     """
     edit(checkout, path, new=new, old=old)
@@ -1469,12 +1481,53 @@ def test_a_task_failing_validation_is_named_at_mise_s_severity(checkout: Checkou
     an alias two tasks share, is named on the file holding the task at the
     severity mise reports.
     """
-    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "audit"\ntrue\n')
+    path = task(checkout, "py/sweep", f'{SHELL}#MISE alias = "inspect"\ntrue\n')
 
     assert [
         (finding.file, finding.level)
         for finding in TaskCheck(checkout=checkout).findings
     ] == [(path, Level.ERROR)]
+
+
+@mark.parametrize("alias", ["use", "x"], ids=["command", "alias"])
+def test_a_task_alias_naming_a_command_of_mise_s_own_is_named(
+    alias    : str,
+    checkout : Checkout
+):
+    """
+    Asserts that a task taking as its alias a command `mise --help` lists,
+    or one of that command's aliases, is named on the file holding the task,
+    while the alias beside it that mise leaves free is not.
+    """
+    path = task(
+        checkout,
+        "py/sweep",
+        f'{SHELL}#MISE alias = ["sweep", "{alias}"]\ntrue\n'
+    )
+
+    assert AliasCheck(checkout=checkout).findings == [
+        Finding(
+            file    = path,
+            message = f"`py:sweep` takes the alias `{alias}`, a command of mise's own "
+            f"that `mise {alias}` runs in place of the task"
+        )
+    ]
+
+
+def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+    """
+    Asserts that a Markdown template opening on no front matter is named on
+    its file rather than read as naming no label.
+    """
+    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+
+    assert LabelCheck(checkout=checkout).findings == [
+        Finding(
+            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
+            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
+            "front matter"
+        )
+    ]
 
 
 @mark.parametrize(
@@ -1734,19 +1787,21 @@ def test_a_moved_manifest_declaration_names_every_copy(
     ]
 
 
-def test_a_template_opening_on_no_front_matter_is_named(checkout: Checkout):
+def test_a_toml_task_alias_naming_a_command_of_mise_s_own_is_named_on_its_configuration(
+    checkout: Checkout
+):
     """
-    Asserts that a Markdown template opening on no front matter is named on
-    its file rather than read as naming no label.
+    Asserts that a task `.mise/config.toml` declares in TOML, taking as its
+    alias a command `mise --help` lists, is named on that configuration.
     """
-    edit(checkout, ".github/ISSUE_TEMPLATE/bug.md", new="", old="---\n")
+    append(
+        checkout,
+        ".mise/config.toml",
+        '\n[tasks."py:sweep"]\nalias = "use"\nrun = "true"\n'
+    )
 
-    assert LabelCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".github/ISSUE_TEMPLATE/bug.md"),
-            message = "`.github/ISSUE_TEMPLATE/bug.md`: Value error, opens on no "
-            "front matter"
-        )
+    assert [finding.file for finding in AliasCheck(checkout=checkout).findings] == [
+        Path(".mise/config.toml")
     ]
 
 
@@ -2065,7 +2120,7 @@ def test_a_workflow_sharing_no_concurrency_group_passes(checkout: Checkout):
         "  cancel-in-progress : ${{ github.event_name == 'pull_request' }}\n"
         "  group              : ${{ github.workflow }}-"
         "${{ github.head_ref || github.ref }}"
-        "${{ case(github.event.pull_request.draft, '-draft', '') }}\n"
+        "${{ case(github.event.pull_request.draft == true, '-draft', '') }}\n"
     )
 
     assert DraftCheck(checkout=checkout).findings == []

@@ -4,6 +4,8 @@ import type { VNode }               from 'vue'
 import theme from '../../theme/index.ts'
 
 vi.mock('vitepress/theme-without-fonts', () => ({ default: { Layout: 'Layout' } }))
+vi.mock('../../theme/credits/section.ts', () => ({ default: 'CreditsSection' }))
+vi.mock('../../theme/credits/snapshots.ts', () => ({ default: 'CreditsSnapshots' }))
 vi.mock('../../theme/crop.ts', () => ({ default: 'CropKept' }))
 vi.mock('../../theme/identity/faces.ts', () => ({ default: 'IdentityFaces' }))
 vi.mock('../../theme/identity/heat.ts', () => ({ default: 'IdentityHeat' }))
@@ -17,6 +19,7 @@ vi.mock('../../theme/pause.ts', () => ({ default: 'MotionPause' }))
 vi.mock('../../theme/rules/neighbors.ts', () => ({ default: 'RulesNeighbors' }))
 vi.mock('../../theme/rules/reach.ts', () => ({ default: 'RulesReach' }))
 vi.mock('../../theme/rules/spacing.ts', () => ({ default: 'RulesSpacing' }))
+vi.mock('../../theme/sources.ts', () => ({ default: 'SourcesFlock' }))
 vi.mock('../../theme/threat.ts', () => ({ default: 'ThreatFront' }))
 
 describe('the theme', () => {
@@ -24,10 +27,12 @@ describe('the theme', () => {
     expect(theme.extends).toEqual({ Layout: 'Layout' })
   })
 
-  it('registers the widgets a page’s rules write by name', () => {
+  it('registers the widgets a page’s rules and its footnotes write by name', () => {
     const component = vi.fn<(name: string, widget: unknown) => void>()
     theme.enhanceApp({ app: { component } } as unknown as Parameters<typeof theme.enhanceApp>[0])
     expect(component.mock.calls).toEqual([
+      ['CreditsSection', 'CreditsSection'],
+      ['CreditsSnapshots', 'CreditsSnapshots'],
       ['CropKept', 'CropKept'],
       ['IdentityFaces', 'IdentityFaces'],
       ['IdentityHeat', 'IdentityHeat'],
@@ -37,7 +42,8 @@ describe('the theme', () => {
       ['RulesNeighbors', 'RulesNeighbors'],
       ['RulesReach', 'RulesReach'],
       ['RulesSpacing', 'RulesSpacing'],
-      ['ThreatFront', 'ThreatFront']
+      ['ThreatFront', 'ThreatFront'],
+      ['SourcesFlock', 'SourcesFlock']
     ])
   })
 

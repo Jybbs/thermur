@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --exact --locked
-# MISE alias       = "audit"
+# MISE alias       = "inspect"
 # MISE description = "Audit the declarations, tasks, programs, wheel, and workflows"
 """
 Runs every check `thermur.repo.checks` declares over the checkout in the

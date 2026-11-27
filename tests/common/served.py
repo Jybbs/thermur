@@ -1,12 +1,14 @@
 """
 Holds `Served`, one file a test serves over HTTP on the loopback address,
 answering range requests as the Apache server the WRF-SFIRE dataset
-publishes through does, behind a redirect from another path, and failing the
-requests a case lines up.
+publishes through does, behind a redirect from another path, failing
+the requests a case lines up, and printing the traceback of a failure
+in a handler before the case ends unless the client closed or reset the
+connection.
 """
 
 from collections.abc import Iterator
-from contextlib      import contextmanager
+from contextlib      import contextmanager, suppress
 from http.server     import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib         import Path
 from pydantic        import BaseModel
@@ -72,7 +74,8 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
     @contextmanager
     def serving(self) -> Iterator[str]:
         """
-        Serves the file from a thread for the length of the block.
+        Serves the file from a thread for the length of the block, and waits
+        on leaving it for each connection's thread to end.
 
         Yields:
             The address the file is redirected to from, under the loopback
@@ -87,6 +90,13 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
             """
 
             protocol_version = "HTTP/1.1"
+            timeout          = 5
+            """
+            The longest the handler waits on a read or a write, in seconds,
+            before it closes the connection with nothing printed, as Apache's
+            `KeepAliveTimeout` sets it by default, so a connection a case
+            leaves open ends before `serving` waits on its thread.
+            """
 
             def do_GET(self):
                 """
@@ -176,6 +186,15 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
                 self.send_header("Content-Length", str(served.path.stat().st_size))
                 self.end_headers()
 
+            def handle(self):
+                """
+                Answers each request over the connection until either end
+                closes it, ending with nothing printed where the client
+                resets the connection or closes it while the server writes.
+                """
+                with suppress(ConnectionError):
+                    super().handle()
+
             def log_message(self, *_: object):
                 """
                 Writes nothing, leaving the output of a case to the case.
@@ -208,7 +227,8 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
                 super().setup()
 
         with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
-            thread = Thread(target=server.serve_forever)
+            server.daemon_threads = False
+            thread                = Thread(target=server.serve_forever)
             thread.start()
             try:
                 yield f"http://127.0.0.1:{server.server_port}/moved/{self.path.name}"

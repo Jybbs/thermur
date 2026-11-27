@@ -3,8 +3,9 @@ Holds `Outputs`, the files the `docs:render` task writes into the site
 and every Markdown page git tracks, which `repo:audit` holds the committed
 copies to, beside `tabled`, which lays a record's fields out as the table a
 page's region holds, `specimens`, which lays out the identity as the regions
-of The Visual Identity, and `pieces`, which lays out the kit's pieces as the
-region of The Kit.
+of The Visual Identity, `pieces`, which lays out the kit's pieces as the
+region of The Kit, and `credited`, which lays out the plume dataset's credit
+as the lines closing the Data page.
 """
 
 from collections.abc import Collection, Iterable, Iterator, Mapping, Sequence
@@ -61,6 +62,12 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     """
     The file the site's flocks read each default slot's kind and parameters
     from, beside the fields of the plan their launch and their step read.
+    """
+
+    credit: Path = Path("docs/.vitepress/lib/rendered/credit.json")
+    """
+    The file the Data page's seal and band of snapshots, and the link closing
+    each figure drawn from the sample, read the plume dataset's credit from.
     """
 
     crop: Path = Path("docs/.vitepress/lib/rendered/crop.json")
@@ -133,15 +140,16 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     @cached_property
     def regions(self) -> dict[Path, dict[str, str]]:
         """
-        Renders the body of each region the render task writes into a page,
-        by the page's path and then by the region's name, meaning the fields
-        `Sample`, `Crop`, `Ranges`, and `ParametricThreat` declare on the
-        Data page, on The Interaction Rules the fields `Plan`, the contact,
-        the plant, the radio, and the roost declare beside those of each
-        open slot's default and each of its candidates, every one named for
-        its component, on The Visual Identity the identity as `specimens`
-        lays it out, and on The Kit the pieces each declaration in the clone
-        records.
+        Renders the body of each region the render task writes into a
+        page, by the page's path and then by the region's name, meaning
+        on the Data page the fields `Sample`, `Crop`, `Ranges`, and
+        `ParametricThreat` declare beside the plume dataset's credit as
+        `credited` lays it out, on The Interaction Rules the fields `Plan`,
+        the contact, the plant, the radio, and the roost declare beside
+        those of each open slot's default and each of its candidates, every
+        one named for its component, on The Visual Identity the identity as
+        `specimens` lays it out, and on The Kit the pieces each declaration
+        in the clone records.
         """
         defaults = Settings()
         return {
@@ -150,10 +158,11 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 "pieces": pieces(Piece.declared(self.checkout.root))
             },
             Path("docs/pages/data/index.md")         : {
-                "crop"   : tabled(Crop),
-                "ranges" : tabled(Ranges),
-                "sample" : tabled(Sample),
-                "threat" : tabled(ParametricThreat)
+                "credits" : credited(Sample()),
+                "crop"    : tabled(Crop),
+                "ranges"  : tabled(Ranges),
+                "sample"  : tabled(Sample),
+                "threat"  : tabled(ParametricThreat)
             },
             Path("docs/pages/methods/rules.md")      : {
                 slot.name: tabled(type(getattr(defaults, slot.name)))
@@ -202,12 +211,13 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
         """
         Renders the text of each file the render task writes, by its path,
         the identity as JSON with its fields in the order the records
-        declare them, the crop's heights as JSON beside the sample's length
-        and snapshot times, the default threat as JSON beside the constants
-        its air is worked out from, the changes each condition of each trial
-        makes to the plan as JSON by slot, and each page with its regions
-        as `Page.filled` writes them and its definitions as `Page.cited`
-        writes them.
+        declare them, the plume dataset's credit as JSON beside the count
+        of the sample's snapshots, the crop's heights as JSON beside the
+        sample's length and snapshot times, the default threat as JSON
+        beside the constants its air is worked out from, the changes each
+        condition of each trial makes to the plan as JSON by slot, and
+        each page with its regions as `Page.filled` writes them and its
+        definitions as `Page.cited` writes them.
         """
         crop   = Crop().model_dump(include={"floor_m", "levels", "spacing_m"})
         sample = Sample()
@@ -238,6 +248,16 @@ class Outputs(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
                 },
                 default = float,
                 indent  = 2
+            ) + "\n",
+            self.credit    : dumps(
+                {
+                    "license"   : sample.license.name,
+                    "snapshots" : len(sample.times_s),
+                    "surnames"  : sample.dataset.surnames,
+                    "title"     : sample.dataset.title,
+                    "year"      : sample.dataset.year
+                },
+                indent = 2
             ) + "\n",
             self.crop      : dumps(
                 crop | {"length_m": sample.length_m, "times_s": sample.times_s},
@@ -297,6 +317,30 @@ def colored(name: str, palette: Palette) -> str:
     code, such as ``Fire Lord Deep `#995500` `` for `fire-lord-deep`.
     """
     return f"{name.replace('-', ' ').title()} `{palette.colors[name]}`"
+
+
+def credited(sample: Sample) -> str:
+    """
+    Lays out the credit CC BY 4.0 requires of a modified work as the list
+    closing the Data page: the dataset `sample` is cut from, its creators,
+    its publisher and year, its license, and what the cut keeps and the
+    format it is written in, the `snapshots` marker standing where the site
+    draws the snapshots.
+    """
+    dataset = sample.dataset
+    return "\n".join(
+        (
+            f"- [{dataset.title}]({dataset.address})",
+            f"- Created by {dataset.authors}",
+            f"- Published by {dataset.publisher} in {dataset.year}",
+            f"- Licensed under [{sample.license.name}]({sample.license.address})",
+            f"- Cut from the dataset's `{sample.simulation}` to "
+            f"{len(sample.times_s)} snapshots `{sample.interval_s:g} s` apart, from "
+            f"{sample.window_s[0]:,.0f}\N{NO-BREAK SPACE}s <!-- snapshots --> to "
+            f"{sample.window_s[1]:,.0f}\N{NO-BREAK SPACE}s, and "
+            f"rewritten as {sample.format}"
+        )
+    )
 
 
 def described(kind: type[BaseModel], name: str) -> str:
@@ -433,27 +477,28 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     """
     Moves three flocks of twelve drones from `plan` through one step of
     `composite`, each with five zigs under way at its side, at its push
-    back, and in its refractory time. The first sits astride the rim of the
-    roost's disk on the side its course heads toward, its zigs read from
-    the key the step derives, and the other two sit on the roost's center,
-    half their drones drawing zero and the rest drawing across the chances a
-    few zigging neighbors give, the last under a radio whose delay outlasts
-    the zig's reaction and cue. Beside them, the radio carries a flock of
-    eight more drones than a table holds on the roost's center, launched at
-    half the spacing of the other three, so a drone hears more senders than
-    its table keeps, its last drone flying back at the cruise speed from 5
-    m past the radio's range ahead of the drone leading along the flock's
-    mean velocity, so no drone holds it as the radio opens and it flies into
-    the flock's range. A second run carries 120 drones scattered 25 m about
-    the roost's center over a radio losing no packet, the even drones flying
-    east at the cruise speed and the odd ones west, each velocity scattered
-    1.5 m/s on every axis and its third drone flying on its second, and
-    the curve orders 340 drones scattered the same way, its third drone on
-    its second, each value drawn in double precision and rounded to four
-    decimals. A launch of 24 drones at a spacing of 120 m and a clearance
-    of 1.5 deviations raises its center past `center_m` and sets two drones
-    on the ground, one of them drawn heading down, the launch run in double
-    precision and the draws it reads written to eight decimals.
+    back, and in its refractory time. The first sits astride the rim of
+    the roost's disk on the side its course heads toward, at the top of the
+    roost's band, its zigs read from the key the step derives, and the other
+    two sit on the roost's center, half their drones drawing zero and the
+    rest drawing across the chances a few zigging neighbors give, the last
+    under a radio whose delay outlasts the zig's reaction and cue. Beside
+    them, the radio carries a flock of eight more drones than a table holds
+    on the roost's center, launched at half the spacing of the other three,
+    so a drone hears more senders than its table keeps, its last drone
+    flying back at the cruise speed from 5 m past the radio's range ahead
+    of the drone leading along the flock's mean velocity, so no drone holds
+    it as the radio opens and it flies into the flock's range. A second run
+    carries 120 drones scattered 25 m about the roost's center over a radio
+    losing no packet, the even drones flying east at the cruise speed and
+    the odd ones west, each velocity scattered 1.5 m/s on every axis and
+    its third drone flying on its second, and the curve orders 340 drones
+    scattered the same way, its third drone on its second, each value drawn
+    in double precision and rounded to four decimals. A launch of 24 drones
+    at a spacing of 140 m and a clearance of 1.5 deviations raises its
+    center past `center_m` and sets two drones on the ground, one of them
+    drawn heading down, the launch run in double precision and the draws it
+    reads written to eight decimals.
 
     Returns:
         Each flock as `flown` lays it out, by its name, beside the run of
@@ -464,6 +509,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     """
     zig            = composite.noise
     roost          = composite.roost
+    center         = (*roost.center_m, roost.height_m)
     rest           = zig.refractory_s
     forces         = zeros((12, 3))
     forces[:5, :2] = [
@@ -476,19 +522,23 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
     draws       = zeros(len(forces))
     draws[1::2] = around(geomspace(1e-4, 4e-3, len(forces) // 2), 4)
     rim         = posed(
-        center_m  = (roost.center_m[0] - roost.radius_m, roost.center_m[1]),
+        center_m = (
+            roost.center_m[0] - roost.radius_m,
+            roost.center_m[1],
+            round(roost.height_m + roost.band_m / 2)
+        ),
         composite = composite,
         forces    = forces,
         plan      = plan
     )
     middle = posed(
-        center_m  = roost.center_m,
+        center_m  = center,
         composite = composite,
         forces    = forces,
         plan      = plan
     )
     radio = posed(
-        center_m  = roost.center_m,
+        center_m  = center,
         composite = composite,
         forces    = zeros((Radio.slots + 8, 3)),
         plan      = plan,
@@ -501,7 +551,7 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
         composite,
         replace(composite.radio, delay_s=2 * (zig.reaction_s + zig.cue_s))
     )
-    raised = plan.changed(clearance_sd=1.5, drones=24, spacing_m=120.0)
+    raised = plan.changed(clearance_sd=1.5, drones=24, spacing_m=140.0)
     with enable_x64():
         where_key, heading_key = split(seeded(raised.seed))
         launch                 = raised.launched(seeded(raised.seed))
@@ -513,7 +563,6 @@ def paired(composite: Composite, plan: Plan) -> dict[str, object]:
             8
         )
     cloud             = default_rng(plan.seed)
-    center            = (*roost.center_m, roost.height_m)
     points            = around(cloud.normal(center, 25.0, (340, 3)), 4)
     points[2]         = points[1]
     crossing          = around(cloud.normal(center, 25.0, (120, 3)), 4)
@@ -628,7 +677,7 @@ def posed(
     a copy of the step reads the same flock the package moves.
     """
     launch = plan.changed(
-        center_m  = (*center_m, composite.roost.height_m),
+        center_m  = center_m,
         drones    = len(forces),
         spacing_m = spacing_m
     ).launched(seeded(plan.seed))

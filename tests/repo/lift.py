@@ -10,7 +10,10 @@ then prints, writes, and tries:
   `[tool.uv]` declares, each beside its newest release's date and the
   advisories the lift clears, and the edits each writes into the copy
 - The releases `Site` reads as exact, and the ranges it leaves alone
-- The folder `Manager.info` runs `bun info` from
+- The folder `Manager.info` runs `bun info` from, and the one `Site` runs
+  each other Bun command from
+- The window `[tool.uv]` declares holding the releases `Tools` and
+  `Actions` read, short of a pin a lift moved inside it
 - The table the lift prints with each recorded hold's reason, the holds
   and recorded holds naming no row, and the pins it lifts short of both
 - The commands the write runs, and the trial's verdict in a scratch clone
@@ -61,13 +64,13 @@ pytestmark = mark.reads(*DECLARED)
 
 
 @fixture
-def age(checkout: Checkout) -> str:
+def age(seconds: int) -> str:
     """
     Writes the `--minimum-release-age` flag, in whole seconds, that holds
     a Bun resolve to releases older than the window the copy's `[tool.uv]`
     declares.
     """
-    return f"--minimum-release-age={int(checkout.manifest.window.total_seconds())}"
+    return f"--minimum-release-age={seconds}"
 
 
 @fixture
@@ -95,6 +98,24 @@ def answer(stand_in: Callable[[str, str], StandIn]) -> Callable[..., StandIn]:
         )
 
     return write
+
+
+@fixture
+def recent(checkout: Checkout) -> str:
+    """
+    Writes the instant half the window the copy's `[tool.uv]` declares ago,
+    as a registry dates a release, so a release published then is inside
+    the window.
+    """
+    return f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}"
+
+
+@fixture
+def seconds(checkout: Checkout) -> int:
+    """
+    Reads the window the copy's `[tool.uv]` declares in whole seconds.
+    """
+    return int(checkout.manifest.window.total_seconds())
 
 
 @fixture
@@ -290,9 +311,9 @@ def test_an_action_under_a_subpath_reads_the_releases_of_its_repository(
         "gh",
         answers = {
             "*codeql-action": printed(
-                value = {"publishedAt": NOW.isoformat(), "tagName": "v4"}
+                value = [{"publishedAt": NOW.isoformat(), "tagName": "v4"}]
             ),
-            "*": printed({"publishedAt": NOW.isoformat(), "tagName": "v1"})
+            "*": printed([{"publishedAt": NOW.isoformat(), "tagName": "v1"}])
         }
     )
     answer(
@@ -416,6 +437,63 @@ def test_info_runs_bun_from_the_folder_holding_the_site_s_manifest(
     )
 
 
+def test_locked_reads_each_package_the_upgrade_moves(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Locked` reports each package the dry run of `uv lock
+    --upgrade` updates, leaving out one it adds, as a package the lift
+    upgrades, beside the earliest upload of its newest release and each
+    advisory a release up to the newest fixes.
+    """
+    dry_run = (
+        "Resolved 3 packages in 1ms\n"
+        "Update alpha v1.0.0 -> v1.1.0\n"
+        "Add gamma v1.0.0\n"
+        "Update beta-pkg v0.9.0 -> v2.0.0"
+    )
+    alpha = {"name": "alpha", "version": "1.0.0"}
+    audit = {
+        "vulnerabilities": [
+            {"dependency": alpha, "id": "GHSA-fixed", "fix_versions": ["1.0.5"]},
+            {"dependency": alpha, "id": "GHSA-later", "fix_versions": ["1.2.0"]}
+        ]
+    }
+    tree = {
+        "resolution": {
+            "a" : package("alpha", uploaded="2026-10-07T00:00:00Z", version="1.1.0"),
+            "b" : package("beta-pkg", uploaded="2026-10-09T00:00:00Z", version="2.0.0")
+        }
+    }
+    answer(
+        "uv",
+        answers = {
+            '"lock --dry-run"*' : f"{printed(dry_run)} >&2",
+            '"audit "*'         : printed(audit),
+            '"tree --format"*'  : printed(tree)
+        }
+    )
+
+    assert Locked(checkout=checkout).lags == [
+        Lag(
+            advisories = ("GHSA-fixed",),
+            current    = "1.0.0",
+            newest     = "1.1.0",
+            pin        = "alpha",
+            published  = datetime(2026, 10, 7, tzinfo=UTC),
+            upgraded   = True
+        ),
+        Lag(
+            current   = "0.9.0",
+            newest    = "2.0.0",
+            pin       = "beta-pkg",
+            published = datetime(2026, 10, 9, tzinfo=UTC),
+            upgraded  = True
+        )
+    ]
+
+
 @mark.parametrize(
     ("latest", "listed"),
     [
@@ -487,63 +565,6 @@ def test_scripts_reads_each_exact_pin_a_task_script_declares(
     )) is bool(latest and listed)
 
 
-def test_locked_reads_each_package_the_upgrade_moves(
-    answer   : Callable[..., StandIn],
-    checkout : Checkout
-):
-    """
-    Asserts that `Locked` reports each package the dry run of `uv lock
-    --upgrade` updates, leaving out one it adds, as a package the lift
-    upgrades, beside the earliest upload of its newest release and each
-    advisory a release up to the newest fixes.
-    """
-    dry_run = (
-        "Resolved 3 packages in 1ms\n"
-        "Update alpha v1.0.0 -> v1.1.0\n"
-        "Add gamma v1.0.0\n"
-        "Update beta-pkg v0.9.0 -> v2.0.0"
-    )
-    alpha = {"name": "alpha", "version": "1.0.0"}
-    audit = {
-        "vulnerabilities": [
-            {"dependency": alpha, "id": "GHSA-fixed", "fix_versions": ["1.0.5"]},
-            {"dependency": alpha, "id": "GHSA-later", "fix_versions": ["1.2.0"]}
-        ]
-    }
-    tree = {
-        "resolution": {
-            "a" : package("alpha", uploaded="2026-10-07T00:00:00Z", version="1.1.0"),
-            "b" : package("beta-pkg", uploaded="2026-10-09T00:00:00Z", version="2.0.0")
-        }
-    }
-    answer(
-        "uv",
-        answers = {
-            '"lock --dry-run"*' : f"{printed(dry_run)} >&2",
-            '"audit "*'         : printed(audit),
-            '"tree --format"*'  : printed(tree)
-        }
-    )
-
-    assert Locked(checkout=checkout).lags == [
-        Lag(
-            advisories = ("GHSA-fixed",),
-            current    = "1.0.0",
-            newest     = "1.1.0",
-            pin        = "alpha",
-            published  = datetime(2026, 10, 7, tzinfo=UTC),
-            upgraded   = True
-        ),
-        Lag(
-            current   = "0.9.0",
-            newest    = "2.0.0",
-            pin       = "beta-pkg",
-            published = datetime(2026, 10, 9, tzinfo=UTC),
-            upgraded  = True
-        )
-    ]
-
-
 def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
     age      : str,
     answer   : Callable[..., StandIn],
@@ -610,6 +631,47 @@ def test_site_lifts_each_workspace_pin_in_the_manifest_declaring_it(
         "devDependencies"  : {"vue": "9.9.9"},
         "peerDependencies" : {"vue": f"{vue} || ^4.0.0"}
     }
+    assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
+
+
+def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
+    age      : str,
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Site` reports a package two manifests of the workspace pin
+    at different releases as one row for each release, each lifting only the
+    manifest declaring it, a release opening on the other's included.
+    """
+    kit = loads(checkout.read(KIT))
+    vue = override(checkout, {})["devDependencies"]["vue"]
+    (checkout.root / KIT).write_text(
+        dumps({**kit, "devDependencies": {"vue": f"{vue}0"}}, indent=4),
+        encoding = "utf-8"
+    )
+    answer(
+        "bun",
+        answers = {
+            f'"outdated --filter=* {age}"': printed(
+                value = "| Package | Current | Update | Latest | Workspace |\n"
+                "|---------|---------|--------|--------|-----------|\n"
+                f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
+                f"| vue (dev) | {vue}0 | {vue}0 | 9.9.9 | @thermur/kit |"
+            ),
+            '"info "*'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
+            '"audit --json"' : printed({}),
+            "*"              : "exit 1"
+        }
+    )
+
+    lags = written(Site(checkout=checkout).lags, checkout.root)
+
+    assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
+        ("vue", vue, [PACKAGE]),
+        ("vue", f"{vue}0", [KIT])
+    ]
+    assert loads(checkout.read(KIT))["devDependencies"] == {"vue": "9.9.9"}
     assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
 
 
@@ -702,51 +764,11 @@ def test_site_reads_each_package_bun_outdated_lists(
     assert (f"bun install --lockfile-only {age}" in bun.commands) is bool(audited)
 
 
-def test_site_makes_one_row_for_each_release_a_workspace_pins_a_package_at(
-    age      : str,
-    answer   : Callable[..., StandIn],
-    checkout : Checkout
-):
-    """
-    Asserts that `Site` reports a package two manifests of the workspace pin
-    at different releases as one row for each release, each lifting only the
-    manifest declaring it, a release opening on the other's included.
-    """
-    kit = loads(checkout.read(KIT))
-    vue = override(checkout, {})["devDependencies"]["vue"]
-    (checkout.root / KIT).write_text(
-        dumps({**kit, "devDependencies": {"vue": f"{vue}0"}}, indent=4),
-        encoding = "utf-8"
-    )
-    answer(
-        "bun",
-        answers = {
-            f'"outdated --filter=* {age}"': printed(
-                value = "| Package | Current | Update | Latest | Workspace |\n"
-                "|---------|---------|--------|--------|-----------|\n"
-                f"| vue (dev) | {vue} | {vue} | 9.9.9 | thermur |\n"
-                f"| vue (dev) | {vue}0 | {vue}0 | 9.9.9 | @thermur/kit |"
-            ),
-            '"info "*'       : printed({"9.9.9": "2026-10-13T00:00:00Z"}),
-            '"audit --json"' : printed({}),
-            "*"              : "exit 1"
-        }
-    )
-
-    lags = written(Site(checkout=checkout).lags, checkout.root)
-
-    assert [(lag.pin, lag.current, lag.files) for lag in lags] == [
-        ("vue", vue, [PACKAGE]),
-        ("vue", f"{vue}0", [KIT])
-    ]
-    assert loads(checkout.read(KIT))["devDependencies"] == {"vue": "9.9.9"}
-    assert loads(checkout.read(PACKAGE))["devDependencies"]["vue"] == "9.9.9"
-
-
 def test_site_reads_each_release_overrides_holds_a_package_to(
     age      : str,
     answer   : Callable[..., StandIn],
-    checkout : Checkout
+    checkout : Checkout,
+    recent   : str
 ):
     """
     Asserts that `Site` reports each package `overrides` holds to a release
@@ -782,9 +804,8 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
             "vue"        : vue
         }
     )
-    old    = "2026-03-02T00:00:00Z"
-    recent = f"{datetime.now(UTC) - checkout.manifest.window / 2:%FT%TZ}"
-    times  = {
+    old   = "2026-03-02T00:00:00Z"
+    times = {
         "chokidar"   : {"2.0.0": old, "2.1.0-beta.1": old},
         "fflate"     : {"0.7.5": old, "0.8.3": "2026-05-16T00:14:03Z"},
         "minimatch"  : {"11.0.8": old, "modified": old},
@@ -831,6 +852,47 @@ def test_site_reads_each_release_overrides_holds_a_package_to(
     assert lifted["devDependencies"]["vue"] == "9.9.9"
 
 
+def test_site_runs_each_bun_command_from_the_folder_holding_the_site_s_manifest(
+    age      : str,
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that `Site` runs `bun outdated --filter=*`, `bun audit
+    --json`, and `bun install --lockfile-only` from the folder holding
+    `docs/package.json`, in the checkout and in the copy of `docs/` it
+    audits the lift in, through a stand-in `bun` that fails and prints no
+    report from any other folder. Bun reads the workspace, its lockfile,
+    and the registry from the folder it runs in, so a command run from the
+    checkout's root reads none of them.
+    """
+    pins = override(checkout, {})["devDependencies"]
+    here = (
+        f'test "${{PWD##*/}}" = {checkout.package.folder.name} && test -f package.json '
+        "|| { echo elsewhere; exit 1; };"
+    )
+    table = (
+        "| Package | Current | Update | Latest |\n"
+        "|---------|---------|--------|--------|\n"
+        f"| satori (dev) | {pins['satori']} | {pins['satori']} | 0.99.0 |"
+    )
+    lifted = 'grep -q \'"satori"[^,]*"0.99.0"\' package.json'
+    answer(
+        "bun",
+        answers = {
+            f'"outdated --filter=* {age}"': f"{here} {printed(table)}",
+            '"info "*'       : printed({"0.99.0": NOW.isoformat()}),
+            '"audit --json"' : f"{here} {lifted} && {printed({})} "
+            f"|| {printed(ADVISED)}",
+            f'"install --lockfile-only {age}"': here
+        }
+    )
+
+    assert [(lag.pin, lag.advisories) for lag in Site(checkout=checkout).lags] == [
+        ("satori", ("GHSA-s",))
+    ]
+
+
 @mark.parametrize(
     ("tags", "current"),
     [
@@ -868,9 +930,9 @@ def test_actions_reads_each_action_its_latest_release_moves(
         "gh",
         answers = {
             "*upload-artifact": printed(
-                value = {"publishedAt": NOW.isoformat(), "tagName": "v9.9.9"}
+                value = [{"publishedAt": NOW.isoformat(), "tagName": "v9.9.9"}]
             ),
-            "*": printed({"publishedAt": NOW.isoformat(), "tagName": "v1"})
+            "*": printed([{"publishedAt": NOW.isoformat(), "tagName": "v1"}])
         }
     )
     answer(
@@ -905,6 +967,65 @@ def test_actions_reads_each_action_its_latest_release_moves(
         for action, commit in [step.pin]
         if action == "actions/upload-artifact"
     } == {lifted}
+
+
+@mark.parametrize("ahead", [param(False, id="behind"), param(True, id="ahead")])
+def test_actions_reads_the_newest_release_older_than_the_window(
+    ahead    : bool,
+    answer   : Callable[..., StandIn],
+    checkout : Checkout,
+    recent   : str
+):
+    """
+    Asserts that `Actions` reads the release whose tag reads as the
+    highest version among those `gh release list` dates before the window
+    `[tool.uv]` declares, short of a draft and a prerelease, so a release
+    inside the window and a fix to an older major published after the newest
+    release make no row. A pin a release inside the window tags, as a lift
+    inside the window leaves it, makes no row either.
+    """
+    pinned = dict(step.pin for _, step in checkout.steps if step.pin)[
+        "actions/upload-artifact"
+    ]
+    gh = answer(
+        "gh",
+        answers = {
+            "*upload-artifact" : printed(
+                value = [
+                    {"publishedAt": recent, "tagName": "v9.0.0"},
+                    {"publishedAt": "2026-10-02T00:00:00Z", "tagName": "v7.9.9"},
+                    {"publishedAt": "2026-10-01T00:00:00Z", "tagName": "v8.0.0"}
+                ]
+            ),
+            "*"                : printed([])
+        }
+    )
+    answer(
+        "git",
+        answers = {
+            "*/actions/upload-artifact": printed(
+                value = "\n".join(
+                    [
+                        f"{pinned if ahead else 'a' * 40}\trefs/tags/v9.0.0",
+                        f"{'b' * 40}\trefs/tags/v7.9.9",
+                        f"{'c' * 40}\trefs/tags/v8.0.0"
+                    ]
+                )
+            )
+        }
+    )
+
+    assert [
+        (lag.pin, lag.newest, lag.published) for lag in Actions(checkout=checkout).lags
+    ] == (
+        []
+        if ahead
+        else [("actions/upload-artifact", "v8.0.0", datetime(2026, 10, 1, tzinfo=UTC))]
+    )
+    assert all(
+        "release list --exclude-drafts --exclude-pre-releases" in command
+        for command in gh.commands
+    )
 
 
 def test_the_lift_gathers_each_managers_lags_in_the_order_they_are_declared(
@@ -1081,39 +1202,42 @@ def test_the_table_lists_each_lag_or_says_none_lags(checkout: Checkout):
     )
 
 
-def test_tools_lifts_a_tool_its_configuration_pins_through_a_table(
+def test_tools_holds_each_tool_and_the_floor_to_the_window(
     answer   : Callable[..., StandIn],
-    checkout : Checkout
+    checkout : Checkout,
+    seconds  : int
 ):
     """
-    Asserts that a tool `.mise/config.toml` pins through an inline table,
-    the form an `os` restriction takes, is lifted at the `version` the table
-    names, leaving the rest of the table as it stood.
+    Asserts that `Tools` asks `mise outdated` under `minimum_release_age`
+    set to the window `[tool.uv]` declares, in seconds, through a stand-in
+    `mise` failing under any other, and reports only a tool whose newest
+    release under the window is ahead of its pin. mise also lists a tool
+    and the floor it finds no installed release of at the pin itself or at
+    a release behind it, as a pin a lift moved inside the window is, and
+    neither makes a row.
     """
-    zizmor = from_toml(checkout.read(CONFIG))["tools"]["zizmor"]
-    edit(
-        checkout,
-        str(CONFIG),
-        new = f'zizmor = {{ os = ["linux"], version = "{zizmor}" }}',
-        old = f'zizmor                    = "{zizmor}"'
-    )
+    config = checkout.config
+    pinned = from_toml(checkout.read(CONFIG))["tools"]
+    held   = f'test "$MISE_MINIMUM_RELEASE_AGE" = {seconds}s || exit 1;'
+    tools  = {
+        "bun"    : {"latest": pinned["bun"], "requested": pinned["bun"]},
+        "uv"     : {"latest": "9.0.0", "requested": config.uv},
+        "zizmor" : {"latest": "0.0.1", "requested": pinned["zizmor"]}
+    }
+    floored = {"aqua:jdx/mise": {"latest": config.floor, "requested": config.floor}}
     answer(
         "mise",
         answers = {
-            '"outdated --bump --json --local"': printed(
-                value = {"zizmor": {"latest": "9.9.9", "requested": zizmor}}
-            ),
-            '"outdated "*'  : printed({}),
-            '"ls-remote "*' : printed([])
+            '"outdated --bump --json --local"': f"{held} {printed(tools)}",
+            f'"outdated --bump --json aqua:jdx/mise@{config.floor}"':
+                f"{held} {printed(floored)}",
+            '"ls-remote "*': printed([])
         }
     )
 
-    written(Tools(checkout=checkout).lags, checkout.root)
-
-    assert from_toml(checkout.read(CONFIG))["tools"]["zizmor"] == {
-        "version" : "9.9.9",
-        "os"      : ["linux"]
-    }
+    assert [(lag.pin, lag.newest) for lag in Tools(checkout=checkout).lags] == [
+        ("uv", "9.0.0")
+    ]
 
 
 @mark.parametrize(
@@ -1162,7 +1286,7 @@ def test_the_audit_reads_what_uv_reports_on_an_advisory_and_raises_past_it(
 @mark.parametrize(
     ("answered", "raised"),
     [
-        param("echo 'release not found' >&2; exit 1", False, id="unreleased"),
+        param(printed([]), False, id="unreleased"),
         param("echo 'HTTP 401: Bad credentials' >&2; exit 1", True, id="refused")
     ]
 )
@@ -1173,16 +1297,51 @@ def test_an_action_whose_repository_publishes_no_release_makes_no_row(
     raised   : bool
 ):
     """
-    Asserts that an action whose repository `gh` finds no release for makes
+    Asserts that an action whose repository `gh` lists no release for makes
     no row without reading its tags, which a stand-in `git` failing every
-    call stops, whereas any other failure of `gh` raises rather than leaving
-    the action out of the table unreported.
+    call stops, whereas a failure of `gh` raises rather than leaving the
+    action out of the table unreported.
     """
     answer("gh", answers={"*": answered})
     answer("git", answers={"*": "exit 1"})
 
     with raises(CalledProcessError) if raised else nullcontext():
         assert Actions(checkout=checkout).lags == []
+
+
+def test_tools_lifts_a_tool_its_configuration_pins_through_a_table(
+    answer   : Callable[..., StandIn],
+    checkout : Checkout
+):
+    """
+    Asserts that a tool `.mise/config.toml` pins through an inline table,
+    the form an `os` restriction takes, is lifted at the `version` the table
+    names, leaving the rest of the table as it stood.
+    """
+    zizmor = from_toml(checkout.read(CONFIG))["tools"]["zizmor"]
+    edit(
+        checkout,
+        str(CONFIG),
+        new = f'zizmor = {{ os = ["linux"], version = "{zizmor}" }}',
+        old = f'zizmor                    = "{zizmor}"'
+    )
+    answer(
+        "mise",
+        answers = {
+            '"outdated --bump --json --local"': printed(
+                value = {"zizmor": {"latest": "9.9.9", "requested": zizmor}}
+            ),
+            '"outdated "*'  : printed({}),
+            '"ls-remote "*' : printed([])
+        }
+    )
+
+    written(Tools(checkout=checkout).lags, checkout.root)
+
+    assert from_toml(checkout.read(CONFIG))["tools"]["zizmor"] == {
+        "version" : "9.9.9",
+        "os"      : ["linux"]
+    }
 
 
 def test_tools_reads_each_tool_mise_reports_newer_and_the_floor(
