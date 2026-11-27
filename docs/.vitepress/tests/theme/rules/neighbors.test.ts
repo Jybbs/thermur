@@ -81,25 +81,6 @@ function short(count: number): void {
   })
 }
 
-/**
- * Mounts the drawing and reads the scale each bird of its last frame is drawn
- * at, its length over the size its flock gives it, in the order the frame
- * draws them, the marked bird last.
- */
-function scaled(): number[] {
-  const marked = { chosen: -1, flock: undefined as Flock | undefined }
-  const heard  = Flock.prototype.heard
-  vi.spyOn(Flock.prototype, 'heard').mockImplementation(function seen(this: Flock, index, into) {
-    marked.chosen = index
-    marked.flock  = this
-    return heard.call(this, index, into)
-  })
-  const last              = frame(drawn().birds)
-  const { chosen, flock } = marked
-  const order             = [...last.keys()].filter(index => index !== chosen).concat(chosen)
-  return last.map((bird, at) => bird.length / flock!.size[order[at]!]!)
-}
-
 enableAutoUnmount(afterEach)
 
 afterEach(() => {
@@ -140,9 +121,21 @@ describe('the header', () => {
 })
 
 describe('the marked bird', () => {
-  it('draws the marked bird last and at the largest scale of its size', () => {
-    const scales = scaled()
-    expect(scales.at(-1)! - Math.max(...scales.slice(0, -1))).toBeGreaterThan(1e-9)
+  it('draws the marked bird last at 1.6 times the largest flock size, above every other bird', () => {
+    const marked = { chosen: -1, flock: undefined as Flock | undefined }
+    const heard  = Flock.prototype.heard
+    vi.spyOn(Flock.prototype, 'heard').mockImplementation(function seen(this: Flock, index, into) {
+      marked.chosen = index
+      marked.flock  = this
+      return heard.call(this, index, into)
+    })
+    const last              = frame(drawn().birds)
+    const { chosen, flock } = marked
+    const order             = [...last.keys()].filter(index => index !== chosen)
+    const zoom              = Math.min(...order.map((index, at) => last[at]!.length / flock!.size[index]!))
+    const others            = last.slice(0, -1).map(bird => bird.length)
+    expect(last.at(-1)!.length).toBeCloseTo(1.6 * FLIGHT.size[1] * zoom, 6)
+    expect(last.at(-1)!.length).toBeGreaterThan(Math.max(...others))
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {
