@@ -52,16 +52,18 @@ def install(site: Path, check: bool = True) -> CompletedProcess:
     return run(["mise", "run", "site:install"], check=check, cwd=site.parent)
 
 
+@mark.parametrize("failing", ["install", "prune"])
 @mark.usefixtures("bun")
 def test_a_failed_install_leaves_no_marker(
+    failing  : str,
     site     : Path,
     stand_in : Callable[[str, str], StandIn]
 ):
     """
-    Asserts that an install whose Bun fails exits nonzero and touches no
-    marker, so the next install runs Bun again.
+    Asserts that an install whose `bun install` or `bun prune` fails exits
+    nonzero and touches no marker, so the next install runs Bun again.
     """
-    stand_in("bun", "exit 1")
+    stand_in("bun", f'[ "$1" != {failing} ]')
 
     assert install(site, check=False).returncode
     assert not (site / "node_modules/.installed").exists()
