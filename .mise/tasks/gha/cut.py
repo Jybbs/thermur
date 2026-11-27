@@ -80,20 +80,18 @@ class Draft:
             return "published", published["url"]
 
         if self.releases:
-            notes = from_json(
-                run(
-                    "gh",
-                    "api",
-                    "-f",
-                    f"tag_name={self.version}",
-                    "-f",
-                    "target_commitish=main",
-                    "--jq",
-                    "{body}",
-                    "--method",
-                    "POST",
-                    "repos/{owner}/{repo}/releases/generate-notes"
-                )
+            tag   = {"tag_name": self.version, "target_commitish": "main"}
+            notes = run(
+                "gh",
+                "api",
+                "--input",
+                "-",
+                "--jq",
+                "{body}",
+                "--method",
+                "POST",
+                "repos/{owner}/{repo}/releases/generate-notes",
+                input = dumps(tag)
             )
             return "updated", run(
                 "gh",
@@ -105,9 +103,7 @@ class Draft:
                 "--method",
                 "PATCH",
                 f"repos/{{owner}}/{{repo}}/releases/{self.releases[0]['id']}",
-                input = dumps(
-                    notes | {"tag_name": self.version, "target_commitish": "main"}
-                )
+                input = dumps(from_json(notes) | tag)
             )
 
         return "created", run(
