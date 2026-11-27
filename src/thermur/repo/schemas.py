@@ -853,8 +853,8 @@ class Task(BaseModel, extra="ignore", frozen=True, use_attribute_docstrings=True
         """
         Writes the command running the task, `mise` and its first alias
         where it declares one and `mise run` and its name otherwise, which
-        reaches the task since `AliasCheck` holds no alias to a command of
-        mise's own.
+        reaches the task unless the alias names a command `mise --help`
+        hides, since `AliasCheck` holds no alias to one it lists.
         """
         return f"mise {self.aliases[0]}" if self.aliases else f"mise run {self.name}"
 

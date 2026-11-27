@@ -305,7 +305,8 @@ def test_subcommands_reads_the_help_whatever_the_terminal(
 ):
     """
     Asserts that the commands `mise --help` lists are read under forced
-    color and a wide terminal, either of which moves the `Commands` heading.
+    color, which wraps the `Commands` heading in escape codes, and under a
+    wide terminal, which prints mise's logo on the heading's line.
     """
     monkeypatch.setenv(variable, value)
 

@@ -77,8 +77,8 @@ class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
 class AliasCheck(Check):
     """
     No task the checkout declares takes an alias naming a command or an
-    alias of mise's own, since `mise <alias>` runs mise's command ahead of
-    the task and `mise tasks validate` reports no such collision.
+    alias `mise --help` lists, since `mise <alias>` runs mise's command
+    ahead of the task and `mise tasks validate` reports no such collision.
     """
 
     def scan(self) -> Iterator[Finding]:

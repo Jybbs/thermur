@@ -311,8 +311,9 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         Reads every command and alias `mise --help` lists under `Commands`,
         each of which `mise <word>` runs ahead of a task aliased the same,
         joining an alias list the help wraps across lines. The help prints
-        without color at 100 columns, since forced color or a wider terminal
-        moves the heading the read starts from.
+        without color at 100 columns, since forced color wraps the heading
+        the read starts from in escape codes and a wider terminal prints
+        mise's logo on the heading's line.
         """
         printed = self.run(
             "env",
