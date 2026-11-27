@@ -1,4 +1,9 @@
 #!/usr/bin/env -S bash -euo pipefail
-#MISE description = "Install `docs/node_modules` from `docs/bun.lock` and prune it, skipping both while `docs/package.json` and `docs/bun.lock` are unchanged and `docs/node_modules` exists"
+#MISE description = "Install `docs/node_modules` from `docs/bun.lock`, pruning any package the lockfile no longer names, and skip both while `docs/package.json` and `docs/bun.lock` are older than `docs/node_modules/.installed`"
+#MISE dir         = "{{config_root}}/docs"
+#MISE outputs     = ["node_modules/.installed"]
+#MISE sources     = ["package.json", "bun.lock"]
 
-mise deps install bun
+bun install --frozen-lockfile
+bun prune
+touch node_modules/.installed
