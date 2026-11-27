@@ -472,6 +472,23 @@ def test_a_copied_zig_starts_at_once_where_the_radio_s_delay_outlasts_the_cue():
     )
 
 
+def test_a_drone_hearing_a_firing_neighbor_fires_whether_or_not_the_stimulus_rises():
+    """
+    Asserts that an alarmed drone at the front whose alertness has settled
+    at the stimulus still fires on a firing neighbor, since the rise gates
+    only the drone's own firing.
+    """
+    assert_allclose(
+        alarmed(
+            alarm  = (1.0, 1.0, 0.0, 0.0),
+            alarms = [[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6,
+            draws  = (0.0, 1.0),
+            front  = 0.0
+        )[0],
+        2.0
+    )
+
+
 def test_a_marginal_speed_imitates_the_neighbors_and_restores_the_cruise():
     """
     Asserts that the speed slot pulls a drone along its velocity by the
@@ -552,29 +569,6 @@ def test_a_persistent_force_enters_the_acceleration_and_decays():
     assert_allclose(White().relaxation(view), 0.0)
 
 
-def test_a_zig_s_chance_of_spreading_grows_with_each_zigging_neighbor():
-    """
-    Asserts that a resting drone hearing two of its seven neighbors zig
-    through one whole zig copies them where the draw of 0.2 falls below the
-    chance of 1 - (6/7)**2, about 0.265, which one zigging neighbor's 1/7
-    would leave it short of.
-    """
-    assert_allclose(
-        ZIG.excited(
-            delay_s     = 1.0,
-            draw        = array(0.2),
-            observation = viewed(
-                [[10.0 * (index + 1), 0.0, 0.0] for index in range(7)],
-                forces = array([[4.5, -1.0, 0.0]] * 2 + [[0.0, 0.0, 0.0]] * 5)
-            ),
-            step_s = ZIG.zig_s,
-            turn   = array([0.0, 0.0, 0.0])
-        ),
-        (6.0, -1.0, 0.0),
-        atol = 1e-6
-    )
-
-
 @mark.parametrize(
     "alarm",
     [
@@ -596,21 +590,23 @@ def test_an_excitable_escape_copies_no_neighbor_while_firing_or_refractory(
     )
 
 
-def test_an_excitable_escape_hears_no_firing_from_a_slot_holding_no_sender():
+def test_a_thermal_only_control_flock_never_fires_beside_the_one_with_the_escape():
     """
-    Asserts that a resting drone copies nothing from a table slot at no
-    distance, the slot holding no sender, whatever state it reads.
+    Asserts that the escape slot removed leaves the alarm state of a drone
+    at the front, beside a firing neighbor and with the lowest draws, as it
+    stands where the escape slot fills fires it.
     """
-    assert_allclose(
-        alarmed(
-            alarm   = (0.0, 0.0, 0.0, 0.0),
-            alarms  = [[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6,
-            draws   = (0.0, 0.0),
-            offsets = [[0.0, 0.0, 0.0]] + SEVEN[1:]
-        ),
-        (0.0, 0.0, 0.0, 0.0),
-        atol = 1e-6
+    view = viewed(
+        SEVEN,
+        air = {"excess": array(0.0), "front": array(0.0)}
+        | dict.fromkeys("uvw", array(0.0)),
+        alarm  = array((1.0, 0.5, 0.0, 0.0)),
+        alarms = array([[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6)
     )
+    draws = array([0.0, 0.0])
+
+    assert_allclose(Escape().excited(draws, view, 0.1), view.alarm)
+    assert EXCITABLE.excited(draws, view, 0.1)[0] == Alarm.FIRING
 
 
 RISEN = float(1 - 0.5 * exp(-0.05))
@@ -627,8 +623,8 @@ def test_an_alarmed_drone_fires_on_its_own_at_its_alertness_over_its_cycle(
 ):
     """
     Asserts that a drone alarmed at the front with a rising stimulus,
-    hearing no firing neighbor, fires on its own within a step of `step_s`
-    with the chance `1 - exp(-alertness * step_s / (firing_s +
+    hearing no firing neighbor, fires on its own within a step of
+    `step_s` with the chance `1 - exp(-alertness * step_s / (firing_s +
     refractory_s))`.
     """
     assert_allclose(
@@ -667,40 +663,46 @@ def test_an_alarmed_drone_fires_on_its_own_only_while_the_stimulus_rises(
     assert stepped[0] == (2.0 if fired else 1.0)
 
 
-def test_a_drone_hearing_a_firing_neighbor_fires_whether_or_not_the_stimulus_rises():
+def test_a_zig_s_chance_of_spreading_grows_with_each_zigging_neighbor():
     """
-    Asserts that an alarmed drone at the front whose alertness has settled at
-    the stimulus still fires on a firing neighbor, since the rise gates only
-    the drone's own firing.
+    Asserts that a resting drone hearing two of its seven neighbors zig
+    through one whole zig copies them where the draw of 0.2 falls below the
+    chance of 1 - (6/7)**2, about 0.265, which one zigging neighbor's 1/7
+    would leave it short of.
+    """
+    assert_allclose(
+        ZIG.excited(
+            delay_s     = 1.0,
+            draw        = array(0.2),
+            observation = viewed(
+                [[10.0 * (index + 1), 0.0, 0.0] for index in range(7)],
+                forces = array([[4.5, -1.0, 0.0]] * 2 + [[0.0, 0.0, 0.0]] * 5)
+            ),
+            step_s = ZIG.zig_s,
+            turn   = array([0.0, 0.0, 0.0])
+        ),
+        (6.0, -1.0, 0.0),
+        atol = 1e-6
+    )
+
+
+def test_an_excitable_escape_hears_no_firing_from_a_slot_holding_no_sender():
+    """
+    Asserts that a resting drone copies nothing from a table slot at no
+    distance, the slot holding no sender, whatever state it reads.
     """
     assert_allclose(
         alarmed(
-            alarm  = (1.0, 1.0, 0.0, 0.0),
-            alarms = [[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6,
-            draws  = (0.0, 1.0),
-            front  = 0.0
-        )[0],
-        2.0
+            alarm   = (0.0, 0.0, 0.0, 0.0),
+            alarms  = [[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6,
+            draws   = (0.0, 0.0),
+            offsets = [[0.0, 0.0, 0.0]] + SEVEN[1:]
+        ),
+        (0.0, 0.0, 0.0, 0.0),
+        atol = 1e-6
     )
 
 
-def test_a_thermal_only_control_flock_never_fires_beside_the_one_with_the_escape():
-    """
-    Asserts that the escape slot removed leaves the alarm state of a drone at
-    the front, beside a firing neighbor and with the lowest draws, as it
-    stands where the escape slot fills fires it.
-    """
-    view = viewed(
-        SEVEN,
-        air    = {"excess": array(0.0), "front": array(0.0)}
-        | dict.fromkeys("uvw", array(0.0)),
-        alarm  = array((1.0, 0.5, 0.0, 0.0)),
-        alarms = array([[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6)
-    )
-    draws = array([0.0, 0.0])
-
-    assert_allclose(Escape().excited(draws, view, 0.1), view.alarm)
-    assert EXCITABLE.excited(draws, view, 0.1)[0] == Alarm.FIRING
 @mark.parametrize(
     ("alertness", "front", "expected"),
     [
