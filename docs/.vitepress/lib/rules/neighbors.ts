@@ -49,7 +49,8 @@ export const RANGE = { max: 6, min: 1, step: 0.25, value: 3 } as const
 /**
  * The elements of the chip a drawing of the neighbors reads how far out the
  * farthest sender the marked bird ranks flies into: the name, set in the
- * seven's color, and the value.
+ * seven's color under the dark scheme and in the ink under the light, and the
+ * value.
  */
 export interface Reach {
   named : HTMLElement

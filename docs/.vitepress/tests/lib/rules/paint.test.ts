@@ -26,6 +26,7 @@ interface Word extends Fill {
   halo    : string
   spacing : string
   text    : string
+  x       : number
 }
 
 /**
@@ -76,16 +77,17 @@ function painted(built: Strips, scheme: Scheme, ranged: string, seven: string): 
     fillRect      : (): void => {
       laidDown.rects.push({ alpha: pen.globalAlpha, style: pen.fillStyle })
     },
-    fillText      : (text: string): void => {
+    fillText      : (text: string, x: number): void => {
       laidDown.words.push({
         alpha   : pen.globalAlpha,
         halo    : pen.strokeStyle,
         spacing : pen.letterSpacing,
         style   : pen.fillStyle,
-        text
+        text,
+        x
       })
     },
-    measureText   : (): Partial<TextMetrics> => ({ width: 60 }),
+    measureText   : (): Partial<TextMetrics> => ({ width: pen.letterSpacing === '0.1em' ? 60 : 0 }),
     strokeText    : (): void => undefined
   }
   built.paint(pen as unknown as CanvasRenderingContext2D, geometry({ scheme }), ranged, seven)
@@ -141,12 +143,19 @@ describe('Strips', () => {
 })
 
 describe('the strips’ labels', () => {
-  it('track every word at 0.1em and restore the spacing after the paint', () => {
+  it('write every word in capitals, tracked at 0.1em', () => {
     const built = strips(new Tones())
     built.sample(4, 3)
     const { words } = painted(built, 'dark', 'ranged', 'seven')
     expect(new Set(words.map(word => word.spacing))).toEqual(new Set(['0.1em']))
     expect(words.map(word => word.text)).toEqual(words.map(word => word.text.toUpperCase()))
+  })
+
+  it('measure every label at its tracking before placing it', () => {
+    const built = strips(new Tones())
+    built.sample(4, 3)
+    const { words } = painted(built, 'dark', 'ranged', 'seven')
+    expect(words.find(word => word.text === 'BY RANK, 3')!.x).toBe(1200 - 18 - 60 + 8)
   })
 
   it('set both strips’ labels in the ink under the light scheme and in their strips’ colors under the dark', () => {
