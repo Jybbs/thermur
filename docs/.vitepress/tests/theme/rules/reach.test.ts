@@ -138,12 +138,12 @@ describe('the heading chart', () => {
     expect(dots(chart)).toEqual(['true', 'false'])
   })
 
-  it.for([1024, 672, 390])('leaves a clear gap between each angle and the next words on its line at %i px', width => {
+  it.for([1024, 672, 390])('leaves 16 px between each angle and the next words on its line at %i px', width => {
     const chart  = charted(RulesReach, width)
     const texts  = [...chart.host.querySelectorAll('text')]
     const angles = texts.filter(text => /^\d+\.\d°$/u.test(text.textContent))
     expect(angles).toHaveLength(6)
-    expect(angles.map(angle => roomAfter(angle, texts)).filter(room => room < 7)).toStrictEqual([])
+    expect(angles.map(angle => roomAfter(angle, texts)).filter(room => room < 16)).toStrictEqual([])
   })
 
   it('sets the shorter names beside each angle between the narrow and the wide widths', () => {

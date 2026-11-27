@@ -98,9 +98,9 @@ const RAD = Math.PI / 180
 const RIM = { 'fill': markup.TONE.ground, 'r': 7, 'stroke': markup.TONE.lead, 'stroke-width': 1.5 } as const
 /**
  * How far right of an angle a reading's name starts where the two share a
- * line, the room an angle in the reading's 21 px face takes.
+ * line: the angle's four mono glyphs at 0.6 em in its 21 px face, and a gap.
  */
-const SHARE = 86
+const SHARE = Math.ceil(4 * 0.6 * 21) + 16
 
 /**
  * Draws the rule at `row`'s reading beside the dial into `plot`: its name, the
