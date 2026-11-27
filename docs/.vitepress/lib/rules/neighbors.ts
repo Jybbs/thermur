@@ -49,7 +49,8 @@ export const RANGE = { max: 6, min: 1, step: 0.25, value: 3 } as const
 /**
  * The elements of the chip a drawing of the neighbors reads how far out the
  * farthest sender the marked bird ranks flies into: the name, set in the
- * seven's color, and the value.
+ * seven's color under the dark scheme and in the ink under the light, and the
+ * value.
  */
 export interface Reach {
   named : HTMLElement
@@ -120,14 +121,14 @@ export class Neighbors {
 
   /**
    * Reads the farthest ranked sender's distance into the chip, its name in the
-   * seven's color in `scheme`, and grows the lines of a bird newly marked out
-   * to the senders it ranks.
+   * seven's color under the dark scheme and in the ink under the light, and
+   * grows the lines of a bird newly marked out to the senders it ranks.
    */
   #read(farthest: number, scheme: Scheme): void {
     const { chosen }              = this.#shared
     const moved                   = this.#drawn >= 0 && chosen !== this.#drawn
     this.#drawn                   = chosen
-    this.#reach.named.style.color = this.#tones.flock(scheme, falcon.ALONG.seven, 1)
+    this.#reach.named.style.color = scheme === 'light' ? this.#tones.ink(scheme) : this.#tones.flock(scheme, falcon.ALONG.seven, 1)
     this.#reach.value.textContent = `${farthest.toFixed(1)} lengths`
     if (!moved) return
     this.#stop()
