@@ -19,6 +19,7 @@ vi.mock('../../theme/pause.ts', () => ({ default: 'MotionPause' }))
 vi.mock('../../theme/rules/neighbors.ts', () => ({ default: 'RulesNeighbors' }))
 vi.mock('../../theme/rules/reach.ts', () => ({ default: 'RulesReach' }))
 vi.mock('../../theme/rules/spacing.ts', () => ({ default: 'RulesSpacing' }))
+vi.mock('../../theme/sources.ts', () => ({ default: 'SourcesFlock' }))
 vi.mock('../../theme/threat.ts', () => ({ default: 'ThreatFront' }))
 
 describe('the theme', () => {
@@ -26,7 +27,7 @@ describe('the theme', () => {
     expect(theme.extends).toEqual({ Layout: 'Layout' })
   })
 
-  it('registers the widgets a page’s rules write by name', () => {
+  it('registers the widgets a page’s rules and its footnotes write by name', () => {
     const component = vi.fn<(name: string, widget: unknown) => void>()
     theme.enhanceApp({ app: { component } } as unknown as Parameters<typeof theme.enhanceApp>[0])
     expect(component.mock.calls).toEqual([
@@ -41,7 +42,8 @@ describe('the theme', () => {
       ['RulesNeighbors', 'RulesNeighbors'],
       ['RulesReach', 'RulesReach'],
       ['RulesSpacing', 'RulesSpacing'],
-      ['ThreatFront', 'ThreatFront']
+      ['ThreatFront', 'ThreatFront'],
+      ['SourcesFlock', 'SourcesFlock']
     ])
   })
 
