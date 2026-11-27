@@ -190,19 +190,6 @@ def pushed(flock: Flock) -> Array:
         plan      = Plan(drones=len(flock.positions)),
         t         = array(0.0)
     ).commands
-def threatened(composite: Composite, drones: int, duration_s: float) -> Flight:
-    """
-    Flies the default plan at `drones` for `duration_s` under `composite`
-    through the parametric threat's air.
-    """
-    settings = Settings()
-    return Flight.flown(
-        WrfOutput.from_settings(settings).air,
-        composite,
-        settings.plan.changed(drones=drones, duration_s=duration_s)
-    )
-
-
 
 
 def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
@@ -214,6 +201,25 @@ def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
     spots = concat([diag([30.0, 20.0, 10.0]), -diag([30.0, 20.0, 10.0])] * 2)
 
     assert_allclose(laid(spots, [10.0, 0.0, 0.0]).aspect_ratio, 3.0, rtol=1e-5)
+
+
+def test_a_flight_holds_every_command_within_the_plant_s_speed_bounds():
+    """
+    Asserts that noise strong enough to carry a command past the plant's
+    speed bounds within a step leaves every command at every kept frame
+    within them, some at a bound, so the command stops at the speed the
+    plant can fly rather than integrating past it.
+    """
+    plant    = Plant()
+    commands = Flight.flown(
+        AIR,
+        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
+        short(turn_deg=0.0)
+    ).frames.commands
+    assert (linalg.norm(commands[..., :2], axis=-1) <= plant.level_m_s + 1e-4).all()
+    assert (commands[..., 2] <= plant.climb_m_s + 1e-4).all()
+    assert (commands[..., 2] >= -plant.descent_m_s - 1e-4).all()
+    assert allclose(abs(commands[..., 2]).max(), plant.climb_m_s)
 
 
 @mark.parametrize(
@@ -365,25 +371,6 @@ def test_a_flight_of_100_drones_keeps_every_drone_over_the_roost(hundred: Flight
     assert (spots[..., 2] >= 0).all()
 
 
-def test_a_flight_holds_every_command_within_the_plant_s_speed_bounds():
-    """
-    Asserts that noise strong enough to carry a command past the plant's
-    speed bounds within a step leaves every command at every kept frame
-    within them, some at a bound, so the command stops at the speed the
-    plant can fly rather than integrating past it.
-    """
-    plant    = Plant()
-    commands = Flight.flown(
-        AIR,
-        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
-        short(turn_deg=0.0)
-    ).frames.commands
-    assert (linalg.norm(commands[..., :2], axis=-1) <= plant.level_m_s + 1e-4).all()
-    assert (commands[..., 2] <= plant.climb_m_s + 1e-4).all()
-    assert (commands[..., 2] >= -plant.descent_m_s - 1e-4).all()
-    assert allclose(abs(commands[..., 2]).max(), plant.climb_m_s)
-
-
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
     composite : Composite,
     flight    : Flight
@@ -459,6 +446,23 @@ def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     )
 
 
+def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
+    """
+    Asserts that a flight under the persistent force holds a nonzero force
+    on some drone at some kept frame, so each step advances the force the
+    step before it left rather than the one it started from.
+    """
+    assert (
+        asarray(
+            Flight.flown(
+                AIR,
+                replace(composite, noise=Persistent()),
+                short()
+            ).frames.forces
+        ) != 0
+    ).any()
+
+
 @mark.parametrize(
     ("delay_s", "lag_s"),
     [
@@ -530,23 +534,6 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
-def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
-    """
-    Asserts that a flight under the persistent force holds a nonzero force
-    on some drone at some kept frame, so each step advances the force the
-    step before it left rather than the one it started from.
-    """
-    assert (
-        asarray(
-            Flight.flown(
-                AIR,
-                replace(composite, noise=Persistent()),
-                short()
-            ).frames.forces
-        ) != 0
-    ).any()
-
-
 def test_a_push_across_the_command_keeps_each_drone_s_speed():
     """
     Asserts that two drones a contact pushes apart across their command keep
@@ -597,6 +584,34 @@ def test_a_replay_ranks_every_composite_it_is_given(
     assert list(ranked.model.values) == ["one", "two"]
     assert isfinite(ranked.log_likelihood).all()
     assert_allclose(ranked.log_likelihood[0], ranked.log_likelihood[1])
+
+
+def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
+    """
+    Asserts that a flight whose drones command a swing of one meter per
+    second across the course and back each frame, replayed through a
+    composite whose drift is zero, reads the log-likelihood of a Gaussian
+    in the plane across each command, its variance per axis half the mean
+    squared residual, whatever the velocities the drones reach.
+    """
+    swing  = 10.0 * stack([ones(20), arange(20) % 2 / 10.0, zeros(20)], -1)[:, None]
+    flight = laid(
+        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
+        commands   = swing,
+        velocities = [10.0, 0.0, 0.0]
+    )
+    rates = asarray(
+        across(
+            diff(flight.frames.commands, axis=1) / 0.1,
+            flight.frames.commands[:, :-1]
+        )
+    )
+
+    assert_allclose(
+        flight.likelihoods(AIR, {"still": STILL}).log_likelihood,
+        [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
+        rtol = 1e-5
+    )
 
 
 @mark.parametrize(
@@ -661,34 +676,6 @@ def test_a_flock_rotating_as_a_whole_reads_only_the_rotation_its_turn_adds(
         replace(turned, unturned=unturned.frames).turn_response,
         [[0.0, 0.0], [reach, reach]],
         atol = 1e-6
-    )
-
-
-def test_a_replay_reads_the_likelihood_of_its_residual_across_each_command():
-    """
-    Asserts that a flight whose drones command a swing of one meter per
-    second across the course and back each frame, replayed through a
-    composite whose drift is zero, reads the log-likelihood of a Gaussian
-    in the plane across each command, its variance per axis half the mean
-    squared residual, whatever the velocities the drones reach.
-    """
-    swing  = 10.0 * stack([ones(20), arange(20) % 2 / 10.0, zeros(20)], -1)[:, None]
-    flight = laid(
-        positions  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1),
-        commands   = swing,
-        velocities = [10.0, 0.0, 0.0]
-    )
-    rates = asarray(
-        across(
-            diff(flight.frames.commands, axis=1) / 0.1,
-            flight.frames.commands[:, :-1]
-        )
-    )
-
-    assert_allclose(
-        flight.likelihoods(AIR, {"still": STILL}).log_likelihood,
-        [-(log(pi * (rates**2).sum(-1).mean()) + 1)],
-        rtol = 1e-5
     )
 
 
@@ -771,6 +758,23 @@ def test_each_seed_of_the_batch_flies_as_it_does_alone(
     assert_allclose(flight.frames.velocities[1], alone.velocities, atol=1e-4)
 
 
+def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
+    """
+    Asserts that a noise slot holding each step's draw as its force holds
+    another force at every step, each kept as a frame, so no two steps read
+    one draw.
+    """
+    forces = asarray(
+        Flight.flown(
+            AIR,
+            replace(composite, noise=Drawn()),
+            short(frame_every=1)
+        ).frames.forces
+    )
+
+    assert (diff(sort(forces[..., 0], axis=1), axis=1) != 0).all()
+
+
 @mark.parametrize(
     ("curve", "expected"),
     [
@@ -788,23 +792,6 @@ def test_the_first_zero_is_the_first_value_at_or_below_zero(
     curve's length where none is.
     """
     assert first_zero(array(curve)) == expected
-
-
-def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
-    """
-    Asserts that a noise slot holding each step's draw as its force holds
-    another force at every step, each kept as a frame, so no two steps read
-    one draw.
-    """
-    forces = asarray(
-        Flight.flown(
-            AIR,
-            replace(composite, noise=Drawn()),
-            short(frame_every=1)
-        ).frames.forces
-    )
-
-    assert (diff(sort(forces[..., 0], axis=1), axis=1) != 0).all()
 
 
 def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
@@ -992,3 +979,16 @@ def test_the_statistics_table_holds_each_statistic_by_seed(flight: Flight):
     assert isnan(table.turn_speed_m_s).all()
     assert flight.unturned is None
     assert (table.fragments >= 1).all()
+
+
+def threatened(composite: Composite, drones: int, duration_s: float) -> Flight:
+    """
+    Flies the default plan at `drones` for `duration_s` under `composite`
+    through the parametric threat's air.
+    """
+    settings = Settings()
+    return Flight.flown(
+        WrfOutput.from_settings(settings).air,
+        composite,
+        settings.plan.changed(drones=drones, duration_s=duration_s)
+    )
