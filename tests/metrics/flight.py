@@ -173,19 +173,6 @@ def laid(
     )
 
 
-def threatened(composite: Composite, drones: int, duration_s: float) -> Flight:
-    """
-    Flies the default plan at `drones` for `duration_s` under `composite`
-    through the parametric threat's air.
-    """
-    settings = Settings()
-    return Flight.flown(
-        WrfOutput.from_settings(settings).air,
-        composite,
-        settings.plan.changed(drones=drones, duration_s=duration_s)
-    )
-
-
 def pushed(flock: Flock) -> Array:
     """
     Steps a flock laid out by hand once under `PUSHED` through still air,
@@ -203,6 +190,19 @@ def pushed(flock: Flock) -> Array:
         plan      = Plan(drones=len(flock.positions)),
         t         = array(0.0)
     ).commands
+def threatened(composite: Composite, drones: int, duration_s: float) -> Flight:
+    """
+    Flies the default plan at `drones` for `duration_s` under `composite`
+    through the parametric threat's air.
+    """
+    settings = Settings()
+    return Flight.flown(
+        WrfOutput.from_settings(settings).air,
+        composite,
+        settings.plan.changed(drones=drones, duration_s=duration_s)
+    )
+
+
 
 
 def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
