@@ -18,7 +18,7 @@ from os         import X_OK, access, pathsep
 from pathlib    import Path
 from pytest     import Config, MonkeyPatch, Subtests, TempPathFactory, mark, param, raises
 from re         import findall
-from subprocess import CalledProcessError, check_output
+from subprocess import CalledProcessError, CompletedProcess, check_output
 
 from thermur.repo.checkout import Checkout
 from thermur.repo.schemas  import Task
@@ -254,6 +254,67 @@ def test_steps_lists_the_actions_ahead_of_the_workflows(checked: Checkout):
 
     assert paths == sorted(paths)
     assert set(paths) == {*checked.actions, *checked.workflows}
+
+
+def test_subcommands_reads_each_command_and_alias_the_help_lists(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch
+):
+    """
+    Asserts that every command the `Commands` section of `mise --help` lists
+    is read beside each alias, one wrapped onto the next line, even right
+    after `[aliases:`, among them, and that no word from a section after
+    it is.
+    """
+    printed = (
+        "Usage: mise [OPTIONS] [TASK] [COMMAND]\n\nCommands:\n"
+        "  activate      Print the script to activate mise in an\n"
+        "                interactive shell\n"
+        "  audit         Check tool versions\n"
+        "  backends      Manage backends [aliases: b, backend,\n"
+        "                backend-list]\n"
+        "  daemons       Manage project daemons [aliases:\n"
+        "                daemon]\n"
+        "  self-update   Update mise itself\n\n"
+        "Flags:\n  -C, --cd <DIR>  Run as if mise were started in DIR\n"
+    )
+    monkeypatch.setattr(
+        Checkout,
+        "run",
+        lambda checkout, *command, capture: CompletedProcess(
+            command,
+            0,
+            {("env", "NO_COLOR=1", "COLUMNS=100", "mise", "--help"): printed}[command]
+        )
+    )
+
+    assert checkout.subcommands == {
+        "activate", "audit", "b", "backend", "backend-list",
+        "backends", "daemon", "daemons", "self-update"
+    }
+
+
+@mark.parametrize(
+    ("variable", "value"),
+    [
+        param("CLICOLOR_FORCE", "1", id = "forced-color"),
+        param("COLUMNS", "300", id = "wide-terminal")
+    ]
+)
+def test_subcommands_reads_the_help_whatever_the_terminal(
+    checkout    : Checkout,
+    monkeypatch : MonkeyPatch,
+    value       : str,
+    variable    : str
+):
+    """
+    Asserts that the commands `mise --help` lists are read under forced
+    color, which wraps the `Commands` heading in escape codes, and under a
+    wide terminal, which prints mise's logo on the heading's line.
+    """
+    monkeypatch.setenv(variable, value)
+
+    assert "use" in checkout.subcommands
 
 
 def test_tasks_carries_the_lines_a_toml_task_runs(checkout: Checkout):

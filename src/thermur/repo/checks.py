@@ -74,6 +74,29 @@ class Check(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tru
         yield from filter(None, (pair.finding for pair in self.pairs))
 
 
+class AliasCheck(Check):
+    """
+    No task the checkout declares takes an alias naming a command or an
+    alias `mise --help` lists, since `mise <alias>` runs mise's command
+    ahead of the task and `mise tasks validate` reports no such collision.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Names each alias a task declares that `mise --help` lists, on the
+        file holding or declaring the task.
+        """
+        for task in self.checkout.tasks:
+            for alias in task.aliases:
+                if alias in self.checkout.subcommands:
+                    yield Finding(
+                        file    = task.path.relative_to(self.checkout.root),
+                        message = f"`{task.name}` takes the alias `{alias}`, a "
+                        f"command of mise's own that `mise {alias}` runs in place "
+                        "of the task"
+                    )
+
+
 class AnchorCheck(Check):
     """
     No composite action's manifest carries a YAML anchor, since GitHub's
