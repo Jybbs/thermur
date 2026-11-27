@@ -14,8 +14,16 @@ import { declared, styled } from '../../common/sheets.ts'
 const NUMBERS = [
   ['.vp-doc a.cite', '--th-lead', '--vp-c-bg', ''],
   ['.vp-doc .source-number', '--th-lead', '--vp-c-bg', ''],
-  ['.vp-doc .source[data-current] .source-numeral', '--vp-c-bg', '--th-lead', 'var(--th-lead)']
+  [
+    '.vp-doc .source[data-current] .source-numeral, .vp-doc a.back[aria-current]',
+    '--vp-c-bg', '--th-lead', 'var(--th-lead)'
+  ]
 ] as const
+/**
+ * Each number beside each scheme, the color it is set in, and its ground.
+ */
+const schemed = NUMBERS.flatMap(([selector, color, ground]) =>
+  (['dark', 'light'] as const).map(scheme => [selector, scheme, color, ground] as const))
 
 /**
  * Reads the color custom property `property` paints under `scheme`, the page's
@@ -30,11 +38,9 @@ describe('the numbers', () => {
     expect(declared('background', selector, sources)).toBe(background)
   })
 
-  it.for(NUMBERS.flatMap(([selector, color, ground]) => (['dark', 'light'] as const).map(scheme => [selector, scheme, color, ground] as const)))(
-    'holds %s to the text contrast in the %s scheme', ([, scheme, color, ground]) => {
-      expect(wcagContrast(shade(color, scheme), shade(ground, scheme))).toBeGreaterThanOrEqual(FLOORS.text)
-    }
-  )
+  it.for(schemed)('holds %s to the text contrast in the %s scheme', ([, scheme, color, ground]) => {
+    expect(wcagContrast(shade(color, scheme), shade(ground, scheme))).toBeGreaterThanOrEqual(FLOORS.text)
+  })
 })
 
 describe('the targets', () => {
@@ -54,10 +60,12 @@ describe('the targets', () => {
 })
 
 describe('the motion', () => {
-  it('times every transition and the band by the site’s shared motion, which reduced motion sets to nothing', () => {
-    const timed = styled(sources).flatMap(rule => [rule.style.getPropertyValue('transition'), rule.style.getPropertyValue('animation')])
+  it('times every transition and the band by the site’s shared motion, which reduced motion stops', () => {
+    const timed = styled(sources)
+      .flatMap(rule => [rule.style.getPropertyValue('transition'), rule.style.getPropertyValue('animation')])
       .filter(Boolean)
     expect(timed.length).toBeGreaterThan(0)
-    for (const each of timed) expect(each).toMatch(/^(?:[\w-]+ var\(--th-(?:settle|fill-cross)\)[^,]*,? ?)+$/u)
+    const shared = /^(?:[\w-]+ var\(--th-(?:settle|fill-cross)\)[^,]*,?\s*)+$/u
+    expect(timed.filter(each => !shared.test(each))).toEqual([])
   })
 })

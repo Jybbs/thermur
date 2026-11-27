@@ -19,7 +19,7 @@
   --th-bird-up   : url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-1.018 -0.219 1.069 1.069'%3E%3Cpath d='M-0.201 0.850 L-0.247 0.827 L-0.293 0.593 L-0.328 0.513 L-0.376 0.535 L-0.590 0.748 L-0.625 0.758 L-0.646 0.748 L-0.645 0.687 L-0.485 0.355 L-0.472 0.292 L-0.484 0.264 L-0.555 0.268 L-0.893 0.391 L-0.935 0.392 L-0.956 0.374 L-0.918 0.281 L-0.687 0.023 L-0.458 -0.147 L-0.261 -0.219 L-0.162 -0.199 L-0.109 -0.153 L-0.069 -0.093 L-0.036 0.010 L-0.011 0.269 L-0.056 0.576 L-0.123 0.745Z'/%3E%3C/svg%3E");
 }
 
-.vp-doc .cite-run { white-space: nowrap; }
+.vp-doc .cite-run { white-space : nowrap; }
 
 .vp-doc a.cite {
   color                : var(--th-lead);
@@ -36,7 +36,7 @@
   vertical-align       : baseline;
 }
 
-.vp-doc a.cite + a.cite { margin-left: 0.2em; }
+.vp-doc a.cite + a.cite { margin-left : 0.2em; }
 
 .vp-doc a.cite::after {
   content   : '';
@@ -64,7 +64,8 @@
   pointer-events : none;
   position       : absolute;
   top            : -0.08em;
-  transition     : translate var(--th-settle) var(--th-settle-curve), rotate var(--th-settle) var(--th-settle-curve);
+  transition     : translate var(--th-settle) var(--th-settle-curve),
+                   rotate var(--th-settle) var(--th-settle-curve);
   width          : 0.62em;
 }
 
@@ -73,7 +74,7 @@
   translate : 0.06em -0.18em;
 }
 
-.vp-doc a.cite[data-current] .cite-number { text-decoration: underline 1px; text-underline-offset: 2px; }
+.vp-doc a.cite[data-current] .cite-number { text-decoration : underline 1px; text-underline-offset : 2px; }
 
 @media (hover: hover) {
   .vp-doc a.cite:hover .cite-art {
@@ -81,10 +82,10 @@
     translate : 0.06em -0.18em;
   }
 
-  .vp-doc a.cite:hover .cite-number { text-decoration: underline 1px; text-underline-offset: 2px; }
+  .vp-doc a.cite:hover .cite-number { text-decoration : underline 1px; text-underline-offset : 2px; }
 }
 
-.vp-doc .sources { position: relative; }
+.vp-doc .sources { position : relative; }
 
 .vp-doc .sources-list {
   display    : grid;
@@ -93,7 +94,7 @@
   padding    : 0;
 }
 
-.vp-doc .sources-list > li + li { margin-top: 0; }
+.vp-doc .sources-list > li + li { margin-top : 0; }
 
 .vp-doc .source {
   border-radius         : 3px 3px 0 0;
@@ -104,7 +105,7 @@
   padding               : 0 0.75rem 0 0;
 }
 
-.vp-doc .source:focus-visible { outline: 2px solid var(--th-lead); outline-offset: 2px; }
+.vp-doc .source:focus-visible { outline : 2px solid var(--th-lead); outline-offset : 2px; }
 
 .vp-doc .source[data-current] {
   animation         : source-front var(--th-fill-cross) linear var(--th-fill-wait) both;
@@ -128,10 +129,12 @@
   font-variant-numeric : tabular-nums;
   line-height          : 1.25rem;
   padding              : 0 0.3rem;
-  transition           : background-color var(--th-settle) var(--th-settle-curve), color var(--th-settle) var(--th-settle-curve);
+  transition           : background-color var(--th-settle) var(--th-settle-curve),
+                         color var(--th-settle) var(--th-settle-curve);
 }
 
-.vp-doc .source[data-current] .source-numeral {
+.vp-doc .source[data-current] .source-numeral,
+.vp-doc a.back[aria-current] {
   background : var(--th-lead);
   color      : var(--vp-c-bg);
 }
@@ -147,7 +150,7 @@
   margin      : 0;
 }
 
-.vp-doc .source-names { font-weight: 600; }
+.vp-doc .source-names { font-weight : 600; }
 
 .vp-doc a.source-address {
   color           : var(--vp-c-text-2);
@@ -158,7 +161,7 @@
   width           : fit-content;
 }
 
-.vp-doc a.source-address > span { white-space: nowrap; }
+.vp-doc a.source-address > span { white-space : nowrap; }
 
 .vp-doc .source-backs {
   display   : flex;
@@ -179,7 +182,8 @@
   min-width       : 24px;
   padding         : 0 0.4rem 0 0.3rem;
   text-decoration : none;
-  transition      : background-color var(--th-settle) var(--th-settle-curve), color var(--th-settle) var(--th-settle-curve);
+  transition      : background-color var(--th-settle) var(--th-settle-curve),
+                    color var(--th-settle) var(--th-settle-curve);
 }
 
 .vp-doc a.back::before {
@@ -188,11 +192,6 @@
   height     : 0.9rem;
   mask       : var(--th-bird-back) center / contain no-repeat;
   width      : 0.9rem;
-}
-
-.vp-doc a.back[aria-current] {
-  background : var(--th-lead);
-  color      : var(--vp-c-bg);
 }
 
 .vp-doc .sources-flock {

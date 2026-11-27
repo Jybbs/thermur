@@ -54,6 +54,8 @@ export default {
   extends : DefaultTheme,
 
   enhanceApp: ({ app }) => {
-    for (const [name, component] of Object.entries({ ...COMPONENTS, SourcesFlock })) app.component(name, component)
+    for (const [name, component] of Object.entries({ ...COMPONENTS, SourcesFlock })) {
+      app.component(name, component)
+    }
   }
 } satisfies Theme

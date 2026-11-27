@@ -29,7 +29,6 @@ interface Footnotes {
  * on its stop, before the DOI address.
  */
 const ENTRY = /^(?<names>.+? \d{4}\.) (?<title>&quot;.+&quot;) (?<venue>.+\.) $/su
-
 /**
  * The address every DOI resolves through, which opens the link to a study.
  */
@@ -50,45 +49,11 @@ function backOf(place: number, count: number): string {
 }
 
 /**
- * Builds an inline token of raw markup `content`.
- */
-function raw(state: State, content: string): Token {
-  const token   = new state.Token('html_inline', '', 0)
-  token.content = content
-  return token
-}
-
-/**
- * Sets a study's definition as its parts, when its tokens hold the form `mise
- * render` writes: the names and the year in bold, the title in its quotes, the
- * venue with the journal in italics, and the DOI address on its own line,
- * split into runs that break only after a slash. A definition in any other
- * form keeps its tokens whole.
- */
-function sectioned(state: State, inline: Token): void {
-  const children = inline.children ?? []
-  const [open, text, close] = children.slice(-3)
-  if (open?.type !== 'link_open' || !open.attrGet('href')?.startsWith(RESOLVER) || close?.type !== 'link_close') return
-  const prose = state.md.renderer.renderInline(children.slice(0, -3), state.md.options, state.env)
-  const parts = ENTRY.exec(prose)?.groups
-  if (!parts) return
-  const runs = [RESOLVER, ...text!.content.slice(RESOLVER.length).split(/(?<=\/)/u)]
-  open.attrJoin('class', 'source-address')
-  inline.children = [
-    raw(state, `<span class="source-names">${parts.names}</span> <span class="source-title">${parts.title}</span> `
-             + `<span class="source-venue">${parts.venue}</span> `),
-    open,
-    raw(state, runs.map(run => `<span>${state.md.utils.escapeHtml(run)}</span>`).join('<wbr>')),
-    close
-  ]
-}
-
-/**
  * Holds each run of markers on one line with the word before it and the stop
  * after it, inside a span that never wraps.
  */
 function held(state: State, inline: Token): void {
-  const children = inline.children ?? []
+  const children     = inline.children ?? []
   const out: Token[] = []
   for (let start = 0; start < children.length;) {
     if (children[start]!.type !== 'footnote_ref') {
@@ -114,10 +79,13 @@ function held(state: State, inline: Token): void {
 }
 
 /**
- * Names the footnote a token of the plugin's belongs to by its label, the
- * study's key, or by its place where it has none.
+ * Builds an inline token of raw markup `content`.
  */
-const keyOf = (token: Token): string => String(token.meta.label ?? token.meta.id + 1)
+function raw(state: State, content: string): Token {
+  const token   = new state.Token('html_inline', '', 0)
+  token.content = content
+  return token
+}
 
 /**
  * Rewrites each page's footnotes before they render: each run of markers held
@@ -125,7 +93,7 @@ const keyOf = (token: Token): string => String(token.meta.label ?? token.meta.id
  * their own, and each study's definition set as its parts.
  */
 function rewritten(state: State): void {
-  let source = false
+  let source           = false
   const backs: Token[] = []
   const kept: Token[]  = []
   for (const token of state.tokens) {
@@ -149,6 +117,33 @@ function rewritten(state: State): void {
 }
 
 /**
+ * Sets a study's definition as its parts, when its tokens hold the form `mise
+ * render` writes: the names and the year in bold, the title in its quotes, the
+ * venue with the journal in italics, and the DOI address on its own line,
+ * split into runs that break only after a slash. A definition in any other
+ * form keeps its tokens whole.
+ */
+function sectioned(state: State, inline: Token): void {
+  const children            = inline.children ?? []
+  const [open, text, close] = children.slice(-3)
+  if (open?.type !== 'link_open' || text?.type !== 'text' || close?.type !== 'link_close') return
+  if (!open.attrGet('href')?.startsWith(RESOLVER)) return
+  const prose = state.md.renderer.renderInline(children.slice(0, -3), state.md.options, state.env)
+  const parts = ENTRY.exec(prose)?.groups
+  if (!parts) return
+  const runs = [RESOLVER, ...text.content.slice(RESOLVER.length).split(/(?<=\/)/u)]
+  open.attrJoin('class', 'source-address')
+  inline.children = [
+    raw(state, `<span class="source-names">${parts.names}</span> `
+             + `<span class="source-title">${parts.title}</span> `
+             + `<span class="source-venue">${parts.venue}</span> `),
+    open,
+    raw(state, runs.map(run => `<span>${state.md.utils.escapeHtml(run)}</span>`).join('<wbr>')),
+    close
+  ]
+}
+
+/**
  * Replaces the footnote plugin's renderer rules, so each marker reads as a
  * small number in the lead hue beside a rising bird of the mark, and the
  * definitions at a page's end read as a list headed Sources, whose numbers
@@ -164,29 +159,35 @@ function rewritten(state: State): void {
 export function footnoteRules(md: MarkdownRenderer): void {
   const { escapeHtml } = md.utils
   const rules          = md.renderer.rules
+  const keyOf          = ({ meta }: Token): string => escapeHtml(String(meta.label ?? meta.id + 1))
   md.core.ruler.after('footnoteTail', 'thermur_sources', rewritten)
 
   rules.footnote_ref = (tokens, index) => {
-    const token = tokens[index]!
-    const [key, n] = [escapeHtml(keyOf(token)), token.meta.id + 1]
-    return `<a class="cite" href="#source-${key}" id="cite-${key}-${(token.meta.subId ?? 0) + 1}" aria-label="Source ${n}">`
-         + `<span class="cite-art"></span><span class="cite-number">${n}</span></a>`
+    const token    = tokens[index]!
+    const [key, n] = [keyOf(token), token.meta.id + 1]
+    return `<a class="cite" href="#source-${key}" id="cite-${key}-${(token.meta.subId ?? 0) + 1}" `
+         + `aria-label="Source ${n}"><span class="cite-art"></span><span class="cite-number">${n}</span></a>`
   }
-  rules.footnote_block_open  = () => '<section class="sources" aria-labelledby="sources">\n'
-                                   + '<h2 id="sources" class="sources-title">Sources</h2>\n<ol class="sources-list">\n'
+  rules.footnote_block_open = () => '<section class="sources" aria-labelledby="sources">\n'
+                                  + '<h2 id="sources" class="sources-title">Sources</h2>\n'
+                                  + '<ol class="sources-list">\n'
   rules.footnote_block_close = () => '</ol>\n<SourcesFlock />\n</section>\n'
   rules.footnote_open        = (tokens, index) => {
     const token = tokens[index]!
-    return `<li id="source-${escapeHtml(keyOf(token))}" class="source"><span class="source-number">`
+    return `<li id="source-${keyOf(token)}" class="source"><span class="source-number">`
          + `<span class="source-numeral">${token.meta.id + 1}</span></span><div class="source-body">\n`
   }
-  rules.footnote_close       = () => '</div></li>\n'
-  rules.footnote_anchor      = (tokens, index, _, env: Footnotes) => {
-    const { meta } = tokens[index]!
+  rules.footnote_close  = () => '</div></li>\n'
+  rules.footnote_anchor = (tokens, index, _, env: Footnotes) => {
+    const token    = tokens[index]!
+    const { meta } = token
     const count    = env.footnotes?.list?.[meta.id]?.count ?? 1
-    const key      = escapeHtml(keyOf(tokens[index]!))
+    const key      = keyOf(token)
     const back     = `<a class="back" href="#cite-${key}-${meta.subId + 1}" `
-                   + `aria-label="Back to citation ${meta.subId + 1} of source ${meta.id + 1}">${backOf(meta.subId, count)}</a>`
-    return `${meta.subId === 0 ? '<span class="source-backs">' : ''}${back}${meta.subId === Math.max(count, 1) - 1 ? '</span>\n' : ''}`
+                   + `aria-label="Back to citation ${meta.subId + 1} of source ${meta.id + 1}">`
+                   + `${backOf(meta.subId, count)}</a>`
+    const opening  = meta.subId === 0 ? '<span class="source-backs">' : ''
+    const closing  = meta.subId === count - 1 ? '</span>\n' : ''
+    return `${opening}${back}${closing}`
   }
 }
