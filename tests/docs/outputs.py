@@ -16,15 +16,17 @@ repository holds:
   Visual Identity's regions lay the identity out as
 """
 
-from common.edits import append, edit
-from dataclasses  import asdict, fields
-from jax          import numpy as jnp
-from jax.random   import key as seeded, uniform
-from json         import loads
-from numpy        import asarray, linalg, minimum
-from pathlib      import Path
-from pydantic     import BaseModel, Field
-from typing       import Annotated
+from common.declarations import RENDERED
+from common.edits        import append, edit
+from dataclasses         import asdict, fields
+from jax                 import numpy as jnp
+from jax.random          import key as seeded, uniform
+from json                import loads
+from numpy               import asarray, linalg, minimum
+from pathlib             import Path
+from pydantic            import BaseModel, Field
+from pytest              import Subtests, mark
+from typing              import Annotated
 
 from thermur.controller.components import HardSphere, Home
 from thermur.controller.schemas    import Composite, Flock, Radio
@@ -54,6 +56,8 @@ DATA     = Path("docs/pages/data/index.md")
 IDENTITY = Path("docs/pages/reference/identity.md")
 KIT      = Path("docs/pages/reference/kit.md")
 RULES    = Path("docs/pages/methods/rules.md")
+
+pytestmark = mark.reads(*RENDERED)
 
 
 class Inner(BaseModel, use_attribute_docstrings=True):
@@ -282,14 +286,14 @@ def test_each_marker_naming_no_entry_is_listed_on_its_page(checkout: Checkout):
     assert outputs.drifted == [page]
 
 
-def test_each_region_is_written_from_its_record(checkout: Checkout):
+def test_each_region_is_written_from_its_record(checked: Checkout, subtests: Subtests):
     """
     Asserts that the Data page carries the fields `Sample`, `Crop`,
     `Ranges`, and `ParametricThreat` declare, and that every region of every
     page sits between its pair of markers as the render writes it, so the
     copies the repository holds have not drifted.
     """
-    outputs = Outputs(checkout=checkout)
+    outputs = Outputs(checkout=checked)
 
     assert outputs.regions[DATA] == {
         "crop"   : tabled(Crop),
@@ -297,15 +301,16 @@ def test_each_region_is_written_from_its_record(checkout: Checkout):
         "sample" : tabled(Sample),
         "threat" : tabled(ParametricThreat)
     }
-    assert all(
-        f"<!-- {name} -->\n\n{body}\n\n<!-- /{name} -->" in checkout.read(page)
-        for page, regions in outputs.regions.items()
-        for name, body in regions.items()
-    )
     assert not {DATA, IDENTITY, RULES} & set(outputs.drifted)
+    for page, regions in outputs.regions.items():
+        for name, body in regions.items():
+            with subtests.test(page=str(page), region=name):
+                assert f"<!-- {name} -->\n\n{body}\n\n<!-- /{name} -->" in checked.read(
+                    page
+                )
 
 
-def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Checkout):
+def test_the_identity_page_lays_out_each_specimen_from_its_record(checked: Checkout):
     """
     Asserts that The Visual Identity carries the specimens of the shipped
     identity, each role of the palette before each chart series, each heat
@@ -313,7 +318,7 @@ def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Chec
     its files, and the tagline as a quotation.
     """
     identity = Identity.shipped()
-    regions  = Outputs(checkout=checkout).regions[IDENTITY]
+    regions  = Outputs(checkout=checked).regions[IDENTITY]
     palette  = regions["palette"].splitlines()[2:]
 
     assert regions == specimens(identity)
@@ -334,14 +339,14 @@ def test_the_identity_page_lays_out_each_specimen_from_its_record(checkout: Chec
     assert regions["tagline"] == f'> *"{identity.tagline.text}"*'
 
 
-def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkout):
+def test_the_kit_page_lays_out_each_piece_from_its_declaration(checked: Checkout):
     """
     Asserts that The Kit carries a row per piece declared in the clone, each
     import and machine backticked and a piece no machine covers marked as
     running on none.
     """
-    declared = Piece.declared(checkout.root)
-    regions  = Outputs(checkout=checkout).regions[KIT]
+    declared = Piece.declared(checked.root)
+    regions  = Outputs(checkout=checked).regions[KIT]
     table    = regions["pieces"]
     rows     = table.splitlines()[2:]
 
@@ -353,14 +358,14 @@ def test_the_kit_page_lays_out_each_piece_from_its_declaration(checkout: Checkou
 
 
 def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
-    checkout: Checkout
+    checked: Checkout
 ):
     """
     Asserts that the composite's file holds the kind and the fields of each
     slot's default scaled to the plan, and the plan's fields a site flock
     reads, and that the copy the repository holds has not drifted.
     """
-    outputs  = Outputs(checkout=checkout)
+    outputs  = Outputs(checkout=checked)
     settings = Settings()
     written  = loads(outputs.written[outputs.composite])
 
@@ -382,13 +387,13 @@ def test_the_render_writes_each_default_slot_and_the_plan_the_site_flies(
     assert outputs.composite not in outputs.drifted
 
 
-def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
+def test_the_render_writes_each_trial_s_conditions_by_slot(checked: Checkout):
     """
     Asserts that the trials' file holds what each condition of each trial
     sets, by slot, so the charts place each mean where the trial flew it,
     and that the copy the repository holds has not drifted.
     """
-    outputs = Outputs(checkout=checkout)
+    outputs = Outputs(checkout=checked)
 
     assert loads(outputs.written[outputs.trials]) == {
         trial.slot: trial.conditions for trial in Trial.listed()
@@ -402,7 +407,7 @@ def test_the_render_writes_each_trial_s_conditions_by_slot(checkout: Checkout):
 
 
 def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio(
-    checkout: Checkout
+    checked: Checkout
 ):
     """
     Asserts that the parity file holds a flock of twelve astride the rim
@@ -419,7 +424,7 @@ def test_the_render_writes_one_step_of_three_small_flocks_and_a_run_of_the_radio
     and whose third drone sits on its second, a curve over drones with one
     coincident pair, and that the copy the repository holds has not drifted.
     """
-    outputs   = Outputs(checkout=checkout)
+    outputs   = Outputs(checkout=checked)
     settings  = Settings()
     composite = Composite.from_settings(settings)
     zig       = composite.noise
@@ -517,7 +522,7 @@ def test_the_render_writes_the_threat_beside_the_constants_of_its_air():
 
 
 def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
-    checkout: Checkout
+    checked: Checkout
 ):
     """
     Asserts that The Interaction Rules carries the fields of the plan, the
@@ -525,7 +530,7 @@ def test_the_rules_page_tables_each_slot_s_default_beside_its_candidates(
     those of its default and then each candidate, every field named after
     its component.
     """
-    regions = Outputs(checkout=checkout).regions[RULES]
+    regions = Outputs(checkout=checked).regions[RULES]
     rows    = regions["cohesion"].splitlines()[2:]
 
     assert regions["contact"] == tabled(HardSphere)

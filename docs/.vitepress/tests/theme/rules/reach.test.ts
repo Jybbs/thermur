@@ -142,7 +142,7 @@ describe('the heading chart', () => {
     const texts  = [...chart.host.querySelectorAll('text')]
     const angles = texts.filter(text => /^\d+\.\d°$/u.test(text.textContent))
     expect(angles).toHaveLength(5)
-    for (const angle of angles) expect(roomAfter(angle, texts)).toBeGreaterThanOrEqual(7)
+    expect(angles.map(angle => roomAfter(angle, texts)).filter(room => room < 7)).toStrictEqual([])
   })
 
   it('sets the shorter names beside each angle between the narrow and the wide widths', () => {
@@ -199,7 +199,7 @@ describe('the stops on the dial’s rim', () => {
     const wide   = places()
     chart.widen(390)
     await chart.widget.vm.$nextTick()
-    expect(wide.every(place => /^[\d.]+px [\d.]+px$/u.test(place))).toBe(true)
+    expect(wide.filter(place => !/^[\d.]+px [\d.]+px$/u.test(place))).toStrictEqual([])
     expect(places()).not.toEqual(wide)
   })
 })
@@ -283,13 +283,15 @@ describe('take A of the heading chart', () => {
     const chart  = charted(RulesReach, width)
     const tracks = [...chart.host.querySelectorAll('rect')].filter(rect => rect.style.opacity === '0.15')
     expect(tracks).toHaveLength(5)
-    for (const track of tracks) expect(Number(track.getAttribute('width'))).toBe(Number(track.getAttribute('x')) - gutter)
+    expect(tracks.map(track => Number(track.getAttribute('width'))))
+      .toStrictEqual(tracks.map(track => Number(track.getAttribute('x')) - gutter))
   })
 
   it('fills half the chart with the dial where its radius stays under the cap', () => {
     const chart  = charted(RulesReach, 672)
     const tracks = [...chart.host.querySelectorAll('rect')].filter(rect => rect.style.opacity === '0.15')
     expect(tracks).toHaveLength(5)
-    for (const track of tracks) expect(Number(track.getAttribute('x')) + Number(track.getAttribute('width'))).toBeGreaterThan(672 - 4)
+    const ends = tracks.map(track => Number(track.getAttribute('x')) + Number(track.getAttribute('width')))
+    expect(ends.filter(end => end <= 672 - 4)).toStrictEqual([])
   })
 })

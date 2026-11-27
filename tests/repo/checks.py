@@ -6,11 +6,12 @@ A case naming a pin reads its release through the `pins` fixture, so a lift
 leaves every case as it stands.
 """
 
-from common.edits import append, edit, task
-from pathlib      import Path
-from pydantic     import TypeAdapter, ValidationError
-from pytest       import MonkeyPatch, mark, param, raises
-from shutil       import copystat
+from common.declarations import DECLARED
+from common.edits        import append, edit, task
+from pathlib             import Path
+from pydantic            import TypeAdapter, ValidationError
+from pytest              import MonkeyPatch, mark, param, raises
+from shutil              import copystat
 
 from thermur.docs.outputs  import Outputs
 from thermur.repo.checkout import Checkout
@@ -49,6 +50,8 @@ SHELL  = "#!/usr/bin/env -S bash -euo pipefail\n"
 SITE   = ".github/workflows/site.yml"
 WARM   = ".github/workflows/warm.yml"
 
+pytestmark = mark.reads(*DECLARED)
+
 
 @mark.parametrize(
     "check",
@@ -75,13 +78,13 @@ def test_a_bibliography_failing_validation_is_named_on_its_path(
     ]
 
 
-def test_a_check_declaring_nothing_makes_no_finding(checkout: Checkout):
+def test_a_check_declaring_nothing_makes_no_finding(checked: Checkout):
     """
     Asserts that the base check, comparing no restated declarations and
     scanning nothing of its own, makes no finding, the default each check
     holding pairs or a scan of its own builds on.
     """
-    assert Check(checkout=checkout).findings == []
+    assert Check(checkout=checked).findings == []
 
 
 @mark.parametrize(
@@ -408,14 +411,14 @@ def test_a_guide_without_its_checks_table_lists_no_check(checkout: Checkout):
     [param(check, id=check.__name__) for check in Check.__subclasses__()]
 )
 def test_each_check_passes_the_checkout_as_it_stands(
-    check    : type[Check],
-    checkout : Checkout
+    check   : type[Check],
+    checked : Checkout
 ):
     """
     Asserts that every check makes no finding over an unedited copy of the
     checkout.
     """
-    assert check(checkout=checkout).findings == []
+    assert check(checkout=checked).findings == []
 
 
 @mark.parametrize(
@@ -426,6 +429,7 @@ def test_each_check_passes_the_checkout_as_it_stands(
         param("thermur.cli:app", False, id="package")
     ]
 )
+@mark.reads("src/**")
 def test_a_script_is_named_where_its_module_is_not_carried(
     checkout : Checkout,
     target   : str,
@@ -813,6 +817,7 @@ def test_a_marker_naming_no_entry_is_named_at_its_line(checkout: Checkout):
     ]
 
 
+@mark.reads("src/**")
 def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
     """
     Asserts that a wheel `packages` entry naming a folder that holds no
@@ -833,20 +838,47 @@ def test_a_packages_entry_holding_no_module_is_named(checkout: Checkout):
     ]
 
 
-def test_a_page_whose_definitions_drift_is_named(checkout: Checkout):
+@mark.parametrize(
+    ("page", "drifts"),
+    [
+        param(".github/README.md", ["definitions"], id="definitions"),
+        param("docs/pages/data/index.md", ["region"], id="region"),
+        param(
+            "docs/pages/data/index.md",
+            ["region", "definitions"],
+            id = "region-and-definitions"
+        )
+    ]
+)
+@mark.reads("docs/.vitepress/lib/rendered/**", "docs/kit/src/**")
+def test_a_drifted_page_is_named_once_for_each_drift(
+    checkout : Checkout,
+    drifts   : list[str],
+    page     : str
+):
     """
-    Asserts that a page citing a study whose definition it leaves out is
-    named as drifted from the bibliography.
+    Asserts that a page whose region was edited by hand is named once for
+    the region, and a page citing a study whose definition it leaves out
+    once for the definitions, the region first where both drifted.
     """
-    append(checkout, ".github/README.md", "\nOrdered flocks[^cavagna2010].\n")
+    messages = {
+        "definitions": f"The footnote definitions in `{page}` have drifted from their "
+        "entries in `docs/pages/references.bib`, and `mise render` writes them again",
+        "region": f"The `sample` region of `{page}` has drifted from the declaration "
+        "it is written from, which `mise render` writes again"
+    }
+    if "region" in drifts:
+        edit(
+            checkout,
+            page,
+            new = "| `file` | `edited.nc` |",
+            old = "| `file` | `wrf_sample.nc` |"
+        )
+    if "definitions" in drifts:
+        append(checkout, page, "\nOrdered flocks[^cavagna2010].\n")
 
     assert RenderCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(".github/README.md"),
-            message = "The footnote definitions in `.github/README.md` have drifted "
-            "from their entries in `docs/pages/references.bib`, and `mise render` "
-            "writes them again"
-        )
+        Finding(file=Path(page), message=messages[drift]) for drift in drifts
     ]
 
 
@@ -929,19 +961,30 @@ def test_a_gate_that_cannot_carry_every_verdict_is_named(
         ),
         param(
             CI,
-            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
-            f"`{CI}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft`",
+            f"`{CI}` cancels a ready run from a draft or fails a "
+            "run no pull request started, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "ci-group"
         ),
         param(
             SITE,
-            "${{ case(github.event.pull_request.draft, '-draft', '') }}",
+            "${{ case(github.event.pull_request.draft == true, '-draft', '') }}",
             "",
-            f"`{SITE}` cancels a ready run from a draft, since its concurrency "
-            "group leaves out `github.event.pull_request.draft`",
+            f"`{SITE}` cancels a ready run from a draft or fails a "
+            "run no pull request started, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
             id = "site-group"
+        ),
+        param(
+            CI,
+            "draft == true, '-draft'",
+            "draft, '-draft'",
+            f"`{CI}` cancels a ready run from a draft or fails a "
+            "run no pull request started, since its concurrency group leaves out "
+            "`github.event.pull_request.draft == true`",
+            id = "ci-group-null"
         ),
         param(
             CI,
@@ -978,8 +1021,8 @@ def test_a_workflow_running_on_a_draft_is_named(
 ):
     """
     Asserts that a pull-request workflow whose activity types leave out
-    `ready_for_review` or whose concurrency group leaves out the draft
-    state is named, as is each of its jobs whose condition carries no guard
+    `ready_for_review` or whose concurrency group compares no draft state to
+    `true` is named, as is each of its jobs whose condition carries no guard
     skipping a draft.
     """
     edit(checkout, path, new=new, old=old)
@@ -989,63 +1032,8 @@ def test_a_workflow_running_on_a_draft_is_named(
     ]
 
 
-def test_a_page_whose_region_alone_drifts_is_named_for_the_region(checkout: Checkout):
-    """
-    Asserts that a page whose region was edited by hand, while its footnote
-    definitions stand as the bibliography gives them, is named once, for
-    the region.
-    """
-    page = "docs/pages/data/index.md"
-    edit(
-        checkout,
-        page,
-        new = "| `file` | `edited.nc` |",
-        old = "| `file` | `wrf_sample.nc` |"
-    )
-
-    assert RenderCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(page),
-            message = f"The `sample` region of `{page}` has drifted from the "
-            "declaration it is written from, which `mise render` writes again"
-        )
-    ]
-
-
-def test_a_page_whose_region_and_definitions_drift_is_named_for_each(
-    checkout: Checkout
-):
-    """
-    Asserts that a page whose region was edited by hand and whose citation
-    lacks its definition is named once for the region and once for the
-    definitions.
-    """
-    page = "docs/pages/data/index.md"
-    edit(
-        checkout,
-        page,
-        new = "| `file` | `edited.nc` |",
-        old = "| `file` | `wrf_sample.nc` |"
-    )
-    append(checkout, page, "\nOrdered flocks[^cavagna2010].\n")
-
-    assert RenderCheck(checkout=checkout).findings == [
-        Finding(
-            file    = Path(page),
-            message = f"The `sample` region of `{page}` has drifted from the "
-            "declaration it is written from, which `mise render` writes again"
-        ),
-        Finding(
-            file    = Path(page),
-            message = f"The footnote definitions in `{page}` have drifted from their "
-            "entries in `docs/pages/references.bib`, and `mise render` writes them "
-            "again"
-        )
-    ]
-
-
 def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
-    checkout    : Checkout,
+    checked     : Checkout,
     monkeypatch : MonkeyPatch
 ):
     """
@@ -1056,7 +1044,7 @@ def test_a_problem_on_a_task_outside_the_checkout_is_left_out(
     outside = Issue(message="m", severity=Level.ERROR, task="global:task")
     monkeypatch.setattr(Checkout, "issues", property(lambda checkout: [outside]))
 
-    assert TaskCheck(checkout=checkout).findings == []
+    assert TaskCheck(checkout=checked).findings == []
 
 
 def test_a_program_on_the_path_running_uv_run_unlocked_is_named(checkout: Checkout):
@@ -1093,6 +1081,7 @@ def test_a_python_task_is_read_by_its_shebang_alone(checkout: Checkout):
     ]
 
 
+@mark.reads("docs/.vitepress/lib/rendered/**", "docs/kit/src/**")
 def test_a_region_missing_its_pair_of_markers_is_named(checkout: Checkout):
     """
     Asserts that a region whose page carries its opening marker twice is
@@ -2041,7 +2030,7 @@ def test_a_required_check_no_pull_request_gate_names_is_named(
 
 
 def test_a_validation_error_outside_the_documents_is_raised(
-    checkout    : Checkout,
+    checked     : Checkout,
     monkeypatch : MonkeyPatch
 ):
     """
@@ -2056,7 +2045,7 @@ def test_a_validation_error_outside_the_documents_is_raised(
     )
 
     with raises(ValidationError):
-        LockfileCheck(checkout=checkout).findings
+        LockfileCheck(checkout=checked).findings
 
 
 def test_a_workflow_failing_to_read_is_reported_on_its_path(checkout: Checkout):
@@ -2087,12 +2076,13 @@ def test_a_workflow_sharing_no_concurrency_group_passes(checkout: Checkout):
         "  cancel-in-progress : ${{ github.event_name == 'pull_request' }}\n"
         "  group              : ${{ github.workflow }}-"
         "${{ github.head_ref || github.ref }}"
-        "${{ case(github.event.pull_request.draft, '-draft', '') }}\n"
+        "${{ case(github.event.pull_request.draft == true, '-draft', '') }}\n"
     )
 
     assert DraftCheck(checkout=checkout).findings == []
 
 
+@mark.reads("docs/.vitepress/lib/rendered/**", "docs/kit/src/**")
 def test_a_written_file_drifting_from_its_declaration_is_named(checkout: Checkout):
     """
     Asserts that a copy of the identity edited by hand, rather than written
