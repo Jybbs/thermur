@@ -3,6 +3,7 @@ import CreditsSnapshots from './credits/snapshots.ts'
 import CropKept         from './crop.ts'
 import { IdentityFaces, IdentityHeat, IdentityMarks, IdentityPalette } from './identity/widgets.ts'
 import KitCatalog       from './kit/catalog.ts'
+import RoostView        from './roost.ts'
 import RulesNeighbors   from './rules/neighbors.ts'
 import RulesReach       from './rules/reach.ts'
 import RulesSpacing     from './rules/spacing.ts'
@@ -20,6 +21,7 @@ export const COMPONENTS = {
   IdentityMarks,
   IdentityPalette,
   KitCatalog,
+  RoostView,
   RulesNeighbors,
   RulesReach,
   RulesSpacing,

@@ -2,8 +2,8 @@ import type { Pair }   from '../common.ts'
 import type { Scheme } from '../identity.ts'
 
 /**
- * The reading column of the page, in pixels across the window and down the
- * page.
+ * The box of an element of the page, in pixels across the window and down the
+ * page, as the reading column and the tagline are.
  */
 interface Column {
   bottom : number
@@ -15,7 +15,7 @@ interface Column {
 /**
  * The page as a part draws it this frame: the canvas's width and height, the
  * page's scroll and length, the hero's box and the reading column down the
- * page, the scheme, the clock, the reader's pointer on the page for a pinned
+ * page, the tagline's box, the scheme, the clock, the reader's pointer on the page for a pinned
  * stage and on the canvas for one in the page's flow, and whether the drawing
  * stands still. The stage updates one record in place, so a part reads it only
  * for the frame it is handed in.
@@ -30,6 +30,7 @@ export interface Geometry {
   scheme  : Scheme
   still   : boolean
   t       : number
+  tagline : Column | null
   w       : number
 }
 

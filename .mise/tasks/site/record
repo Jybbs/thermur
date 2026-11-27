@@ -1,0 +1,7 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE alias       = "record"
+#MISE depends     = ["site:press"]
+#MISE description = "Record the roost view's flight as the animated WebP files the README shows, light and dark, and stamp the sources they were made from"
+#MISE dir         = "{{config_root}}/docs"
+
+node .vitepress/config/record.ts "$@"

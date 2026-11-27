@@ -39,12 +39,24 @@ export function groundPath(bottom: number, height: (x: number) => number, w: num
 }
 
 /**
+ * The pixels a bird keeps clear of the tagline's box, which a bird at its
+ * largest, 6.6 pixels long, stays inside.
+ */
+const KEEP = 8
+
+/**
  * Measures how much of a drawing stays at a point in the window, falling away
  * by up to `depth` in an oval behind the hero's wordmark, tagline, and button
  * and by 0.7 over the reading column below it, so the words stand on a clear
- * ground.
+ * ground. In the light scheme nothing stays within `KEEP` pixels of the
+ * tagline's box, where the tagline's contrast is measured against the Dawn
+ * alone.
  */
 export function quietAt(g: part.Geometry, x: number, y: number, depth: number): number {
+  const { tagline } = g
+  if (tagline !== null && g.scheme === 'light'
+    && x > tagline.left - KEEP && x < tagline.right + KEEP
+    && y > tagline.top - g.dy - KEEP && y < tagline.bottom - g.dy + KEEP) return 0
   const rx   = Math.min(g.w * 0.44, 540)
   const ry   = Math.max(130, g.hero.h * 0.34)
   const cy   = g.hero.top + g.hero.h * 0.5 - g.dy

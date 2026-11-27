@@ -7,6 +7,7 @@ beside them.
 
 from collections     import Counter
 from collections.abc import Iterator
+from hashlib         import sha256
 from filecmp         import cmp
 from itertools       import product
 from packaging.utils import canonicalize_name
@@ -768,6 +769,79 @@ class ProvisionCheck(Check):
                             "only a value fixed across the saves of one tool subset "
                             "keeps `gha:prune` grouping them"
                         )
+
+
+class RecordingCheck(Check):
+    """
+    Where the README shows the flight recordings, the stamp beside them
+    names each source the roost view and the composite it flies are written
+    in, with the SHA-256 of each as the recording was made, so an edit to
+    any of them leaves the recordings showing a flight the page no longer
+    flies until `mise run site:record` makes them again.
+    """
+
+    STAMP: ClassVar[Path] = Path("docs/pages/public/readme/flight.stamp")
+    """
+    The file listing each source's digest, one line to a source, in the form
+    `sha256sum` writes.
+    """
+
+    SOURCES: ClassVar[tuple[str, ...]] = (
+        "docs/.vitepress/lib/front/composite.ts",
+        "docs/.vitepress/lib/roost/*.ts",
+        "docs/.vitepress/theme/roost.ts",
+        "docs/.vitepress/theme/styles/roost.css"
+    )
+    """
+    The patterns of the sources a recording is made from, which the record
+    task's own list matches.
+    """
+
+    def scan(self) -> Iterator[Finding]:
+        """
+        Finds nothing where the README shows no recording, and otherwise
+        names a missing stamp, each source the stamp lists that is gone or
+        whose digest differs, and each source it leaves out.
+        """
+        readme = self.checkout.manifest.readme
+        if "readme/flight-" not in self.checkout.read(readme):
+            return
+
+        if not (self.checkout.root / self.STAMP).is_file():
+            yield Finding(
+                file    = readme,
+                message = f"`{readme}` shows the flight recordings, which `{self.STAMP}` "
+                "stamps with the sources they were made from and which `mise run "
+                "site:record` writes"
+            )
+            return
+
+        stamped = {
+            Path(path): digest
+            for digest, path in (
+                line.split("  ", 1)
+                for line in self.checkout.read(self.STAMP).splitlines()
+            )
+        }
+        sources = {
+            path
+            for pattern in self.SOURCES
+            for path in self.checkout.glob(pattern)
+        }
+        for path in sorted(stamped.keys() | sources):
+            if path not in sources:
+                message = f"`{path}` is stamped as a source of the flight recordings, and is gone"
+            elif path not in stamped:
+                message = f"`{path}` is a source of the flight recordings the stamp leaves out"
+            elif sha256((self.checkout.root / path).read_bytes()).hexdigest() != stamped[path]:
+                message = f"`{path}` has changed since the flight recordings were made from it"
+            else:
+                continue
+
+            yield Finding(
+                file    = self.STAMP,
+                message = f"{message}, which `mise run site:record` makes again"
+            )
 
 
 class RenderCheck(Check):

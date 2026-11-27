@@ -34,6 +34,12 @@ describe('pageData', () => {
     })
   })
 
+  it('lays the roost page out in the default page layout with a class of its own, keeping its frontmatter', async () => {
+    expect(await pageData({ frontmatter: { kept: true }, relativePath: 'roost.md' }, REPOSITORY, DOCS)).toEqual({
+      frontmatter: { kept: true, layout: 'page', pageClass: 'roost-page' }
+    })
+  })
+
   it.for(['methods/index.md', 'methods/alarm.md'])('leaves %s as it was written', async (relativePath) => {
     expect(await pageData({ frontmatter: {}, relativePath }, REPOSITORY, DOCS)).toBeUndefined()
   })

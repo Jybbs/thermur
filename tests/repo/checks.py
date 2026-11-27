@@ -8,6 +8,7 @@ leaves every case as it stands.
 
 from common.declarations import DECLARED
 from common.edits        import append, edit, task
+from hashlib             import sha256
 from pathlib             import Path
 from pydantic            import TypeAdapter, ValidationError
 from pytest              import MonkeyPatch, mark, param, raises
@@ -32,6 +33,7 @@ from thermur.repo.checks   import (
     ParityCheck,
     PinCheck,
     ProvisionCheck,
+    RecordingCheck,
     RenderCheck,
     RulesetCheck,
     ScriptCheck,
@@ -2233,4 +2235,93 @@ def test_an_undeclared_input_to_a_composite_action_is_named(checkout: Checkout):
             message = f"`{CI}` passes `$/.github/actions/provision` the input `cache`, "
             f"which `{ACTION}` does not declare"
         )
+    ]
+
+
+def stamped(checkout: Checkout, *, leaving: str = "") -> None:
+    """
+    Appends the flight recordings to the README and writes the stamp the
+    record task would, one line for each source, leaving out the source
+    whose path ends in `leaving`.
+    """
+    append(checkout, ".github/README.md", "\n![Flight](https://thermur.fyi/readme/flight-light.webp)\n")
+    sources = sorted({
+        path
+        for pattern in RecordingCheck.SOURCES
+        for path in checkout.glob(pattern)
+    })
+    (checkout.root / RecordingCheck.STAMP).write_text("".join(
+        f"{sha256((checkout.root / path).read_bytes()).hexdigest()}  {path}\n"
+        for path in sources
+        if not leaving or not path.name.endswith(leaving)
+    ))
+
+
+def test_a_readme_showing_no_recording_is_not_checked_for_a_stamp(checkout: Checkout):
+    """
+    Asserts that a README with no flight recording leaves the stamp's absence
+    unreported.
+    """
+    assert RecordingCheck(checkout=checkout).findings == []
+
+
+def test_recordings_stamped_with_the_sources_read_clean(checkout: Checkout):
+    """
+    Asserts that recordings whose stamp matches every source's digest are
+    reported as clean.
+    """
+    stamped(checkout)
+
+    assert RecordingCheck(checkout=checkout).findings == []
+
+
+def test_recordings_without_a_stamp_are_named_on_the_readme(checkout: Checkout):
+    """
+    Asserts that a README showing the recordings beside no stamp is reported
+    on the README.
+    """
+    append(checkout, ".github/README.md", "\n![Flight](https://thermur.fyi/readme/flight-light.webp)\n")
+
+    assert [finding.file for finding in RecordingCheck(checkout=checkout).findings] == [
+        Path(".github/README.md")
+    ]
+
+
+def test_a_source_edited_since_the_recordings_is_named(checkout: Checkout):
+    """
+    Asserts that a source whose digest differs from its stamped one is named
+    on the stamp.
+    """
+    stamped(checkout)
+    append(checkout, "docs/.vitepress/theme/roost.ts", "\n")
+
+    assert [finding.message for finding in RecordingCheck(checkout=checkout).findings] == [
+        "`docs/.vitepress/theme/roost.ts` has changed since the flight recordings were "
+        "made from it, which `mise run site:record` makes again"
+    ]
+
+
+def test_a_source_the_stamp_leaves_out_is_named(checkout: Checkout):
+    """
+    Asserts that a source the stamp lacks is named on the stamp.
+    """
+    stamped(checkout, leaving="roost.ts")
+
+    assert [finding.message for finding in RecordingCheck(checkout=checkout).findings] == [
+        "`docs/.vitepress/theme/roost.ts` is a source of the flight recordings the stamp "
+        "leaves out, which `mise run site:record` makes again"
+    ]
+
+
+def test_a_stamped_source_that_is_gone_is_named(checkout: Checkout):
+    """
+    Asserts that a source the stamp lists and the checkout lacks is named on
+    the stamp.
+    """
+    stamped(checkout)
+    (checkout.root / "docs/.vitepress/lib/roost/burn.ts").unlink()
+
+    assert [finding.message for finding in RecordingCheck(checkout=checkout).findings] == [
+        "`docs/.vitepress/lib/roost/burn.ts` is stamped as a source of the flight "
+        "recordings, and is gone, which `mise run site:record` makes again"
     ]

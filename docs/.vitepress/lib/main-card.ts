@@ -27,11 +27,6 @@ const ACCENT = 'fire-lord-lift'
  */
 const FIRE: Fire = { across: 0.9, along: 1.25, puffs: 12, scale: 1.02, seed: 53, x: 905, y: 368 }
 /**
- * The ground under the main card's terrain, a tone darker than the dark
- * scheme's ground, which the palette names no color for.
- */
-const GROUND = '#121114'
-/**
  * The points the flock's route runs through after the wordmark's tip, in pixels
  * across and down the card: climbing on at the chevrons' angle, then bending
  * over into a ring that enters the fire's left side, passes under it, and rises
@@ -112,7 +107,7 @@ function backdrop({ glyphs, identity }: MainCard): string {
     `<defs>${scene.glyphDefs(glyphs)}${blurs}`,
     `<linearGradient id="veil" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${width}" y2="0">`,
     `${stops.join('')}</linearGradient></defs>`,
-    `<rect width="${width}" height="${height}" fill="${GROUND}"/>`,
+    `<rect width="${width}" height="${height}" fill="${layout.nightOf(identity).ground}"/>`,
     contours(cream),
     fire.svg,
     `<rect width="${width}" height="${height}" fill="url(#veil)"/>`,
