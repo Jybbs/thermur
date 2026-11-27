@@ -116,12 +116,12 @@ Flies the flock, or computes the steps of the graph named.
 │                               crosses within two minutes, its height the     │
 │                               lowest the launch's center takes, which        │
 │                               clearance_sd raises for a deeper cloud.        │
-│                               [default: (1000.0, 1000.0, 100.0)]             │
+│                               [default: (1000.0, 1000.0, 150.0)]             │
 │ --plan.clearance-sd FLOAT     The vertical standard deviations of the launch │
 │                               cloud its center sits at least above the       │
 │                               ground, by default 4, past which a Gaussian    │
 │                               draw falls for 0.003% of drones, so about one  │
-│                               flock of 1,000 in 32 sets a drone on the       │
+│                               flock of 2,000 in 16 sets a drone on the       │
 │                               ground. [default: 4.0]                         │
 │ --plan.course-deg FLOAT       The launch heading in degrees counterclockwise │
 │                               from east, by default west. [default: 180.0]   │
@@ -217,6 +217,12 @@ Flies the flock, or computes the steps of the graph named.
 │                               fail. [default: 50.0]                          │
 │ --radio.rate-hz FLOAT         The number of packets each drone sends each    │
 │                               second. [default: 5.0]                         │
+│ --roost.band-m FLOAT          The depth of the band centered on height_m     │
+│                               that no pull acts in, in meters, at a          │
+│                               starling's scale, by default the thickness     │
+│                               measured on the starling flock of 781 birds,   │
+│                               whose counterpart in the starling model sets   │
+│                               that scale. [default: 5.33]                    │
 │ --roost.bound-m-s2 FLOAT      The largest turning acceleration, in meters    │
 │                               per second squared, by default the plant's     │
 │                               bound on a horizontal acceleration. [default:  │
@@ -224,16 +230,15 @@ Flies the flock, or computes the steps of the graph named.
 │ --roost.center-m FLOAT FLOAT  The disk's center east and north, in meters,   │
 │   --roost.empty-center-m      by default the launch's. [default: (1000.0,    │
 │                               1000.0)]                                       │
-│ --roost.height-m FLOAT        The height the drone is pulled toward, in      │
-│                               meters above the ground, by default that of    │
-│                               the launch's center, which a flock of more     │
-│                               than 304 drones launches above. [default:      │
-│                               100.0]                                         │
+│ --roost.height-m FLOAT        The height of the band's middle, in meters     │
+│                               above the ground, by default that of the       │
+│                               launch's center, which a flock of more than    │
+│                               1,026 drones launches above. [default: 150.0]  │
 │ --roost.radius-m FLOAT        The disk's radius, in meters. [default:        │
 │                               1000.0]                                        │
-│ --roost.stiffness-per-s2      The acceleration toward the height per meter   │
-│   FLOAT                       away from it, in reciprocal square seconds, at │
-│                               a starling's scale, by default the starling    │
+│ --roost.stiffness-per-s2      The acceleration toward the band per meter     │
+│   FLOAT                       outside it, in reciprocal square seconds, at a │
+│                               starling's scale, by default the starling      │
 │                               model's vertical weight of 0.2 newtons per     │
 │                               meter over its bird's mass of 80 grams, read   │
 │                               per meter since the model multiplies it by the │

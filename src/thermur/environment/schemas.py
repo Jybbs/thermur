@@ -1,8 +1,9 @@
 """
-Holds the records the fire data is read through, meaning `Crop`, `Grid`,
-`ParametricThreat`, `Ranges`, and `Sample`, beside the constants WRF and
-the wrf-python diagnostics share, the bounds a record's field takes, and
-`documented`, which gives each field of an `equinox.Module` its docstring.
+Holds the records the fire data is read through, meaning `Crop`, `Deposit`,
+`Grid`, `License`, `ParametricThreat`, `Ranges`, and `Sample`, beside the
+constants WRF and the wrf-python diagnostics share, the bounds a record's
+field takes, and `documented`, which gives each field of an `equinox.Module`
+its docstring.
 """
 
 from ast                import AnnAssign, Constant, Expr, parse
@@ -11,6 +12,7 @@ from equinox            import Module
 from hashlib            import file_digest
 from importlib.metadata import version
 from inspect            import cleandoc, getsource
+from itertools          import pairwise
 from math               import isnan
 from numpy              import arange, tanh, zeros
 from pathlib            import Path
@@ -91,6 +93,69 @@ class Crop(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         """
         heights = self.floor_m + self.spacing_m * arange(self.levels)
         return DataArray(heights, coords={"height": heights}, dims="height")
+
+
+class Deposit(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The WRF-SFIRE LES Synthetic Wildfire Plume Dataset as its DataCite
+    record gives it, which CC BY 4.0 requires a copy to credit.
+    """
+
+    creators: tuple[str, ...] = ("Nadya Moisseeva", "Roland Stull")
+    """
+    The dataset's creators, in the order its record lists them.
+    """
+
+    doi: str = "10.20383/102.0314"
+    """
+    The DOI the dataset is registered under.
+    """
+
+    publisher: str = (
+        "Federated Research Data Repository / dépôt fédéré de données de recherche"
+    )
+    """
+    The repository publishing the dataset.
+    """
+
+    title: str = "WRF-SFIRE LES Synthetic Wildfire Plume Dataset"
+    """
+    The dataset's title.
+    """
+
+    year: Count = 2020
+    """
+    The year the dataset was published.
+    """
+
+    @property
+    def address(self) -> str:
+        """
+        Composes the address `doi` resolves at.
+        """
+        return f"https://doi.org/{self.doi}"
+
+    @property
+    def authors(self) -> str:
+        """
+        Joins the names of `creators` in one phrase.
+        """
+        return " and ".join(self.creators)
+
+    @property
+    def credit(self) -> str:
+        """
+        Credits the dataset on one line by its title, its creators, and the
+        address of its DOI.
+        """
+        return f"{self.title} by {self.authors}, {self.address}"
+
+    @property
+    def surnames(self) -> tuple[str, ...]:
+        """
+        Reads the last word of each creator's name.
+        """
+        return tuple(creator.rpartition(" ")[2] for creator in self.creators)
 
 
 class Grid(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
@@ -220,6 +285,30 @@ class Grid(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
         )
 
 
+class License(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
+    """
+    The license the plume dataset is published under, which the sample stays
+    under.
+    """
+
+    address: str = "https://creativecommons.org/licenses/by/4.0/"
+    """
+    The address of the license's terms.
+    """
+
+    name: str = "CC BY 4.0"
+    """
+    The license's name.
+    """
+
+    @property
+    def credit(self) -> str:
+        """
+        Names the license on one line beside the address of its terms.
+        """
+        return f"{self.name}, {self.address}"
+
+
 class Ranges(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The values each field `WrfOutput` converts may take, which a misread
@@ -247,6 +336,109 @@ class Ranges(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     """
 
 
+class ParametricThreat(
+    BaseModel,
+    extra                    = "forbid",
+    frozen                   = True,
+    use_attribute_docstrings = True
+):
+    """
+    A front of hot air entering the domain at its western edge as the first
+    snapshot is written and advancing east at a steady speed, the cells it
+    has passed burning, laid out as the dataset a WRF-SFIRE output holds so
+    every conversion of `WrfOutput` reads it as it reads a simulation.
+
+    The air holds the potential temperature WRF's base state takes at every
+    height, warmed behind the front by `anomaly_k`, which a hyperbolic
+    tangent of scale `edge_m` carries to zero ahead of it, and the smoke
+    tracer follows the same profile from one behind the front to zero ahead.
+    """
+
+    anomaly_k: Positive = 20.0
+    """
+    The potential temperature behind the front in excess of the air ahead
+    of it, in kelvin.
+    """
+
+    edge_m: Positive = 40.0
+    """
+    The scale of the hyperbolic tangent carrying the anomaly to zero ahead of
+    the front, in meters, one grid spacing by default, so 76% of the anomaly
+    falls within this distance on either side of the front.
+    """
+
+    grid: Grid = Grid()
+    """
+    The grid the dataset is laid out on.
+    """
+
+    speed_m_s: NonNegative = 1.0
+    """
+    The speed at which the front advances east, in meters per second.
+    """
+
+    @property
+    def dataset(self) -> Dataset:
+        """
+        Lays the front out under the variable and dimension names WRF
+        writes, in single precision as WRF writes them.
+
+        The base state is the hydrostatic atmosphere whose potential
+        temperature holds `BASE_K` at every height and whose pressure holds
+        `REFERENCE_PA` at the ground, so the air ahead of the front cools
+        with height at the dry adiabatic lapse rate. The winds are still,
+        and the ground heat flux `GRNHFX` holds one watt per square meter on
+        each cell whose center the front has reached and zero elsewhere.
+        """
+        grid     = self.grid
+        mass     = grid.zeros("Time", "bottom_top", "south_north", "west_east")
+        faces    = grid.zeros("Time", "bottom_top_stag", "south_north", "west_east")
+        front    = self.speed_m_s * grid.seconds
+        profile  = (1 - tanh((grid.centers - front) / self.edge_m)) / 2
+        exner    = 1 - GRAVITY_M_S2 * grid.heights / (HEAT_CAPACITY_J_KG_K * BASE_K)
+        pressure = REFERENCE_PA * exner ** (HEAT_CAPACITY_J_KG_K / DRY_AIR_J_KG_K)
+        return Dataset(
+            {
+                "GRNHFX" : mass.isel(bottom_top=0, drop=True) + (grid.centers <= front),
+                "P"      : mass,
+                "PB"     : mass + pressure,
+                "PH"     : faces,
+                "PHB"    : faces + GRAVITY_M_S2 * grid.depths,
+                "T"      : mass + self.anomaly_k * profile,
+                "U" : grid.zeros("Time", "bottom_top", "south_north", "west_east_stag"),
+                "V" : grid.zeros("Time", "bottom_top", "south_north_stag", "west_east"),
+                "W" : faces,
+                "XTIME"  : grid.seconds / 60,
+                "tr17_1" : mass + profile
+            },
+            attrs = {"DX": grid.spacing_m, "DY": grid.spacing_m}
+        ).astype("float32")
+
+    @model_validator(mode="after")
+    def held(self) -> Self:
+        """
+        Holds the front and five times `edge_m` ahead of it at or west of
+        the center of the first column a median over the columns reads,
+        through the last snapshot, so the median `WrfOutput.ambient` takes
+        still reads the air ahead of the front, the anomaly having fallen
+        under 0.005% of itself that far ahead.
+
+        Raises:
+            ValueError: Where the front's edge passes that column's center
+                        by the last snapshot.
+        """
+        middle = float(self.grid.centers[(self.grid.columns - 1) // 2])
+        reach  = self.speed_m_s * self.grid.span_s + 5 * self.edge_m
+        if reach > middle:
+            raise ValueError(
+                f"The front's edge reaches {reach:g} m by the last snapshot, past "
+                f"the column at {middle:g} m a median reads on a domain "
+                f"{self.grid.length_m:g} m long"
+            )
+
+        return self
+
+
 class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True):
     """
     The WRF-SFIRE sample the `thermur fetch sample` command downloads and
@@ -261,13 +453,9 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     snapshot and in the last, in square meters.
     """
 
-    dataset: str = (
-        "WRF-SFIRE LES Synthetic Wildfire Plume Dataset by Nadya Moisseeva and "
-        "Roland Stull, https://doi.org/10.20383/102.0314"
-    )
+    dataset: Deposit = Deposit()
     """
-    The credit of the dataset the sample is cut from, naming its title, its
-    creators, and its DOI.
+    The dataset the sample is cut from.
     """
 
     digest: Annotated[str, Field(
@@ -288,6 +476,11 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The folder the fetch writes the file into, relative to the clone.
     """
 
+    format: str = "NetCDF-4"
+    """
+    The format the cut writes the file in.
+    """
+
     host: str = "https://data.thermur.fyi"
     """
     The address of the public Cloudflare R2 bucket serving the file, on its
@@ -299,10 +492,9 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
     The hottest air on the fixed heights in any snapshot, in kelvin.
     """
 
-    license: str = "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/"
+    license: License = License()
     """
-    The license the dataset is published under, which the sample stays
-    under.
+    The license the sample stays under.
     """
 
     simulation: str = "wrfout_W5F7R4"
@@ -357,9 +549,22 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
         `dataset`.
         """
         return {
-            "license" : self.license,
-            "source"  : f"Cut from {self.simulation} of the {self.dataset}"
+            "license" : self.license.credit,
+            "source"  : f"Cut from {self.simulation} of the {self.dataset.credit}"
         }
+
+    @property
+    def interval_s(self) -> float:
+        """
+        Measures the gap between neighboring snapshots of `times_s`, in
+        seconds.
+
+        Raises:
+            ValueError: Where the snapshots stand at no gap, or at more
+                        than one.
+        """
+        (interval,) = {after - before for before, after in pairwise(self.times_s)}
+        return interval
 
     @property
     def length_m(self) -> float:
@@ -483,109 +688,6 @@ class Sample(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=Tr
             Path(file.name).replace(target)
 
         return target
-
-
-class ParametricThreat(
-    BaseModel,
-    extra                    = "forbid",
-    frozen                   = True,
-    use_attribute_docstrings = True
-):
-    """
-    A front of hot air entering the domain at its western edge as the first
-    snapshot is written and advancing east at a steady speed, the cells it
-    has passed burning, laid out as the dataset a WRF-SFIRE output holds so
-    every conversion of `WrfOutput` reads it as it reads a simulation.
-
-    The air holds the potential temperature WRF's base state takes at every
-    height, warmed behind the front by `anomaly_k`, which a hyperbolic
-    tangent of scale `edge_m` carries to zero ahead of it, and the smoke
-    tracer follows the same profile from one behind the front to zero ahead.
-    """
-
-    anomaly_k: Positive = 20.0
-    """
-    The potential temperature behind the front in excess of the air ahead
-    of it, in kelvin.
-    """
-
-    edge_m: Positive = 40.0
-    """
-    The scale of the hyperbolic tangent carrying the anomaly to zero ahead of
-    the front, in meters, one grid spacing by default, so 76% of the anomaly
-    falls within this distance on either side of the front.
-    """
-
-    grid: Grid = Grid()
-    """
-    The grid the dataset is laid out on.
-    """
-
-    speed_m_s: NonNegative = 1.0
-    """
-    The speed at which the front advances east, in meters per second.
-    """
-
-    @property
-    def dataset(self) -> Dataset:
-        """
-        Lays the front out under the variable and dimension names WRF
-        writes, in single precision as WRF writes them.
-
-        The base state is the hydrostatic atmosphere whose potential
-        temperature holds `BASE_K` at every height and whose pressure holds
-        `REFERENCE_PA` at the ground, so the air ahead of the front cools
-        with height at the dry adiabatic lapse rate. The winds are still,
-        and the ground heat flux `GRNHFX` holds one watt per square meter on
-        each cell whose center the front has reached and zero elsewhere.
-        """
-        grid     = self.grid
-        mass     = grid.zeros("Time", "bottom_top", "south_north", "west_east")
-        faces    = grid.zeros("Time", "bottom_top_stag", "south_north", "west_east")
-        front    = self.speed_m_s * grid.seconds
-        profile  = (1 - tanh((grid.centers - front) / self.edge_m)) / 2
-        exner    = 1 - GRAVITY_M_S2 * grid.heights / (HEAT_CAPACITY_J_KG_K * BASE_K)
-        pressure = REFERENCE_PA * exner ** (HEAT_CAPACITY_J_KG_K / DRY_AIR_J_KG_K)
-        return Dataset(
-            {
-                "GRNHFX" : mass.isel(bottom_top=0, drop=True) + (grid.centers <= front),
-                "P"      : mass,
-                "PB"     : mass + pressure,
-                "PH"     : faces,
-                "PHB"    : faces + GRAVITY_M_S2 * grid.depths,
-                "T"      : mass + self.anomaly_k * profile,
-                "U" : grid.zeros("Time", "bottom_top", "south_north", "west_east_stag"),
-                "V" : grid.zeros("Time", "bottom_top", "south_north_stag", "west_east"),
-                "W" : faces,
-                "XTIME"  : grid.seconds / 60,
-                "tr17_1" : mass + profile
-            },
-            attrs = {"DX": grid.spacing_m, "DY": grid.spacing_m}
-        ).astype("float32")
-
-    @model_validator(mode="after")
-    def held(self) -> Self:
-        """
-        Holds the front and five times `edge_m` ahead of it at or west of
-        the center of the first column a median over the columns reads,
-        through the last snapshot, so the median `WrfOutput.ambient` takes
-        still reads the air ahead of the front, the anomaly having fallen
-        under 0.005% of itself that far ahead.
-
-        Raises:
-            ValueError: Where the front's edge passes that column's center
-                        by the last snapshot.
-        """
-        middle = float(self.grid.centers[(self.grid.columns - 1) // 2])
-        reach  = self.speed_m_s * self.grid.span_s + 5 * self.edge_m
-        if reach > middle:
-            raise ValueError(
-                f"The front's edge reaches {reach:g} m by the last snapshot, past "
-                f"the column at {middle:g} m a median reads on a domain "
-                f"{self.grid.length_m:g} m long"
-            )
-
-        return self
 
 
 def documented[Kind: type[Module]](kind: Kind) -> Kind:

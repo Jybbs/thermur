@@ -1,11 +1,12 @@
 import { Select }                                        from '@thermur/kit'
 import { type VNode, computed, defineComponent, h, ref } from 'vue'
 
-import { useStage }   from '../lib/canvas/mount.ts'
-import type { Stage } from '../lib/canvas/stage.ts'
-import { drawKept }   from '../lib/crop/drawing.ts'
-import { Kept }       from '../lib/crop/kept.ts'
-import * as sentence  from '../lib/crop/sentence.ts'
+import { useStage }      from '../lib/canvas/mount.ts'
+import type { Stage }    from '../lib/canvas/stage.ts'
+import { drawKept }      from '../lib/crop/drawing.ts'
+import { Kept }          from '../lib/crop/kept.ts'
+import * as sentence     from '../lib/crop/sentence.ts'
+import { creditCaption } from './credits/caption.ts'
 
 /**
  * How much of an output the graph reads, set through three menus inside one
@@ -47,7 +48,8 @@ export default defineComponent({
         'aria-live'  : 'polite',
         'class'      : 'crop-lines',
         'data-empty' : lines.value === null ? '' : undefined
-      }, lines.value ?? sentence.DEFAULTS)
+      }, lines.value ?? sentence.DEFAULTS),
+      creditCaption('The sample’s length and snapshots, sketched at made-up sizes.')
     ])
   }
 })

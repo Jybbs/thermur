@@ -127,11 +127,11 @@ describe('the heading chart', () => {
     const chart = charted(RulesReach, 1024)
     expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(readings(chart)).toEqual([
-      '0.1°', 'of 20° · 0.3% ± 0.3',
-      '0.5°', 'of 20° · 2.6% ± 2.2',
-      '0.1°', 'of 20° · 0.3% ± 0.2',
-      '0.5°', 'of 20° · 2.5% ± 2.0',
-      '0.6°', 'of 20° · 3.2% ± 2.8'
+      '0.2°', 'of 20° · 0.9% ± 0.6',
+      '0.6°', 'of 20° · 2.8% ± 2.1',
+      '0.1°', 'of 20° · 0.4% ± 0.3',
+      '0.5°', 'of 20° · 2.6% ± 2.1',
+      '0.5°', 'of 20° · 2.6% ± 2.2'
     ])
     expect(knobs(chart).map(knob => knob.checked)).toEqual([true, false])
     expect(dots(chart)).toEqual(['true', 'false'])
@@ -166,11 +166,11 @@ describe('the stops on the dial’s rim', () => {
     knobs(chart)[1]!.click()
     await chart.widget.vm.$nextTick()
     expect(readings(chart)).toEqual([
-      '0.2°', 'of 90° · 0.2% ± 0.2',
-      '0.5°', 'of 90° · 0.6% ± 0.3',
-      '0.2°', 'of 90° · 0.2% ± 0.2',
       '0.3°', 'of 90° · 0.3% ± 0.2',
-      '2.1°', 'of 90° · 2.3% ± 1.9'
+      '0.4°', 'of 90° · 0.5% ± 0.3',
+      '0.3°', 'of 90° · 0.3% ± 0.2',
+      '0.5°', 'of 90° · 0.5% ± 0.3',
+      '1.8°', 'of 90° · 2.0% ± 1.6'
     ])
     expect(knobs(chart).map(knob => knob.checked)).toEqual([false, true])
     expect(dots(chart)).toEqual(['false', 'true'])

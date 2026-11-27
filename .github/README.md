@@ -452,7 +452,7 @@ Each operation runs as a mise task, and the tasks that run the formatter and pyt
 | `mise vet` | Audits the workflows and the composite action through zizmor, online under GitHub Actions and offline on a laptop |
 | `mise fetch` | Downloads the WRF-SFIRE sample from the address its pinned digest keys and checks it against that digest before moving it into `data/samples/` |
 | `mise browse` | Opens Hamilton's experiment viewer over the runs `thermur fly` records under `data/runs/`, passing any further arguments to it |
-| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/pages/references.bib` |
+| `mise render` | Writes the identity the docs site reads out of the declaration in `src/thermur/identity/`, and into each Markdown page the table or list of each region out of the record that region is written from, and the footnote definition of every study it cites out of `docs/pages/references.bib` |
 | `mise measure` | Writes the means and standard errors the docs site's charts of the interaction rules draw, out of the coupling and heading trials of the run under `data/runs/` it is given |
 | `mise cite` | Prints the footnote definition of each study whose key it is given, out of `docs/pages/references.bib`, for pasting into an issue, a pull request, or a comment |
 | `mise press` | Builds the docs site into `docs/.vitepress/dist`, failing on a link between pages that leads nowhere |

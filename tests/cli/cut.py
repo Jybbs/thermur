@@ -5,6 +5,7 @@ writes it into the clone the package was installed from, and prints the
 file's path relative to it.
 """
 
+from netCDF4 import Dataset
 from pathlib import Path
 from pytest  import CaptureFixture, MonkeyPatch, raises
 from xarray  import open_dataset
@@ -103,3 +104,6 @@ def test_the_sample_is_cut_into_the_clone_and_named_relative_to_it(
 
     with open_dataset(tmp_path / Sample().path, engine="netcdf4") as written:
         assert Sample().attributes.items() <= written.attrs.items()
+
+    with Dataset(tmp_path / Sample().path) as written:
+        assert written.data_model == Sample().format.replace("-", "").upper()
