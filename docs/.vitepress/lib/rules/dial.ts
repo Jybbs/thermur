@@ -69,16 +69,21 @@ export const DIAL: Tuning = { lag: 0.14, narrow: 600, sweep: 5, wide: 960 }
  */
 const HALO = 10.5
 /**
- * The name each heading rule the chart draws reads under, the default's first,
- * beside the shorter name a narrow chart sets.
+ * The name each heading rule the chart draws reads under, the default's first
+ * and the overdamped limit second, beside the shorter name a narrow chart sets.
  */
 export const NAMES = {
-  reference : ['Consensus, the default', 'Consensus'],
-  inertial  : ['Inertial spin', 'Inertial spin'],
-  delayed   : ['Delayed', 'Delayed'],
-  nonmutual : ['Nonmutual', 'Nonmutual'],
-  quartic   : ['Quartic', 'Quartic']
+  reference  : ['Consensus, the default', 'Consensus'],
+  overdamped : ['Overdamped limit', 'Overdamped'],
+  inertial   : ['Inertial spin', 'Inertial spin'],
+  delayed    : ['Delayed', 'Delayed'],
+  nonmutual  : ['Nonmutual', 'Nonmutual'],
+  quartic    : ['Quartic', 'Quartic']
 } as const
+/**
+ * The heading rule drawn in the ink, the palette holding no hue for it.
+ */
+export const INKED = 'overdamped'
 /**
  * The opacity a ring and its band take past the first drone's turn.
  */
