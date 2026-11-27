@@ -1,3 +1,0 @@
-gh api --jq '.[] | select(.tag_name == "0.2.0") | {draft, id, url: .html_url}' --paginate 'repos/{owner}/{repo}/releases'
-gh api -f tag_name=0.2.0 -f target_commitish=main --jq '{body}' --method POST 'repos/{owner}/{repo}/releases/generate-notes'
-gh api --input - --jq .html_url --method PATCH 'repos/{owner}/{repo}/releases/7'

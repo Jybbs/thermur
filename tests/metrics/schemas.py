@@ -74,16 +74,15 @@ def test_a_flock_of_100_launches_at_the_center_s_height_as_drawn():
     assert vmap(plan.launched)(split(key(plan.seed), 256)).positions[..., 2].min() > 0
 
 
-def test_a_flock_of_the_default_size_launches_above_the_ground():
+def test_a_flock_of_2000_launches_above_the_ground():
     """
-    Asserts that a flock of the default size launches its center
-    `clearance_sd` deviations of its depth above the ground, past the height
-    `center_m` sets, and that no drone of 256 launches starts under the
-    ground, the hold at the ground setting at least one drone and fewer
-    than one in 10,000 on it, each climbing and commanding the velocity it
-    launches at.
+    Asserts that a flock of 2000 launches its center `clearance_sd`
+    deviations of its depth above the ground, past the height `center_m`
+    sets, and that no drone of 256 launches starts under the ground, the
+    hold at the ground setting at least one drone and fewer than one in
+    10,000 on it, each climbing and commanding the velocity it launches at.
     """
-    plan     = Plan()
+    plan     = Plan(drones=2000)
     launches = vmap(plan.launched)(split(key(plan.seed), 256))
     heights  = launches.positions[..., 2]
 

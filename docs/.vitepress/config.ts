@@ -1,14 +1,13 @@
 import { defineConfig } from 'vitepress'
 
-import { Cards }        from './lib/cards.ts'
-import * as head        from './lib/head.ts'
-import { projectFacts } from './lib/manifest.ts'
-import { mathRules }    from './lib/math.ts'
-import { pageData }     from './lib/page-data.ts'
-import * as paths       from './lib/paths.ts'
-import { themeConfig }  from './lib/site.ts'
-import * as vite        from './lib/vite.ts'
-import { widgetRules }  from './lib/widgets.ts'
+import { Cards }         from './lib/cards.ts'
+import * as head         from './lib/head.ts'
+import { projectFacts }  from './lib/manifest.ts'
+import { markdownRules } from './lib/markdown.ts'
+import { pageData }      from './lib/page-data.ts'
+import * as paths        from './lib/paths.ts'
+import { themeConfig }   from './lib/site.ts'
+import * as vite         from './lib/vite.ts'
 
 const facts    = projectFacts(import.meta.url)
 const previews = new head.Previews(Cards.under(import.meta.url, facts), facts)
@@ -20,7 +19,7 @@ export default defineConfig({
   cleanUrls         : true,
   description       : facts.description,
   head              : head.siteHead(facts.base),
-  markdown          : { config: md => void md.use(mathRules).use(widgetRules) },
+  markdown          : { config: markdownRules },
   sitemap           : { hostname: facts.homepage },
   srcDir            : paths.pagesDir(import.meta.url),
   themeConfig       : themeConfig(facts, paths.pagesDir(import.meta.url)),

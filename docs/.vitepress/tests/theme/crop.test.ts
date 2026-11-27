@@ -8,6 +8,8 @@ import { Flock }                           from '../../lib/front/flock.ts'
 import CropKept                            from '../../theme/crop.ts'
 import { type Browser, RELEASED, browser } from '../common/browser.ts'
 
+vi.mock('vitepress', () => ({ withBase: (path: string) => path }))
+
 /**
  * A mounted widget over the stand-in browser, beside the stand-ins.
  */

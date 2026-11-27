@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
-import { Radios, Select, Slider, Toggle }            from '@thermur/kit'
+import { Radios, Select, Slider, Toggle }                           from '@thermur/kit'
 import { type VueWrapper, enableAutoUnmount, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi }       from 'vitest'
+import { afterEach, describe, expect, it, vi }                      from 'vitest'
 
 import { FUELS, GROUND, SPAN, reachOf } from '../../../lib/kit/front.ts'
 import { SCENES }                       from '../../../theme/kit/scenes.ts'
@@ -96,8 +96,10 @@ describe('the chrome scene', () => {
   it('copies a step of the heat ramp from its button', async () => {
     const { widget } = staged('chrome')
     const step       = widget.get('.kit-catalog-step')
+    const write      = vi.spyOn(navigator.clipboard, 'writeText')
     await step.trigger('click')
-    await vi.waitFor(async () => expect(await navigator.clipboard.readText()).toBe(step.get('.kit-fuse').text()))
+    await write.mock.results[0]!.value
+    expect(await navigator.clipboard.readText()).toBe(step.get('.kit-fuse').text())
   })
 })
 

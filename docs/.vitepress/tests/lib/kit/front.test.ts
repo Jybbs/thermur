@@ -45,7 +45,7 @@ describe('Front', () => {
     const front  = new Front()
     const shown  = (): (string | null)[] => front.labels.map(label => label.getAttribute('display'))
     front.draw(150)
-    expect(shown().every(display => display === 'inline')).toBe(true)
+    expect(shown().filter(display => display !== 'inline')).toStrictEqual([])
     front.fit(300)
     expect(front.node.getAttribute('viewBox')).toBe('0 0 300 112')
     expect(shown()).toEqual(['inline', 'none', 'inline', 'none', 'inline', 'none', 'inline'])
