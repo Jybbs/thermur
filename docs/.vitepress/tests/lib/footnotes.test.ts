@@ -93,6 +93,11 @@ describe('the markers', () => {
     expect([spoken(run), run?.querySelector('b')]).toEqual(['a<b1.', null])
   })
 
+  it('keeps the anchor of a heading a run of markers closes', async () => {
+    const heading = (await page('## Topological neighbors[^x]\n\n[^x]: Noted.\n')).querySelector('h2')
+    expect(heading?.id).toBe('topological-neighbors')
+  })
+
   it('numbers an inline footnote by its place', async () => {
     const document = await page('Said^[Inline.] here.\n')
     expect(document.querySelector('a.cite')?.id).toBe('cite-1-1')
