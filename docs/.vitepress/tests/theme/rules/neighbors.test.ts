@@ -234,13 +234,13 @@ describe('a marked bird ranking fewer than seven', () => {
     const chart  = drawn(false)
     const labels = (): string[] => chart.stand.context.fillText!.mock.calls
       .map(([words]) => String(words))
-      .filter(words => words.startsWith('by rank'))
-    expect(labels().at(-1)).toBe('by rank, 3')
+      .filter(words => words.startsWith('BY RANK'))
+    expect(labels().at(-1)).toBe('BY RANK, 3')
     chart.stand.frames.run(20, 50)
-    expect(labels().at(-1)).toBe('by rank, 3')
+    expect(labels().at(-1)).toBe('BY RANK, 3')
     vi.mocked(Flock.prototype.heard).mockRestore()
     chart.stand.frames.run(20, 50)
-    expect(labels().at(-1)).toBe('by rank, 7')
+    expect(labels().at(-1)).toBe('BY RANK, 7')
   })
 })
 
@@ -248,9 +248,9 @@ describe('the strips', () => {
   it('label each strip at its end on a wide canvas and above it on a narrow one, by the count ranked', () => {
     const heard  = vi.spyOn(Flock.prototype, 'heard')
     const chart  = drawn()
-    const ranked = (): string => `by rank, ${heard.mock.results.at(-1)!.value}`
+    const ranked = (): string => `BY RANK, ${heard.mock.results.at(-1)!.value}`
     const labels = (): unknown[][] => chart.stand.context.fillText!.mock.calls
-      .filter(([words]) => String(words).startsWith('by rank'))
+      .filter(([words]) => String(words).startsWith('BY RANK'))
     chart.stand.context.measureText!.mockReturnValue({ width: 200 })
     chart.stand.reflow(canvas(chart))
     expect(labels().at(-1)).toEqual([ranked(), 982 + 8, expect.any(Number)])
@@ -268,12 +268,12 @@ describe('the strips', () => {
     const inside = last.slice(0, -1).filter(bird => ranged.has(bird.color))
     const counts = chart.stand.context.fillText!.mock.calls
       .map(([words]) => String(words))
-      .filter(words => words.startsWith('within range'))
+      .filter(words => words.startsWith('WITHIN RANGE'))
     expect(inside.length).toBeGreaterThan(0)
     for (const bird of inside) {
       expect(Math.hypot(bird.x - marked.x, bird.y - marked.y)).toBeLessThanOrEqual(reach)
     }
-    expect(counts.at(-1)).toBe(`within range, ${inside.length}`)
+    expect(counts.at(-1)).toBe(`WITHIN RANGE, ${inside.length}`)
   })
 
   it('counts the birds inside the range as the flock flies under the falcon, leaving nothing behind', () => {
@@ -285,7 +285,7 @@ describe('the strips', () => {
     chart.stand.frames.run(5, 50)
     expect(frame(chart.birds)).not.toEqual(before)
     expect(chart.stand.context.fillText).toHaveBeenCalledWith(
-      expect.stringMatching(/^within range, \d+$/u), expect.any(Number), expect.any(Number))
+      expect.stringMatching(/^WITHIN RANGE, \d+$/u), expect.any(Number), expect.any(Number))
     chart.widget.unmount()
     expect(chart.stand.held()).toEqual(RELEASED)
   })
