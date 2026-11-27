@@ -10,6 +10,7 @@ from jax     import Array, grad, hessian
 from jax.numpy  import (
     array,
     asarray,
+    clip,
     concat,
     cos,
     cross,
@@ -427,14 +428,24 @@ class HardSphere(Component):
 @documented
 class Home(Component):
     """
-    The roost term of a starling flock model, pulling a drone toward the
-    roost's height in proportion to its distance from it, which keeps the
-    flock flat, beside the turn fish take from a wall, turning the drone
-    across its heading away from the rim of a disk around the roost at a
-    rate rising as its time to reach that rim falls.
+    The roost term of a starling flock model, pulling a drone back toward
+    a band about the roost's height in proportion to its distance outside
+    it, which keeps the flock flat while leaving its depth to grow with its
+    size, beside the turn fish take from a wall, turning the drone across
+    its heading away from the rim of a disk around the roost at a rate
+    rising as its time to reach that rim falls.
 
     The pull also opposes the drone's climb over the ground at twice the
-    square root of the stiffness, which damps the height critically.
+    square root of the stiffness, which damps the height critically outside
+    the band.
+    """
+
+    band_m: NonNegative = 5.33
+    """
+    The depth of the band centered on `height_m` that no pull acts in, in
+    meters, at a starling's scale, by default the thickness measured on the
+    starling flock of 781 birds, whose counterpart in the starling model
+    sets that scale.
     """
 
     bound_m_s2: Positive = Plant().level_m_s2
@@ -448,11 +459,11 @@ class Home(Component):
     The disk's center east and north, in meters, by default the launch's.
     """
 
-    height_m: float = 100.0
+    height_m: float = 150.0
     """
-    The height the drone is pulled toward, in meters above the ground, by
-    default that of the launch's center, which a flock of more than 304
-    drones launches above.
+    The height of the band's middle, in meters above the ground, by default
+    that of the launch's center, which a flock of more than 1,026 drones
+    launches above.
     """
 
     radius_m: Positive = 1000.0
@@ -462,7 +473,7 @@ class Home(Component):
 
     stiffness_per_s2: NonNegative = 2.5
     """
-    The acceleration toward the height per meter away from it, in
+    The acceleration toward the band per meter outside it, in
     reciprocal square seconds, at a starling's scale, by default the
     starling model's vertical weight of 0.2 newtons per meter over its
     bird's mass of 80 grams, read per meter since the model multiplies it by
@@ -516,24 +527,27 @@ class Home(Component):
 
     def scaled(self, factor: float) -> Self:
         """
-        Divides the stiffness by the square of `factor`, as a flock
-        magnified by `factor` at the same speed takes, and leaves the disk
-        and the turn at a drone flock's own values.
+        Multiplies the band by `factor` and divides the stiffness by its
+        square, as a flock magnified by `factor` at the same speed takes,
+        and leaves the disk and the turn at a drone flock's own values.
         """
         return tree_at(
-            lambda home: home.stiffness_per_s2,
+            lambda home: (home.band_m, home.stiffness_per_s2),
             self,
-            self.stiffness_per_s2 / factor**2
+            (self.band_m * factor, self.stiffness_per_s2 / factor**2)
         )
 
     def vertical(self, observation: Observation) -> Array:
         """
-        Pulls the drone toward `height_m` by `stiffness_per_s2` times its
-        height away and against its climb over the ground by twice the
+        Pulls the drone toward the band by `stiffness_per_s2` times its
+        height outside it and against its climb over the ground by twice the
         stiffness's square root.
         """
+        away = observation.position[2] - self.height_m
         return (
-            -self.stiffness_per_s2 * (observation.position[2] - self.height_m)
+            -self.stiffness_per_s2 * (
+                away - clip(away, -self.band_m / 2, self.band_m / 2)
+            )
             - 2 * sqrt(
                 self.stiffness_per_s2
             ) * (observation.velocity + observation.wind)[2]

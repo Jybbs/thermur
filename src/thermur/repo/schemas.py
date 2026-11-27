@@ -1030,6 +1030,13 @@ class Workflow(Document):
     the jobs it runs.
     """
 
+    drafted: ClassVar[str] = "github.event.pull_request.draft == true"
+    """
+    The term of a concurrency group naming a run on a draft pull request,
+    compared to `true` since the field reads as an empty string on a run
+    no pull request started.
+    """
+
     jobs: frozendict[str, Job]
     """
     The jobs the workflow runs, by key.
@@ -1100,11 +1107,11 @@ class Workflow(Document):
     def splits_drafts(self) -> bool:
         """
         Tells whether the workflow's concurrency group, where it declares
-        one, reads the pull request's `draft` state, so a run on a draft
-        shares no group with a run on the head marked ready and leaves it
-        running.
+        one, compares the pull request's `draft` state to `true`, so a run
+        on a draft shares no group with a run on the head marked ready and
+        leaves it running.
         """
-        return not self.group or Job.draft.removeprefix("!") in self.group
+        return not self.group or self.drafted in self.group
 
     def pushes(self, file: str) -> bool:
         """
