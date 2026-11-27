@@ -7,6 +7,14 @@ import { FLOORS }           from '../../common/contrast.ts'
 import { declared, styled } from '../../common/sheets.ts'
 
 /**
+ * Reads the value `property` takes in the rule of the sheet whose selector list
+ * is `selector`, one inside an at-rule such as `@media` included.
+ */
+const nested = (property: string, selector: string): string | undefined =>
+  styled(sources).find(rule => rule.selectorText.replaceAll(/\s+/gu, ' ') === selector)?.style
+    .getPropertyValue(property)
+
+/**
  * Each number the sheet sets, beside the custom property it sets the number
  * in, the one its ground shows, and the background the sheet declares for it,
  * none where the number stands on the page's own ground.
@@ -56,6 +64,32 @@ describe('the targets', () => {
 
   it('sets each line of a DOI address 24 px tall', () => {
     expect(declared('line-height', '.vp-doc a.source-address', sources)).toBe('1.5rem')
+  })
+})
+
+describe('the layout', () => {
+  it.for([
+    ['white-space', '.vp-doc .cite-run', 'nowrap'],
+    ['white-space', '.vp-doc a.source-address > span', 'nowrap'],
+    ['display', '.vp-doc a.source-address', 'block'],
+    ['pointer-events', '.vp-doc .sources-flock', 'none'],
+    ['height', '.vp-doc a.cite', '1em']
+  ] as const)('sets %s on %s to %s', ([property, selector, value]) => {
+    expect(declared(property, selector, sources)).toBe(value)
+  })
+
+  it.for([
+    '.vp-doc a.cite[data-current] .cite-art',
+    '.vp-doc a.cite:hover .cite-art'
+  ])('tilts the bird of %s upward', selector => {
+    expect(nested('rotate', selector)).toBe('-14deg')
+  })
+
+  it.for([
+    '.vp-doc a.cite[data-current] .cite-number',
+    '.vp-doc a.cite:hover .cite-number'
+  ])('underlines the number of %s', selector => {
+    expect(nested('text-decoration', selector)).toMatch(/^underline/u)
   })
 })
 

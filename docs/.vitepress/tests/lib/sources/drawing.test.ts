@@ -57,6 +57,7 @@ describe('flock', () => {
   it('colors the flock from its foot at the last source to its head past the first', () => {
     const ts = numbered.map(bird => bird.t)
     expect(ts).toEqual(ts.toSorted((a, b) => b - a))
+    expect(new Set(ts).size).toBe(ts.length)
   })
 
   it('flies a loose flock up the column and along the heading’s row', () => {

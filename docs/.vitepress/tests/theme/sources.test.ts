@@ -78,6 +78,14 @@ describe('the flock', () => {
     expect(flock.findAll('use').map(each => each.attributes('style'))).not.toEqual(before)
   })
 
+  it('redraws the flock when the list changes width', async () => {
+    const { stand } = opened()
+    stand.frames.run(1)
+    await nextTick()
+    stand.reflow(document.querySelector('.sources')!, 480)
+    expect(stand.held().frames).toBe(1)
+  })
+
   it('leaves no listener, observer, or animation frame behind once it unmounts', () => {
     const { flock, stand } = opened()
     stand.reflow()
@@ -93,6 +101,20 @@ describe('the current source', () => {
     opened()
     document.querySelector<HTMLElement>('#cite-a-2')?.click()
     expect(current()).toEqual([['source-a'], ['cite-a-1', 'cite-a-2'], ['#source-a', '#cite-a-2']])
+  })
+
+  it('clears the source and the citation marked before when the reader follows another', () => {
+    opened()
+    document.querySelector<HTMLElement>('#cite-a-1')?.click()
+    document.querySelector<HTMLElement>('#cite-b-1')?.click()
+    expect(current()).toEqual([['source-b'], ['cite-b-1'], ['#source-b', '#cite-b-1']])
+  })
+
+  it('marks the source the page’s address moves to once it is open', () => {
+    opened()
+    location.hash = '#source-b'
+    window.dispatchEvent(new HashChangeEvent('hashchange'))
+    expect(current()).toEqual([['source-b'], ['cite-b-1'], []])
   })
 
   it('marks the marker a return leads back to', () => {
