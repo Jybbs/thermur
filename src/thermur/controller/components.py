@@ -778,8 +778,8 @@ class Kinetic(Thermal):
         """
         Divides the push by `factor`, as the cruise's relaxation time
         multiplies by it, so an excess holds the same steady speed at every
-        scale, leaving the alignment, a share of the coupling's rate, as it
-        stands.
+        scale, leaving the alignment, a share of the coupling's rate, as
+        it stands.
         """
         return tree_at(
             lambda kinetic: kinetic.speeding_m_s2_k,

@@ -1351,14 +1351,23 @@ def test_a_kinetic_thermal_response_speeds_and_aligns_by_the_excess(
     )
 
 
-@mark.parametrize("factor", [param(1.0, id="starling"), param(Plan().similarity, id="drone")])
-def test_the_default_thermal_push_holds_a_drone_at_the_level_bound_at_20_k(factor: float):
+@mark.parametrize(
+    "factor",
+    [param(1.0, id="starling"), param(Plan().similarity, id="drone")]
+)
+def test_the_default_thermal_push_holds_a_drone_at_the_level_bound_at_20_k(
+    factor: float
+):
     """
-    Asserts that the default push at the parametric threat's anomaly of
-    20 K balances the cruise's pull on a drone at the plant's level bound,
-    at a starling's scale and at the default launch's.
+    Asserts that the default push at the parametric threat's anomaly of 20
+    K balances the cruise's pull on a drone at the plant's level bound, at a
+    starling's scale and at the default launch's.
     """
-    view = viewed([[10.0, 0.0, 0.0]], excess=20.0, velocity=(Plant().level_m_s, 0.0, 0.0))
+    view = viewed(
+        [[10.0, 0.0, 0.0]],
+        excess   = 20.0,
+        velocity = (Plant().level_m_s, 0.0, 0.0)
+    )
 
     assert_allclose(
         Cruise().scaled(factor)(view) + Kinetic().scaled(factor)(view),
