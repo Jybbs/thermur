@@ -1,8 +1,9 @@
 """
-Holds the components filling each slot of the controller, each borrowed from
-another physical system and cited on the page that explains the choice among
-them, meaning the headings, the couplings, the noises, the cohesions, the
-one contact, the roost, and the speeds.
+Holds the components filling each slot of the controller, each borrowed
+from another physical system and cited on the page that explains the choice
+among them, meaning the headings, the couplings, the noises, the cohesions,
+the one contact, the roost, the speeds, the one escape, and the one thermal
+response.
 """
 
 from equinox import tree_at
@@ -23,7 +24,9 @@ from jax.numpy  import (
     log1p,
     maximum,
     minimum,
+    pi,
     select,
+    sign,
     sqrt,
     square,
     where,
@@ -33,11 +36,14 @@ from pydantic import Field
 from typing   import Annotated, ClassVar, Self
 
 from thermur.controller.schemas  import (
+    Alarm,
     Component,
+    Escape,
     Heading,
     Noise,
     Observation,
     Speed,
+    Thermal,
     along,
     torque,
     unit
@@ -322,6 +328,152 @@ class Elastic(Component):
 
 
 @documented
+class Excitable(Escape):
+    """
+    The excitable medium of a stadium's Mexican wave run on the neighbor
+    graph, each drone moving through the `Alarm` states as the cells of a
+    Greenberg-Hastings medium do, with the alertness of a starling escape
+    model built from a stimulus only the fire produces.
+
+    The alertness relaxes toward `exp(-sqrt(d / alarm_m))`, `d` being
+    the drone's distance to the burning front, the falloff `exp(-sqrt(d)
+    / sigma)` of the starling model with `sigma` the square root of
+    `alarm_m`, air holding no front reading as no stimulus, and the drone
+    is alarmed while its alertness holds at or above `exp(-1)`. A resting
+    or alarmed drone fires as its firing neighbors set it off, each firing
+    neighbor it hears with the chance `branching` over the neighbor count
+    within one firing, the branching ratio of an excitable network, and an
+    alarmed drone also fires on its own at its alertness over `firing_s +
+    refractory_s`. Firing turns the drone through half a turn across its
+    heading, or climbs, for `firing_s`, after which it rests from firing
+    for `refractory_s`.
+    """
+
+    alarm_m: Positive = 50.0
+    """
+    The distance to the burning front within which a drone's alertness
+    settles at or above the alarm, in meters at a drone's own scale, by
+    default the radio's range.
+    """
+
+    branching: NonNegative = 1.0
+    """
+    The mean number of drones each firing sets off among the neighbors
+    hearing it, by default the critical branching ratio of an excitable
+    network.
+    """
+
+    climbing: Annotated[float, Field(ge=0, le=1)] = 0.5
+    """
+    The share of the maneuvers a drone fires on its own that climb rather
+    than turn, by default an even split between the starling model's level
+    turn and the climb that stands for its dive.
+    """
+
+    firing_s: Positive = 3.5 / 2.88 / 2
+    """
+    The time a drone fires its maneuver, in seconds, at a starling's scale,
+    by default half the time a starling agitation wave lasts per pulse,
+    3.5 s across 2.88 pulses.
+    """
+
+    refractory_s: Positive = 3.5 / 2.88 / 2
+    """
+    The time after firing during which the drone fires no maneuver, in
+    seconds, at a starling's scale, by default the other half of that time,
+    so a drone the fire holds alarmed fires at most once per pulse.
+    """
+
+    relaxation_s: Positive = 1.0
+    """
+    The time over which the alertness relaxes toward the stimulus, in
+    seconds, by default the reciprocal of the starling model's decay rate
+    of 1 per second.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Turns a firing drone toward its side at the rate carrying it through
+        half a turn within `firing_s`, or pushes it upward at the same
+        acceleration where its side is zero, adding nothing in any other
+        state.
+        """
+        alarm, _, _, side = observation.alarm
+        velocity          = observation.velocity
+        return where(
+            alarm == Alarm.FIRING,
+            pi * linalg.norm(velocity) / self.firing_s,
+            0.0
+        ) * where(side == 0, asarray([0.0, 0.0, 1.0]), side * left(velocity))
+
+    def excited(self, draws: Array, observation: Observation, step_s: float) -> Array:
+        """
+        Steps one drone's escape state by `step_s`, relaxing its alertness
+        toward the stimulus and moving it through the `Alarm` states:
+
+        - A resting or alarmed drone fires where the first of `draws` falls
+          below the chance its firing neighbors and its own alertness set
+          it off within the step, copying the side most of those neighbors
+          take, climbing where their sides cancel, or, firing on its own,
+          climbing where the second of `draws` falls below `climbing` and
+          otherwise turning to either side alike
+        - A firing drone counts its time down, then moves on to
+          `refractory_s`
+        - A refractory drone counts its time down, then returns to the
+          alarm its alertness sets
+        """
+        alarm, alertness, left_s, side = observation.alarm
+        stimulus = exp(-sqrt(observation.air.get("front", inf) / self.alarm_m))
+        alert    = stimulus + (alertness - stimulus) * exp(-step_s / self.relaxation_s)
+        alarmed  = where(alert >= exp(-1.0), Alarm.ALARMED, Alarm.RESTING)
+        firing   = (observation.distances > 0) & (
+            observation.alarms[:, 0] == Alarm.FIRING
+        )
+        copied = branched(self.branching, observation) * firing.sum()
+        own    = where(alarmed == Alarm.ALARMED, alert, 0.0) * self.firing_s / (
+            self.firing_s + self.refractory_s
+        )
+        ready   = alarm <= Alarm.ALARMED
+        heading = select(
+            [
+                firing.any(),
+                draws[1] < self.climbing,
+                draws[1] < (1 + self.climbing) / 2
+            ],
+            [sign(observation.alarms[:, 3] @ firing), 0.0, 1.0],
+            -1.0
+        )
+        counted = left_s - step_s
+        ended   = counted <= 0
+        return select(
+            [
+                ready & (draws[0] < -expm1(-(copied + own) * step_s / self.firing_s)),
+                (alarm == Alarm.FIRING) & ended,
+                (alarm >= Alarm.FIRING) & ~ended
+            ],
+            [
+                asarray([Alarm.FIRING, alert, self.firing_s, heading]),
+                asarray([Alarm.REFRACTORY, alert, self.refractory_s, side]),
+                asarray([alarm, alert, counted, side])
+            ],
+            asarray([alarmed, alert, 0.0, side])
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Multiplies the times of the maneuver by `factor`, as a flock
+        magnified by `factor` at the same speed takes, leaving the distance
+        to the front and the relaxation of the alertness, which are the
+        fire's and a drone's own at any spacing.
+        """
+        return tree_at(
+            lambda escape: (escape.firing_s, escape.refractory_s),
+            self,
+            (self.firing_s * factor, self.refractory_s * factor)
+        )
+
+
+@documented
 class Fitted(Component):
     """
     The cohesion on the form fitted to pairs of rummy-nose tetras,
@@ -569,6 +721,71 @@ class Intrinsic(Noise):
             square(self.spontaneous) + self.copying_per_s * disagreement.mean() / 3
         )
         return command, zeros_like(command)
+
+
+@documented
+class Kinetic(Thermal):
+    """
+    The thermal response of a fish school tracking a field of light no one
+    fish resolves, each drone speeding up along its command and aligning
+    faster with its neighbors as the air at its own position runs hotter
+    than the ambient profile, so a flock reading different values across
+    it turns toward its slower, cooler side, the gradient emerging from the
+    neighbors rather than from any one drone.
+
+    Air cooler than the ambient profile reads as no excess.
+    """
+
+    aligning_per_k: NonNegative = 0.05
+    """
+    The rise of the rate at which a drone aligns with each neighbor, as a
+    share of the coupling's rate per kelvin of excess, by default the value
+    doubling the rate at the parametric threat's anomaly of 20 K.
+    """
+
+    speeding_m_s2_k: NonNegative = 0.26
+    """
+    The acceleration along a drone's command per kelvin of excess, in meters
+    per second squared, at a starling's scale, by default the value holding
+    the cruise's steady speed at the plant's level bound at the parametric
+    threat's anomaly of 20 K, the 5.2 m/s from the cruise's 10 m/s to the
+    bound's 15.2 m/s over 20 K and the cruise's relaxation of 1 s, or about
+    0.0076 at a drone flock's scale.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Pushes the drone along its command by `speeding_m_s2_k` times the
+        excess.
+        """
+        return (
+            self.speeding_m_s2_k
+            * maximum(observation.air["excess"], 0.0)
+            * unit(observation.velocity)
+        )
+
+    def aligning(self, observation: Observation) -> Array:
+        """
+        Scales every neighbor's rate by one plus `aligning_per_k` times
+        the excess.
+        """
+        return full(
+            observation.distances.shape,
+            1 + self.aligning_per_k * maximum(observation.air["excess"], 0.0)
+        )
+
+    def scaled(self, factor: float) -> Self:
+        """
+        Divides the push by `factor`, as the cruise's relaxation time
+        multiplies by it, so an excess holds the same steady speed at every
+        scale, leaving the alignment, a share of the coupling's rate, as
+        it stands.
+        """
+        return tree_at(
+            lambda kinetic: kinetic.speeding_m_s2_k,
+            self,
+            self.speeding_m_s2_k / factor
+        )
 
 
 @documented
@@ -1066,7 +1283,7 @@ class Zig(White):
         zigging            = (observation.distances > 0) & self.zigging(
             observation.forces[:, 0]
         )
-        hazard  = -log1p(-self.branching / observation.distances.size) / self.zig_s
+        hazard  = branched(self.branching, observation) / self.zig_s
         resting = countdown <= 0
         walled  = resting & (linalg.norm(turn[:2]) >= self.accel_m_s2)
         copied  = resting & ~walled & (
@@ -1124,6 +1341,15 @@ class Zig(White):
         return (countdown > self.refractory_s) & (
             countdown <= self.refractory_s + self.zig_s
         )
+
+
+def branched(branching: float, observation: Observation) -> Array:
+    """
+    Computes the hazard, integrated over one firing, at which one firing
+    neighbor sets a drone off with the chance `branching` over the size of
+    the drone's table.
+    """
+    return -log1p(-branching / observation.distances.size)
 
 
 def left(velocity: Array) -> Array:

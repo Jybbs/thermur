@@ -15,17 +15,26 @@ from thermur.metrics.schemas     import Plan
 from thermur.pipeline.settings   import Settings
 
 
-def flock_of(positions: object, velocities: object, commands: object = None) -> Flock:
+def flock_of(
+    positions  : object,
+    velocities : object,
+    commands   : object = None,
+    *,
+    alarms     : object = None
+) -> Flock:
     """
     Builds a flock at `positions` and `velocities`, holding no force and
     no spin, each drone commanding `commands`, or its own velocity where
-    `commands` is `None`.
+    `commands` is `None`, and holding the escape state `alarms`, or resting
+    where `alarms` is `None`.
     """
+    shape = asarray(positions).shape
     return Flock(
+        alarms     = zeros((*shape[:-1], 4)) if alarms is None else asarray(alarms),
         commands   = asarray(velocities if commands is None else commands),
-        forces     = zeros(asarray(positions).shape),
+        forces     = zeros(shape),
         positions  = asarray(positions),
-        spins      = zeros(asarray(positions).shape),
+        spins      = zeros(shape),
         velocities = asarray(velocities)
     )
 
@@ -117,7 +126,9 @@ def viewed(
     distances = linalg.norm(spots, axis=-1)
     return Observation(
         **{
-            "air": {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
+            "air"    : {"excess": asarray(excess)} | dict.fromkeys("uvw", asarray(0.0)),
+            "alarm"  : zeros(4),
+            "alarms" : zeros((len(offsets), 4)),
             "centrality" : linalg.norm(unit(spots).sum(0))
             / max(int((distances > 0).sum()), 1),
             "cruise"     : linalg.norm(own),

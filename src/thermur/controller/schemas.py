@@ -1,12 +1,14 @@
 """
-Holds the records of the numerical core, meaning the `Flock` a flight steps,
-the `Radio` carrying each drone's state to the others and the `Inbox` it
-keeps, the `Observation` that is the one input a slot reads, the abstract
-`Component` filling a slot with the `Heading`, `Noise`, and `Speed` bases,
-and the `Composite` summing the slots the settings nest by name.
+Holds the records of the numerical core, meaning the `Alarm` states of the
+escape slot, the `Flock` a flight steps, the `Radio` carrying each drone's
+state to the others and the `Inbox` it keeps, the `Observation` that is
+the one input a slot reads, the abstract `Component` filling a slot with
+the `Escape`, `Heading`, `Noise`, `Speed`, and `Thermal` bases, and the
+`Composite` summing the slots the settings nest by name.
 """
 
 from dataclasses import fields
+from enum        import IntEnum
 from equinox     import Module, field, filter_jit, tree_at
 from functools   import partial
 from jax         import Array, ShapeDtypeStruct, lax, tree, vmap
@@ -21,6 +23,7 @@ from jax.numpy     import (
     isfinite,
     linalg,
     maximum,
+    ones_like,
     sqrt,
     stack,
     unique,
@@ -42,11 +45,50 @@ from thermur.environment.schemas import Count, NonNegative, Positive, documented
 from thermur.pipeline.settings   import Settings
 
 
+class Alarm(IntEnum):
+    """
+    The state a drone holds in the escape slot's excitable medium, compared
+    against the first column of `Flock.alarms` inside `jit`.
+    """
+
+    ALARMED = 1
+    """
+    Flying with the flock, its alertness at or above the alarm.
+    """
+
+    FIRING = 2
+    """
+    Turning or climbing away, the maneuver its neighbors copy.
+    """
+
+    REFRACTORY = 3
+    """
+    Flying with the flock after firing, starting no maneuver.
+    """
+
+    RESTING = 0
+    """
+    Flying with the flock, its alertness below the alarm.
+    """
+
+
 class Flock(Module):
     """
     The state of every drone, each array laid out as `(..., n_drones, 3)`,
-    so a property reads one flock, a flight's frames, or a batch of seeds
-    alike.
+    or `(..., n_drones, 4)` for `alarms`, so a property reads one flock, a
+    flight's frames, or a batch of seeds alike.
+    """
+
+    alarms: Array
+    """
+    The state the escape slot holds on each drone, all zero under a slot
+    holding none, in four columns:
+
+    - Its `Alarm`
+    - Its alertness
+    - The seconds left in its state
+    - The side its maneuver turns toward, one to the left of the heading,
+      minus one to the right, and zero for a climb
     """
 
     commands: Array
@@ -138,6 +180,11 @@ class Inbox(Module):
     ...)`, a slot holding no sender naming the receiver itself.
     """
 
+    alarms: Array
+    """
+    Each held sender's escape state in the broadcast the receiver last heard.
+    """
+
     delayed: Array
     """
     Each held sender's velocity `Heading.lag_s` before the broadcast the
@@ -215,6 +262,7 @@ class Inbox(Module):
         )
         senders = where(heard, indices, arange(drones)[:, newaxis])
         return cls(
+            alarms     = sent.alarms[senders],
             delayed    = earlier.velocities[senders],
             forces     = sent.forces[senders],
             heard      = heard,
@@ -229,13 +277,13 @@ class Inbox(Module):
 @documented
 class Radio(Module):
     """
-    The link each drone broadcasts its position, its velocity, its noise
-    state, and its table's senders over, each packet reaching another drone
-    within range late, at a fixed rate, and only where the link does not
-    lose it, after the simulated radios of an outdoor drone flock, each
-    receiver forgetting a sender once `hold_periods` packet periods pass
-    with no packet from it, the neighbor hold time of the mobile ad hoc
-    routing protocols.
+    The link each drone broadcasts its position, its velocity, its
+    noise state, its escape state, and its table's senders over, each
+    packet reaching another drone within range late, at a fixed rate,
+    and only where the link does not lose it, after the simulated radios
+    of an outdoor drone flock, each receiver forgetting a sender once
+    `hold_periods` packet periods pass with no packet from it, the neighbor
+    hold time of the mobile ad hoc routing protocols.
 
     Each receiver keeps in its table the `slots` nearest senders it hears,
     and learns a sender beyond its table in two ways:
@@ -398,11 +446,12 @@ class Radio(Module):
 
         return tree_at(
             lambda table: (
-                table.delayed, table.forces, table.heard, table.positions,
-                table.received, table.senders, table.velocities
+                table.alarms, table.delayed, table.forces, table.heard,
+                table.positions, table.received, table.senders, table.velocities
             ),
             inbox,
             (
+                told(broadcast.alarms, inbox.alarms),
                 told(earlier.velocities, inbox.delayed),
                 told(broadcast.forces, inbox.forces),
                 kept,
@@ -540,6 +589,17 @@ class Observation(Module):
     air: dict[str, Array]
     """
     Each channel of the air at the drone's position, by the channel's name.
+    """
+
+    alarm: Array
+    """
+    The escape state the drone holds.
+    """
+
+    alarms: Array
+    """
+    Each neighbor's escape state as its radio last heard it, `(n_neighbors,
+    4)`, in the order of its rank.
     """
 
     centrality: Array
@@ -691,6 +751,8 @@ class Observation(Module):
         offsets = told(inbox.positions, positions) - positions[:, newaxis]
         return cls(
             air        = air.sampled(positions, t),
+            alarm      = flock.alarms,
+            alarms     = told(inbox.alarms, flock.alarms),
             centrality = linalg.norm(
                 where(inbox.heard[..., newaxis], unit(apart), 0.0).sum(1),
                 axis = -1
@@ -730,6 +792,32 @@ class Component(Module):
         own as it stands.
         """
         return self
+
+
+class Escape(Component):
+    """
+    The slot moving a drone through the `Alarm` states, whose call returns
+    the acceleration of the maneuver it fires, in meters per second squared.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Adds no acceleration for a slot firing no maneuver.
+        """
+        return zeros_like(observation.velocity)
+
+    def excited(self, draws: Array, observation: Observation, step_s: float) -> Array:
+        """
+        Computes the escape state one drone holds after one step of
+        `step_s`, leaving it as it stands for a slot whose state no step
+        updates.
+
+        Args:
+            draws: Two numbers drawn uniformly between zero and one.
+            observation: What the drone senses at the step's start.
+            step_s: The step of the integrator, in seconds.
+        """
+        return observation.alarm
 
 
 class Heading(Component):
@@ -864,6 +952,27 @@ class Speed(Component):
         return zeros_like(increment)
 
 
+class Thermal(Component):
+    """
+    The slot answering the air's excess over the ambient profile at a
+    drone's own position, whose call returns an acceleration along the
+    drone's command, in meters per second squared, and whose `aligning`
+    scales the rate at which the drone aligns with each neighbor.
+    """
+
+    def __call__(self, observation: Observation) -> Array:
+        """
+        Adds no acceleration for a slot reading no air.
+        """
+        return zeros_like(observation.velocity)
+
+    def aligning(self, observation: Observation) -> Array:
+        """
+        Leaves the coupling's rates as they stand for a slot reading no air.
+        """
+        return ones_like(observation.distances)
+
+
 class Composite(Module):
     """
     The slots the settings nest by name, summed for every drone into the
@@ -884,6 +993,12 @@ class Composite(Module):
     coupling: Component
     """
     The rate at which a drone aligns with each neighbor.
+    """
+
+    escape: Escape
+    """
+    The turn or climb a drone fires away from the fire, or copies from its
+    neighbors.
     """
 
     heading: Heading
@@ -917,11 +1032,18 @@ class Composite(Module):
     The acceleration along a drone's command.
     """
 
+    thermal: Thermal
+    """
+    The speed and the alignment a drone takes up in air hotter than the
+    ambient profile.
+    """
+
     def __call__(self, observation: Observation) -> tuple[Array, Array]:
         """
-        Turns the cohesion, the contact, the noise, and the roost through
-        the heading, which reads the weights the coupling sets, then adds
-        the speed slot's acceleration, or keeps only the part across the
+        Turns the cohesion, the contact, the escape, the noise, and the
+        roost through the heading, which reads the weights the coupling
+        sets as the thermal slot scales them, then adds the speed slot's and
+        the thermal slot's accelerations, or keeps only the part across the
         drone's command where the speed slot holds the speed fixed.
 
         Returns:
@@ -932,18 +1054,19 @@ class Composite(Module):
         weighted = tree_at(
             lambda sensed: sensed.weights,
             observation,
-            self.coupling(observation)
+            self.coupling(observation) * self.thermal.aligning(observation)
         )
         turned, spun = self.heading.steered(
             self.cohesion(observation)
             + self.contact(observation)
+            + self.escape(observation)
             + self.noise(observation)
             + self.roost(observation),
             weighted
         )
         return (
             across(turned, observation.velocity) if self.speed.fixed
-            else turned + self.speed(weighted),
+            else turned + self.speed(weighted) + self.thermal(weighted),
             spun
         )
 
@@ -961,7 +1084,7 @@ class Composite(Module):
         The noise slot scales the increments of the force and the part of
         each command increment across the command, which the heading splits
         between the command and the spin, and the speed slot scales the part
-        along it.
+        along it, while no increment reaches the escape state.
         """
         command, force = vmap(self.noise.amplitudes)(observation)
 
@@ -975,6 +1098,7 @@ class Composite(Module):
                 observation
             )
             return Flock(
+                alarms   = zeros_like(increment.alarms),
                 commands = commands
                 + vmap(self.speed.kicked)(increment.commands, observation),
                 forces     = force[:, newaxis] * increment.forces,
@@ -993,6 +1117,7 @@ class Composite(Module):
         """
         commands, spun = vmap(self)(observation)
         return Flock(
+            alarms     = zeros_like(flock.alarms),
             commands   = commands,
             forces     = vmap(self.noise.relaxation)(observation),
             positions  = flock.velocities + observation.wind,
@@ -1008,24 +1133,36 @@ class Composite(Module):
         step_s      : float
     ) -> Flock:
         """
-        Advances the state the noise slot holds on each drone by one step
-        of `step_s` from the state `flock` holds after the step, each drone
-        reading one uniform draw from `key`, the roost's acceleration on it,
-        and the radio's `delay_s`.
+        Advances the states the noise slot and the escape slot hold on each
+        drone by one step of `step_s`, the noise's from the state `flock`
+        holds after the step, each drone reading one uniform draw from
+        `key`, the roost's acceleration on it, and the radio's `delay_s`,
+        and the escape's from what each drone sensed at the step's start,
+        reading two uniform draws from a key `fold_in` derives from `key`.
         """
         return tree_at(
-            lambda held: held.forces,
+            lambda held: (held.alarms, held.forces),
             flock,
-            vmap(
-                partial(self.noise.excited, delay_s=self.radio.delay_s, step_s=step_s)
-            )(
-                draw        = uniform(key, flock.forces.shape[:-1]),
-                observation = tree_at(
-                    lambda sensed: sensed.force,
-                    observation,
-                    flock.forces
+            (
+                vmap(partial(self.escape.excited, step_s=step_s))(
+                    uniform(fold_in(key, 1), (*flock.alarms.shape[:-1], 2)),
+                    observation
                 ),
-                turn = vmap(self.roost)(observation)
+                vmap(
+                    partial(
+                        self.noise.excited,
+                        delay_s = self.radio.delay_s,
+                        step_s  = step_s
+                    )
+                )(
+                    draw        = uniform(key, flock.forces.shape[:-1]),
+                    observation = tree_at(
+                        lambda sensed: sensed.force,
+                        observation,
+                        flock.forces
+                    ),
+                    turn = vmap(self.roost)(observation)
+                )
             )
         )
 

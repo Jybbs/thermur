@@ -53,7 +53,7 @@ from thermur.controller.components import (
     Persistent,
     White
 )
-from thermur.controller.schemas import Composite, Flock, Inbox, Radio, across
+from thermur.controller.schemas import Composite, Escape, Flock, Inbox, Radio, Thermal, across
 from thermur.environment.plant  import Plant
 from thermur.environment.wrf    import WrfOutput
 from thermur.metrics.flight     import Flight, first_zero, kept, ratio_on_hull, response, stepped
@@ -66,12 +66,14 @@ STILL = Composite(
     cohesion = Centroid(stiffness_per_s2=0.0),
     contact  = HardSphere(weight_m_s2=0.0),
     coupling = Constant(coupling_per_s=0.0),
+    escape   = Escape(),
     heading  = Overdamped(),
     noise    = White(),
     plant    = Plant(),
     radio    = Radio(delay_s=0.0, loss=0.0),
     roost    = Centroid(stiffness_per_s2=0.0),
-    speed    = Marginal(fixed=True)
+    speed    = Marginal(fixed=True),
+    thermal  = Thermal()
 )
 """
 The composite whose command rate is zero on every flock, every drone hearing
@@ -82,12 +84,14 @@ PUSHED = Composite(
     cohesion = Centroid(stiffness_per_s2=0.0),
     contact  = HardSphere(sphere_m=5.0, weight_m_s2=250.0),
     coupling = Constant(coupling_per_s=0.0),
+    escape   = Escape(),
     heading  = InertialSpin(friction=1.0, inertia_s=0.02),
     noise    = White(amplitude=0.0),
     plant    = Plant(),
     radio    = Radio(delay_s=0.0, loss=0.0),
     roost    = Centroid(stiffness_per_s2=0.0),
-    speed    = Marginal(amplitude=0.0)
+    speed    = Marginal(amplitude=0.0),
+    thermal  = Thermal()
 )
 """
 The composite under which two drones 3 m apart, inside each other's hard
