@@ -1,5 +1,6 @@
-import * as common          from '../common.ts'
-import { Composite }        from './composite.ts'
+import type * as common    from '../common.ts'
+import type { Composite }   from './composite.ts'
+import { Flown }            from './flown.ts'
 import { type Heat, repel } from './heat.ts'
 
 /**
@@ -78,22 +79,15 @@ export class Flock {
   #box                 : common.Box = { x0: 0, x1: 1, y0: 0, y1: 1 }
   #clock               = 0
   readonly #composite  : Composite
-  readonly #draws      : Float64Array
   readonly #flight     : Flight
-  readonly #increments : Float64Array
-  readonly #normal     : () => number
+  readonly #flown      : Flown
   readonly #pushes     : Float64Array
-  readonly #random     : () => number
 
   constructor(flight: Flight) {
-    const { count } = flight
-    const random    = common.mulberry(flight.seed)
-    this.#composite  = new Composite(count)
+    const { count }  = flight
+    this.#flown      = new Flown(count, flight.seed)
+    this.#composite  = this.#flown.composite
     this.#flight     = flight
-    this.#random     = random
-    this.#normal     = common.gaussian(random)
-    this.#draws      = new Float64Array(count)
-    this.#increments = new Float64Array(count * 3)
     this.#pushes     = new Float64Array(count * 3)
     this.positions   = this.#composite.positions
     this.scale       = flight.spacing / this.#composite.model.plan.spacing_m
@@ -103,25 +97,22 @@ export class Flock {
     this.vy          = new Float32Array(count)
     this.size        = new Float32Array(count)
     this.glyph       = new Uint8Array(count)
+    const { random } = this.#flown
     for (let i = 0; i < count; i++) {
       this.size[i]  = flight.size[0] + (flight.size[1] - flight.size[0]) * random() ** 1.6
       this.glyph[i] = Math.floor(random() * flight.glyphs)
     }
-    this.#composite.launch(this.#normal)
+    this.#flown.launch()
     this.#project()
   }
 
   /**
    * Flies the composite one step through the heat `field` gives off where each
-   * bird is drawn, under fresh Brownian increments, zig draws, and radio
-   * losses.
+   * bird is drawn.
    */
   #advance(field: Heat): void {
-    const root   = Math.sqrt(this.#composite.model.plan.step_s)
     const pushes = this.#pushes
     const away   = this.#away
-    for (let i = 0; i < this.#increments.length; i++) this.#increments[i] = this.#normal() * root
-    for (let i = 0; i < this.#draws.length; i++) this.#draws[i] = this.#random()
     pushes.fill(0)
     for (let i = 0; i < this.x.length; i++) {
       const hot = field.heat(this.x[i]!, this.y[i]!)
@@ -130,8 +121,7 @@ export class Flock {
       pushes[i * 3]     = away[0]
       pushes[i * 3 + 2] = -away[1]
     }
-    this.#composite.hear(this.#random)
-    this.#composite.advance(this.#increments, this.#draws, pushes)
+    this.#flown.advance(pushes)
     this.#project()
   }
 

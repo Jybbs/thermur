@@ -36,3 +36,7 @@ app.command(
     "thermur.cli.fly:fly",
     help = "Flies the flock, or computes the steps of the graph named."
 )
+app.command(
+    "thermur.cli.watch:watch",
+    help = "Serves the Lookout on flights the graph flies."
+)

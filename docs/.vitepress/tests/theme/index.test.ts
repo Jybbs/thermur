@@ -10,6 +10,7 @@ vi.mock('../../theme/identity/heat.ts', () => ({ default: 'IdentityHeat' }))
 vi.mock('../../theme/identity/marks.ts', () => ({ default: 'IdentityMarks' }))
 vi.mock('../../theme/identity/palette.ts', () => ({ default: 'IdentityPalette' }))
 vi.mock('../../theme/kit/catalog.ts', () => ({ default: 'KitCatalog' }))
+vi.mock('../../theme/lookout.ts', () => ({ default: 'LookoutFlight' }))
 vi.mock('../../theme/front/hero.ts', () => ({ default: 'FrontHero' }))
 vi.mock('../../theme/front/sky.ts', () => ({ default: 'FrontSky' }))
 vi.mock('../../theme/not-found/page.ts', () => ({ default: 'NotFoundPage' }))
@@ -34,6 +35,7 @@ describe('the theme', () => {
       ['IdentityMarks', 'IdentityMarks'],
       ['IdentityPalette', 'IdentityPalette'],
       ['KitCatalog', 'KitCatalog'],
+      ['LookoutFlight', 'LookoutFlight'],
       ['RulesNeighbors', 'RulesNeighbors'],
       ['RulesReach', 'RulesReach'],
       ['RulesSpacing', 'RulesSpacing'],

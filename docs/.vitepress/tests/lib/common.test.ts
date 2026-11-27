@@ -7,6 +7,19 @@ import * as common from '../../lib/common.ts'
  */
 const draws = (seed: number): number[] => Array.from({ length: 64 }, common.mulberry(seed))
 
+describe('apart', () => {
+  it('measures the distance between two points of two arrays, each from its own place on', () => {
+    expect(common.apart(1, [9, 1, 2, 3], [0, 0, 4, 6, 3], 2)).toBe(5)
+  })
+})
+
+/**
+ * Draws the number every one of 16 receivers draws from every one of 16 senders
+ * at the step `step` under the seed `seed`.
+ */
+const grid = (seed: number, step: number): number[] =>
+  Array.from({ length: 256 }, (_, at) => common.hashed(seed, step, at >> 4, at & 15))
+
 describe('gaussian', () => {
   it('draws one fixed sequence from each seed, near a mean of 0 and a deviation of 1', () => {
     const drawn = Array.from({ length: 4000 }, common.gaussian(common.mulberry(41)))
@@ -15,6 +28,27 @@ describe('gaussian', () => {
     expect(drawn.slice(0, 9)).toEqual(Array.from({ length: 9 }, common.gaussian(common.mulberry(41))))
     expect(Math.abs(mean)).toBeLessThan(0.05)
     expect(Math.sqrt(share)).toBeCloseTo(1, 1)
+  })
+})
+
+describe('hashed', () => {
+  it('draws one fixed number in [0, 1) from each seed and triple, another from any other', () => {
+    const drawn = grid(41, 3)
+    expect(drawn).toEqual(grid(41, 3))
+    expect(drawn).not.toEqual(grid(42, 3))
+    expect(drawn).not.toEqual(grid(41, 4))
+    expect(new Set(drawn).size).toBe(drawn.length)
+    expect(Math.min(...drawn)).toBeGreaterThanOrEqual(0)
+    expect(Math.max(...drawn)).toBeLessThan(1)
+  })
+
+  it('tells a pair from the same pair the other way around', () => {
+    expect(common.hashed(0, 0, 1, 2)).not.toBe(common.hashed(0, 0, 2, 1))
+  })
+
+  it('draws near a mean of one half', () => {
+    const drawn = Array.from({ length: 4000 }, (_, at) => common.hashed(7, at, 0, 1))
+    expect(drawn.reduce((sum, value) => sum + value, 0) / drawn.length).toBeCloseTo(0.5, 1)
   })
 })
 

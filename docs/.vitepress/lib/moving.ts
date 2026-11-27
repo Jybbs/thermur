@@ -3,10 +3,10 @@ import type { PageData } from 'vitepress'
 import { FRONT_PAGE } from './head.ts'
 
 /**
- * The pages carrying a drawing that moves on its own, the front page and the
- * Data page's drawing of the threat's front.
+ * The pages carrying a drawing that moves on its own, the front page, the Data
+ * page's drawing of the threat's front, and the Lookout.
  */
-const MOVING: ReadonlySet<string> = new Set([FRONT_PAGE, 'data/index.md'])
+const MOVING: ReadonlySet<string> = new Set([FRONT_PAGE, 'data/index.md', 'methods/lookout.md'])
 
 /**
  * Reports whether `page` carries a drawing that moves on its own, one of the

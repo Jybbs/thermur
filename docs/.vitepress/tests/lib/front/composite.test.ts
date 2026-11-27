@@ -133,10 +133,10 @@ describe('Composite.hear', () => {
     const calm  = new Float64Array(copy.count).fill(1)
     const hold  = model.radio.hold_periods * Math.round(1 / (model.radio.rate_hz * model.plan.step_s))
     for (let step = 0; step <= hold; step++) {
-      copy.hear(() => 0)
+      copy.hear(() => 1)
       copy.advance(STILL, calm, STILL)
     }
-    copy.hear(() => 0)
+    copy.hear(() => 1)
     const alone = new Composite(1)
     const at    = 5 * 3
     for (const name of ['positions', 'velocities', 'commands', 'forces'] as const) {

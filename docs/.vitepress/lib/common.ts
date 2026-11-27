@@ -36,6 +36,15 @@ interface Ridge {
 export const NEIGHBORS = source.plan.neighbors
 
 /**
+ * Measures the distance between the point at `at` of `from` and the one at
+ * `to` of `into`, each three numbers long.
+ */
+export function apart(at: number, from: ArrayLike<number>, into: ArrayLike<number>, to: number): number {
+  const dx = from[at]! - into[to]!, dy = from[at + 1]! - into[to + 1]!, dz = from[at + 2]! - into[to + 2]!
+  return Math.sqrt(dx * dx + dy * dy + dz * dz)
+}
+
+/**
  * Reads the value `map` holds under `key`, building it through `build` and
  * storing it there on the first read.
  */
@@ -78,6 +87,26 @@ export function gaussian(random: () => number): () => number {
     return radius * Math.cos(angle)
   }
 }
+
+/**
+ * Folds `word` into the hash `state` through MurmurHash3's 32-bit mix and
+ * finalizer.
+ */
+function folded(state: number, word: number): number {
+  let mixed = Math.imul(state ^ word, 0xcc9e2d51)
+  mixed     = Math.imul(mixed ^ (mixed >>> 16), 0x85ebca6b)
+  mixed     = Math.imul(mixed ^ (mixed >>> 13), 0xc2b2ae35)
+  return mixed ^ (mixed >>> 16)
+}
+
+/**
+ * Draws one number in [0, 1) from `seed` and three whole numbers, each folded
+ * in turn through MurmurHash3's 32-bit mix and finalizer, so the same four
+ * always draw the same number and four differing in one place draw unrelated
+ * ones.
+ */
+export const hashed = (seed: number, first: number, second: number, third: number): number =>
+  (folded(folded(folded(folded(0x9e3779b9, seed), first), second), third) >>> 0) / 4294967296
 
 /**
  * Reads the height at `x` of the ridge whose waves of `amplitude` cancel at
