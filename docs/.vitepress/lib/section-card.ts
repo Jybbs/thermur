@@ -17,13 +17,6 @@ export interface SectionCard extends layout.Signed {
 }
 
 /**
- * The tones a night scene draws in that the palette names no color for: `gray`,
- * the neutral a section's hue is softened toward, and three tones darker than
- * the dark scheme's ground, meaning `ridge`, the ridge in front, `silhouette`,
- * the flock against the sky, and `sky`, the night above the sky's bands.
- */
-const NIGHT = { gray: '#77767c', ridge: '#0b0a0c', silhouette: '#0e0d10', sky: '#131216' } as const
-/**
  * A section card's sky, in pixels down and across the card: the horizon the
  * bands run down to, the fire's place along the ridge, the ridge's waves eight
  * pixels below the horizon, and the share of the way down to the horizon the
@@ -92,12 +85,13 @@ function sky({ glyphs, identity, section }: SectionCard): string {
   const { height, width } = layout.CANVAS
   const { fire, horizon } = SKY
   const heat              = heatRamp(identity)
+  const night             = layout.nightOf(identity)
   const ridge             = common.ridgeline({ ...SKY.ridge, base: horizon + 8 })
   const rim               = (x: number): number => scene.tenths(ridge(x))
   const crest             = scene.tenths(ridge(fire) - 6)
   const front             = `M${fire - 46} ${rim(fire - 46)}Q${fire} ${crest} ${fire + 46} ${rim(fire + 46)}`
   const flock             = scene.murmuration({
-    color  : () => NIGHT.silhouette,
+    color  : () => night.silhouette,
     count  : 900,
     gap    : plumeHeat,
     glyphs : glyphs.length,
@@ -113,11 +107,11 @@ function sky({ glyphs, identity, section }: SectionCard): string {
 
   return [
     `<defs>${scene.glyphDefs(glyphs)}${glow}</defs>`,
-    `<rect width="${width}" height="${height}" fill="${NIGHT.sky}"/>`,
+    `<rect width="${width}" height="${height}" fill="${night.sky}"/>`,
     scene.skyBands({ edges: skyEdges(), rise: plumeRise, tones: skyTones(identity, section.place), width }),
     `<ellipse cx="${fire}" cy="${rim(fire)}" rx="120" ry="40" fill="${heat[1]}" fill-opacity="0.55" `
   + 'filter="url(#glow)"/>',
-    `<path d="${scene.trace(width, ridge)}L${width} ${height}L0 ${height}Z" fill="${NIGHT.ridge}"/>`,
+    `<path d="${scene.trace(width, ridge)}L${width} ${height}L0 ${height}Z" fill="${night.ridge}"/>`,
     `<path d="${front}" fill="none" stroke="${heat[0]}" stroke-width="2.4"/>`,
     `<g opacity="0.94">${flock}</g>`
   ].join('')
@@ -144,9 +138,10 @@ function skyEdges(): number[] {
  */
 function skyTones(identity: Identity, place: number): string[] {
   const ground        = shadeOf('ground', 'dark', identity)
-  const hue           = common.mix(seriesOf(place, 'dark', identity), NIGHT.gray, 0.3)
+  const night         = layout.nightOf(identity)
+  const hue           = common.mix(seriesOf(place, 'dark', identity), night.gray, 0.3)
   const [dim, bright] = [common.mix(hue, ground, 0.82), common.mix(hue, ground, 0.2)]
-  const above         = SKY.feather.shares.map(share => common.mix(NIGHT.sky, dim, share)).toReversed()
+  const above         = SKY.feather.shares.map(share => common.mix(night.sky, dim, share)).toReversed()
   return [...above, ...[0, 1, 2, 3].map(k => common.mix(dim, bright, (k / 3) ** 1.1))]
 }
 

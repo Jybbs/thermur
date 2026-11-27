@@ -2,14 +2,17 @@
 Holds the patterns a `reads` mark passes so a case's checkout copies
 only the files a check or a task reads. `DECLARED` matches every tracked
 file outside the package's code, its tests, and the site's code, such as
-the manifests, the lockfiles, the workflows, the tasks, and the pages.
+the manifests, the lockfiles, the workflows, the tasks, and the pages, with
+the sources the README's flight recordings are made from.
 `PACKAGED` adds the package's code, and `RENDERED` adds the records the
 render writes and the kit's source beside them.
 """
 
 DECLARED = (
     ".*", "*.*", ".github/**", ".mise/**",
-    "LICENSE", "docs/*", "docs/kit/package.json", "docs/pages/**"
+    "LICENSE", "docs/*", "docs/kit/package.json", "docs/pages/**",
+    "docs/.vitepress/lib/front/composite.ts", "docs/.vitepress/lib/roost/*.ts",
+    "docs/.vitepress/theme/roost.ts", "docs/.vitepress/theme/styles/roost.css"
 )
 
 PACKAGED = (*DECLARED, "src/**")

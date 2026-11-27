@@ -35,6 +35,7 @@ const MARKERS: Readonly<Record<string, string>> = {
   'pieces'       : `<KitCatalog :readers="$frontmatter.kit" />\n${FOLD}`,
   'polarization' : '<RulesSpacing />\n',
   'reach'        : '<RulesReach />\n',
+  'roost'        : '<RoostView />\n',
   'threat'       : `<ThreatFront />\n${FOLD}`
 }
 

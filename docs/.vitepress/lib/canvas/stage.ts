@@ -15,6 +15,15 @@ interface Observers {
 }
 
 /**
+ * Measures the element `selector` names on the page, or `null` where the page
+ * has none.
+ */
+function boxOf(selector: string): Geometry['doc'] {
+  const box = document.querySelector(selector)?.getBoundingClientRect()
+  return box === undefined ? null : { bottom: box.bottom + window.scrollY, left: box.left, right: box.right, top: box.top + window.scrollY }
+}
+
+/**
  * The longest step a stalled frame counts as, in seconds.
  */
 const STALL = 0.05
@@ -58,6 +67,7 @@ export class Stage {
       scheme  : this.#scheme,
       still   : false,
       t       : 0,
+      tagline : null,
       w       : 0
     }
     host.append(this.#canvas)
@@ -121,22 +131,17 @@ export class Stage {
   }
 
   /**
-   * Measures where the hero and the reading column stand on the page, which
+   * Measures where the hero, the reading column, and the tagline stand on the page, which
    * moves only when the page is resized or reflows.
    */
   #measure(): void {
     const g       = this.#g
     const hero    = document.querySelector('.VPHero')?.getBoundingClientRect()
-    const column  = document.querySelector('.VPHomeContent')?.getBoundingClientRect()
     g.hero.top    = (hero?.top ?? 0) + window.scrollY
     g.hero.h      = hero?.height ?? 0
     g.hero.bottom = g.hero.top + g.hero.h
-    g.doc         = column === undefined ? null : {
-      bottom : column.bottom + window.scrollY,
-      left   : column.left,
-      right  : column.right,
-      top    : column.top + window.scrollY
-    }
+    g.doc         = boxOf('.VPHomeContent')
+    g.tagline     = boxOf('.front-hero-tagline')
   }
 
   /**

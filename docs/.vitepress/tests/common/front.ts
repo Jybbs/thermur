@@ -31,13 +31,14 @@ export const FLOCK = { count: 40, settle: 0.5 } as const
  */
 const GLYPHS = ['M0 0Z', 'M1 1Z', 'M2 2Z']
 /**
- * The places the front page's hero and reading column stand in the window, and
- * the page's length, in pixels.
+ * The places the front page's hero, reading column, and tagline stand in the
+ * window, and the page's length, in pixels.
  */
 export const LAYOUT = {
-  column : { bottom: 1500, left: 256, right: 944, top: 900 },
-  hero   : { height: 640, top: 0 },
-  page   : 2600
+  column  : { bottom: 1500, left: 256, right: 944, top: 900 },
+  hero    : { height: 640, top: 0 },
+  page    : 2600,
+  tagline : { bottom: 300, left: 400, right: 800, top: 240 }
 } as const
 
 /**
@@ -54,9 +55,10 @@ function place(selector: string, rect: Partial<DOMRect>): void {
  */
 export function front(): HTMLElement {
   window.scrollTo(0, 0)
-  const host = box('front-sky', '<div class="VPHero"></div><div class="VPHomeContent"></div>')
+  const host = box('front-sky', '<div class="VPHero"><p class="front-hero-tagline"></p></div><div class="VPHomeContent"></div>')
   place('.VPHero', LAYOUT.hero)
   place('.VPHomeContent', LAYOUT.column)
+  place('.front-hero-tagline', LAYOUT.tagline)
   vi.spyOn(document.documentElement, 'scrollHeight', 'get').mockReturnValue(LAYOUT.page)
   return host
 }
@@ -64,7 +66,7 @@ export function front(): HTMLElement {
 /**
  * Builds the page a part draws on: a window 1200 by 800 pixels over a page 3000
  * long, its hero ending 640 pixels down, in the dark scheme with no reading
- * column, with any of it replaced by `page`.
+ * column or tagline, with any of it replaced by `page`.
  */
 export const geometry = (page: Partial<Geometry> = {}): Geometry => ({
   doc     : null,
@@ -76,6 +78,7 @@ export const geometry = (page: Partial<Geometry> = {}): Geometry => ({
   scheme  : 'dark',
   still   : false,
   t       : 0,
+  tagline : null,
   w       : 1200,
   ...page
 })

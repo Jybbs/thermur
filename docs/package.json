@@ -25,6 +25,7 @@
         "vue"                 : "3.5.45"
     },
     "knip"            : {
+        "entry"              : [".vitepress/config/record.ts"],
         "ignoreDependencies" : ["oxlint"],
         "rules"              : { "cycles": "error" },
         "typescript"         : { "config": [".vitepress/tsconfig.json"] },

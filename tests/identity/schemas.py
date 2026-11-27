@@ -103,14 +103,15 @@ def test_a_color_off_six_lowercase_hex_digits_fails(hex: str):
         Palette.model_validate(palette)
 
 
+@mark.parametrize("field", ["alpha", "front"])
 @mark.parametrize("alpha", [0, 1.5])
-def test_the_tagline_s_alpha_lies_in_its_range(alpha: float):
+def test_the_tagline_s_shares_lie_in_their_range(alpha: float, field: str):
     """
-    Asserts that the tagline's share of the ink lies above zero and at most
-    one.
+    Asserts that each share of the ink the tagline is set in lies above zero
+    and at most one.
     """
     identity = Identity.shipped().model_dump()
-    identity["tagline"]["alpha"] = alpha
+    identity["tagline"][field] = alpha
 
     with raises(ValidationError):
         Identity.model_validate(identity)

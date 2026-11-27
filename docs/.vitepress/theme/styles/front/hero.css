@@ -23,6 +23,8 @@
   text-wrap   : balance;
 }
 
+:root:not(.dark) .front-hero-tagline { color: var(--th-tagline-front); }
+
 .front-page .VPHomeContent { max-width: 43rem; }
 
 .front-page .VPHomeContent h1,

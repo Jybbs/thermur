@@ -63,10 +63,11 @@ describe('the stage’s fit', () => {
     const { drawn, stage } = staged()
     expect(drawn.fit).toHaveBeenCalledOnce()
     expect(drawn.painted[0]).toMatchObject({
-      doc  : { left: LAYOUT.column.left, right: LAYOUT.column.right },
-      hero : { bottom: LAYOUT.hero.height, h: LAYOUT.hero.height, top: 0 },
-      page : LAYOUT.page,
-      w    : 1200
+      doc     : { left: LAYOUT.column.left, right: LAYOUT.column.right },
+      hero    : { bottom: LAYOUT.hero.height, h: LAYOUT.hero.height, top: 0 },
+      page    : LAYOUT.page,
+      tagline : LAYOUT.tagline,
+      w       : 1200
     })
     stage.destroy()
   })
@@ -76,7 +77,7 @@ describe('the stage’s fit', () => {
     window.scrollTo(0, 0)
     const drawn = part()
     const stage = new Stage(box('front-sky'), [drawn], PINNED)
-    expect(drawn.painted[0]).toMatchObject({ doc: null, hero: { bottom: 0, h: 0, top: 0 } })
+    expect(drawn.painted[0]).toMatchObject({ doc: null, hero: { bottom: 0, h: 0, top: 0 }, tagline: null })
     stage.destroy()
   })
 

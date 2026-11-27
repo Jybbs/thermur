@@ -103,6 +103,14 @@ describe('quietAt', () => {
     expect(quietAt(page, 40, 1200, 0.92)).toBeCloseTo(1)
   })
 
+  it('clears the light scheme of every bird within a few pixels of the tagline, and the dark scheme of none', () => {
+    const light = geometry({ scheme: 'light', tagline: LAYOUT.tagline })
+    expect(quietAt(light, 600, 270, 0.92)).toBe(0)
+    expect(quietAt(light, 395, 270, 0.92)).toBe(0)
+    expect(quietAt(light, 600, 320, 0.92)).toBeGreaterThan(0)
+    expect(quietAt(geometry({ tagline: LAYOUT.tagline }), 600, 270, 0.92)).toBeGreaterThan(0)
+  })
+
   it('keeps the whole drawing beside a page with no reading column', () => {
     expect(quietAt(geometry(), 600, 1200, 0.92)).toBeCloseTo(1)
   })

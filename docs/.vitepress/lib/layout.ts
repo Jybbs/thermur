@@ -1,5 +1,33 @@
+import { mix }                    from './common.ts'
 import { type Identity, shadeOf } from './identity.ts'
 import type { ProjectFacts }      from './manifest.ts'
+
+/**
+ * The one literal color a card draws, which the night's dark tones lie toward.
+ */
+const BLACK = '#000000'
+
+/**
+ * The tones a card's night draws in that the palette names no color for: `gray`,
+ * the neutral a section's hue is softened toward, and four tones of the dark
+ * scheme's ground drawn toward black, meaning `ground` under a card's terrain,
+ * `ridge` for the ridge in front, `silhouette` for the flock against the sky,
+ * and `sky` for the night above the sky's bands.
+ */
+export interface Night {
+  gray       : string
+  ground     : string
+  ridge      : string
+  silhouette : string
+  sky        : string
+}
+
+/**
+ * The share of the way toward black each of the night's dark tones lies from
+ * the dark scheme's ground, and the share of the way toward its ink the gray
+ * lies, as the front page's own ridge and shade are drawn from its ground.
+ */
+const NIGHT = { gray: 0.44, ground: 0.22, ridge: 0.52, silhouette: 0.42, sky: 0.17 } as const
 
 /**
  * The edition a card names in its lower left corner, its host and version set
@@ -22,6 +50,21 @@ export interface Element {
     width?    : number
   }
   type  : 'div' | 'img'
+}
+
+/**
+ * Reads the night's tones from the dark scheme's ground and ink in `identity`.
+ */
+export function nightOf(identity: Identity): Night {
+  const ground = shadeOf('ground', 'dark', identity)
+  const toward = (color: string, share: number): string => mix(ground, color, share)
+  return {
+    gray       : toward(shadeOf('ink', 'dark', identity), NIGHT.gray),
+    ground     : toward(BLACK, NIGHT.ground),
+    ridge      : toward(BLACK, NIGHT.ridge),
+    silhouette : toward(BLACK, NIGHT.silhouette),
+    sky        : toward(BLACK, NIGHT.sky)
+  }
 }
 
 /**

@@ -64,6 +64,13 @@ class Tagline(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=T
     The share of the ink laid over the ground the tagline is set in.
     """
 
+    front: Annotated[float, Field(gt=0, le=1)]
+    """
+    The share of the ink the tagline is set in on the front page's light
+    scheme, where the Dawn sits behind it, raised from `alpha` to hold the
+    4.5:1 that WCAG 2.2 sets for body text.
+    """
+
     text: str
     """
     The tagline's words.

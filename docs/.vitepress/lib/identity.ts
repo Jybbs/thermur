@@ -105,7 +105,8 @@ export const MIXES: Readonly<Record<string, Mix>> = {
   '--vp-c-gutter'       : { kind: 'rule', role: 'ink', share: 0.12 },
   '--vp-c-text-1'       : { kind: 'text', role: 'ink', share: 1 },
   '--vp-c-text-2'       : { kind: 'text', role: 'ink', share: 0.78 },
-  '--vp-c-text-3'       : { kind: 'text', role: 'ink', share: source.tagline.alpha }
+  '--vp-c-text-3'       : { kind: 'text', role: 'ink', share: source.tagline.alpha },
+  '--th-tagline-front'  : { kind: 'text', role: 'ink', share: source.tagline.front }
 }
 /**
  * The id the theme imports the identity's stylesheet by.
