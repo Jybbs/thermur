@@ -83,10 +83,11 @@ function short(count: number): void {
 
 /**
  * Mounts the drawing and reads the length of its marked bird, the lengths of
- * the others in a frame's drawing order, and the zoom, which the least scaled
- * bird's length over its flock size gives.
+ * the others in a frame's drawing order, the scale each of those others is
+ * drawn at over the zoom, and the zoom, which the least scaled bird's length
+ * over its flock size gives.
  */
-function lengths(): { marked: number, others: number[], zoom: number } {
+function lengths(): { marked: number, others: number[], scales: number[], zoom: number } {
   const seen  = { chosen: -1, flock: undefined as Flock | undefined }
   const heard = Flock.prototype.heard
   vi.spyOn(Flock.prototype, 'heard').mockImplementation(function heardBy(this: Flock, index, into) {
@@ -98,11 +99,9 @@ function lengths(): { marked: number, others: number[], zoom: number } {
   const { chosen, flock } = seen
   const order             = [...last.keys()].filter(index => index !== chosen)
   const others            = last.slice(0, -1).map(bird => bird.length)
-  return {
-    marked: last.at(-1)!.length,
-    others,
-    zoom  : Math.min(...order.map((index, at) => others[at]! / flock!.size[index]!))
-  }
+  const scales            = order.map((index, at) => others[at]! / flock!.size[index]!)
+  const zoom              = Math.min(...scales)
+  return { marked: last.at(-1)!.length, others, scales: scales.map(scale => scale / zoom), zoom }
 }
 
 enableAutoUnmount(afterEach)
@@ -146,9 +145,10 @@ describe('the header', () => {
 
 describe('the marked bird', () => {
   it('draws the marked bird last at 1.6 times the largest flock size, above every other bird', () => {
-    const { marked, others, zoom } = lengths()
+    const { marked, others, scales, zoom } = lengths()
     expect(marked).toBeCloseTo(1.6 * FLIGHT.size[1] * zoom, 6)
     expect(marked).toBeGreaterThan(Math.max(...others))
+    expect(new Set(scales.map(scale => scale.toFixed(6)))).toEqual(new Set(['1.000000', '1.150000']))
   })
 
   it('moves to a bird pressed in select mode, ringing the bird under the pointer first', () => {
