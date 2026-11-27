@@ -6,7 +6,9 @@ Keeps one draft GitHub release open for the `[project].version` that
 Draft` runs on the runner's own interpreter and the `gh` it carries.
 `Draft.cut` creates the draft where no release carries the version, replaces
 a draft's notes with the ones GitHub generates now where only a draft
-carries it, and fails where a published release does.
+carries it, sending its tag and target beside them since GitHub moves a
+draft updated without its tag to an `untagged-` one, and fails where a
+published release does.
 """
 
 from contextlib  import nullcontext
@@ -78,18 +80,18 @@ class Draft:
             return "published", published["url"]
 
         if self.releases:
+            tag   = {"tag_name": self.version, "target_commitish": "main"}
             notes = run(
                 "gh",
                 "api",
-                "-f",
-                f"tag_name={self.version}",
-                "-f",
-                "target_commitish=main",
+                "--input",
+                "-",
                 "--jq",
                 "{body}",
                 "--method",
                 "POST",
-                "repos/{owner}/{repo}/releases/generate-notes"
+                "repos/{owner}/{repo}/releases/generate-notes",
+                input = dumps(tag)
             )
             return "updated", run(
                 "gh",
@@ -101,7 +103,7 @@ class Draft:
                 "--method",
                 "PATCH",
                 f"repos/{{owner}}/{{repo}}/releases/{self.releases[0]['id']}",
-                input = notes
+                input = dumps(from_json(notes) | tag)
             )
 
         return "created", run(

@@ -230,7 +230,7 @@ export const Width = defineComponent({
           x      : place * (bar + 8),
           y      : 4
         })),
-        markup.text(markup.FACE.mono, 11, `DRAWN AT ${width} PX`, 0, 48, { 'fill': markup.TONE.muted, 'letter-spacing': '0.1em' })))
+        markup.text(markup.FACE.mono, 11, `DRAWN AT ${width} PX`, 0, 48, markup.CAPTION)))
     })
     return () => h('div', { class: 'kit-catalog-width', ref: host })
   }

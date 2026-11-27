@@ -106,7 +106,7 @@ export class Front {
     this.node   = markup.svg('svg', { 'aria-hidden': 'true', 'class': 'kit-catalog-front', 'height': HIGH },
       markup.svg('defs', {}, ramp),
       this.ground, ...this.ticks, ...this.labels, this.burn, this.edge, this.flock,
-      markup.text(markup.FACE.mono, 10, 'MADE-UP SPREAD RATES', MARGIN, 14, { 'fill': markup.TONE.faint, 'letter-spacing': '0.1em' }))
+      markup.text(markup.FACE.mono, 10, 'MADE-UP SPREAD RATES', MARGIN, 14, { ...markup.CAPTION, fill: markup.TONE.faint }))
     this.fit(this.wide)
   }
 
