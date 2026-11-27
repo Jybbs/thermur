@@ -33,6 +33,11 @@ const FLOOR: Record<Geometry['scheme'], { ranged: number, seven: number }> = {
  */
 const INK = 0.65
 /**
+ * The letter spacing of every word the strips write, the identity's tracking
+ * for a mono label.
+ */
+const TRACKING = '0.1em'
+/**
  * The unbroken line the ring returns to from `DASH`.
  */
 const LINE: readonly number[] = []
@@ -127,7 +132,7 @@ export class Strips {
     this.#tones = tones
     this.#trace = new Float32Array(samples)
     this.#words = {
-      ago     : `${seconds} s ago`,
+      ago     : `${seconds} s ago`.toUpperCase(),
       counted : -1,
       range   : '',
       ranked  : -1,
@@ -202,29 +207,32 @@ export class Strips {
 
   /**
    * Draws the strips under a band of the sky's night, the seven's in `seven`
-   * and the range's in `ranged`.
+   * and the range's in `ranged`, their labels in the same colors under the
+   * dark scheme and in the ink under the light.
    */
   paint(ctx: CanvasRenderingContext2D, g: Geometry, ranged: string, seven: string): void {
     const { panel } = this
     const words     = this.#words
     const faint     = this.#tones.ink(g.scheme, INK)
     const floor     = FLOOR[g.scheme]
+    const ink       = g.scheme === 'light' ? this.#tones.ink(g.scheme) : undefined
     const left      = panel.x0 + 12
     const counted   = this.#last(this.#trace)
     const ranked    = this.#last(this.#ranks)
     if (words.counted !== counted) {
       words.counted = counted
-      words.range   = `within range, ${counted}`
+      words.range   = `within range, ${counted}`.toUpperCase()
     }
     if (words.ranked !== ranked) {
       words.ranked = ranked
-      words.seven  = `by rank, ${ranked}`
+      words.seven  = `by rank, ${ranked}`.toUpperCase()
     }
     ctx.fillStyle   = this.#tones.sky(g.scheme).top
     ctx.globalAlpha = 0.82
     ctx.fillRect(panel.x0, panel.y0, panel.x1 - panel.x0, panel.y1 - panel.y0)
     ctx.globalAlpha = 1
-    ctx.font        = this.#font
+    ctx.font          = this.#font
+    ctx.letterSpacing = TRACKING
     const widest    = Math.max(ctx.measureText(words.seven).width, ctx.measureText(words.range).width)
     const right     = panel.x1 - 18 - widest
     const stacked   = right - left < (panel.x1 - panel.x0) * 0.55
@@ -234,16 +242,14 @@ export class Strips {
     const next      = stacked ? panel.y0 + 49 : top + tall + 4
     const foot      = panel.y1 - (stacked ? 5 : 6)
     this.#label(ctx, 'left', faint, g, words.ago, left, foot)
-    this.#label(ctx, 'right', faint, g, 'now', end, foot)
+    this.#label(ctx, 'right', faint, g, 'NOW', end, foot)
     this.#strip(ctx, seven, floor.seven, left, end, tall, stacked ? panel.y0 + 19 : top, this.#ranks)
     this.#strip(ctx, ranged, floor.ranged, left, end, tall, next, this.#trace)
-    if (stacked) {
-      this.#label(ctx, 'left', seven, g, words.seven, left, panel.y0 + 15)
-      this.#label(ctx, 'left', ranged, g, words.range, left, panel.y0 + 45)
-      return
-    }
-    this.#label(ctx, 'left', seven, g, words.seven, right + 8, top + tall / 2 + 4)
-    this.#label(ctx, 'left', ranged, g, words.range, right + 8, next + tall / 2 + 4)
+    const sevenAt   = stacked ? [left, panel.y0 + 15] as const : [right + 8, top + tall / 2 + 4] as const
+    const rangedAt  = stacked ? [left, panel.y0 + 45] as const : [right + 8, next + tall / 2 + 4] as const
+    this.#label(ctx, 'left', ink ?? seven, g, words.seven, ...sevenAt)
+    this.#label(ctx, 'left', ink ?? ranged, g, words.range, ...rangedAt)
+    ctx.letterSpacing = '0px'
   }
 
   /**

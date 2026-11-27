@@ -23,8 +23,9 @@ interface Fill {
  * One word a paint writes, filled over the halo stroked under it.
  */
 interface Word extends Fill {
-  halo : string
-  text : string
+  halo    : string
+  spacing : string
+  text    : string
 }
 
 /**
@@ -42,12 +43,11 @@ const SCHEMES = ['dark', 'light'] as const
 
 /**
  * The labels each scheme holds to a text's contrast, after four samples
- * counting four inside the range and three by rank; the light by-rank count
- * waits on a pick of its color.
+ * counting four inside the range and three by rank; in capitals.
  */
 const HELD: Record<Scheme, string[]> = {
-  dark  : ['4 s ago', 'now', 'by rank, 3', 'within range, 4'],
-  light : ['4 s ago', 'now', 'within range, 4']
+  dark  : ['4 S AGO', 'NOW', 'BY RANK, 3', 'WITHIN RANGE, 4'],
+  light : ['4 S AGO', 'NOW', 'BY RANK, 3', 'WITHIN RANGE, 4']
 }
 
 /**
@@ -69,17 +69,24 @@ function strips(tones: Tones): Strips {
 function painted(built: Strips, scheme: Scheme, ranged: string, seven: string): Painted {
   const laidDown: Painted = { rects: [], words: [] }
   const pen               = {
-    fillStyle   : '',
-    globalAlpha : 1,
-    strokeStyle : '',
-    fillRect    : (): void => {
+    fillStyle     : '',
+    globalAlpha   : 1,
+    letterSpacing : '',
+    strokeStyle   : '',
+    fillRect      : (): void => {
       laidDown.rects.push({ alpha: pen.globalAlpha, style: pen.fillStyle })
     },
-    fillText    : (text: string): void => {
-      laidDown.words.push({ alpha: pen.globalAlpha, halo: pen.strokeStyle, style: pen.fillStyle, text })
+    fillText      : (text: string): void => {
+      laidDown.words.push({
+        alpha   : pen.globalAlpha,
+        halo    : pen.strokeStyle,
+        spacing : pen.letterSpacing,
+        style   : pen.fillStyle,
+        text
+      })
     },
-    measureText : (): Partial<TextMetrics> => ({ width: 60 }),
-    strokeText  : (): void => undefined
+    measureText   : (): Partial<TextMetrics> => ({ width: 60 }),
+    strokeText    : (): void => undefined
   }
   built.paint(pen as unknown as CanvasRenderingContext2D, geometry({ scheme }), ranged, seven)
   return laidDown
@@ -109,7 +116,7 @@ describe('Strips', () => {
     built.sample(4, ranked)
     const { rects, words } = painted(built, scheme, 'ranged', 'seven')
     const shades           = (style: string): number[] => rects.filter(rect => rect.style === style).map(rect => rect.alpha)
-    expect(words.map(word => word.text)).toEqual(expect.arrayContaining([`by rank, ${ranked}`, 'within range, 4']))
+    expect(words.map(word => word.text)).toEqual(expect.arrayContaining([`BY RANK, ${ranked}`, 'WITHIN RANGE, 4']))
     expect(shades('seven')).toEqual([1, 1, 1, newest].map(alpha => expect.closeTo(alpha, 6)))
     expect(shades('ranged')).toEqual([5, 5, 5, 4].map(count => expect.closeTo(0.8 + 0.2 * count / NEIGHBORS, 6)))
   })
@@ -119,10 +126,10 @@ describe('Strips', () => {
     built.sample(4, 3)
     const texts = (): string[] => painted(built, 'dark', 'ranged', 'seven').words.map(word => word.text)
     const first = texts()
-    expect(first).toEqual(['4 s ago', 'now', 'by rank, 3', 'within range, 4'])
+    expect(first).toEqual(['4 S AGO', 'NOW', 'BY RANK, 3', 'WITHIN RANGE, 4'])
     expect(texts()).toEqual(first)
     built.sample(9, 6)
-    expect(texts()).toEqual(['4 s ago', 'now', 'by rank, 6', 'within range, 9'])
+    expect(texts()).toEqual(['4 S AGO', 'NOW', 'BY RANK, 6', 'WITHIN RANGE, 9'])
   })
 
   it('shades a range counting more than seven at full opacity', () => {
@@ -130,6 +137,28 @@ describe('Strips', () => {
     built.sample(12, 3)
     const { rects } = painted(built, 'light', 'ranged', 'seven')
     expect(rects.findLast(rect => rect.style === 'ranged')!.alpha).toBe(1)
+  })
+})
+
+describe('the strips’ labels', () => {
+  it('track every word at 0.1em and restore the spacing after the paint', () => {
+    const built = strips(new Tones())
+    built.sample(4, 3)
+    const { words } = painted(built, 'dark', 'ranged', 'seven')
+    expect(new Set(words.map(word => word.spacing))).toEqual(new Set(['0.1em']))
+    expect(words.map(word => word.text)).toEqual(words.map(word => word.text.toUpperCase()))
+  })
+
+  it('set both strips’ labels in the ink under the light scheme and in their strips’ colors under the dark', () => {
+    const tones = new Tones()
+    const built = strips(tones)
+    built.sample(4, 3)
+    const color = (scheme: Scheme, text: string): string =>
+      painted(built, scheme, 'ranged', 'seven').words.find(word => word.text === text)!.style
+    expect(color('light', 'BY RANK, 3')).toBe(tones.ink('light'))
+    expect(color('light', 'WITHIN RANGE, 4')).toBe(tones.ink('light'))
+    expect(color('dark', 'BY RANK, 3')).toBe('seven')
+    expect(color('dark', 'WITHIN RANGE, 4')).toBe('ranged')
   })
 })
 
@@ -150,7 +179,7 @@ describe.for(SCHEMES)('the strips under the %s scheme', scheme => {
     }
   })
 
-  it('write every label but the light scheme’s by-rank count at a text’s contrast against their halo', () => {
+  it('write every label at a text’s contrast against their halo', () => {
     const built = strips(tones)
     built.sample(4, 3)
     const words = painted(built, scheme, ranged, seven).words.filter(word => HELD[scheme].includes(word.text))
