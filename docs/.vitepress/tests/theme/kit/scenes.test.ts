@@ -174,6 +174,7 @@ describe('the drawing scene', () => {
     stand.frames.run(1)
     const caption = widget.get('.kit-catalog-width text').element as SVGElement
     expect(caption.getAttribute('class')).toBe('kit-caption')
+    expect(caption).toSetAsControlLabel()
     expect(caption.style.getPropertyValue('fill')).toBe('var(--vp-c-text-2)')
     expect(caption.hasAttribute('letter-spacing')).toBe(false)
     widget.unmount()

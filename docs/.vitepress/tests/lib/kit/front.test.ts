@@ -26,6 +26,7 @@ describe('Front', () => {
   it('captions itself in the faint tone and the class the kit’s label rule sets', () => {
     const caption = [...new Front().node.querySelectorAll('text')].at(-1)!
     expect(caption.getAttribute('class')).toBe('kit-caption')
+    expect(caption).toSetAsControlLabel()
     expect(caption.style.getPropertyValue('fill')).toBe('var(--vp-c-text-3)')
     expect(caption.hasAttribute('letter-spacing')).toBe(false)
   })
