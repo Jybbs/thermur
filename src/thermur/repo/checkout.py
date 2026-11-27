@@ -326,7 +326,7 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
         listing = printed.stdout.partition("\nCommands:\n")[2].partition("\n\n")[0]
         return {
             *findall(r"(?m)^  ([\w-]+)", listing),
-            *findall(r"[\w-]+", " ".join(findall(r"\[aliases: ([^\]]+)\]", listing)))
+            *findall(r"[\w-]+", " ".join(findall(r"\[aliases:\s([^\]]+)\]", listing)))
         }
 
     @cached_property

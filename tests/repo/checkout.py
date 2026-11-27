@@ -262,8 +262,9 @@ def test_subcommands_reads_each_command_and_alias_the_help_lists(
 ):
     """
     Asserts that every command the `Commands` section of `mise --help` lists
-    is read beside each alias, one wrapped onto the next line among them,
-    and that no word from a section after it is.
+    is read beside each alias, one wrapped onto the next line, even right
+    after `[aliases:`, among them, and that no word from a section after
+    it is.
     """
     printed = (
         "Usage: mise [OPTIONS] [TASK] [COMMAND]\n\nCommands:\n"
@@ -272,6 +273,8 @@ def test_subcommands_reads_each_command_and_alias_the_help_lists(
         "  audit         Check tool versions\n"
         "  backends      Manage backends [aliases: b, backend,\n"
         "                backend-list]\n"
+        "  daemons       Manage project daemons [aliases:\n"
+        "                daemon]\n"
         "  self-update   Update mise itself\n\n"
         "Flags:\n  -C, --cd <DIR>  Run as if mise were started in DIR\n"
     )
@@ -286,7 +289,8 @@ def test_subcommands_reads_each_command_and_alias_the_help_lists(
     )
 
     assert checkout.subcommands == {
-        "activate", "audit", "b", "backend", "backend-list", "backends", "self-update"
+        "activate", "audit", "b", "backend", "backend-list",
+        "backends", "daemon", "daemons", "self-update"
     }
 
 
