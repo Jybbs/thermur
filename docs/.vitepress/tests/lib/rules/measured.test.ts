@@ -83,3 +83,15 @@ describe('the rules out of a trial', () => {
     expect(measured.setting(changes, 'spacing_m')).toStrictEqual({})
   })
 })
+
+describe('the rule drawn in the ink', () => {
+  it('colors the inked rule with the ink and leaves the series places to the others', () => {
+    const trial: measured.Trial = {
+      given    : { dense: 10 },
+      measured : { metric: { dense: { error: 0.1, mean: 0.7 } }, reference: { dense: { error: 0.02, mean: 0.93 } } }
+    }
+    const names = { reference: ['Constant', 'Constant'], metric: ['Metric', 'M'] } as const
+    expect(measured.rulesOf(names, trial, 'reference').map(rule => rule.color))
+      .toEqual(['var(--vp-c-text-1)', 'var(--th-series-1)'])
+  })
+})

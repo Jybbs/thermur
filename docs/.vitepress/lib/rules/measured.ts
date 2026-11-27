@@ -1,3 +1,5 @@
+import { markup } from '@thermur/kit'
+
 import trials     from '../measured/trials.json' with { type: 'json' }
 import conditions from '../rendered/trials.json' with { type: 'json' }
 import { series } from './chart.ts'
@@ -83,15 +85,18 @@ export function between(rule: Rule, spacing: number): Point {
 export const reading = (point: Point): string => `${point.mean.toFixed(2)} ± ${point.error.toFixed(2)}`
 
 /**
- * Lists each rule `names` holds out of `trial`, in that order, each colored by
- * its place in the chart series.
+ * Lists each rule `names` holds out of `trial`, in that order, each colored
+ * by its place among the chart series, the one named `inked` taking the ink
+ * and no place of its own.
  */
-export const rulesOf = (names: Names, trial: Trial): Rule[] =>
-  Object.entries(names).map(([name, [label, short]], place) => ({
-    color  : series(place),
+export const rulesOf = (names: Names, trial: Trial, inked = ''): Rule[] => {
+  let place = 0
+  return Object.entries(names).map(([name, [label, short]]) => ({
+    color  : name === inked ? markup.TONE.ink : series(place++),
     label,
     points : Object.entries(trial.measured[name]!)
       .map(([condition, { error, mean }]) => ({ error, given: trial.given[condition]!, mean }))
       .toSorted((a, b) => a.given - b.given),
     short
   }))
+}

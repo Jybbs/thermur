@@ -125,9 +125,10 @@ afterEach(() => {
 describe('the heading chart', () => {
   it('reads each rule’s reach at the smallest turn, named in full beside a wide dial', () => {
     const chart = charted(RulesReach, 1024)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus, the default', 'Overdamped limit', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(readings(chart)).toEqual([
       '0.2°', 'of 20° · 0.9% ± 0.6',
+      '0.1°', 'of 20° · 0.5% ± 0.3',
       '0.6°', 'of 20° · 2.8% ± 2.1',
       '0.1°', 'of 20° · 0.4% ± 0.3',
       '0.5°', 'of 20° · 2.6% ± 2.1',
@@ -137,24 +138,24 @@ describe('the heading chart', () => {
     expect(dots(chart)).toEqual(['true', 'false'])
   })
 
-  it.for([1024, 672, 390])('leaves a clear gap between each angle and the next words on its line at %i px', width => {
+  it.for([1024, 672, 390])('leaves 16 px between each angle and the next words on its line at %i px', width => {
     const chart  = charted(RulesReach, width)
     const texts  = [...chart.host.querySelectorAll('text')]
     const angles = texts.filter(text => /^\d+\.\d°$/u.test(text.textContent))
-    expect(angles).toHaveLength(5)
-    expect(angles.map(angle => roomAfter(angle, texts)).filter(room => room < 7)).toStrictEqual([])
+    expect(angles).toHaveLength(6)
+    expect(angles.map(angle => roomAfter(angle, texts)).filter(room => room < 16)).toStrictEqual([])
   })
 
   it('sets the shorter names beside each angle between the narrow and the wide widths', () => {
     const chart = charted(RulesReach, 672)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Overdamped', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(words(chart)).not.toContain('Consensus, the default')
   })
 
   it('sets the shorter names under the dial on a narrow column', () => {
     const chart = charted(RulesReach, 672)
     chart.widen(390)
-    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
+    expect(words(chart)).toEqual(expect.arrayContaining(['Consensus', 'Overdamped', 'Inertial spin', 'Delayed', 'Nonmutual', 'Quartic']))
     expect(chart.host.querySelector('svg')!.getAttribute('width')).toBe('390')
   })
 
@@ -166,6 +167,7 @@ describe('the stops on the dial’s rim', () => {
     knobs(chart)[1]!.click()
     await chart.widget.vm.$nextTick()
     expect(readings(chart)).toEqual([
+      '0.3°', 'of 90° · 0.3% ± 0.2',
       '0.3°', 'of 90° · 0.3% ± 0.2',
       '0.4°', 'of 90° · 0.5% ± 0.3',
       '0.3°', 'of 90° · 0.3% ± 0.2',
@@ -210,7 +212,7 @@ describe('the rings', () => {
     const groups  = [...chart.host.querySelectorAll<SVGElement>('g.rules-fade')]
     const opacity = (): string[] => groups.map(group => group.style.getPropertyValue('opacity'))
     groups[2]!.dispatchEvent(new Event('pointerenter'))
-    expect(opacity()).toEqual(['0.3', '0.3', '1', '1', '0.3', '0.3', '0.3', '0.3', '0.3', '0.3'])
+    expect(opacity()).toEqual(['0.3', '0.3', '1', '1', '0.3', '0.3', '0.3', '0.3', '0.3', '0.3', '0.3', '0.3'])
     groups[3]!.dispatchEvent(new Event('pointerleave'))
     expect(new Set(opacity())).toEqual(new Set(['1']))
   })
@@ -219,7 +221,7 @@ describe('the rings', () => {
     const chart = charted(RulesReach, 672)
     knobs(chart)[stop]!.dispatchEvent(new Event('click'))
     expect(Math.min(...xsOf(chart))).toBeGreaterThanOrEqual(centerOf(chart) - 1e-6)
-    expect(arcs(chart).map(([, past]) => past)).toEqual(['', '', '', '', ''])
+    expect(arcs(chart).map(([, past]) => past)).toEqual(['', '', '', '', '', ''])
   })
 
   it.for([0, 1])('holds each bar’s whisker inside the chart on stop %i', stop => {
@@ -282,7 +284,7 @@ describe('take A of the heading chart', () => {
   it.for([[1024, 56], [672, 40]] as const)('sets the readings in a column as wide as the dial at %i px', ([width, gutter]) => {
     const chart  = charted(RulesReach, width)
     const tracks = [...chart.host.querySelectorAll('rect')].filter(rect => rect.style.opacity === '0.15')
-    expect(tracks).toHaveLength(5)
+    expect(tracks).toHaveLength(6)
     expect(tracks.map(track => Number(track.getAttribute('width'))))
       .toStrictEqual(tracks.map(track => Number(track.getAttribute('x')) - gutter))
   })
@@ -290,7 +292,7 @@ describe('take A of the heading chart', () => {
   it('fills half the chart with the dial where its radius stays under the cap', () => {
     const chart  = charted(RulesReach, 672)
     const tracks = [...chart.host.querySelectorAll('rect')].filter(rect => rect.style.opacity === '0.15')
-    expect(tracks).toHaveLength(5)
+    expect(tracks).toHaveLength(6)
     const ends = tracks.map(track => Number(track.getAttribute('x')) + Number(track.getAttribute('width')))
     expect(ends.filter(end => end <= 672 - 4)).toStrictEqual([])
   })

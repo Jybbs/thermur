@@ -2,7 +2,7 @@ import { Radios, markup }                      from '@thermur/kit'
 import { defineComponent, h, ref, shallowRef } from 'vue'
 
 import { useStage }        from '../../lib/canvas/mount.ts'
-import { NAMES }           from '../../lib/rules/dial.ts'
+import { INKED, NAMES }    from '../../lib/rules/dial.ts'
 import { TRIALS, rulesOf } from '../../lib/rules/measured.ts'
 import { Reach }           from '../../lib/rules/reach.ts'
 
@@ -15,7 +15,7 @@ import { Reach }           from '../../lib/rules/reach.ts'
 export default defineComponent({
   name: 'RulesReach',
   setup() {
-    const rules  = rulesOf(NAMES, TRIALS.heading)
+    const rules  = rulesOf(NAMES, TRIALS.heading, INKED)
     const turns  = rules[0]!.points.map(point => point.given)
     const picked = ref(0)
     const stops  = shallowRef<readonly markup.Spot[]>([])
