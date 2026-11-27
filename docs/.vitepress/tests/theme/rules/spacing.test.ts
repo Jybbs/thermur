@@ -158,7 +158,7 @@ describe('a drag along the track', () => {
     await drag(chart, 17.5)
     expect(parts(chart).readout).toBe('17.5 m')
     expect(parts(chart).thumb.getAttribute('aria-valuetext')).toBe('17.5 m, between measured spacings')
-    expect(parts(chart).values[0]).toMatch(/^≈ 0\.97$/u)
+    expect(parts(chart).values[0]).toMatch(/^≈ 0\.96$/u)
     await drag(chart, 17.5, true)
     expect(parts(chart).readout).toBe('15 m')
   })

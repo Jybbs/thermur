@@ -28,6 +28,13 @@ const publicSvgs = import.meta.glob<string>('../../../pages/public/*.svg', {
 })
 
 /**
+ * Reads the path data of each traced bird the dark scheme's mark in the public
+ * folder draws, in the order the mark draws them.
+ */
+export const tracedGlyphs = (identity: Identity): string[] =>
+  glyphsOf(publicSvgs[`../../../pages/public/${identity.marks.mark.dark}`]!)
+
+/**
  * The pieces a drawing draws over and over, each built once: the traced birds
  * as paths, and the fire's glow as a small canvas per scheme, placed scaled and
  * faded every frame rather than drawn through a gradient.
@@ -49,7 +56,7 @@ export class Marks {
    * dark scheme's mark the public folder holds.
    */
   static traced(tones: Tones, identity: Identity): Marks {
-    return new Marks(glyphsOf(publicSvgs[`../../../pages/public/${identity.marks.mark.dark}`]!), tones)
+    return new Marks(tracedGlyphs(identity), tones)
   }
 
   /**

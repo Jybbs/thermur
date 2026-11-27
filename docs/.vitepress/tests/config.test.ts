@@ -106,6 +106,7 @@ test.for([
       '.vitepress/tests/lib/moving.test.ts',
       '.vitepress/tests/lib/page-data.test.ts',
       '.vitepress/tests/theme/components.test.ts',
+      '.vitepress/tests/theme/credits/figures.test.ts',
       '.vitepress/tests/theme/pause.test.ts'
     ]
   ],
@@ -114,8 +115,10 @@ test.for([
     [
       '.vitepress/tests/config.test.ts',
       '.vitepress/tests/lib/kit/readers.test.ts',
+      '.vitepress/tests/lib/markdown.test.ts',
       '.vitepress/tests/lib/math.test.ts',
-      '.vitepress/tests/lib/page-data.test.ts'
+      '.vitepress/tests/lib/page-data.test.ts',
+      '.vitepress/tests/theme/credits/figures.test.ts'
     ]
   ],
   [
@@ -132,6 +135,7 @@ test.for([
       '.vitepress/tests/lib/kit/readers.test.ts',
       '.vitepress/tests/lib/page-data.test.ts',
       '.vitepress/tests/theme/components.test.ts',
+      '.vitepress/tests/theme/credits/figures.test.ts',
       '.vitepress/tests/theme/crop.test.ts'
     ]
   ]

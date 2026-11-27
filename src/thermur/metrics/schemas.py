@@ -36,7 +36,7 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     course and its thin axis vertical.
     """
 
-    center_m: tuple[float, float, float] = (1000.0, 1000.0, 100.0)
+    center_m: tuple[float, float, float] = (1000.0, 1000.0, 150.0)
     """
     The center of the launch cloud, east, north, and above the ground, in
     meters, by default on the parametric threat's course to the front it
@@ -48,7 +48,7 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     """
     The vertical standard deviations of the launch cloud its center sits at
     least above the ground, by default 4, past which a Gaussian draw falls
-    for 0.003% of drones, so about one flock of 1,000 in 32 sets a drone on
+    for 0.003% of drones, so about one flock of 2,000 in 16 sets a drone on
     the ground.
     """
 
@@ -186,9 +186,9 @@ class Plan(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=True
     def height_m(self) -> float:
         """
         Raises the launch's center to `clearance_sd` times `depth_m` where
-        that clears `center_m`'s height, in meters, which leaves a flock
-        of up to 304 drones at the default 100 m and lifts one of 1,000 to
-        149 m.
+        that clears `center_m`'s height, in meters, which leaves a flock of
+        up to 1,026 drones at the default 150 m and lifts one of 2,000 to
+        187 m.
         """
         return max(self.center_m[2], self.clearance_sd * self.depth_m)
 

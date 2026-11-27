@@ -81,7 +81,8 @@ describe('the drawing of the page met at a missing address', () => {
     const fit   = vi.spyOn(Opening.prototype, 'fit')
     const stage = drawLost(box('not-found-stage'))
     expect(stand.fonts.load).toHaveBeenCalledWith("400 1em 'Bellefair'")
-    await vi.waitFor(() => expect(fit).toHaveBeenCalledTimes(2))
+    await stand.fonts.load.mock.results[0]!.value
+    expect(fit).toHaveBeenCalledTimes(2)
     stage.destroy()
   })
 })

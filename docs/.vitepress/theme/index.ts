@@ -7,6 +7,7 @@ import FrontHero      from './front/hero.ts'
 import FrontSky       from './front/sky.ts'
 import NotFoundPage   from './not-found/page.ts'
 import MotionPause    from './pause.ts'
+import SourcesFlock   from './sources.ts'
 
 import '@thermur/kit/styles.css'
 import 'katex/dist/katex.min.css'
@@ -21,10 +22,15 @@ import './styles/not-found/page.css'
 import './styles/not-found/track.css'
 import './styles/pause.css'
 import './styles/crop.css'
+import './styles/credits/caption.css'
+import './styles/credits/section.css'
+import './styles/credits/seal.css'
+import './styles/credits/snapshots.css'
 import './styles/threat.css'
 import './styles/rules/figure.css'
 import './styles/rules/neighbors.css'
 import './styles/values.css'
+import './styles/sources.css'
 import './styles/identity/specimen.css'
 import './styles/identity/palette.css'
 import './styles/identity/heat.css'
@@ -52,6 +58,8 @@ export default {
   extends : DefaultTheme,
 
   enhanceApp: ({ app }) => {
-    for (const [name, component] of Object.entries(COMPONENTS)) app.component(name, component)
+    for (const [name, component] of Object.entries({ ...COMPONENTS, SourcesFlock })) {
+      app.component(name, component)
+    }
   }
 } satisfies Theme
