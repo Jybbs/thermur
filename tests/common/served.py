@@ -90,6 +90,13 @@ class Served(BaseModel, extra="forbid", use_attribute_docstrings=True):
             """
 
             protocol_version = "HTTP/1.1"
+            timeout          = 5
+            """
+            The longest the handler waits on a read or a write, in seconds,
+            before it closes the connection with nothing printed, as Apache's
+            `KeepAliveTimeout` sets it by default, so a connection a case
+            leaves open ends before `serving` waits on its thread.
+            """
 
             def do_GET(self):
                 """
