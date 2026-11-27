@@ -124,12 +124,7 @@ def hundred(composite: Composite, request: FixtureRequest) -> Flight:
     the parametric threat's air, for the plan's two minutes and for the five
     the rules page reads.
     """
-    settings = Settings()
-    return Flight.flown(
-        WrfOutput.from_settings(settings).air,
-        composite,
-        settings.plan.changed(drones=100, duration_s=request.param)
-    )
+    return threatened(composite, 100, request.param)
 
 
 @fixture(scope="module")
@@ -138,25 +133,6 @@ def flight(composite: Composite) -> Flight:
     Flies the short plan under the default composite through still air.
     """
     return Flight.flown(AIR, composite, short())
-
-
-def pushed(flock: Flock) -> Array:
-    """
-    Steps a flock laid out by hand once under `PUSHED` through still air,
-    from where it stands and under no Brownian increment, reading each
-    drone's command at the step's end.
-    """
-    still = zeros(flock.positions.shape)
-    return stepped(
-        air       = AIR,
-        composite = PUSHED,
-        flock     = flock,
-        inbox     = Inbox.from_broadcast(flock, PUSHED.radio.range_m, flock),
-        key       = key(0),
-        path      = lambda *_: flock_of(still, still),
-        plan      = Plan(drones=len(flock.positions)),
-        t         = array(0.0)
-    ).commands
 
 
 class Drawn(White):
@@ -197,6 +173,25 @@ def laid(
     )
 
 
+def pushed(flock: Flock) -> Array:
+    """
+    Steps a flock laid out by hand once under `PUSHED` through still air,
+    from where it stands and under no Brownian increment, reading each
+    drone's command at the step's end.
+    """
+    still = zeros(flock.positions.shape)
+    return stepped(
+        air       = AIR,
+        composite = PUSHED,
+        flock     = flock,
+        inbox     = Inbox.from_broadcast(flock, PUSHED.radio.range_m, flock),
+        key       = key(0),
+        path      = lambda *_: flock_of(still, still),
+        plan      = Plan(drones=len(flock.positions)),
+        t         = array(0.0)
+    ).commands
+
+
 def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
     """
     Asserts that drones in pairs on each axis at 30, 20, and 10 m from the
@@ -206,6 +201,25 @@ def test_a_cloud_on_its_axes_reads_its_longest_axis_over_its_thinnest():
     spots = concat([diag([30.0, 20.0, 10.0]), -diag([30.0, 20.0, 10.0])] * 2)
 
     assert_allclose(laid(spots, [10.0, 0.0, 0.0]).aspect_ratio, 3.0, rtol=1e-5)
+
+
+def test_a_flight_holds_every_command_within_the_plant_s_speed_bounds():
+    """
+    Asserts that noise strong enough to carry a command past the plant's
+    speed bounds within a step leaves every command at every kept frame
+    within them, some at a bound, so the command stops at the speed the
+    plant can fly rather than integrating past it.
+    """
+    plant    = Plant()
+    commands = Flight.flown(
+        AIR,
+        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
+        short(turn_deg=0.0)
+    ).frames.commands
+    assert (linalg.norm(commands[..., :2], axis=-1) <= plant.level_m_s + 1e-4).all()
+    assert (commands[..., 2] <= plant.climb_m_s + 1e-4).all()
+    assert (commands[..., 2] >= -plant.descent_m_s - 1e-4).all()
+    assert allclose(abs(commands[..., 2]).max(), plant.climb_m_s)
 
 
 @mark.parametrize(
@@ -296,6 +310,30 @@ def test_a_flight_of_100_drones_keeps_a_starling_flock_s_shape(hundred: Flight):
 
 
 @mark.slow
+@mark.parametrize(
+    ("drones", "duration_s"),
+    [
+        param(448, 120.0, id="448-for-two-minutes"),
+        param(448, 300.0, id="448-for-five-minutes"),
+        param(1000, 120.0, id="1000-for-two-minutes")
+    ]
+)
+def test_a_larger_flight_keeps_a_starling_flock_s_shape(
+    composite  : Composite,
+    drones     : int,
+    duration_s : float
+):
+    """
+    Asserts that a flight of 448 drones, the smallest of the starling flocks
+    the span is read from, and one of 1000 hold the largest group's longest
+    axis within 4.02 to 6.94 times its thinnest, averaged as at 100 drones.
+    """
+    flight = threatened(composite, drones, duration_s)
+
+    assert 4.02 <= flight.group_aspect_ratios.mean(0)[2] <= 6.94
+
+
+@mark.slow
 def test_a_flight_of_100_drones_sets_off_zigs(hundred: Flight):
     """
     Asserts that some drone of a flight of 100 drones after two minutes and
@@ -320,36 +358,17 @@ def test_a_flight_of_100_drones_keeps_the_outdoor_drone_flock_s_spacing(
 @mark.slow
 def test_a_flight_of_100_drones_keeps_every_drone_over_the_roost(hundred: Flight):
     """
-    Asserts that every drone of a flight of 100 drones after two minutes
-    and after five sits within the roost's radius of its center and above
-    the ground.
+    Asserts that every drone of a flight of 100 drones through two minutes
+    and through five sits within the roost's radius of its center and above
+    the ground at every kept frame.
     """
     roost = Settings().roost
-    spots = asarray(hundred.frames.positions)[:, -1]
+    spots = asarray(hundred.frames.positions)
 
     assert (
         linalg.norm(spots[..., :2] - asarray(roost.center_m), axis=-1) <= roost.radius_m
     ).all()
     assert (spots[..., 2] >= 0).all()
-
-
-def test_a_flight_holds_every_command_within_the_plant_s_speed_bounds():
-    """
-    Asserts that noise strong enough to carry a command past the plant's
-    speed bounds within a step leaves every command at every kept frame
-    within them, some at a bound, so the command stops at the speed the
-    plant can fly rather than integrating past it.
-    """
-    plant    = Plant()
-    commands = Flight.flown(
-        AIR,
-        replace(STILL, heading=Consensus(), noise=White(amplitude=30.0)),
-        short(turn_deg=0.0)
-    ).frames.commands
-    assert (linalg.norm(commands[..., :2], axis=-1) <= plant.level_m_s + 1e-4).all()
-    assert (commands[..., 2] <= plant.climb_m_s + 1e-4).all()
-    assert (commands[..., 2] >= -plant.descent_m_s - 1e-4).all()
-    assert allclose(abs(commands[..., 2]).max(), plant.climb_m_s)
 
 
 def test_a_flight_repeats_from_its_seed_and_differs_across_seeds(
@@ -410,16 +429,38 @@ def test_a_lattice_s_border_is_as_dense_as_its_inside():
     assert ratio_on_hull(lattice, where(inside, 0.5, 1.0)) < 1.0
 
 
-def test_a_push_across_the_command_keeps_each_drone_s_speed():
+def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
     """
-    Asserts that two drones a contact pushes apart across their command keep
-    the 10 m/s they commanded, the speed being the stepped command's part
-    along the heading rather than its length of `sqrt(10^2 + 5^2)`.
+    Asserts that drones on the corners of a box 100 m long and 10 m across,
+    each 10 m from its nearest corner, around four drones on its axis 20 m
+    apart, read a border density eight times the inside's from each drone's
+    nearest neighbor rather than its farthest.
     """
-    commands = pushed(flock_of(SPOTS.at[1, 1].set(SPOTS[0, 1] + 3.0), EAST))
+    corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
+    axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
 
-    assert_allclose(linalg.norm(commands[:2], axis=-1), 10.0, rtol=1e-5)
-    assert abs(commands[1, 1]) > 1.0
+    assert_allclose(
+        laid(concat([corners, axis]), [10.0, 0.0, 0.0]).border_density,
+        8.0,
+        rtol = 1e-5
+    )
+
+
+def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
+    """
+    Asserts that a flight under the persistent force holds a nonzero force
+    on some drone at some kept frame, so each step advances the force the
+    step before it left rather than the one it started from.
+    """
+    assert (
+        asarray(
+            Flight.flown(
+                AIR,
+                replace(composite, noise=Persistent()),
+                short()
+            ).frames.forces
+        ) != 0
+    ).any()
 
 
 @mark.parametrize(
@@ -493,38 +534,40 @@ def test_two_strings_of_drones_read_their_spacing_and_their_groups(
     assert_allclose(flight.fragments, groups)
 
 
-def test_a_long_box_reads_its_border_denser_by_the_cube_of_the_spacings():
+def test_a_push_across_the_command_keeps_each_drone_s_speed():
     """
-    Asserts that drones on the corners of a box 100 m long and 10 m across,
-    each 10 m from its nearest corner, around four drones on its axis 20 m
-    apart, read a border density eight times the inside's from each drone's
-    nearest neighbor rather than its farthest.
+    Asserts that two drones a contact pushes apart across their command keep
+    the 10 m/s they commanded, the speed being the stepped command's part
+    along the heading rather than its length of `sqrt(10^2 + 5^2)`.
     """
-    corners = stack(meshgrid([0.0, 100.0], [0.0, 10.0], [0.0, 10.0]), -1).reshape(-1, 3)
-    axis    = stack([20.0 * arange(1, 5), full(4, 5.0), full(4, 5.0)], -1)
+    commands = pushed(flock_of(SPOTS.at[1, 1].set(SPOTS[0, 1] + 3.0), EAST))
 
-    assert_allclose(
-        laid(concat([corners, axis]), [10.0, 0.0, 0.0]).border_density,
-        8.0,
-        rtol = 1e-5
+    assert_allclose(linalg.norm(commands[:2], axis=-1), 10.0, rtol=1e-5)
+    assert abs(commands[1, 1]) > 1.0
+
+
+def test_a_relaxing_mode_over_a_static_deformation_peaks_in_the_lowest_bin():
+    """
+    Asserts that a line of drones whose velocities across the course hold
+    a static deformation five times the size of a fluctuation relaxing
+    with no wave reads its spectral peak at the lowest frequency the flight
+    resolves, since the deformation is the mode's time mean and leaves the
+    zero bin once that mean is removed.
+    """
+    spots  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
+    along  = spots[:, 0] - spots[:, 0].mean()
+    wave   = 2 * pi * along / (4 * along.std())
+    swing  = 5 * cos(wave) + exp(-arange(20)[:, None] / 3) * sin(wave)
+    flight = laid(
+        positions  = spots,
+        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
     )
 
-
-def test_a_persistent_force_leaves_zero_in_flight(composite: Composite):
-    """
-    Asserts that a flight under the persistent force holds a nonzero force
-    on some drone at some kept frame, so each step advances the force the
-    step before it left rather than the one it started from.
-    """
-    assert (
-        asarray(
-            Flight.flown(
-                AIR,
-                replace(composite, noise=Persistent()),
-                short()
-            ).frames.forces
-        ) != 0
-    ).any()
+    assert_allclose(
+        flight.spectral_peak_hz,
+        1 / (flight.settled.velocities.shape[1] * flight.plan.frame_s),
+        rtol = 1e-5
+    )
 
 
 def test_a_replay_ranks_every_composite_it_is_given(
@@ -694,30 +737,6 @@ def test_a_traveling_wave_reads_its_frequency_at_the_spectral_peak():
     assert_allclose(flight.spectral_peak_hz, 4 / 3, rtol=1e-5)
 
 
-def test_a_relaxing_mode_over_a_static_deformation_peaks_in_the_lowest_bin():
-    """
-    Asserts that a line of drones whose velocities across the course hold
-    a static deformation five times the size of a fluctuation relaxing
-    with no wave reads its spectral peak at the lowest frequency the flight
-    resolves, since the deformation is the mode's time mean and leaves the
-    zero bin once that mean is removed.
-    """
-    spots  = stack([10.0 * arange(12), zeros(12), zeros(12)], -1)
-    along  = spots[:, 0] - spots[:, 0].mean()
-    wave   = 2 * pi * along / (4 * along.std())
-    swing  = 5 * cos(wave) + exp(-arange(20)[:, None] / 3) * sin(wave)
-    flight = laid(
-        positions  = spots,
-        velocities = stack([full(swing.shape, 10.0), swing, zeros(swing.shape)], -1)
-    )
-
-    assert_allclose(
-        flight.spectral_peak_hz,
-        1 / (flight.settled.velocities.shape[1] * flight.plan.frame_s),
-        rtol = 1e-5
-    )
-
-
 def test_each_seed_of_the_batch_flies_as_it_does_alone(
     composite : Composite,
     flight    : Flight
@@ -739,6 +758,23 @@ def test_each_seed_of_the_batch_flies_as_it_does_alone(
     assert_allclose(flight.frames.velocities[1], alone.velocities, atol=1e-4)
 
 
+def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
+    """
+    Asserts that a noise slot holding each step's draw as its force holds
+    another force at every step, each kept as a frame, so no two steps read
+    one draw.
+    """
+    forces = asarray(
+        Flight.flown(
+            AIR,
+            replace(composite, noise=Drawn()),
+            short(frame_every=1)
+        ).frames.forces
+    )
+
+    assert (diff(sort(forces[..., 0], axis=1), axis=1) != 0).all()
+
+
 @mark.parametrize(
     ("curve", "expected"),
     [
@@ -756,23 +792,6 @@ def test_the_first_zero_is_the_first_value_at_or_below_zero(
     curve's length where none is.
     """
     assert first_zero(array(curve)) == expected
-
-
-def test_each_step_of_a_flight_reads_a_draw_of_its_own(composite: Composite):
-    """
-    Asserts that a noise slot holding each step's draw as its force holds
-    another force at every step, each kept as a frame, so no two steps read
-    one draw.
-    """
-    forces = asarray(
-        Flight.flown(
-            AIR,
-            replace(composite, noise=Drawn()),
-            short(frame_every=1)
-        ).frames.forces
-    )
-
-    assert (diff(sort(forces[..., 0], axis=1), axis=1) != 0).all()
 
 
 def test_lines_of_three_drones_read_their_first_g_r_peak_over_shell_volume():
@@ -854,25 +873,6 @@ def test_the_first_drone_holds_its_turn_and_the_turn_reaches_the_flock(
     assert isfinite(speed).all()
     assert (speed >= 0).all()
     assert isfinite(reach).all()
-
-
-@mark.parametrize(
-    ("curve", "expected"),
-    [
-        param([1.0, 0.5, -0.1, 0.3], 2, id="crossing"),
-        param([1.0, 0.0], 1, id="zero"),
-        param([1.0, 0.5], 2, id="none")
-    ]
-)
-def test_the_first_zero_is_the_first_value_at_or_below_zero(
-    curve    : list[float],
-    expected : int
-):
-    """
-    Asserts that `first_zero` finds the first value at or below zero, or the
-    curve's length where none is.
-    """
-    assert first_zero(array(curve)) == expected
 
 
 def test_the_frames_table_holds_each_kept_frame_at_its_time(flight: Flight):
@@ -979,3 +979,16 @@ def test_the_statistics_table_holds_each_statistic_by_seed(flight: Flight):
     assert isnan(table.turn_speed_m_s).all()
     assert flight.unturned is None
     assert (table.fragments >= 1).all()
+
+
+def threatened(composite: Composite, drones: int, duration_s: float) -> Flight:
+    """
+    Flies the default plan at `drones` for `duration_s` under `composite`
+    through the parametric threat's air.
+    """
+    settings = Settings()
+    return Flight.flown(
+        WrfOutput.from_settings(settings).air,
+        composite,
+        settings.plan.changed(drones=drones, duration_s=duration_s)
+    )

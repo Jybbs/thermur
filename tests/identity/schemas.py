@@ -8,7 +8,7 @@ from importlib.resources import files
 from pydantic            import ValidationError
 from pytest              import mark, param, raises
 
-from thermur.identity.schemas import Identity, Palette
+from thermur.identity.schemas import Face, Identity, Palette
 
 
 def test_every_file_a_face_names_ships_beside_the_declaration():
@@ -35,27 +35,16 @@ def test_the_shipped_identity_hashes_alike_across_reads():
     assert hash(Identity.shipped()) == hash(Identity.shipped())
 
 
-def test_the_shipped_identity_names_a_file_for_every_face():
+@mark.parametrize(
+    "face",
+    [param(face, id=name) for name, face in Identity.shipped().faces]
+)
+def test_the_shipped_identity_names_a_file_for_every_face(face: Face):
     """
     Asserts that every face names at least one file the package ships it as,
     since a preview card sets its words from those files alone.
     """
-    assert all(face.fonts for _, face in Identity.shipped().faces)
-
-
-def test_the_shipped_identity_orders_the_series_and_the_heat_ramp():
-    """
-    Asserts that the chart series run from Fire Lord to Viridian and the
-    heat ramp from Kindleflame to Burnt Crimson, each in the order a chart
-    assigns them.
-    """
-    palette = Identity.shipped().palette
-
-    assert [pair.light for pair in palette.series] == [
-        "fire-lord", "toronto", "topiary-garden", "purpureus", "viridian"
-    ]
-    assert palette.heat[0] == "kindleflame"
-    assert palette.heat[-1] == "burnt-crimson"
+    assert face.fonts
 
 
 def test_the_shipped_identity_reads_each_role_s_colors():

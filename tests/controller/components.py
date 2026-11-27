@@ -252,9 +252,9 @@ def test_each_coupling_weights_its_neighbors_by_its_source_s_form(
             id = "delayed"
         ),
         param(
-            Home(height_m=100.0, stiffness_per_s2=0.5),
+            Home(band_m=20.0, height_m=100.0, stiffness_per_s2=0.5),
             viewed([[10.0, 0.0, 0.0]], position=array([1000.0, 1000.0, 130.0])),
-            [0.0, 0.0, -15.0],
+            [0.0, 0.0, -10.0],
             id = "home-heading-for-the-rim"
         ),
         param(
@@ -806,18 +806,18 @@ def test_a_zig_copies_no_neighbor_short_of_its_push(
     ("position", "velocity", "expected"),
     [
         param(
-            (1000.0, 1500.0, 100.0),
+            (1000.0, 1500.0, 150.0),
             (10.0, 0.0, 0.0),
             (0.0, -0.94 * 10.0**2 / 750_000**0.5, 0.0),
             id = "inside"
         ),
         param(
-            (2500.0, 1000.0, 100.0),
+            (2500.0, 1000.0, 150.0),
             (0.0, 10.0, 0.0),
             (-5.0, 0.0, 0.0),
             id = "outside"
         ),
-        param((1000.0, 1999.9, 100.0), (10.0, 0.0, 0.0), (0.0, -5.0, 0.0), id="bounded")
+        param((1000.0, 1999.9, 150.0), (10.0, 0.0, 0.0), (0.0, -5.0, 0.0), id="bounded")
     ]
 )
 def test_home_turns_a_drone_from_the_rim_by_its_time_to_reach_it(
@@ -860,28 +860,41 @@ def test_the_time_to_reach_the_rim_follows_the_course_to_the_circle(
     assert_allclose(Home().rim_s(array(ground), array(outward)), expected, rtol=1e-6)
 
 
+def test_home_defaults_to_the_launch_s_center():
+    """
+    Asserts that the roost's disk and band sit by default on the launch's
+    center, east, north, and above the ground.
+    """
+    home = Home()
+
+    assert (*home.center_m, home.height_m) == Plan().center_m
+
+
 @mark.parametrize(
     ("height", "climb", "updraft", "expected"),
     [
         param(100.0, 2.0, 0.0, -2.0, id="climbing"),
-        param(104.0, 0.0, 0.0, -1.0, id="above"),
-        param(100.0, 0.0, 1.5, -1.5, id="lifted"),
-        param(96.0, -1.0, 0.0, 2.0, id="below-and-sinking")
+        param(102.0, 0.0, 0.0, 0.0, id="at-the-band-s-top"),
+        param(98.0, 0.0, 0.0, 0.0, id="at-the-band-s-foot"),
+        param(106.0, 0.0, 0.0, -1.0, id="above"),
+        param(101.0, 0.0, 1.5, -1.5, id="lifted-inside-the-band"),
+        param(94.0, -1.0, 0.0, 2.0, id="below-and-sinking")
     ]
 )
-def test_home_damps_a_drone_s_height_critically(
+def test_home_pulls_a_drone_back_to_its_band_and_damps_its_climb(
     climb    : float,
     expected : float,
     height   : float,
     updraft  : float
 ):
     """
-    Asserts that the roost pulls a drone toward its height by the stiffness
-    times the height away and against its climb over the ground, the wind's
-    included, by twice the stiffness's square root.
+    Asserts that the roost pulls a drone toward its band by the stiffness
+    times the height outside it, leaving one inside the band free, and
+    against its climb over the ground, the wind's included, by twice the
+    stiffness's square root, inside the band and out.
     """
     assert_allclose(
-        Home(height_m=100.0, stiffness_per_s2=0.25)(
+        Home(band_m=4.0, height_m=100.0, stiffness_per_s2=0.25)(
             viewed(
                 [[1.0, 0.0, 0.0]],
                 velocity = (10.0, 0.0, climb),
@@ -895,16 +908,45 @@ def test_home_damps_a_drone_s_height_critically(
     )
 
 
-def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
+@mark.parametrize(
+    ("height", "expected"),
+    [param(100.0, 0.0, id="at-the-height"), param(104.0, -1.0, id="above")]
+)
+def test_home_without_a_band_pulls_by_the_full_height_away(
+    expected : float,
+    height   : float
+):
     """
-    Asserts that a drone the roost alone moves, lifted 30 m above the
-    roost's height at the drone scale, settles back to within a meter of
-    it in ten minutes without ever falling below it, the pull setting the
+    Asserts that a roost whose band has no depth pulls a level drone toward
+    its height by the stiffness times the whole height away, as the starling
+    model's roost term does.
+    """
+    assert_allclose(
+        Home(band_m=0.0, height_m=100.0, stiffness_per_s2=0.25)(
+            viewed(
+                [[1.0, 0.0, 0.0]],
+                velocity = (10.0, 0.0, 0.0),
+                air      = {"excess": array(0.0), "u": array(0.0), "v": array(0.0)}
+                | {"w": array(0.0)},
+                position = array([1000.0, 1000.0, height])
+            )
+        )[2],
+        expected,
+        atol = 1e-6
+    )
+
+
+def test_home_returns_a_lifted_drone_to_its_band_without_passing_its_top():
+    """
+    Asserts that a drone the roost alone moves, lifted 30 m above the top
+    of the roost's band at the drone scale, settles back to within a meter
+    of it in ten minutes without ever falling below it, the pull setting the
     rate of the command and the velocity following the command through the
     plant's lag, as a flight steps them.
     """
     plant = Plant()
     roost = Settings().roost.scaled(Plan().similarity)
+    top   = roost.height_m + roost.band_m / 2
     alone = viewed([[1.0, 0.0, 0.0]])
 
     def step(state: Array, *_: None) -> tuple[Array, Array]:
@@ -927,11 +969,11 @@ def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
         )
 
     _, heights = lax.scan(
-        step, array([roost.height_m + 30.0, 0.0, 0.0]), length=6000
+        step, array([top + 30.0, 0.0, 0.0]), length=6000
     )
 
-    assert heights.min() >= roost.height_m - 1e-3
-    assert_allclose(heights[-1], roost.height_m, atol=1.0)
+    assert heights.min() >= top - 1e-3
+    assert_allclose(heights[-1], top, atol=1.0)
 
 
 @mark.parametrize(
@@ -954,7 +996,11 @@ def test_home_returns_a_lifted_drone_to_its_height_without_passing_it():
         ),
         param(Consensus(), Consensus(), id="consensus"),
         param(Cruise(relaxation_s=1.0), Cruise(relaxation_s=4.0), id="cruise"),
-        param(Home(stiffness_per_s2=8.0), Home(stiffness_per_s2=0.5), id="home"),
+        param(
+            Home(band_m=2.0, stiffness_per_s2=8.0),
+            Home(band_m=8.0, stiffness_per_s2=0.5),
+            id = "home"
+        ),
         param(White(amplitude=4.0), White(amplitude=2.0), id="white"),
         param(
             Zig(

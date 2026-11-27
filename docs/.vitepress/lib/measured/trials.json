@@ -2,120 +2,120 @@
   "coupling": {
     "reference": {
       "dense": {
-        "error": 0.001,
+        "error": 0.0016,
         "mean": 0.9804
       },
       "middle": {
-        "error": 0.0014,
-        "mean": 0.9728
+        "error": 0.0016,
+        "mean": 0.9708
       },
       "sparse": {
-        "error": 0.0026,
-        "mean": 0.9475
+        "error": 0.0035,
+        "mean": 0.9365
       }
     },
     "anisotropic": {
       "dense": {
-        "error": 0.0002,
-        "mean": 0.9993
+        "error": 0.0006,
+        "mean": 0.9979
       },
       "middle": {
-        "error": 0.0005,
-        "mean": 0.9974
+        "error": 0.0002,
+        "mean": 0.995
       },
       "sparse": {
-        "error": 0.0021,
-        "mean": 0.9873
+        "error": 0.0018,
+        "mean": 0.9782
       }
     },
     "metric": {
       "dense": {
-        "error": 0.0007,
-        "mean": 0.9941
+        "error": 0.0006,
+        "mean": 0.9929
       },
       "middle": {
-        "error": 0.004,
-        "mean": 0.9756
+        "error": 0.0058,
+        "mean": 0.9723
       },
       "sparse": {
-        "error": 0.0047,
-        "mean": 0.9353
+        "error": 0.0033,
+        "mean": 0.9283
       }
     },
     "weighted": {
       "dense": {
-        "error": 0.0002,
-        "mean": 0.9988
+        "error": 0.0005,
+        "mean": 0.9972
       },
       "middle": {
         "error": 0.0007,
-        "mean": 0.9959
+        "mean": 0.9942
       },
       "sparse": {
-        "error": 0.0013,
-        "mean": 0.9809
+        "error": 0.0008,
+        "mean": 0.969
       }
     }
   },
   "heading": {
     "reference": {
       "large": {
-        "error": 0.0017,
-        "mean": 0.002
+        "error": 0.0023,
+        "mean": 0.0029
       },
       "small": {
-        "error": 0.0028,
-        "mean": 0.0033
+        "error": 0.0056,
+        "mean": 0.0093
       }
     },
     "delayed": {
       "large": {
-        "error": 0.0018,
-        "mean": 0.0021
+        "error": 0.0021,
+        "mean": 0.0033
       },
       "small": {
-        "error": 0.0023,
-        "mean": 0.0026
+        "error": 0.003,
+        "mean": 0.0041
       }
     },
     "inertial": {
       "large": {
-        "error": 0.0032,
-        "mean": 0.0056
+        "error": 0.0034,
+        "mean": 0.0046
       },
       "small": {
-        "error": 0.0221,
-        "mean": 0.026
+        "error": 0.0207,
+        "mean": 0.0277
       }
     },
     "nonmutual": {
       "large": {
-        "error": 0.0022,
-        "mean": 0.0032
+        "error": 0.0026,
+        "mean": 0.0051
       },
       "small": {
-        "error": 0.02,
-        "mean": 0.0251
+        "error": 0.0211,
+        "mean": 0.0257
       }
     },
     "overdamped": {
       "large": {
-        "error": 0.0021,
-        "mean": 0.0024
+        "error": 0.002,
+        "mean": 0.003
       },
       "small": {
         "error": 0.0025,
-        "mean": 0.003
+        "mean": 0.0047
       }
     },
     "quartic": {
       "large": {
-        "error": 0.0192,
-        "mean": 0.0229
+        "error": 0.0157,
+        "mean": 0.0201
       },
       "small": {
-        "error": 0.0276,
-        "mean": 0.0324
+        "error": 0.0219,
+        "mean": 0.0255
       }
     }
   }

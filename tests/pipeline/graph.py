@@ -8,19 +8,20 @@ step reads, which calls the graph refuses, where the recorder files a run,
 and what a recorded run keeps.
 """
 
-from collections.abc import Callable
-from common.cached   import Pitch
-from common.drones   import small
-from common.edits    import edit
-from common.runs     import computed
-from common.settings import Tuned
-from contextlib      import closing
-from dataclasses     import make_dataclass
-from decimal         import Decimal
-from enum            import IntEnum, StrEnum
-from equinox         import Module
-from functools       import partial
-from gc              import collect
+from collections.abc     import Callable
+from common.cached       import Pitch
+from common.declarations import PACKAGED
+from common.drones       import small
+from common.edits        import edit
+from common.runs         import computed
+from common.settings     import Tuned
+from contextlib          import closing
+from dataclasses         import make_dataclass
+from decimal             import Decimal
+from enum                import IntEnum, StrEnum
+from equinox             import Module
+from functools           import partial
+from gc import collect
 from hamilton.caching.fingerprinting import UNHASHABLE, hash_value
 from hamilton.function_modifiers     import cache
 from importlib      import import_module
@@ -50,6 +51,8 @@ from thermur.pipeline.graph    import (
 from thermur.pipeline.schemas  import Run
 from thermur.pipeline.settings import Settings
 from thermur.repo.checkout     import Checkout
+
+pytestmark = mark.reads(*PACKAGED)
 
 
 class Bare(BaseModel):

@@ -69,7 +69,7 @@ describe('the heat ramp a plot draws in', () => {
   it.for(['dark', 'light'] as const)('holds a mark’s contrast on the %s ground, cool to hot', scheme => {
     const ramp = visible(tones.heat, scheme)
     expect(ramp).toHaveLength(3)
-    for (const color of ramp) expect(wcagContrast(color, shadeOf('ground', scheme))).toBeGreaterThanOrEqual(3)
+    expect(ramp.filter(color => wcagContrast(color, shadeOf('ground', scheme)) < 3)).toStrictEqual([])
   })
 
   it('runs the dark ground’s to the hottest of the ramp', () => {

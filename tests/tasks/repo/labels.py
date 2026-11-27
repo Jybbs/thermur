@@ -5,15 +5,18 @@ live labels it lists for a rename or a deletion by hand, and the prompt that
 stops it from writing anything unanswered.
 """
 
-from collections.abc  import Callable
-from common.stand_ins import StandIn
-from pytest           import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
-from shlex            import join
-from subprocess       import CalledProcessError, DEVNULL, run
-from syrupy.assertion import SnapshotAssertion
-from types            import ModuleType
+from collections.abc     import Callable
+from common.declarations import RENDERED
+from common.stand_ins    import StandIn
+from pytest              import CaptureFixture, MonkeyPatch, fixture, mark, param, raises
+from shlex               import join
+from subprocess          import CalledProcessError, DEVNULL, run
+from syrupy.assertion    import SnapshotAssertion
+from types               import ModuleType
 
 from thermur.repo.checkout import Checkout
+
+pytestmark = mark.reads(*RENDERED)
 
 
 @fixture

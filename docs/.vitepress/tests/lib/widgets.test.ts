@@ -48,6 +48,17 @@ describe('widgetRules', () => {
     expect(await rendered(`<!-- ${marker} -->\n`)).toBe(`<${widget} />\n`)
   })
 
+  it('sets the credit’s lines inside their section, the snapshots drawn in the line their marker stands in', async () => {
+    const html = await rendered('<!-- credits -->\n\n- from 0 s <!-- snapshots --> to 60 s\n\n<!-- /credits -->\n')
+    expect(html).toMatch(/^<CreditsSection>\n<ul>/u)
+    expect(html).toContain('<li>from 0 s <CreditsSnapshots /> to 60 s</li>')
+    expect(html).toMatch(/<\/CreditsSection>\n$/u)
+  })
+
+  it('leaves another comment inside a line as it was written', async () => {
+    expect(await rendered('a <!-- kept --> b\n')).toBe('<p>a <!-- kept --> b</p>\n')
+  })
+
   it.for(['<!-- sample -->', '<!-- tagline -->', '<div>kept</div>'])('leaves %s as it was written', async block => {
     expect(await rendered(`${block}\n`)).toBe(`${block}\n`)
   })

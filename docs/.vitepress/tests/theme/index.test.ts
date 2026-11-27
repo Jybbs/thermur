@@ -4,6 +4,8 @@ import type { VNode }               from 'vue'
 import theme from '../../theme/index.ts'
 
 vi.mock('vitepress/theme-without-fonts', () => ({ default: { Layout: 'Layout' } }))
+vi.mock('../../theme/credits/section.ts', () => ({ default: 'CreditsSection' }))
+vi.mock('../../theme/credits/snapshots.ts', () => ({ default: 'CreditsSnapshots' }))
 vi.mock('../../theme/crop.ts', () => ({ default: 'CropKept' }))
 vi.mock('../../theme/identity/faces.ts', () => ({ default: 'IdentityFaces' }))
 vi.mock('../../theme/identity/heat.ts', () => ({ default: 'IdentityHeat' }))
@@ -29,6 +31,8 @@ describe('the theme', () => {
     const component = vi.fn<(name: string, widget: unknown) => void>()
     theme.enhanceApp({ app: { component } } as unknown as Parameters<typeof theme.enhanceApp>[0])
     expect(component.mock.calls).toEqual([
+      ['CreditsSection', 'CreditsSection'],
+      ['CreditsSnapshots', 'CreditsSnapshots'],
       ['CropKept', 'CropKept'],
       ['IdentityFaces', 'IdentityFaces'],
       ['IdentityHeat', 'IdentityHeat'],
