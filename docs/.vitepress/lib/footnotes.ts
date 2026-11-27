@@ -70,9 +70,9 @@ function held(state: State, inline: Token): void {
     if (stop) after!.content = after!.content.slice(stop.length)
     out.push(
       raw(state, '<span class="cite-run">'),
-      ...[word].filter(Boolean).map(content => text(state, content)),
+      ...[word].filter(Boolean).map(content => plain(state, content)),
       ...children.slice(start, end),
-      ...[stop].filter(Boolean).map(content => text(state, content)),
+      ...[stop].filter(Boolean).map(content => plain(state, content)),
       raw(state, '</span>')
     )
     start = end
@@ -84,7 +84,7 @@ function held(state: State, inline: Token): void {
  * Builds a text token of `content`, which the renderer escapes and a heading's
  * slug reads.
  */
-function text(state: State, content: string): Token {
+function plain(state: State, content: string): Token {
   const token   = new state.Token('text', '', 0)
   token.content = content
   return token
