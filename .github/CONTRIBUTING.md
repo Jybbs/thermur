@@ -29,7 +29,7 @@ A page cites published work through a footnote whose label is the study's key in
 2. Type only the marker in the page (*`[^cavagna2010]`*), then run `mise render`, which writes the definition of every study the page cites at its end, in the order the page first cites each, and removes the definition of one it no longer cites.
 3. Paste what `mise cite <key>` prints beneath the text of an issue, a pull request, or a comment citing the study, since no render reaches that text.
 
-`mise audit` fails where a page's definitions differ from what `mise render` writes, and where a marker under a study's key names no entry in the file.
+`mise inspect` fails where a page's definitions differ from what `mise render` writes, and where a marker under a study's key names no entry in the file.
 
 ## Checks
 
@@ -41,7 +41,7 @@ Every pull request runs `🐦‍⬛ CI` except one touching only the site's own 
 | `⛈️ Advisories` | `mise scan` | A package `uv.lock`, `docs/bun.lock`, or a task script's lockfile resolves carries a published advisory the project has not set aside, an `AUDIT_IGNORE` entry in `.mise/config.toml` names an advisory a release now fixes, or the advisory service cannot be reached |
 | `🪻 Prose` | `mise check` | *Prose* reports a rewrite or a lint finding, each shown as an annotation on the line it concerns |
 | `☂️ Coverage` | `mise coverage` | A test fails under coverage, the suite fails to collect, or the package's coverage falls below 95% |
-| `🧯 Audit` | `mise audit` | A check under `src/thermur/repo/` makes a finding at the error level, such as a file restating a value otherwise than its source, or this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
+| `🧯 Audit` | `mise inspect` | A check under `src/thermur/repo/` makes a finding at the error level, such as a file restating a value otherwise than its source, or this guide naming a check or a label otherwise than the workflows or `.github/labels.toml` |
 | `🗝️ Workflows` | `mise vet` | [zizmor](https://docs.zizmor.sh/) cannot parse a workflow or the composite action, or finds a hazard in one, such as template injection, an unpinned action, an over-broad permission, checkout credentials left on disk, or a cache a privileged job restores |
 | `🪁 Press` | `mise press` | VitePress fails to build a page, or a link between pages leads nowhere |
 | `📻 Links` | `mise links` | A link, an asset, or a heading fragment in the built site, the README, or this guide names nothing it can reach |

@@ -5,9 +5,9 @@ Pins the records the fire data is read through:
 - The points and sizes of the `Grid` a threat lays its dataset out on
 - The dataset a `ParametricThreat` builds under WRF's names, and the reach
   its validator holds the front to
-- The address and length of the `Sample`, the request it sends, the fetch
-  that checks and moves its file into place, and the checks it holds a
-  window's figures to
+- The address, interval, and length of the `Sample`, the credit it gives,
+  the request it sends, the fetch that checks and moves its file into place,
+  and the checks it holds a window's figures to
 - The docstring `documented` gives each field of a record
 """
 
@@ -32,9 +32,11 @@ from thermur.environment.schemas import (
     BASE_K,
     Crop,
     DRY_AIR_J_KG_K,
+    Deposit,
     GRAVITY_M_S2,
     Grid,
     HEAT_CAPACITY_J_KG_K,
+    License,
     ParametricThreat,
     REFERENCE_PA,
     Sample,
@@ -307,16 +309,70 @@ def test_a_sample_attributes_its_file_to_the_dataset_it_is_cut_from():
     sample holds, crediting no creator the dataset does not name.
     """
     assert Sample(
-        dataset    = "Test Dataset by A. Author, https://doi.org/10.0000/test",
-        license    = "CC0 1.0",
+        dataset = Deposit(
+            creators = ("Ada Author", "Bo de Brie"),
+            doi      = "10.0000/test",
+            title    = "Test Dataset"
+        ),
+        license    = License(address="https://license.test", name="CC0 1.0"),
         simulation = "wrfout_W3F1R0"
     ).attributes == {
-        "license" : "CC0 1.0",
+        "license" : "CC0 1.0, https://license.test",
         "source"  : (
-            "Cut from wrfout_W3F1R0 of the Test Dataset by A. Author, "
-            "https://doi.org/10.0000/test"
+            "Cut from wrfout_W3F1R0 of the Test Dataset by Ada Author and "
+            "Bo de Brie, https://doi.org/10.0000/test"
         )
     }
+
+
+def test_a_sample_measures_its_interval_between_its_snapshots():
+    """
+    Asserts that a sample's interval is the one gap its snapshots stand at.
+    """
+    assert Sample(times_s=(0.0, 30.0, 60.0)).interval_s == 30.0
+
+
+@mark.parametrize(
+    ("message", "times_s"),
+    [
+        param("not enough values to unpack", (0.0,), id="a-lone-snapshot"),
+        param("too many values to unpack", (0.0, 30.0, 45.0), id="two-gaps")
+    ]
+)
+def test_a_sample_refuses_snapshots_at_no_one_gap(
+    message : str,
+    times_s : tuple[float, ...]
+):
+    """
+    Asserts that a sample whose snapshots stand at no gap, or at more than
+    one, has no interval.
+    """
+    with raises(ValueError, match=message):
+        _ = Sample(times_s=times_s).interval_s
+
+
+@mark.parametrize(
+    ("creators", "surnames"),
+    [
+        param(
+            ("Nadya Moisseeva", "Roland Stull"),
+            ("Moisseeva", "Stull"),
+            id = "the-record-s"
+        ),
+        param(("Plato",), ("Plato",), id="a-lone-name"),
+        param(("Bo de Brie",), ("Brie",), id="a-particle-left-off")
+    ]
+)
+def test_a_deposit_reads_the_last_word_of_each_creator_s_name(
+    creators : tuple[str, ...],
+    surnames : tuple[str, ...]
+):
+    """
+    Asserts that a deposit's surnames are the last word of each creator's
+    name, a lone name kept whole and a particle before the last word left
+    off.
+    """
+    assert Deposit(creators=creators).surnames == surnames
 
 
 def test_a_sample_measures_its_length_across_its_rectangle():

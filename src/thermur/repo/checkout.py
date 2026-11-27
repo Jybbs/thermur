@@ -1,12 +1,12 @@
 """
 Holds `Checkout`, the clone the `repo` tasks read and the pipeline resolves
 every path under, which keeps each document it validates for every later
-check that reads it. It lists the tasks, the programs, the workflows, the
-composite actions, the issue templates, the rulesets, every file git tracks,
-and the Markdown pages among them beside the checks each pull request
-runs. It reads the bibliography, the commit checked out, and the digest of
-`uv.lock`, runs a command from the root, and clones itself into a scratch
-folder.
+check that reads it. It lists the tasks, the commands mise ships, the
+programs, the workflows, the composite actions, the issue templates, the
+rulesets, every file git tracks, and the Markdown pages among them beside
+the checks each pull request runs. It reads the bibliography, the commit
+checked out, and the digest of `uv.lock`, runs a command from the root, and
+clones itself into a scratch folder.
 """
 
 from collections.abc    import Iterable
@@ -17,7 +17,7 @@ from json               import loads
 from os                 import environ, pathsep
 from pathlib            import Path
 from pydantic           import AfterValidator, BaseModel, Field, TypeAdapter
-from re                 import sub
+from re                 import findall, sub
 from subprocess         import CompletedProcess, run
 from typing             import Annotated, Self
 
@@ -304,6 +304,30 @@ class Checkout(BaseModel, extra="forbid", frozen=True, use_attribute_docstrings=
             ]
             for step in holder.steps
         ]
+
+    @cached_property
+    def subcommands(self) -> set[str]:
+        """
+        Reads every command and alias `mise --help` lists under `Commands`,
+        each of which `mise <word>` runs ahead of a task aliased the same,
+        joining an alias list the help wraps across lines. The help prints
+        without color at 100 columns, since forced color wraps the heading
+        the read starts from in escape codes and a wider terminal prints
+        mise's logo on the heading's line.
+        """
+        printed = self.run(
+            "env",
+            "NO_COLOR=1",
+            "COLUMNS=100",
+            "mise",
+            "--help",
+            capture = True
+        )
+        listing = printed.stdout.partition("\nCommands:\n")[2].partition("\n\n")[0]
+        return {
+            *findall(r"(?m)^  ([\w-]+)", listing),
+            *findall(r"[\w-]+", " ".join(findall(r"\[aliases:\s([^\]]+)\]", listing)))
+        }
 
     @cached_property
     def tasks(self) -> list[Task]:

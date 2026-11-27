@@ -2,7 +2,7 @@ name : 🐦‍⬛ Site
 
 concurrency:
   cancel-in-progress : ${{ github.event_name == 'pull_request' }}
-  group              : ${{ github.workflow }}-${{ github.head_ref || github.ref }}${{ case(github.event.pull_request.draft, '-draft', '') }}
+  group              : ${{ github.workflow }}-${{ github.head_ref || github.ref }}${{ case(github.event.pull_request.draft == true, '-draft', '') }}
 
 jobs:
   check:
