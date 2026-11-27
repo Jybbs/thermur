@@ -344,7 +344,9 @@ class Excitable(Escape):
     neighbor it hears with the chance `branching` over the neighbor count
     within one firing, the branching ratio of an excitable network, and an
     alarmed drone also fires on its own at its alertness over `firing_s +
-    refractory_s`. Firing turns the drone through half a turn across its
+    refractory_s`, only while the stimulus stands above the alertness it
+    held a step before, which lags the stimulus by `relaxation_s`, so only a
+    drone whose reading rises along its own path fires unprompted. Firing turns the drone through half a turn across its
     heading, or climbs, for `firing_s`, after which it rests from firing
     for `refractory_s`.
     """
@@ -430,7 +432,8 @@ class Excitable(Escape):
             observation.alarms[:, 0] == Alarm.FIRING
         )
         copied = branched(self.branching, observation) * firing.sum()
-        own    = where(alarmed == Alarm.ALARMED, alert, 0.0) * self.firing_s / (
+        rising = stimulus > alertness
+        own    = where((alarmed == Alarm.ALARMED) & rising, alert, 0.0) * self.firing_s / (
             self.firing_s + self.refractory_s
         )
         ready   = alarm <= Alarm.ALARMED

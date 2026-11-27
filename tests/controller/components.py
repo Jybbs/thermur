@@ -42,8 +42,10 @@ from thermur.controller.components import (
     Zig
 )
 from thermur.controller.schemas import (
+    Alarm,
     Component,
     Composite,
+    Escape,
     Inbox,
     Noise,
     Observation,
@@ -611,28 +613,94 @@ def test_an_excitable_escape_hears_no_firing_from_a_slot_holding_no_sender():
     )
 
 
+RISEN = float(1 - 0.5 * exp(-0.05))
+"""
+The alertness of a drone at the front that held 0.5 a step of 0.1 s before,
+under `EXCITABLE`'s relaxation of 2 s.
+"""
+
+
 @mark.parametrize(("margin", "fired"), [(-1e-4, True), (1e-4, False)])
 def test_an_alarmed_drone_fires_on_its_own_at_its_alertness_over_its_cycle(
     fired  : bool,
     margin : float
 ):
     """
-    Asserts that a drone alarmed at full alertness, hearing no firing
-    neighbor, fires on its own within a step of `step_s` with the chance
-    `1 - exp(-step_s / (firing_s + refractory_s))`.
+    Asserts that a drone alarmed at the front with a rising stimulus,
+    hearing no firing neighbor, fires on its own within a step of `step_s`
+    with the chance `1 - exp(-alertness * step_s / (firing_s +
+    refractory_s))`.
     """
     assert_allclose(
         alarmed(
-            alarm  = (1.0, 1.0, 0.0, 0.0),
-            draws  = (float(-expm1(-0.1 / 1.5)) + margin, 1.0),
+            alarm  = (1.0, 0.5, 0.0, 0.0),
+            draws  = (float(-expm1(-RISEN * 0.1 / 1.5)) + margin, 1.0),
             front  = 0.0,
             step_s = 0.1
         ),
-        (2.0, 1.0, EXCITABLE.firing_s, -1.0) if fired else (1.0, 1.0, 0.0, 0.0),
+        (2.0, RISEN, EXCITABLE.firing_s, -1.0)
+        if fired else (1.0, RISEN, 0.0, 0.0),
         atol = 1e-6
     )
 
 
+@mark.parametrize(
+    ("alertness", "fired"),
+    [
+        param(0.5, True, id="rising"),
+        param(1.0, False, id="steady"),
+        param(1.5, False, id="falling")
+    ]
+)
+def test_an_alarmed_drone_fires_on_its_own_only_while_the_stimulus_rises(
+    alertness : float,
+    fired     : bool
+):
+    """
+    Asserts that an alarmed drone at the front, hearing no firing neighbor
+    and drawing the lowest chance, fires on its own where its alertness
+    stands below the stimulus and stays alarmed where the alertness meets or
+    exceeds it.
+    """
+    stepped = alarmed((1.0, alertness, 0.0, 0.0), draws=(0.0, 1.0), front=0.0)
+
+    assert stepped[0] == (2.0 if fired else 1.0)
+
+
+def test_a_drone_hearing_a_firing_neighbor_fires_whether_or_not_the_stimulus_rises():
+    """
+    Asserts that an alarmed drone at the front whose alertness has settled at
+    the stimulus still fires on a firing neighbor, since the rise gates only
+    the drone's own firing.
+    """
+    assert_allclose(
+        alarmed(
+            alarm  = (1.0, 1.0, 0.0, 0.0),
+            alarms = [[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6,
+            draws  = (0.0, 1.0),
+            front  = 0.0
+        )[0],
+        2.0
+    )
+
+
+def test_a_thermal_only_control_flock_never_fires_beside_the_one_with_the_escape():
+    """
+    Asserts that the escape slot removed leaves the alarm state of a drone at
+    the front, beside a firing neighbor and with the lowest draws, as it
+    stands where the escape slot fills fires it.
+    """
+    view = viewed(
+        SEVEN,
+        air    = {"excess": array(0.0), "front": array(0.0)}
+        | dict.fromkeys("uvw", array(0.0)),
+        alarm  = array((1.0, 0.5, 0.0, 0.0)),
+        alarms = array([[2.0, 1.0, 0.3, 1.0]] + [[0.0] * 4] * 6)
+    )
+    draws = array([0.0, 0.0])
+
+    assert_allclose(Escape().excited(draws, view, 0.1), view.alarm)
+    assert EXCITABLE.excited(draws, view, 0.1)[0] == Alarm.FIRING
 @mark.parametrize(
     ("alertness", "front", "expected"),
     [
@@ -1317,8 +1385,8 @@ def test_an_alarmed_drone_fires_on_its_own_and_picks_its_maneuver(
     below `climbing` and otherwise turning to the side the rest splits.
     """
     assert_allclose(
-        alarmed((1.0, 1.0, 0.0, 0.0), draws=(0.0, second), front=0.0),
-        (2.0, 1.0, EXCITABLE.firing_s, side),
+        alarmed((1.0, 0.5, 0.0, 0.0), draws=(0.0, second), front=0.0),
+        (2.0, RISEN, EXCITABLE.firing_s, side),
         atol = 1e-6
     )
 
